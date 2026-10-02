@@ -16,3 +16,5 @@ Japanese: use wanakana (MIT) to turn kana into romaji. kuroshiro + kuromoji (MIT
 Render bubbles as DOM `<ruby>` (Baseline since 2015) through three.js CSS2DRenderer, built with `textContent`, with a toggle to hide the readings. Show romaji as a separate line.
 
 Findings: [reading-aids](../research/reading-aids.md)
+
+**Amended by [HUD and conversation UI](15-hud-and-conversation-ui.md):** NPC lines show in a chat column on the right of the screen, not in bubbles anchored over the 3D scene. The `{base, reading}` segments and `<ruby>` rendering still apply; only a small "speaking" indicator is anchored to the NPC.
