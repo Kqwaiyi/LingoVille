@@ -16,6 +16,11 @@ The [Voice conversation prototype](06-voice-conversation-prototype.md) ticket fi
 - Hear-it-said (Recap and Help) uses Gemini TTS through the local server, not browser `speechSynthesis`.
 - The Recap is a `generateContent` call with `responseSchema` (`gemini-3.8-flash`, about 6 s), started as soon as the conversation ends.
 
+The [Life Skills and Language Proficiency models](08-life-skills-and-proficiency.md) ticket fixes the following:
+- The NPC prompt takes the current CEFR Proficiency Step (vocabulary, sentence length, pace, choices up front, one simpler rephrase at A1–A2). Starting Patience comes from the step.
+- The Recap `responseSchema` must also return an estimated CEFR level for the player's speech in that conversation, which feeds a weighted moving average.
+- The state includes the hidden Proficiency score, the highest step reached, and XP for five Life Skills.
+
 The [Town and content scope](07-town-and-content-scope.md) ticket fixes the following:
 - One 3D town layout plus four **Culture Pack** data sets (menus/goods, currency, customs, signs, opening-hour overrides), chosen by Target Language.
 - Prices are authored as ratios of one Shift's pay. Each pack converts them with its anchor (¥6,000 / 240元 / €60 / £60) and rounds to local price points.

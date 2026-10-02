@@ -28,12 +28,16 @@ The player's own language, in which the game's UI is shown.
 _Avoid_: UI language, mother tongue
 
 **Life Skill**:
-A practical capability of the Character (e.g. Cooking, Fitness) that improves with use.
+A practical capability of the Character that improves with use and is shown to the player as a level: Cooking, Fitness, and one per Job (Barista, Cashier, Server).
 _Avoid_: Skill (unqualified)
 
 **Language Proficiency**:
-The player's measured ability in the Target Language, which NPCs adapt to.
+The player's measured ability in the Target Language, which NPCs adapt to. It is never shown to the player and can drift down as well as up.
 _Avoid_: Language skill, level
+
+**Proficiency Step**:
+One of the six CEFR levels (A1–C2) that Language Proficiency falls into. NPC behaviour, Patience, the Newcomer Discount and Shift stakes all change at step boundaries.
+_Avoid_: Level, rank, tier
 
 **Job**:
 Paid recurring work the Character performs, made of repeated NPC interactions in the Target Language.
