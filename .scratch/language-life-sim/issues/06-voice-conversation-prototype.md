@@ -1,7 +1,7 @@
 # Voice conversation prototype
 
 Type: prototype
-Status: open
+Status: claimed
 Blocked by: 03, 02
 Map: [Language-learning life sim](../map.md)
 
@@ -15,3 +15,7 @@ The [Anatomy of an interaction](02-anatomy-of-an-interaction.md) ticket adds thi
 - `not_understood()` fires reliably on turns it can't make sense of, and not on turns it understood.
 - Loanwords from the Native Language are understood, but full Native-Language sentences are not.
 - A post-conversation `generateContent` call produces the Recap: outcome, up to 3 corrections, new words.
+
+## Comments
+
+- 2026-10-03 — Prototype built on branch `prototype/voice-conversation` (commit e527c0e), at `prototypes/voice-conversation/`. To run it: `git checkout prototype/voice-conversation`, add the key to `.env`, run `node prototypes/voice-conversation/server.mjs`, then open http://localhost:5174. Waiting for the human to play it and react.
