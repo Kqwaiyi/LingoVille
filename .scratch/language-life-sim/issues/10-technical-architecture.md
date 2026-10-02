@@ -21,6 +21,11 @@ The [Life Skills and Language Proficiency models](08-life-skills-and-proficiency
 - The Recap `responseSchema` must also return an estimated CEFR level for the player's speech in that conversation, which feeds a weighted moving average.
 - The state includes the hidden Proficiency score, the highest step reached, and XP for five Life Skills.
 
+The [Onboarding and Native Language selection](09-onboarding-and-native-language.md) ticket fixes the following:
+- The default Native Language comes from `navigator.languages` (first `ja`/`zh`/`en`/`de` base tag, falling back to English). It can be changed at runtime in Settings, so UI localization must allow switching languages live.
+- The mic permission is requested on a setup screen with a level meter. If it is denied, the save uses the Typed Fallback, and Settings can retry the permission.
+- The game needs a "Voice service unavailable" screen for when the local server can't get a token.
+
 The [Town and content scope](07-town-and-content-scope.md) ticket fixes the following:
 - One 3D town layout plus four **Culture Pack** data sets (menus/goods, currency, customs, signs, opening-hour overrides), chosen by Target Language.
 - Prices are authored as ratios of one Shift's pay. Each pack converts them with its anchor (¥6,000 / 240元 / €60 / £60) and rounds to local price points.

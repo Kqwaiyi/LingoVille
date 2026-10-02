@@ -40,7 +40,7 @@ One of the six CEFR levels (A1–C2) that Language Proficiency falls into. NPC b
 _Avoid_: Level, rank, tier
 
 **Job**:
-Paid recurring work the Character performs, made of repeated NPC interactions in the Target Language.
+Paid recurring work the Character performs, made of repeated NPC interactions in the Target Language. The Character gets each Job once, by asking the staff for work in the Target Language.
 
 **Shift**:
 One stretch of work at a Job, made of several customer interactions. Its pay depends on how many of those interactions succeed.
@@ -49,6 +49,10 @@ _Avoid_: Workday, session
 **Newcomer Discount**:
 A reduction on the Character's rent that shrinks as Language Proficiency rises.
 _Avoid_: Subsidy, allowance
+
+**First Morning**:
+The guided start of a new game: the Character's first morning in the town, with prompts in the Native Language leading to the first café order.
+_Avoid_: Tutorial level, intro
 
 **Fainting**:
 What happens when Well-being runs out: the Character wakes in hospital, losing time and owing a bill.
