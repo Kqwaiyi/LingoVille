@@ -38,9 +38,21 @@ _Avoid_: Language skill, level
 **Job**:
 Paid recurring work the Character performs, made of repeated NPC interactions in the Target Language.
 
+**Shift**:
+One stretch of work at a Job, made of several customer interactions. Its pay depends on how many of those interactions succeed.
+_Avoid_: Workday, session
+
+**Newcomer Discount**:
+A reduction on the Character's rent that shrinks as Language Proficiency rises.
+_Avoid_: Subsidy, allowance
+
 **Fainting**:
 What happens when Well-being runs out: the Character wakes in hospital, losing time and owing a bill.
 _Avoid_: Death, game over
+
+**Illness**:
+A random, temporary condition that drains the Character's Health until a doctor treats it, which means the player has to describe the symptoms in the Target Language.
+_Avoid_: Sickness, disease, status effect
 
 **NPC**:
 A non-player character in the town that the player interacts with by speaking the Target Language.

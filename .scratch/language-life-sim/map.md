@@ -32,6 +32,7 @@ A **game design doc + technical spec** for a single-player, low-poly 3D, desktop
 - [Gemini voice capabilities for Japanese, Chinese, English, German](issues/03-gemini-voice-capabilities.md) — `gemini-3.8-live` does speech-in → reasoning → speech-out in one session for all four languages, with transcripts both ways and function calling (for "goal achieved"). It has no structured output and no pronunciation score, so a post-conversation `generateContent` call handles the recap. Recommended: a small local Node server that creates short-lived tokens. About $0.012 per conversation minute; latency to be measured in the prototype.
 - [Reading aids for Chinese and Japanese](issues/05-reading-aids.md) — Hybrid: Gemini returns `{base, reading}` segments with each line (structured output). For Chinese, fall back to `pinyin-pro` when a reply fails validation; for Japanese, `wanakana` makes romaji and `kuroshiro` loads only on demand (its dictionary is ~18 MB). Text bubbles are DOM `<ruby>` elements placed over the 3D scene (e.g. CSS2DRenderer), and players can hide reading aids.
 - [Web 3D stack for a low-poly life sim](issues/04-web-3d-stack.md) — React Three Fiber + drei on Three.js r186, with @react-three/rapier and Rapier's kinematic character controller; Babylon.js is the fallback. Performance doesn't decide it at this town size. Pin agents to the Three.js version, because r186 changed the shadow APIs. Assets: Kenney and Quaternius (CC0); one Quaternius character rig + animation library for the Character and all NPCs.
+- [Core loop and economy](issues/01-core-loop-and-economy.md) — An open-ended sandbox with no win state or promotions. Money comes only from Jobs, with Shift pay set by interaction success, Mood and Life Skills. Costs are food and drink, weekly rent, comfort purchases, doctor and medicine, and hospital bills; transit is free. Random Illness has to be explained to a doctor. Rent starts with a Newcomer Discount that fades as Language Proficiency rises, and unpaid rent and hospital bills become debt rather than eviction. Pacing and budget ratios are in the ticket.
 
 ## Not yet specified
 
@@ -40,7 +41,7 @@ A **game design doc + technical spec** for a single-player, low-poly 3D, desktop
 - **HUD & conversation UI** — how meters, clock, money, subtitles, reading aids and the mic state are laid out on screen.
 - **Art & audio direction** — low-poly style reference, Character customization (if any), asset sourcing, music/SFX. Asset sources and the shared character rig are settled by the 3D-stack research; style, Character customization and audio are still open.
 - **AI quality evaluation** — how we'll check that NPCs stay in-language, at-level, and judge intent fairly across all four languages, and that reading aids (pinyin/furigana) are accurate — both libraries misread common words in testing, before trusting it.
-- **Save model** — what exactly persists between sessions, and save/load UX.
+- **Save model** — what exactly persists between sessions, and save/load UX. It now needs to include debts (rent, hospital bills), any current Illness, and the Newcomer Discount step.
 - **Final assembly** — stitching resolved tickets into the GDD + tech spec documents; a ticket once most of the frontier has cleared.
 
 ## Out of scope
