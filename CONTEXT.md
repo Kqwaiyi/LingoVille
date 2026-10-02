@@ -122,3 +122,7 @@ _Avoid_: Skin, theme, locale
 **Comfort Purchase**:
 A consumable bought mainly to lift Mood rather than to meet a Well-being need (e.g. cake, a book, a bathhouse visit).
 _Avoid_: Treat, luxury item
+
+**Appearance Preset**:
+One look on the shared character body (build and face, hair, skin tone, clothing), drawn from a single pool that the Character, Named NPCs and Shift Customers all use. The player picks the Character's once, at setup.
+_Avoid_: Skin, avatar, outfit
