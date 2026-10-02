@@ -77,7 +77,7 @@ A goal-free conversation with an NPC that cannot fail and lifts Mood with each e
 _Avoid_: Chit-chat, free talk
 
 **Patience**:
-How many more turns an NPC will tolerate not understanding the player before ending a Goal Interaction as failed.
+How many more turns an NPC will tolerate not understanding the player before ending a Goal Interaction as failed. Only a turn the NPC cannot make sense of at all costs Patience; a clarifying re-ask costs nothing.
 
 **Recap**:
 The skippable summary shown after a conversation: the outcome, up to three corrections, and new words.

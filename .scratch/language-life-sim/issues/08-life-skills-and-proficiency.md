@@ -18,3 +18,6 @@ The [Anatomy of an interaction](02-anatomy-of-an-interaction.md) ticket adds the
 - Starting Patience for each Proficiency step (higher at lower Proficiency).
 - What the Recap evaluation sends as Proficiency signals, and how much each finished interaction counts, whatever the outcome.
 - Conversations never raise Life Skills.
+
+The [Voice conversation prototype](06-voice-conversation-prototype.md) ticket adds the following:
+- Clarifying re-asks are free. Patience falls only on turns the NPC can't make sense of at all, which was once in 24 turns in the playtest, so starting Patience values can be small (the prototype used 4, 3 and 2 for beginner, intermediate and advanced).
