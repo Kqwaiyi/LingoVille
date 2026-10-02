@@ -44,3 +44,5 @@ If Character naming or appearance is added later (see the Art & audio direction 
 - **Contextual tooltips** cover what the morning doesn't reach (Shifts, Fainting, the Journal after the first Recap is closed, open mic, the Typed Fallback). Each fires once, the first time it's relevant, and all of them can be turned off in Settings. They also fire when the tutorial was skipped.
 
 **New decision: Job hiring.** Each Job begins with a one-time **hiring Goal Interaction** with that place's staff ("Can I work here?", give your name, say when you can start). These are B-level, can be retried if they fail, and anyone can be hired on day 1, so "all Jobs open from day 1" still holds. After hiring, pressing **E at the staff door** during opening hours starts a Shift. There is no schedule. This adds **3 Goal Interactions** to the catalogue in [Town and content scope](07-town-and-content-scope.md) (28 in total).
+
+**Amended by [NPC identity and memory](11-npc-identity-and-memory.md):** the self-assessment screen also has a single "your name" field for the Character. The hiring Goal Interaction checks the spoken name against it.

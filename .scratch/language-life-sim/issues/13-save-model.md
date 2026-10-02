@@ -19,4 +19,5 @@ Things the save must cover, gathered from earlier tickets:
 - the chosen Culture Pack, the Jobs the Character has been hired for, First Morning progress and tooltips already seen
 - the input setting (mic or Typed Fallback), with Native Language possibly kept outside the save
 - the Journal of Recaps, with their annotated reading aids
-- anything the [NPC identity and memory](11-npc-identity-and-memory.md) and [Help economics](12-help-economics.md) tickets add
+- the Character's name, and one NPC Memory record per Named NPC (familiarity points and daily cap, `timesMet`, `knowsName`, `usualOrder`, `lastTopic`, `favouriteKnown`, `lastGiftDay`, `registerOffered`), keyed by stable NPC id, from [NPC identity and memory](11-npc-identity-and-memory.md)
+- anything the [Help economics](12-help-economics.md) ticket adds

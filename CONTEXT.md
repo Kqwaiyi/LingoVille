@@ -66,6 +66,22 @@ _Avoid_: Sickness, disease, status effect
 A non-player character in the town that the player interacts with by speaking the Target Language.
 _Avoid_: Bot, agent
 
+**Named NPC**:
+An NPC who is a specific person with a name and a fixed persona: every counter's staff, the park regulars and the landlord. The same person appears in every Culture Pack, with a local name and local dressing.
+_Avoid_: Character (reserved for the player's avatar), villager
+
+**Shift Customer**:
+An anonymous NPC generated for one Shift interaction, with no name or memory.
+_Avoid_: Customer (unqualified)
+
+**Familiarity**:
+How well a Named NPC knows the Character, in hidden tiers (stranger, acquaintance, friend). It is never shown as a number.
+_Avoid_: Friendship, relationship, affinity
+
+**NPC Memory**:
+The small set of facts a Named NPC keeps about the Character between conversations.
+_Avoid_: History, context
+
 **Speaking**:
 The player addressing an NPC by voice, through the microphone, in the Target Language.
 _Avoid_: Chatting

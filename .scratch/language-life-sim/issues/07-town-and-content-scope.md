@@ -130,3 +130,5 @@ The park has Small Talk only.
 - Comfort Purchases 0.1–0.3. Weekly rent 2.0 at full price. Fainting bill ~1.5. Doctor + medicine well below 1.5.
 
 A mix of cooking at home and eating out comes to the ~0.5/day survival target from [Core loop and economy](01-core-loop-and-economy.md).
+
+**Amended by [NPC identity and memory](11-npc-identity-and-memory.md):** Small Talk is available with any Named NPC who isn't busy, not only in the park, and gifts now have an effect (Familiarity bump, once per NPC per week).
