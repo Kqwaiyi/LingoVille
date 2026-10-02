@@ -15,3 +15,8 @@ The [Voice conversation prototype](06-voice-conversation-prototype.md) ticket fi
 - The game ends a Goal Interaction after the completion function succeeds and the NPC finishes speaking.
 - Hear-it-said (Recap and Help) uses Gemini TTS through the local server, not browser `speechSynthesis`.
 - The Recap is a `generateContent` call with `responseSchema` (`gemini-3.8-flash`, about 6 s), started as soon as the conversation ends.
+
+The [Town and content scope](07-town-and-content-scope.md) ticket fixes the following:
+- One 3D town layout plus four **Culture Pack** data sets (menus/goods, currency, customs, signs, opening-hour overrides), chosen by Target Language.
+- Prices are authored as ratios of one Shift's pay. Each pack converts them with its anchor (¥6,000 / 240元 / €60 / £60) and rounds to local price points.
+- The interaction catalogue is 25 player-led Goal Interactions plus 7 Shift customer templates, each authored as data with a typed completion function.

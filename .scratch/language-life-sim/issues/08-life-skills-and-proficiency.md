@@ -21,3 +21,7 @@ The [Anatomy of an interaction](02-anatomy-of-an-interaction.md) ticket adds the
 
 The [Voice conversation prototype](06-voice-conversation-prototype.md) ticket adds the following:
 - Clarifying re-asks are free. Patience falls only on turns the NPC can't make sense of at all, which was once in 24 turns in the playtest, so starting Patience values can be small (the prototype used 4, 3 and 2 for beginner, intermediate and advanced).
+
+The [Town and content scope](07-town-and-content-scope.md) ticket adds the following:
+- Every Goal Interaction and Shift customer template is tagged with a placeholder band, **B/I/A**. This ticket maps those bands onto its Proficiency scale and decides how a Shift weights its customers toward the player's band.
+- Life Skills have hooks in the town: the home kitchen (Cooking, which sets how good cooked groceries are) and the gym at the bathhouse (Fitness, available after signing up).

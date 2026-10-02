@@ -86,3 +86,11 @@ _Avoid_: Report, feedback screen
 **Journal**:
 The player's saved collection of past Recaps.
 _Avoid_: Log, history
+
+**Culture Pack**:
+The local dressing of the one shared town for a Target Language: its food and goods, currency, customs, signs and opening hours.
+_Avoid_: Skin, theme, locale
+
+**Comfort Purchase**:
+A consumable bought mainly to lift Mood rather than to meet a Well-being need (e.g. cake, a book, a bathhouse visit).
+_Avoid_: Treat, luxury item
