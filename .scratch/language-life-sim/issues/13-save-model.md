@@ -21,3 +21,5 @@ Things the save must cover, gathered from earlier tickets:
 - the Journal of Recaps, with their annotated reading aids
 - the Character's name, and one NPC Memory record per Named NPC (familiarity points and daily cap, `timesMet`, `knowsName`, `usualOrder`, `lastTopic`, `favouriteKnown`, `lastGiftDay`, `registerOffered`), keyed by stable NPC id, from [NPC identity and memory](11-npc-identity-and-memory.md)
 - anything the [Help economics](12-help-economics.md) ticket adds
+
+From [Help economics](12-help-economics.md): each Journal entry stores its conversation's **Help log** (hints and phrases shown, NPC lines translated) and whether it earned the "No Help needed" mark.

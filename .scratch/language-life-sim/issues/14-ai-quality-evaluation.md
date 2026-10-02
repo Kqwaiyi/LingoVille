@@ -18,3 +18,5 @@ The [Technical architecture](10-technical-architecture.md) ticket fixes the foll
 - Reading aids are library-first, then replaced by Gemini `/api/annotate` output when it passes validation. Validation rules are in scope here.
 
 From the [Voice conversation prototype](06-voice-conversation-prototype.md): live transcription of learner Mandarin is noisy (小杯 came back as "小贝" or "tape", 一杯 as "100"), yet the NPC understood. From the [Reading aids](05-reading-aids.md) research: both libraries misread common words.
+
+From [Help economics](12-help-economics.md): the Recap evaluation gets a Help log and must discount helped turns. A turn that repeats a hint shown just before it counts for little, and a tap-translated NPC line counts for nothing. Help must never *lower* the level estimate. Whether the evaluation does this correctly is in scope for measurement.

@@ -90,7 +90,7 @@ _Avoid_: Chatting
 Typing a reply instead of Speaking, for when the microphone can't be used.
 
 **Help**:
-Beginner support during a conversation: hints, the phrasebook, and hearing a phrase said aloud.
+Support available in any conversation: hints, the phrasebook, hearing a phrase said aloud, and translating an NPC's line. It is free and the same at every Proficiency Step, but a turn that relied on it counts for less as evidence of Language Proficiency.
 
 **Goal Interaction**:
 A conversation with an NPC that has exactly one goal (e.g. order a drink, explain symptoms), judged as succeeded or failed by what the NPC understood.
