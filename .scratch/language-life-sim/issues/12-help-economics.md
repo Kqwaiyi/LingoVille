@@ -13,3 +13,6 @@ The [Life Skills and Language Proficiency models](08-life-skills-and-proficiency
 - Proficiency is a hidden score in six CEFR steps, moved partway toward the level the Recap evaluation estimates after each conversation. Any Help discount on Proficiency would act on how much that evidence counts.
 - NPCs get less forgiving through Patience only (4/4/3/3/2/2 from A1 to C2). Whether Help gets less generous at higher steps is this ticket's to decide.
 - Job skills help with Shift mechanics only, never with understanding, so Shift results stay clean Proficiency evidence.
+
+The [Technical architecture](10-technical-architecture.md) ticket fixes the following:
+- Hear-it-said uses Gemini TTS through the local gateway and is cached in IndexedDB by `(text, voice)`, so repeat plays cost no API calls.
