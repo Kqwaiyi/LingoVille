@@ -111,6 +111,10 @@ _Avoid_: Report, feedback screen
 The player's saved collection of past Recaps.
 _Avoid_: Log, history
 
+**Save**:
+One Character's whole life in one Target Language, kept only in this browser. A player can keep up to four.
+_Avoid_: Profile, game, file, run
+
 **Culture Pack**:
 The local dressing of the one shared town for a Target Language: its food and goods, currency, customs, signs and opening hours.
 _Avoid_: Skin, theme, locale
