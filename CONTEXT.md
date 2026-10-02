@@ -67,3 +67,22 @@ Typing a reply instead of Speaking, for when the microphone can't be used.
 
 **Help**:
 Beginner support during a conversation: hints, the phrasebook, and hearing a phrase said aloud.
+
+**Goal Interaction**:
+A conversation with an NPC that has exactly one goal (e.g. order a drink, explain symptoms), judged as succeeded or failed by what the NPC understood.
+_Avoid_: Quest, task, mission
+
+**Small Talk**:
+A goal-free conversation with an NPC that cannot fail and lifts Mood with each exchange that is understood.
+_Avoid_: Chit-chat, free talk
+
+**Patience**:
+How many more turns an NPC will tolerate not understanding the player before ending a Goal Interaction as failed.
+
+**Recap**:
+The skippable summary shown after a conversation: the outcome, up to three corrections, and new words.
+_Avoid_: Report, feedback screen
+
+**Journal**:
+The player's saved collection of past Recaps.
+_Avoid_: Log, history

@@ -13,3 +13,8 @@ The [Core loop and economy](01-core-loop-and-economy.md) ticket fixes the follow
 - A Job-relevant Life Skill earns a Shift pay raise.
 - The Newcomer Discount and the per-interaction stakes at work both scale with Language Proficiency, so this ticket must define the steps they key off.
 - Still open here: whether NPC forgiveness and how generous Help is should also tighten as Proficiency rises.
+
+The [Anatomy of an interaction](02-anatomy-of-an-interaction.md) ticket adds the following:
+- Starting Patience for each Proficiency step (higher at lower Proficiency).
+- What the Recap evaluation sends as Proficiency signals, and how much each finished interaction counts, whatever the outcome.
+- Conversations never raise Life Skills.

@@ -15,3 +15,9 @@ The [Core loop and economy](01-core-loop-and-economy.md) ticket adds requirement
 - A catalogue of 3–5 Illnesses with their symptoms.
 - Comfort purchases.
 - Absolute prices, fitted to that ticket's budget ratios (measured in Shifts of pay).
+
+The [Anatomy of an interaction](02-anatomy-of-an-interaction.md) ticket adds requirements here:
+- Each Goal Interaction is authored as data: NPC role and persona, one goal, facts, a completion function with typed arguments, and a Proficiency range.
+- Each Job needs a simple action the player does to fill a customer's hidden order (e.g. a menu grid), checked exactly against data.
+- A Shift is set by its customer count (5–8), not by clock time.
+- Which NPCs start conversations themselves (customers, landlord, doctor) and when.
