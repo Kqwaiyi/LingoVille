@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { CULTURE_PACKS, formatLocalMoney, NAMED_NPCS } from '../content/index.ts';
 import type { LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
@@ -7,7 +7,10 @@ import {
   selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectListening,
+  selectMicLevel,
   selectNpcExpression,
+  selectReconnecting,
   selectTyping,
   useGame,
   type ChatLine,
@@ -98,19 +101,89 @@ function TypedField() {
   };
 
   return (
+    <input
+      ref={field}
+      type="text"
+      aria-label="Typed reply"
+      placeholder="Type a reply (T), Enter to send"
+      autoComplete="off"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={onKeyDown}
+      onFocus={() => setTyping(true)}
+      onBlur={() => setTyping(false)}
+    />
+  );
+}
+
+/**
+ * Push-to-talk: hold Space (unless the typed field has focus) or hold the mic
+ * button. Red with a live dot while listening.
+ */
+function MicButton() {
+  const listening = useGame(selectListening);
+  const level = useGame(selectMicLevel);
+  const typing = useGame(selectTyping);
+  const startTalking = useGame((s) => s.startTalking);
+  const stopTalking = useGame((s) => s.stopTalking);
+
+  useEffect(() => {
+    // Focusing the typed field mid-turn would otherwise lose the Space release.
+    if (typing) return stopTalking();
+    const onDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      // Space would otherwise scroll, or press whichever button has focus.
+      e.preventDefault();
+      if (!e.repeat) startTalking();
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      e.preventDefault();
+      stopTalking();
+    };
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+    };
+  }, [typing, startTalking, stopTalking]);
+
+  // Releasing Space or the button outside the window must still end the turn.
+  useEffect(() => {
+    window.addEventListener('blur', stopTalking);
+    return () => {
+      window.removeEventListener('blur', stopTalking);
+      stopTalking();
+    };
+  }, [stopTalking]);
+
+  return (
+    <button
+      type="button"
+      className="mic"
+      aria-label="Hold to talk (Space)"
+      aria-pressed={listening}
+      data-listening={listening || undefined}
+      style={{ '--level': level } as CSSProperties}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        startTalking();
+      }}
+      onPointerUp={stopTalking}
+      onPointerCancel={stopTalking}
+    >
+      <span className="mic-dot" aria-hidden="true" />
+      🎤
+    </button>
+  );
+}
+
+function InputBar() {
+  return (
     <div className="chat-input">
-      <input
-        ref={field}
-        type="text"
-        aria-label="Typed reply"
-        placeholder="Type a reply (T), Enter to send"
-        autoComplete="off"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-        onFocus={() => setTyping(true)}
-        onBlur={() => setTyping(false)}
-      />
+      <MicButton />
+      <TypedField />
     </div>
   );
 }
@@ -122,6 +195,7 @@ export function ConversationColumn() {
   const minute = useGame(selectClockMinute);
   const packId = useGame(selectCulturePackId);
   const closingCard = useGame(selectClosingCard);
+  const reconnecting = useGame(selectReconnecting);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
@@ -169,8 +243,13 @@ export function ConversationColumn() {
         {lines.map((line, i) => (
           <Bubble key={i} line={line} />
         ))}
+        {reconnecting && (
+          <p className="chat-notice" role="status">
+            Reconnecting…
+          </p>
+        )}
       </div>
-      {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <TypedField />}
+      {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <InputBar />}
     </aside>
   );
 }

@@ -41,6 +41,17 @@ export const OUT_OF_PATIENCE_SCENE =
   "[SCENE: Again you couldn't make sense of anything the customer said, and you have run out of patience. " +
   'Apologise politely and say goodbye: the conversation is over.]';
 
+/** Opens every conversation, so the NPC speaks first. */
+export const GREETING_SCENE = '[SCENE: A customer walks up to you. Greet them first.]';
+
+/**
+ * Follows the conversation so far when a session replaces one whose connection
+ * dropped, so the NPC carries on instead of greeting again.
+ */
+export const RESUME_SCENE =
+  '[SCENE: You were interrupted for a moment, and the customer is still with you. ' +
+  "Don't greet them again: say sorry for the wait in a few words and carry on from where you left off.]";
+
 const NOT_UNDERSTOOD = toToolDeclaration(
   NOT_UNDERSTOOD_TOOL,
   'Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, ' +

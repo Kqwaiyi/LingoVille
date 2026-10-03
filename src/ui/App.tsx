@@ -5,6 +5,7 @@ import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
+import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
 
 /** Pauses the game while the browser tab is hidden. */
@@ -29,6 +30,8 @@ export function App() {
       <InteractionPrompt />
       <Dock />
       <ConversationColumn />
+      <Toast />
+      <VoiceUnavailableScreen />
     </main>
   );
 }

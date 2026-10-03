@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildNpcSession, OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
-import { openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
+import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
   return buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.barista, {
@@ -14,16 +14,21 @@ function npcSession(packId: LanguageCode) {
 function listen() {
   const turns: string[] = [];
   const toolCalls: ToolCall[] = [];
+  const dropped = { count: 0 };
   let current = '';
   const events: VoiceSessionEvents = {
     onOutputTranscript: (text) => (current += text),
+    onInputTranscript: () => {},
     onTurnComplete: () => {
       turns.push(current);
       current = '';
     },
     onToolCall: (call) => toolCalls.push(call),
+    onMicLevel: () => {},
+    onUsage: () => {},
+    onDisconnect: () => dropped.count++,
   };
-  return { turns, toolCalls, events };
+  return { turns, toolCalls, dropped, events };
 }
 
 /** A connected fake barista that has already greeted the Player. */
@@ -192,6 +197,29 @@ describe('mock VoiceSession', () => {
     session.close();
     await vi.runAllTimersAsync();
 
+    expect(turns).toHaveLength(1);
+  });
+
+  it('carries on without greeting again when it replaces a dropped session', async () => {
+    const { turns, events } = listen();
+    const session = openMockVoiceSession(npcSession('ja'), events, {
+      resumeFrom: [{ speaker: 'npc', text: 'いらっしゃいませ！ご注文はお決まりですか？' }],
+    });
+    await session.connect();
+    await vi.runAllTimersAsync();
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).not.toBe('いらっしゃいませ！ご注文はお決まりですか？');
+    expect(turns[0]).toMatch(/[ぁ-んァ-ン]/);
+  });
+
+  it('drops the connection when the Player types the scripted drop line, and says nothing after', async () => {
+    const { turns, dropped, say } = await atTheCounter();
+
+    await say(MOCK_DROP_LINE);
+    await say('ラテ');
+
+    expect(dropped.count).toBe(1);
     expect(turns).toHaveLength(1);
   });
 });

@@ -21,6 +21,8 @@ function fakeVoice() {
     fake.events = events;
     return {
       connect: async () => {},
+      startTalking: () => {},
+      stopTalking: () => {},
       sendText: (text) => fake.sent.push(text),
       sendToolResponse: () => {},
       close: () => (fake.closed = true),

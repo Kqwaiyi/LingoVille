@@ -9,8 +9,16 @@ const REPLY_DELAY_MS = 600;
 // The café order is the only completion the fake knows how to script.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
 
+/**
+ * Typed to the fake NPC, this makes its connection drop, so the smoke tests can
+ * script a network failure. It only exists in mock mode.
+ */
+export const MOCK_DROP_LINE = '#drop';
+
 type Script = {
   greeting: string;
+  /** Picks up again after a dropped connection, instead of greeting. */
+  resume: string;
   /** Clarifying re-asks for a line it understood but can't act on. None sounds like not understanding. */
   clarify: string[];
   readBack: (item: string, price: string) => string;
@@ -27,6 +35,7 @@ type Script = {
 const SCRIPT: Record<LanguageCode, Script> = {
   ja: {
     greeting: 'いらっしゃいませ！ご注文はお決まりですか？',
+    resume: '大変お待たせしました。ご注文をどうぞ。',
     clarify: ['ご注文は何になさいますか？', 'ラテ、コーヒー、紅茶がございます。どれにしますか？'],
     readBack: (item, price) => `${item}ですね。${price}です。よろしいですか？`,
     served: 'ありがとうございます！こちら、どうぞ。またお越しくださいませ。',
@@ -44,6 +53,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
   },
   zh: {
     greeting: '欢迎光临！您想喝点什么？',
+    resume: '让您久等了。您想喝点什么？',
     clarify: ['您想喝点什么？', '我们有拿铁、咖啡和红茶。您要哪个？'],
     readBack: (item, price) => `一杯${item}，${price}。对吗？`,
     served: '好的，这是您的饮料。欢迎下次光临！',
@@ -61,6 +71,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
   },
   en: {
     greeting: 'Hiya! What can I get you?',
+    resume: 'Sorry about that! What can I get you?',
     clarify: ['What would you like?', "We've got lattes, coffee and tea. Which one?"],
     readBack: (item, price) => `One ${item.toLowerCase()}, that's ${price}. Is that right?`,
     served: 'Lovely, here you go. Have a nice day!',
@@ -78,6 +89,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
   },
   de: {
     greeting: 'Hallo! Was darf’s sein?',
+    resume: 'Entschuldigung! Was darf’s sein?',
     clarify: ['Was möchten Sie trinken?', 'Wir haben Latte, Kaffee und Tee. Was darf’s sein?'],
     readBack: (item, price) => `Einmal ${item} für ${price}, richtig?`,
     served: 'Bitte schön! Einen schönen Tag noch!',
@@ -109,9 +121,11 @@ function mentions(line: string, words: string[]) {
  * The mock-mode NPC: a scripted fake barista that greets first and answers
  * every typed line in the Target Language, after a short delay. It reads an
  * order back and calls serve_order only once the Player confirms, and calls
- * not_understood for a line with no word it knows.
+ * not_understood for a line with no word it knows. It has no audio, so
+ * push-to-talk does nothing. Replacing a dropped session, it picks up again
+ * but has forgotten any read-back.
  */
-export const openMockVoiceSession: OpenVoiceSession = (session, events) => {
+export const openMockVoiceSession: OpenVoiceSession = (session, events, options = {}) => {
   const packId = session.voice.targetLanguage;
   const script = SCRIPT[packId];
   const takesOrders = session.tools.some((tool) => tool.name === SERVE_ORDER);
@@ -143,8 +157,15 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events) => {
       events.onToolCall({ id, name, args });
     });
 
+  const drop = () =>
+    later(() => {
+      close();
+      events.onDisconnect();
+    });
+
   const hear = (line: string) => {
     if (line === OUT_OF_PATIENCE_SCENE) return say(script.outOfPatience);
+    if (line === MOCK_DROP_LINE) return drop();
 
     const item = takesOrders ? CAFE_ITEM_IDS.find((id) => mentions(line, script.words.items[id])) : undefined;
     if (item) {
@@ -173,10 +194,19 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events) => {
     );
   };
 
+  const close = () => {
+    closed = true;
+    for (const timer of pending) clearTimeout(timer);
+    pending.clear();
+    awaitingAnswer.clear();
+  };
+
   return {
     connect: async () => {
-      if (!closed) say(script.greeting);
+      if (!closed) say(options.resumeFrom?.length ? script.resume : script.greeting);
     },
+    startTalking: () => {},
+    stopTalking: () => {},
     sendText: (text) => {
       if (!closed) hear(text);
     },
@@ -185,11 +215,6 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events) => {
       awaitingAnswer.delete(id);
       if (!closed && onAnswer) onAnswer(response);
     },
-    close: () => {
-      closed = true;
-      for (const timer of pending) clearTimeout(timer);
-      pending.clear();
-      awaitingAnswer.clear();
-    },
+    close,
   };
 };

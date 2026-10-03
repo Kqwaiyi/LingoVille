@@ -7,6 +7,6 @@ The local Gemini gateway: a small Node app that Vite proxies `/api` to. It holds
 - Model IDs, voices and endpoint versions live only in `config.ts`.
 - `GEMINI_MOCK=1` must make every endpoint answer with canned data, with no network and no key.
 
-**Testing**: Vitest against `createGateway` on an ephemeral port. Never call real Gemini from a test. Changes to `config.ts` need an `npm run eval` before merging.
+**Testing**: Vitest against `createGateway` on an ephemeral port, passing a fake `fetch` to stand in for Gemini. Never call real Gemini from a test. Changes to `config.ts` need an `npm run eval` before merging.
 
 `npx vitest run server`
