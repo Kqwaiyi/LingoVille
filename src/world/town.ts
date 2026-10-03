@@ -29,9 +29,26 @@ export const GROUND_HALF_SIZE = 40;
 export const HOME_TAP: Vec3 = [-10, 0.5, -2.85];
 export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
 export const CAFE_COUNTER: Vec3 = [12, 0.55, -3];
+/** The barista stands behind the counter, facing the door. */
+export const BARISTA: Vec3 = [12, 1, -4.1];
 
-/** Where the Character stands on the First Morning, facing the tap. */
-export const SPAWN: Vec3 = [-10, 1, 0.5];
+/**
+ * Where the Character starts at each place. At home it stands facing the tap
+ * (the First Morning); elsewhere just inside the door.
+ */
+export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
+  home: [-10, 1, 0.5],
+  cafe: [12, 1, 1.5],
+};
+
+/**
+ * Dev only: `?spawn=cafe` starts the Character at the café door, so a smoke test
+ * doesn't have to walk across town. Spawning at the saved place arrives with Continue (ticket 07).
+ */
+export function devSpawnPlace(search: string): PlaceId {
+  const place = new URLSearchParams(search).get('spawn');
+  return import.meta.env.DEV && place !== null && place in SPAWN_POINTS ? (place as PlaceId) : 'home';
+}
 
 /** The place whose interior contains this point, or null on the street. */
 export function placeAt(x: number, z: number): PlaceId | null {

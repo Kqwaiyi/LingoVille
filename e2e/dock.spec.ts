@@ -26,7 +26,8 @@ test('the clock runs at one game minute per real second and stops while the tab 
   await page.goto('/');
   const time = dock(page).getByLabel('Time');
 
-  await expect(time).not.toHaveText('07:00', { timeout: 5_000 });
+  // The clock starts once the scene has booted, which is slow with parallel workers.
+  await expect(time).not.toHaveText('07:00', { timeout: 15_000 });
 
   await hideTab(page);
   const frozen = await time.textContent();

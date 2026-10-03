@@ -7,6 +7,8 @@ const GATEWAY_PORT = '8790';
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // Every test boots the 3D scene with software WebGL, which is slow when workers run in parallel.
+  timeout: 60_000,
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,

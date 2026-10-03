@@ -11,15 +11,29 @@ import {
 import { useEffect, useMemo, useRef } from 'react';
 import { Vector3, type Group } from 'three';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
-import { useGame } from '../store/index.ts';
+import { selectTyping, useGame, type Interactable } from '../store/index.ts';
 import type { Control } from './controls.ts';
-import { HOME_TAP, placeAt, SPAWN } from './town.ts';
+import { BARISTA, devSpawnPlace, HOME_TAP, placeAt, SPAWN_POINTS, type Vec3 } from './town.ts';
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
 
 type CharacterController = ReturnType<RapierContext['world']['createCharacterController']>;
 const CAMERA = { distance: 7, lookHeight: 1.2, minPitch: 0.15, maxPitch: 1.2, dragSensitivity: 0.005, follow: 10 } as const;
+
+const SPAWN = SPAWN_POINTS[devSpawnPlace(window.location.search)];
+
+function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
+  return Math.hypot(x - tx, z - tz);
+}
+
+/** What the Character standing here could use with E. Only from inside, so nothing is reachable through a wall. */
+function interactableAt(x: number, z: number): Interactable | null {
+  const placeId = placeAt(x, z);
+  if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
+  if (placeId === 'cafe' && distanceTo(x, z, BARISTA) <= MOVEMENT.talkRangeMetres) return 'barista';
+  return null;
+}
 
 /** Orbit angles for the follow camera, changed by dragging with the mouse. */
 function useOrbitDrag() {
@@ -62,6 +76,8 @@ export function Character() {
   const { world } = useRapier();
   const enterPlace = useGame((s) => s.enterPlace);
   const setInteractable = useGame((s) => s.setInteractable);
+  // Letters typed into the chat field must not walk the Character away.
+  const typing = useGame(selectTyping);
 
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.
@@ -85,7 +101,7 @@ export function Character() {
     const { yaw, pitch } = orbit.current;
 
     // Walk relative to the camera: forward is away from it, across the ground.
-    const keys = getKeys();
+    const keys = typing ? { forward: false, back: false, left: false, right: false } : getKeys();
     const ahead = Number(keys.forward) - Number(keys.back);
     const across = Number(keys.right) - Number(keys.left);
     const move = scratch.move.set(
@@ -117,9 +133,7 @@ export function Character() {
 
     const placeId = placeAt(next.x, next.z);
     if (placeId) enterPlace(placeId);
-    // Inside the home only, so the tap can't be reached through its wall.
-    const tapDistance = Math.hypot(next.x - HOME_TAP[0], next.z - HOME_TAP[2]);
-    setInteractable(placeId === 'home' && tapDistance <= MOVEMENT.interactRangeMetres ? 'tap' : null);
+    setInteractable(interactableAt(next.x, next.z));
   });
 
   return (

@@ -1,5 +1,5 @@
-import { CuboidCollider, RigidBody } from '@react-three/rapier';
-import { BUILDINGS, CAFE_COUNTER, GROUND_HALF_SIZE, HOME_BED, HOME_TAP, STREET, WALL, type Building, type Vec3 } from './town.ts';
+import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
+import { BARISTA, BUILDINGS, CAFE_COUNTER, GROUND_HALF_SIZE, HOME_BED, HOME_TAP, STREET, WALL, type Building, type Vec3 } from './town.ts';
 
 /** A solid greybox box that the Character collides with. */
 function Block({ position, size, colour }: { position: Vec3; size: Vec3; colour: string }) {
@@ -11,6 +11,19 @@ function Block({ position, size, colour }: { position: Vec3; size: Vec3; colour:
       </mesh>
       <CuboidCollider position={position} args={[size[0] / 2, size[1] / 2, size[2] / 2]} />
     </>
+  );
+}
+
+/** A greybox NPC: a capsule the Character can't walk through. */
+function Npc({ position, colour }: { position: Vec3; colour: string }) {
+  return (
+    <group position={position}>
+      <mesh castShadow>
+        <capsuleGeometry args={[0.35, 1, 4, 12]} />
+        <meshStandardMaterial color={colour} flatShading />
+      </mesh>
+      <CapsuleCollider args={[0.5, 0.35]} />
+    </group>
   );
 }
 
@@ -57,6 +70,7 @@ export function Town() {
       <Block position={HOME_TAP} size={[1.2, 1, 0.6]} colour="#8fa3b8" />
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={CAFE_COUNTER} size={[4, 1.1, 0.8]} colour="#8b6a4f" />
+      <Npc position={BARISTA} colour="#7fb3a3" />
     </RigidBody>
   );
 }

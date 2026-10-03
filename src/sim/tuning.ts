@@ -34,6 +34,8 @@ export const MOVEMENT = {
   walkSpeedMetresPerSecond: 4,
   /** How close the Character must be to use something with E. */
   interactRangeMetres: 1.6,
+  /** How close the Character must be to talk to an NPC. Walking further away ends the conversation. */
+  talkRangeMetres: 2.5,
 } as const;
 
 // --- First Morning ----------------------------------------------------------

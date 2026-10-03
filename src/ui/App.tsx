@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { useGame } from '../store/index.ts';
+import { selectConversation, useGame } from '../store/index.ts';
 import { Scene } from '../world/index.ts';
+import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
@@ -19,13 +20,15 @@ function usePauseWhenHidden() {
 
 export function App() {
   usePauseWhenHidden();
+  const talking = useGame(selectConversation) !== null;
 
   return (
-    <main className="game">
+    <main className="game" data-talking={talking || undefined}>
       <Scene />
       <GatewayStatus />
       <InteractionPrompt />
       <Dock />
+      <ConversationColumn />
     </main>
   );
 }
