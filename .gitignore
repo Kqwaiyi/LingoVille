@@ -2,3 +2,16 @@
 .env
 .env.*
 !.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+
+# Test output
+test-results/
+playwright-report/
+
+# Eval runs and the dev's own voice recordings (the manifest is committed)
+evals/reports/
+evals/recordings/*
+!evals/recordings/manifest.json

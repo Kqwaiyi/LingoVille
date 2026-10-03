@@ -8,11 +8,15 @@
 
 **Status:** ready-for-agent
 
-- [ ] One `npm run dev` starts Vite and the gateway, and the page shows that the gateway is reachable.
-- [ ] The gateway reads the Gemini key only from a gitignored `.env`, with a committed example file. The key never reaches the browser bundle.
-- [ ] `GEMINI_MOCK=1` switches the gateway to mock mode. Model IDs, voices and endpoint versions live in one gateway config.
-- [ ] Strict TypeScript. Folders exist for `sim`, `content`, `ai`, `voice`, `world`, `ui`, `i18n`, `store` and `server`, plus a top-level `evals`. Three.js is pinned at r186.
-- [ ] ESLint `import/no-restricted-paths` fails the lint when `sim`, `content` or `ai` imports `world`, `ui` or `voice`. A deliberate violation proves it.
-- [ ] Vitest runs one trivial `sim` test. Playwright runs one smoke test against the page with the gateway in mock mode.
-- [ ] One tuning module exists for game numbers (open questions 4 and 5 start here as defaults). Tests import values from it rather than copying them.
-- [ ] Each folder has a short `AGENTS.md` with its rule and how to test it. `evals/AGENTS.md` says only a human may update the eval baseline.
+- [x] One `npm run dev` starts Vite and the gateway, and the page shows that the gateway is reachable.
+- [x] The gateway reads the Gemini key only from a gitignored `.env`, with a committed example file. The key never reaches the browser bundle.
+- [x] `GEMINI_MOCK=1` switches the gateway to mock mode. Model IDs, voices and endpoint versions live in one gateway config.
+- [x] Strict TypeScript. Folders exist for `sim`, `content`, `ai`, `voice`, `world`, `ui`, `i18n`, `store` and `server`, plus a top-level `evals`. Three.js is pinned at r186.
+- [x] ESLint `import/no-restricted-paths` fails the lint when `sim`, `content` or `ai` imports `world`, `ui` or `voice`. A deliberate violation proves it.
+- [x] Vitest runs one trivial `sim` test. Playwright runs one smoke test against the page with the gateway in mock mode.
+- [x] One tuning module exists for game numbers (open questions 4 and 5 start here as defaults). Tests import values from it rather than copying them.
+- [x] Each folder has a short `AGENTS.md` with its rule and how to test it. `evals/AGENTS.md` says only a human may update the eval baseline.
+
+## Comments
+
+**2026-10-03 (implemented):** Layout is `src/{sim,content,ai,voice,world,ui,i18n,store}`, top-level `server/` (the gateway, config in `server/config.ts`) and `evals/`, with `e2e/` (Playwright) and `tooling/` (boundary-lint tests). The deliberate violations live in `tooling/boundaries.test.ts`, so the boundary proof runs on every `npm test`. The tuning module is `src/sim/tuning.ts`. The gateway exposes only `GET /api/health` for now. Mock mode is wired, but the canned endpoints arrive with their tickets. The status page's strings move to `i18n` when that module lands. Not yet installed: R3F/drei/Rapier, Zustand, Zod and react-i18next, which each come with the first ticket that uses them.
