@@ -8,20 +8,18 @@ import {
   type RapierContext,
   type RapierRigidBody,
 } from '@react-three/rapier';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Vector3, type Group } from 'three';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
-import { selectWorldKeysOff, useGame, type Interactable } from '../store/index.ts';
+import { selectArrival, selectPlaceId, selectWorldKeysOff, useGame, type Interactable } from '../store/index.ts';
 import type { Control } from './controls.ts';
-import { BARISTA, devSpawnPlace, HOME_TAP, placeAt, SPAWN_POINTS, type Vec3 } from './town.ts';
+import { BARISTA, HOME_TAP, placeAt, spawnPoint, type Vec3 } from './town.ts';
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
 
 type CharacterController = ReturnType<RapierContext['world']['createCharacterController']>;
 const CAMERA = { distance: 7, lookHeight: 1.2, minPitch: 0.15, maxPitch: 1.2, dragSensitivity: 0.005, follow: 10 } as const;
-
-const SPAWN = SPAWN_POINTS[devSpawnPlace(window.location.search)];
 
 function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
   return Math.hypot(x - tx, z - tz);
@@ -72,6 +70,10 @@ export function Character() {
   const model = useRef<Group>(null);
   const fallSpeed = useRef(0);
   const orbit = useOrbitDrag();
+  const arrival = useGame(selectArrival);
+  const startPlaceId = useGame(selectPlaceId);
+  // Where the Character appeared. Fixed at mount: after that, the Character walks.
+  const [spawn] = useState(() => spawnPoint(arrival, startPlaceId, window.location.search));
   const [, getKeys] = useKeyboardControls<Control>();
   const { world } = useRapier();
   const enterPlace = useGame((s) => s.enterPlace);
@@ -137,7 +139,7 @@ export function Character() {
   });
 
   return (
-    <RigidBody ref={body} type="kinematicPosition" colliders={false} position={[...SPAWN]} enabledRotations={[false, false, false]}>
+    <RigidBody ref={body} type="kinematicPosition" colliders={false} position={[...spawn]} enabledRotations={[false, false, false]}>
       <CapsuleCollider ref={collider} args={[CAPSULE.halfHeight, CAPSULE.radius]} />
       <group ref={model} rotation-y={Math.PI}>
         <mesh castShadow>

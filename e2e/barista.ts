@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { startNewGame } from './title.ts';
 
 export const column = (page: Page) => page.getByRole('complementary', { name: 'Conversation' });
 export const chat = (page: Page) => column(page).getByRole('log', { name: 'Chat' });
@@ -8,9 +9,9 @@ export const dock = (page: Page) => page.getByRole('region', { name: 'Dock' });
 // What the scripted fake barista says in the ja pack (mock mode).
 export const GREETING = 'いらっしゃいませ！ご注文はお決まりですか？';
 
-/** Starts at the café door and walks up to the counter until the barista can be talked to. */
+/** Starts a new game at the café door and walks up to the counter until the barista can be talked to. */
 export async function walkToTheBarista(page: Page) {
-  await page.goto('/?spawn=cafe');
+  await startNewGame(page, '/?spawn=cafe');
   await page.locator('canvas').click();
   await page.keyboard.down('KeyW');
   await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });

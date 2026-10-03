@@ -12,6 +12,26 @@ export {
   type NpcExpression,
   type Patience,
 } from './patience.ts';
-export { createSave, type GameState, type LanguageCode, type NewGameSetup, type PlaceId } from './state.ts';
+export {
+  createSave,
+  DEBT_KINDS,
+  ILLNESS_IDS,
+  JOB_IDS,
+  LANGUAGE_CODES,
+  LIFE_SKILL_IDS,
+  PLACE_IDS,
+  type Debt,
+  type GameState,
+  type IllnessId,
+  type InventoryItem,
+  type JobId,
+  type LanguageCode,
+  type LifeSkillId,
+  type NewGameSetup,
+  type NpcMemory,
+  type PaymentPlan,
+  type PhrasebookEntry,
+  type PlaceId,
+} from './state.ts';
 export * from './tuning.ts';
 export { drinkWater, enterPlace, tick } from './wellBeing.ts';

@@ -28,6 +28,15 @@ export const CLOCK = {
   faintWakeAt: 8 * MINUTES_PER_HOUR,
 } as const;
 
+// --- Saving -----------------------------------------------------------------
+
+export const SAVE = {
+  /** Autosave this often in real time while playing, on top of the event triggers. */
+  everyRealMs: 2 * 60 * 1000,
+  /** How long "Saved ✓" stays under the clock. */
+  noticeMs: 2000,
+} as const;
+
 // --- Moving around the town -------------------------------------------------
 
 export const MOVEMENT = {
@@ -78,7 +87,8 @@ export const ECONOMY = {
   maxQuantityPerOrderLine: 5,
 } as const;
 
-export type ProficiencyStep = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+export const PROFICIENCY_STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+export type ProficiencyStep = (typeof PROFICIENCY_STEPS)[number];
 
 /** Patience, Newcomer Discount and Shift stakes by Proficiency Step. */
 export const PROFICIENCY_STEP_TABLE: Record<
@@ -105,6 +115,8 @@ export const PROFICIENCY = {
   updateRate: 0.15,
   fastStartUpdateRate: 0.3,
   fastStartInteractions: 10,
+  /** Where the hidden score starts for each step (default): the middle of the step. Only A1–B2 can be a starting step. */
+  startingScore: { A1: 0.5, A2: 1.5, B1: 2.5, B2: 3.5, C1: 4.5, C2: 5.5 } satisfies Record<ProficiencyStep, number>,
 } as const;
 
 // --- Mood (default: open question 4) ----------------------------------------

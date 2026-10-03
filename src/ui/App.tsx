@@ -1,27 +1,38 @@
 import { useEffect } from 'react';
-import { selectConversation, useGame } from '../store/index.ts';
+import { selectConversation, selectScreen, useGame } from '../store/index.ts';
 import { Scene } from '../world/index.ts';
 import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
+import { TitleScreen } from './TitleScreen.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
 
-/** Pauses the game while the browser tab is hidden. */
-function usePauseWhenHidden() {
+/** Pauses the game while the browser tab is hidden, and saves as it hides or the page closes. */
+function usePauseAndSaveWhenHidden() {
   const setTabHidden = useGame((s) => s.setTabHidden);
+  const saveNow = useGame((s) => s.saveNow);
   useEffect(() => {
     const sync = () => setTabHidden(document.visibilityState === 'hidden');
     sync();
     document.addEventListener('visibilitychange', sync);
-    return () => document.removeEventListener('visibilitychange', sync);
-  }, [setTabHidden]);
+    window.addEventListener('pagehide', saveNow);
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('pagehide', saveNow);
+    };
+  }, [setTabHidden, saveNow]);
 }
 
 export function App() {
-  usePauseWhenHidden();
+  usePauseAndSaveWhenHidden();
+  const screen = useGame(selectScreen);
+  return screen === 'title' ? <TitleScreen /> : <Game />;
+}
+
+function Game() {
   const talking = useGame(selectConversation) !== null;
 
   return (

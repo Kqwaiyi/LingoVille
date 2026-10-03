@@ -22,6 +22,7 @@ import {
   losePatience,
   newPlayerTurn,
   npcExpression,
+  SAVE,
   startPatience,
   tick,
   weekdayOf,
@@ -46,7 +47,9 @@ import {
   type TranscriptLine,
   type VoiceSession,
 } from '../voice/index.ts';
+import { browserDeviceSettings, type DeviceSettingsStore } from './deviceSettings.ts';
 import { browserJournal, journalPage, type Journal, type JournalEntry, type JournalPage, type NewJournalEntry } from './journal.ts';
+import { browserSaves, type Save, type Saves } from './saves.ts';
 
 /** The fixed setup every new game uses until New game setup lands (ticket 12). */
 export const DEV_SETUP: NewGameSetup = {
@@ -58,11 +61,23 @@ export const DEV_SETUP: NewGameSetup = {
   rngSeed: 20261003,
 };
 
-/** The Native Language until device settings and New game setup land (tickets 07 and 12). */
+/** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
-/** The one save slot until save slots land (ticket 08). */
-export const DEV_SLOT_ID = 'slot-1';
+/** The 4 save slots. New game takes the first free one until the slot cards land (ticket 08). */
+export const SLOT_IDS = ['slot-1', 'slot-2', 'slot-3', 'slot-4'] as const;
+
+/** Which screen shows: the title, or the game itself. */
+export type Screen = 'title' | 'playing';
+
+/** What the title screen can offer, once it has looked for saves. */
+export type TitleView =
+  | { status: 'checking' }
+  | { status: 'ready'; canContinue: boolean; canStartNew: boolean }
+  | { status: 'failed'; message: string; canStartNew: boolean };
+
+/** How the Character arrived in the world: the First Morning, or back from a save. The world picks the spawn point from it. */
+export type Arrival = 'newGame' | 'continued';
 
 /** Something in the world the Character is close enough to use with E: the tap, or an NPC to talk to. */
 export type Interactable = 'tap' | NamedNpcId;
@@ -122,9 +137,8 @@ export type GameStoreDeps = {
   /** Asks the gateway for a Recap. Rejects if none can be written. */
   requestRecap: (request: RecapRequest) => Promise<Recap>;
   journal: Journal;
-  slotId: string;
-  /** Called once an outcome is applied, before the closing card. Autosave arrives in ticket 07. */
-  autosave: (game: GameState) => void;
+  saves: Saves;
+  deviceSettings: DeviceSettingsStore;
   hearItSaid: HearItSaid;
 };
 
@@ -142,12 +156,20 @@ const BROWSER_DEPS: GameStoreDeps = {
   openVoiceSession,
   requestRecap: requestRecapFromGateway,
   journal: browserJournal,
-  slotId: DEV_SLOT_ID,
-  autosave: () => {},
+  saves: browserSaves,
+  deviceSettings: browserDeviceSettings,
   hearItSaid,
 };
 
 export type GameStore = {
+  screen: Screen;
+  /** The title screen, while it shows. */
+  title: TitleView | null;
+  arrival: Arrival;
+  /** The slot the game is saved into. */
+  slotId: string;
+  /** How many saves have finished, so the dock can flash "Saved ✓" on each one. */
+  savedCount: number;
   game: GameState;
   /** The Player's own language, which Recaps are written in. */
   nativeLanguage: LanguageCode;
@@ -163,6 +185,14 @@ export type GameStore = {
   voiceUnavailable: boolean;
   /** The full-screen Journal, while it is open. */
   journal: JournalView | null;
+  /** Looks for saves and reads this browser's device settings, for the title screen. */
+  openTitle: () => void;
+  /** Continue: plays the most recently played save. */
+  continueGame: () => void;
+  /** New game: the First Morning, from the fixed dev setup until New game setup lands (ticket 12). */
+  newGame: () => void;
+  /** Saves now, as the page is closed. */
+  saveNow: () => void;
   /** Called once per rendered frame with the real time since the last one. */
   advance: (realDeltaMs: number) => void;
   setTabHidden: (hidden: boolean) => void;
@@ -200,13 +230,44 @@ export type GameStore = {
 const isNpc = (interactable: Interactable | null): interactable is NamedNpcId =>
   interactable !== null && interactable in NAMED_NPCS;
 
-export function createGameStore(initial: GameState, overrides: Partial<GameStoreDeps> = {}) {
+/**
+ * A game store. Given a game, it is already playing it in the first slot;
+ * given null, it starts on the title screen.
+ */
+export function createGameStore(initial: GameState | null, overrides: Partial<GameStoreDeps> = {}) {
   const deps: GameStoreDeps = { ...BROWSER_DEPS, ...overrides };
   // The live session belongs to the open conversation; it never goes into state.
   let voice: VoiceSession | null = null;
   let conversations = 0;
+  // The game as it was when the open conversation began: what a save holds until its outcome is decided.
+  let gameBeforeConversation: GameState | null = null;
+  let realMsSinceSave = 0;
+  // Found by the title screen, and played by Continue.
+  let latestSave: Save | null = null;
+  let freeSlot: string | null = null;
 
   return createStore<GameStore>()((set, get) => {
+    /**
+     * Saves the game into its slot. A conversation is never saved in progress:
+     * until its outcome is decided, the save keeps the game from before it.
+     */
+    const save = () => {
+      const { screen, conversation, slotId } = get();
+      if (screen !== 'playing') return;
+      const game = conversation && !conversation.outcome && gameBeforeConversation ? gameBeforeConversation : get().game;
+      realMsSinceSave = 0;
+      // Started at once: IndexedDB runs writes in the order they began, so an older game never lands after a newer one.
+      deps.saves.write(slotId, game).then(
+        () => set({ savedCount: get().savedCount + 1 }),
+        (error: unknown) => console.error('[save] could not save:', error),
+      );
+    };
+
+    const play = (game: GameState, slotId: string, arrival: Arrival) => {
+      realMsSinceSave = 0;
+      set({ screen: 'playing', title: null, game, slotId, arrival });
+    };
+
     const updateConversation = (change: Partial<Conversation>) => {
       const conversation = get().conversation;
       if (conversation) set({ conversation: { ...conversation, ...change } });
@@ -215,8 +276,8 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
     /** The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. */
     const settleOutcome = (game: GameState, outcome: ClosingCard) => {
       set({ game });
-      deps.autosave(game);
       updateConversation({ outcome });
+      save();
     };
 
     const updateRecap = (conversationId: number, recap: RecapView) => {
@@ -268,7 +329,7 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
             return entry(null);
           },
         )
-        .then((written) => deps.journal.append(deps.slotId, written))
+        .then((written) => deps.journal.append(get().slotId, written))
         .catch((error: unknown) => console.error('[journal] could not save an entry:', error));
     };
 
@@ -406,7 +467,13 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
     };
 
     return {
-      game: initial,
+      screen: initial ? 'playing' : 'title',
+      title: initial ? null : { status: 'checking' },
+      arrival: 'newGame',
+      slotId: SLOT_IDS[0],
+      savedCount: 0,
+      // On the title screen, a First Morning stands in until a game is chosen.
+      game: initial ?? createSave(DEV_SETUP),
       tabHidden: false,
       interactable: null,
       conversation: null,
@@ -416,15 +483,56 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
       voiceUnavailable: false,
       nativeLanguage: DEV_NATIVE_LANGUAGE,
       journal: null,
-      advance: (realDeltaMs) => {
-        const dt = gameMinutesFor(realDeltaMs, selectTimeScale(get()));
-        if (dt > 0) set({ game: tick(get().game, dt) });
+      openTitle: () => {
+        set({ title: { status: 'checking' } });
+        const settings = deps.deviceSettings.load().then(
+          ({ nativeLanguage }) => set({ nativeLanguage }),
+          (error: unknown) => console.warn('[settings] could not be read:', error),
+        );
+        const slots = deps.saves.usedSlots().then(
+          (used) => (freeSlot = SLOT_IDS.find((slot) => !used.includes(slot)) ?? null),
+          () => (freeSlot = null),
+        );
+        const latest = deps.saves.mostRecent().then((found) => (latestSave = found));
+        Promise.all([latest, slots, settings]).then(
+          () => set({ title: { status: 'ready', canContinue: latestSave !== null, canStartNew: freeSlot !== null } }),
+          async (error: unknown) => {
+            console.error('[save] the latest save could not be loaded:', error);
+            await Promise.allSettled([slots, settings]);
+            const message = error instanceof Error ? error.message : String(error);
+            set({ title: { status: 'failed', message, canStartNew: freeSlot !== null } });
+          },
+        );
       },
-      setTabHidden: (tabHidden) => set({ tabHidden }),
+      continueGame: () => {
+        if (get().screen === 'playing' || !latestSave) return;
+        play(latestSave.game, latestSave.slotId, 'continued');
+      },
+      newGame: () => {
+        if (get().screen === 'playing' || !freeSlot) return;
+        play(createSave(DEV_SETUP), freeSlot, 'newGame');
+        save();
+      },
+      saveNow: save,
+      advance: (realDeltaMs) => {
+        if (get().screen !== 'playing') return;
+        const before = get().game;
+        const dt = gameMinutesFor(realDeltaMs, selectTimeScale(get()));
+        if (dt > 0) set({ game: tick(before, dt) });
+        realMsSinceSave += realDeltaMs;
+        if (get().game.clock.day !== before.clock.day || realMsSinceSave >= SAVE.everyRealMs) save();
+      },
+      setTabHidden: (tabHidden) => {
+        set({ tabHidden });
+        if (tabHidden) save();
+      },
       // The world calls these every frame, so they only notify on a change.
       enterPlace: (placeId) => {
         const game = enterPlace(get().game, placeId);
-        if (game !== get().game) set({ game });
+        if (game === get().game) return;
+        set({ game });
+        // Through a door.
+        save();
       },
       setInteractable: (interactable) => {
         if (get().interactable === interactable) return;
@@ -440,6 +548,7 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
         if (conversation || get().journal || !isNpc(interactable)) return;
         const npc = NAMED_NPCS[interactable];
         const interaction = Object.values(INTERACTIONS).find((i) => i.npcId === npc.id)!;
+        gameBeforeConversation = game;
         const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
           clock: game.clock,
         });
@@ -528,7 +637,7 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
       openJournal: () => {
         if (get().conversation || get().journal) return;
         set({ journal: { entries: null, failed: false } });
-        deps.journal.list(deps.slotId).then(
+        deps.journal.list(get().slotId).then(
           (entries) => {
             if (get().journal) set({ journal: { entries, failed: false } });
           },
@@ -546,7 +655,7 @@ export function createGameStore(initial: GameState, overrides: Partial<GameStore
   });
 }
 
-export const gameStore = createGameStore(createSave(DEV_SETUP));
+export const gameStore = createGameStore(null);
 
 /** Reads the game store from React. Pass one of the selectors below. */
 export function useGame<T>(selector: (state: GameStore) => T): T {
@@ -554,6 +663,11 @@ export function useGame<T>(selector: (state: GameStore) => T): T {
 }
 
 // --- Selectors: the only way world and UI read game state -------------------
+
+export const selectScreen = (s: GameStore) => s.screen;
+export const selectTitle = (s: GameStore) => s.title;
+export const selectArrival = (s: GameStore) => s.arrival;
+export const selectSavedCount = (s: GameStore) => s.savedCount;
 
 export const selectTimeScale = (s: GameStore) => {
   if (s.tabHidden || s.journal) return CLOCK.timeScale.paused;

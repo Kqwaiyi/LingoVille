@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from '@playwright/test';
+import { startNewGame } from './title.ts';
 
 const dock = (page: Page) => page.getByRole('region', { name: 'Dock' });
 
@@ -11,7 +12,7 @@ async function hideTab(page: Page) {
 }
 
 test('the dock shows Well-being, Mood, the clock and money on the First Morning', async ({ page }) => {
-  await page.goto('/');
+  await startNewGame(page);
 
   for (const meter of ['Health', 'Hunger', 'Thirst', 'Mood']) {
     await expect(dock(page).getByRole('meter', { name: meter })).toBeVisible();
@@ -23,7 +24,7 @@ test('the dock shows Well-being, Mood, the clock and money on the First Morning'
 });
 
 test('the clock runs at one game minute per real second and stops while the tab is hidden', async ({ page }) => {
-  await page.goto('/');
+  await startNewGame(page);
   const time = dock(page).getByLabel('Time');
 
   // The clock starts once the scene has booted, which is slow with parallel workers.
@@ -36,7 +37,7 @@ test('the clock runs at one game minute per real second and stops while the tab 
 });
 
 test('walking to the tap at home and pressing E refills Thirst for free', async ({ page }) => {
-  await page.goto('/');
+  await startNewGame(page);
   const thirst = dock(page).getByRole('meter', { name: 'Thirst' });
   const money = dock(page).getByLabel('Money');
   await expect(thirst).toHaveAttribute('aria-valuenow', /^\d+$/);

@@ -1,4 +1,5 @@
 import type { PlaceId } from '../sim/index.ts';
+import type { Arrival } from '../store/index.ts';
 
 // Greybox layout: a street along the x axis with a home on one side and a café
 // on the other, both with their door facing the street (+z). The town grows to
@@ -41,11 +42,21 @@ export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
   cafe: [12, 1, 1.5],
 };
 
+/** Back from a save at home, the Character wakes up in bed. It drops onto the mattress. */
+export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
+
 /**
- * Dev only: `?spawn=cafe` starts the Character at the café door, so a smoke test
- * doesn't have to walk across town. Spawning at the saved place arrives with Continue (ticket 07).
+ * Where the Character appears. A new game starts the First Morning at home
+ * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the
+ * saved place's entrance, or in bed if that's home.
  */
-export function devSpawnPlace(search: string): PlaceId {
+export function spawnPoint(arrival: Arrival, placeId: PlaceId, search: string): Vec3 {
+  if (arrival === 'newGame') return SPAWN_POINTS[devSpawnPlace(search)];
+  return placeId === 'home' ? IN_BED : SPAWN_POINTS[placeId];
+}
+
+/** Dev only: `?spawn=cafe` starts a new game at the café door, so a smoke test doesn't have to walk across town. */
+function devSpawnPlace(search: string): PlaceId {
   const place = new URLSearchParams(search).get('spawn');
   return import.meta.env.DEV && place !== null && place in SPAWN_POINTS ? (place as PlaceId) : 'home';
 }

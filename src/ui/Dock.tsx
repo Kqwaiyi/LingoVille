@@ -1,6 +1,6 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { formatLocalMoney } from '../content/index.ts';
-import { METER_MAX, WELL_BEING, type Weekday } from '../sim/index.ts';
+import { METER_MAX, SAVE, WELL_BEING, type Weekday } from '../sim/index.ts';
 import {
   selectClockMinute,
   selectCulturePackId,
@@ -9,6 +9,7 @@ import {
   selectHunger,
   selectMood,
   selectMoneyInShifts,
+  selectSavedCount,
   selectThirst,
   selectWeekday,
   useGame,
@@ -58,6 +59,22 @@ function Money() {
   );
 }
 
+// English until the i18n module lands (ticket 12), like the rest of the dock.
+/** "Saved ✓" under the clock for a moment after each save. Silent: it makes no sound. */
+function SavedNotice() {
+  const savedCount = useGame(selectSavedCount);
+  const [shownFor, setShownFor] = useState(0);
+
+  useEffect(() => {
+    if (savedCount === 0) return;
+    setShownFor(savedCount);
+    const timer = setTimeout(() => setShownFor(0), SAVE.noticeMs);
+    return () => clearTimeout(timer);
+  }, [savedCount]);
+
+  return <div className="dock-saved">{shownFor > 0 ? 'Saved ✓' : ''}</div>;
+}
+
 /** The always-visible dock at the bottom centre: Well-being, Mood, the clock and money. */
 export function Dock() {
   const health = useGame(selectHealth);
@@ -83,6 +100,7 @@ export function Dock() {
         <div className="dock-day">
           Day {day} · {WEEKDAY_LABEL[weekday]}
         </div>
+        <SavedNotice />
       </div>
       <div className="dock-sep" aria-hidden />
       <Money />

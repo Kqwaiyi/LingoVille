@@ -3,6 +3,7 @@ export {
   createGameStore,
   DEV_SETUP,
   gameStore,
+  selectArrival,
   selectChatLines,
   selectClockMinute,
   selectClosingCard,
@@ -22,14 +23,19 @@ export {
   selectPlaceId,
   selectReconnecting,
   selectRecap,
+  selectSavedCount,
+  selectScreen,
   selectThirst,
   selectTimeScale,
+  selectTitle,
   selectToast,
   selectTyping,
   selectVoiceUnavailable,
   selectWeekday,
   selectWorldKeysOff,
+  SLOT_IDS,
   useGame,
+  type Arrival,
   type ChatLine,
   type ClosingCard,
   type Conversation,
@@ -38,6 +44,8 @@ export {
   type Interactable,
   type JournalView,
   type RecapView,
+  type Screen,
+  type TitleView,
   type Toast,
 } from './gameStore.ts';
 export {
@@ -49,3 +57,11 @@ export {
   type JournalPage,
   type NewJournalEntry,
 } from './journal.ts';
+export { browserSaves, createSaves, SAVE_SCHEMA_VERSION, type Save, type Saves } from './saves.ts';
+export {
+  browserDeviceSettings,
+  createDeviceSettings,
+  DEFAULT_DEVICE_SETTINGS,
+  type DeviceSettings,
+  type DeviceSettingsStore,
+} from './deviceSettings.ts';

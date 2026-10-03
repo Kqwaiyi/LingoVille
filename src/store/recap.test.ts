@@ -15,6 +15,7 @@ import {
   selectRecap,
   selectTimeScale,
   selectToast,
+  SAVE_SCHEMA_VERSION,
   type GameStoreDeps,
 } from './index.ts';
 
@@ -81,12 +82,21 @@ function cafe() {
     openVoiceSession,
     requestRecap,
     journal,
-    slotId: 'slot-1',
-    autosave: (game) => autosaves.push({ game, closingCardShown: selectClosingCard(store.getState()) !== null }),
+    saves: {
+      write: async (slotId, game) => {
+        autosaves.push({ game, closingCardShown: selectClosingCard(store.getState()) !== null });
+        return { schemaVersion: SAVE_SCHEMA_VERSION, slotId, createdAt: '', lastPlayedAt: '', game };
+      },
+      load: async () => null,
+      mostRecent: async () => null,
+      usedSlots: async () => [],
+    },
     hearItSaid: async (text, targetLanguage) => void said.push({ text, targetLanguage }),
   });
   store.getState().enterPlace('cafe');
   store.getState().setInteractable('barista');
+  // Walking in through the door saved; these tests count the saves after that.
+  autosaves.length = 0;
   return { store, npc, recaps, journal, autosaves, said };
 }
 
