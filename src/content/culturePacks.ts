@@ -1,4 +1,5 @@
 import type { LanguageCode } from '../sim/index.ts';
+import type { CafeItemId } from './cafe.ts';
 import type { NamedNpcId } from './npcs.ts';
 
 // The parts of each Culture Pack that conversations need so far. Ticket 11 turns
@@ -14,6 +15,8 @@ export type CulturePack = {
     name: string;
     /** Facts the café staff know, in English. */
     facts: string[];
+    /** Each café item's local name, as it's written on the menu. */
+    menu: Record<CafeItemId, string>;
   };
   /** Persona localisations: each Named NPC's local name. */
   personas: Record<NamedNpcId, { name: string }>;
@@ -27,6 +30,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     cafe: {
       name: 'ほしコーヒー',
       facts: ['Cash, card and IC cards are all fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
+      menu: { latte: 'ホットラテ', coffee: 'コーヒー', tea: '紅茶' },
     },
     personas: { barista: { name: '佐藤' } },
   },
@@ -37,6 +41,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     cafe: {
       name: '星星咖啡',
       facts: ['WeChat Pay, Alipay and cash are all fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
+      menu: { latte: '热拿铁', coffee: '美式咖啡', tea: '红茶' },
     },
     personas: { barista: { name: '小李' } },
   },
@@ -47,6 +52,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     cafe: {
       name: 'The Little Star Café',
       facts: ['Card and cash are both fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
+      menu: { latte: 'Hot latte', coffee: 'Filter coffee', tea: 'Cup of tea' },
     },
     personas: { barista: { name: 'Jess' } },
   },
@@ -57,6 +63,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     cafe: {
       name: 'Café Stern',
       facts: ['Card and cash are both fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
+      menu: { latte: 'Latte macchiato', coffee: 'Filterkaffee', tea: 'Schwarztee' },
     },
     personas: { barista: { name: 'Lena' } },
   },

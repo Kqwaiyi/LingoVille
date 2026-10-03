@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { toLocalMoney } from '../content/index.ts';
+import { formatLocalMoney } from '../content/index.ts';
 import { METER_MAX, WELL_BEING, type Weekday } from '../sim/index.ts';
 import {
   selectClockMinute,
@@ -51,11 +51,9 @@ function RingGauge({ label, icon, value, tone }: { label: string; icon: string; 
 function Money() {
   const shifts = useGame(selectMoneyInShifts);
   const packId = useGame(selectCulturePackId);
-  const { currency, amount } = toLocalMoney(shifts, packId);
-  const text = new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
   return (
     <div className="dock-money" aria-label="Money">
-      {text}
+      {formatLocalMoney(shifts, packId)}
     </div>
   );
 }

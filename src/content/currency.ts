@@ -15,3 +15,9 @@ export function toLocalMoney(shifts: number, packId: LanguageCode): { currency: 
   const { currency, perShift } = PACK_CURRENCIES[packId];
   return { currency, amount: shifts * perShift };
 }
+
+/** The amount in the pack's currency for the UI, e.g. "¥450" or "£4.50". */
+export function formatLocalMoney(shifts: number, packId: LanguageCode): string {
+  const { currency, amount } = toLocalMoney(shifts, packId);
+  return new Intl.NumberFormat('en', { style: 'currency', currency, trailingZeroDisplay: 'stripIfInteger' }).format(amount);
+}

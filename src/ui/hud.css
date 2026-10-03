@@ -170,7 +170,15 @@ body,
 }
 
 .chat-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
+}
+
+.npc-face {
+  font-size: 22px;
+  line-height: 1;
 }
 
 .chat-meta {
@@ -262,4 +270,50 @@ body,
   border-radius: 999px;
   font: inherit;
   font-size: 15px;
+}
+
+.closing-card {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--rule);
+  background: #fff;
+}
+
+.closing-card h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.closing-card[data-outcome='failure'] h2 {
+  color: #8a5a44;
+}
+
+.closing-card p {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.closing-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.closing-card-actions button {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.closing-card-actions .primary {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--ink);
+}
+
+.closing-card-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

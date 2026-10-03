@@ -32,6 +32,13 @@ describe('buildNpcSession', () => {
     expect(session.systemInstruction).toMatchSnapshot();
   });
 
+  it("offers the interaction's completion function and not_understood as tools", () => {
+    const { tools } = baristaSession('en');
+
+    expect(tools.map((tool) => tool.name)).toEqual(['serve_order', 'not_understood']);
+    expect(tools[0]).toEqual(INTERACTIONS.orderDrink.toolDeclaration);
+  });
+
   it('is pure: the same inputs give the same session', () => {
     expect(baristaSession('de')).toEqual(baristaSession('de'));
   });

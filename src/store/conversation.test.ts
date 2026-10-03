@@ -22,6 +22,7 @@ function fakeVoice() {
     return {
       connect: async () => {},
       sendText: (text) => fake.sent.push(text),
+      sendToolResponse: () => {},
       close: () => (fake.closed = true),
     };
   };

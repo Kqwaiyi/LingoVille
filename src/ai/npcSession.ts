@@ -1,16 +1,14 @@
-import { PLACE_HOURS, type CulturePack, type Interaction, type NamedNpc, type NamedNpcId } from '../content/index.ts';
+import { z } from 'zod';
+import {
+  interactionFacts,
+  toToolDeclaration,
+  type CulturePack,
+  type FunctionDeclaration,
+  type Interaction,
+  type NamedNpc,
+  type NamedNpcId,
+} from '../content/index.ts';
 import { weekdayOf, type GameState, type LanguageCode, type ProficiencyStep } from '../sim/index.ts';
-
-/** A Live API function declaration (OpenAPI-subset parameters). */
-export type FunctionDeclaration = {
-  name: string;
-  description: string;
-  parameters: {
-    type: 'OBJECT';
-    properties: Record<string, { type: 'STRING'; enum?: string[]; description?: string }>;
-    required: string[];
-  };
-};
 
 /**
  * Which voice the NPC speaks with. The gateway resolves it to a prebuilt voice,
@@ -28,17 +26,27 @@ export type NpcSessionContext = {
   clock: GameState['clock'];
 };
 
-const NOT_UNDERSTOOD: FunctionDeclaration = {
-  name: 'not_understood',
-  description:
-    'Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, ' +
+export const NOT_UNDERSTOOD_TOOL = 'not_understood';
+
+// What the game answers each tool call with. The system instruction tells the NPC what each answer means.
+export type CompletionResponse = { result: 'served' } | { result: 'cannot_afford' } | { result: 'invalid_arguments'; error: string };
+export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
+export type ToolResponse = CompletionResponse | NotUnderstoodResponse | { result: 'unknown_tool' };
+
+/**
+ * Sent instead of the player's turn when an unreadable transcript uses up the
+ * last of the NPC's Patience, so the NPC ends the conversation.
+ */
+export const OUT_OF_PATIENCE_SCENE =
+  "[SCENE: Again you couldn't make sense of anything the customer said, and you have run out of patience. " +
+  'Apologise politely and say goodbye: the conversation is over.]';
+
+const NOT_UNDERSTOOD = toToolDeclaration(
+  NOT_UNDERSTOOD_TOOL,
+  'Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, ' +
     'or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.',
-  parameters: {
-    type: 'OBJECT',
-    properties: { reason: { type: 'STRING', enum: ['unintelligible', 'other_language', 'nothing_heard'] } },
-    required: ['reason'],
-  },
-};
+  z.object({ reason: z.enum(['unintelligible', 'other_language', 'nothing_heard']) }),
+);
 
 // Block 4: how the NPC speaks at each Proficiency Step.
 const STEP_ADAPTATION: Record<ProficiencyStep, string> = {
@@ -103,6 +111,7 @@ function languageRulesBlock(pack: CulturePack) {
     '- If you cannot make sense of what they said at all (gibberish, nothing heard, or a whole sentence in another language), ' +
       `first call not_understood, then say briefly in simple ${language} that you didn't understand.`,
     '- If you understood their meaning, even with mistakes, do not call not_understood. If you need a detail, just ask: clarifying is normal and costs nothing.',
+    `- If not_understood answers "out_of_patience", apologise politely in ${language} and say goodbye: the conversation is over.`,
     '- Never mention tools, functions, patience or that this is a game.',
   ]);
 }
@@ -112,19 +121,21 @@ function stepBlock(step: ProficiencyStep) {
 }
 
 function factsBlock(interaction: Interaction, pack: CulturePack) {
-  const hours = PLACE_HOURS[interaction.placeId];
-  const hoursFact = hours ? `${pack.cafe.name} is open ${formatTime(hours.opensAt)}–${formatTime(hours.closesAt)}.` : null;
   return block('FACTS', [
-    'Answer side questions using only these facts. If asked something not covered, say you don\'t know.',
-    ...[hoursFact, ...pack.cafe.facts].filter((fact) => fact !== null).map((fact) => `- ${fact}`),
+    "Answer side questions using only these facts. If asked something not covered, say you don't know.",
+    ...interactionFacts(interaction, pack.id).map((fact) => `- ${fact}`),
   ]);
 }
 
 function goalBlock(interaction: Interaction) {
+  const { name } = interaction.completion;
   return block('YOUR GOAL', [
     interaction.goal,
-    'Before you act on it, read back what you understood and wait for the customer to confirm. If they correct you, read it back again.',
-    'Once it is done, thank them and say goodbye.',
+    '- Before you act on it, read back what you understood, with the price, and wait for the customer to confirm. If they correct you, read it back again.',
+    `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed. Never call it before.`,
+    `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money and ask whether they would like something else. The conversation goes on.`,
+    `- If ${name} answers "invalid_arguments", ask them again what they would like.`,
+    `- If ${name} answers "served", hand it over, thank them and say goodbye.`,
   ]);
 }
 
@@ -132,7 +143,8 @@ function situationBlock(context: NpcSessionContext) {
   const { day, minuteOfDay } = context.clock;
   return block('THE SITUATION', [
     `It is ${formatTime(minuteOfDay)} on a ${capitalise(weekdayOf(day))} ${dayPart(minuteOfDay)}.`,
-    'When you receive a "[SCENE: ...]" message, a customer has just walked up to you: greet them first.',
+    'A "[SCENE: ...]" message tells you what is happening; it is not the customer speaking. ' +
+      'The first one means a customer has just walked up to you: greet them first.',
   ]);
 }
 
@@ -160,7 +172,7 @@ export function buildNpcSession(
 
   return {
     systemInstruction,
-    tools: [NOT_UNDERSTOOD],
+    tools: [interaction.toolDeclaration, NOT_UNDERSTOOD],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
   };
 }

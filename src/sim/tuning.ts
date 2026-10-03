@@ -60,6 +60,8 @@ export const WELL_BEING = {
   healthFullToEmptyWhileDeprivedGameMinutes: 12 * MINUTES_PER_HOUR,
   /** A Well-being gauge at or below this shows the warning colour. */
   lowWarningAt: 0.25 * METER_MAX,
+  /** Thirst one café drink gives back. */
+  cafeDrinkThirst: 0.4 * METER_MAX,
 } as const;
 
 // --- Economy (prices as ratios of one Shift's base pay) ---------------------
@@ -72,6 +74,8 @@ export const ECONOMY = {
   gymMembershipDays: 30,
   shiftCustomers: { min: 5, max: 8 },
   jobLifeSkillPayRaisePerLevel: 0.06,
+  /** The most of one item a single order can ask for. */
+  maxQuantityPerOrderLine: 5,
 } as const;
 
 export type ProficiencyStep = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
@@ -89,6 +93,11 @@ export const PROFICIENCY_STEP_TABLE: Record<
   C2: { startingPatience: 2, newcomerDiscount: 0, stakeMultiplier: 1.8, failedCustomerDock: 0.2 },
 };
 
+export const PATIENCE = {
+  /** The NPC's face looks strained once this much Patience or less is left. */
+  strainedAtOrBelow: 1,
+} as const;
+
 // --- Language Proficiency ---------------------------------------------------
 
 export const PROFICIENCY = {
@@ -104,7 +113,8 @@ export const MOOD = {
   neutral: 0.5 * METER_MAX,
   changes: {
     goalInteractionSuccess: 4,
-    goalInteractionFailure: -4,
+    /** Always a smaller dip than the success boost, so trying is worth it. */
+    goalInteractionFailure: -2,
     smallTalkExchange: 2,
     sleep: 5,
     bathhouse: 8,

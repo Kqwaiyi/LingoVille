@@ -1,30 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { chat, column, dock, field, talkToTheBarista } from './barista.ts';
 
-const column = (page: Page) => page.getByRole('complementary', { name: 'Conversation' });
-const chat = (page: Page) => column(page).getByRole('log', { name: 'Chat' });
-const field = (page: Page) => column(page).getByRole('textbox', { name: 'Typed reply' });
-const dock = (page: Page) => page.getByRole('region', { name: 'Dock' });
-
-// What the scripted fake barista says in the ja pack (mock mode).
-const GREETING = 'いらっしゃいませ！ご注文はお決まりですか？';
-const FIRST_REPLY = 'はい、かしこまりました。ほかに何かありますか？';
-
-/** Starts at the café door and walks up to the counter until the barista can be talked to. */
-async function walkToTheBarista(page: Page) {
-  await page.goto('/?spawn=cafe');
-  await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
-}
-
-async function talkToTheBarista(page: Page) {
-  await walkToTheBarista(page);
-  await page.keyboard.press('KeyE');
-  await expect(column(page)).toBeVisible();
-  // The barista always speaks first.
-  await expect(chat(page).getByText(GREETING)).toBeVisible();
-}
+// The fake barista reads back an order it recognises, even typed in romaji with a loanword.
+const READ_BACK = 'ホットラテですね。450円です。よろしいですか？';
 
 test('pressing E near the barista opens the chat column, and the barista speaks first', async ({ page }) => {
   await talkToTheBarista(page);
@@ -49,14 +27,14 @@ test('T focuses the typed field, Space types a space, and Enter sends a line the
   await expect(field(page)).toBeFocused();
   await expect(field(page)).toHaveValue('');
 
-  await page.keyboard.type('kohi kudasai');
-  await expect(field(page)).toHaveValue('kohi kudasai');
+  await page.keyboard.type('latte kudasai');
+  await expect(field(page)).toHaveValue('latte kudasai');
   await page.keyboard.press('Enter');
 
   await expect(field(page)).toHaveValue('');
   await expect(chat(page).getByText('Heard as')).toBeVisible();
-  await expect(chat(page).getByText('kohi kudasai')).toBeVisible();
-  await expect(chat(page).getByText(FIRST_REPLY)).toBeVisible();
+  await expect(chat(page).getByText('latte kudasai')).toBeVisible();
+  await expect(chat(page).getByText(READ_BACK)).toBeVisible();
   // Typing never walked the Character away from the counter.
   await expect(column(page)).toBeVisible();
 });

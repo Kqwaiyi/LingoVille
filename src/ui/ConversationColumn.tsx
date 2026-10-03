@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CULTURE_PACKS, NAMED_NPCS } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, NAMED_NPCS } from '../content/index.ts';
+import type { LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
   selectChatLines,
   selectClockMinute,
+  selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectNpcExpression,
   selectTyping,
   useGame,
   type ChatLine,
+  type ClosingCard,
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
 
@@ -20,6 +24,48 @@ function Bubble({ line }: { line: ChatLine }) {
       <small>Heard as</small>
       {line.text}
     </div>
+  );
+}
+
+// A placeholder face until real NPC faces arrive (ticket 30). It's the only way Patience shows.
+const FACE: Record<NpcExpression, string> = { relaxed: '🙂', puzzled: '😕', strained: '😟' };
+
+function NpcFace({ role }: { role: string }) {
+  const expression = useGame(selectNpcExpression);
+  if (!expression) return null;
+  return (
+    <span className="npc-face" role="img" aria-label={`The ${role} looks ${expression}`} data-expression={expression}>
+      {FACE[expression]}
+    </span>
+  );
+}
+
+function outcomeLine(card: ClosingCard, packId: LanguageCode) {
+  // A meter already at its limit doesn't move, so there's nothing to show.
+  const mood = card.moodChange === 0 ? [] : [card.moodChange > 0 ? 'Mood ↑' : 'Mood ↓'];
+  if (card.kind === 'failure') return ['No charge', ...mood];
+  const items = card.served.map(({ gloss, quantity }) => (quantity > 1 ? `${gloss} ×${quantity}` : gloss)).join(', ');
+  return [items, `−${formatLocalMoney(card.paidInShifts, packId)}`, ...mood];
+}
+
+/** Replaces the input bar once the conversation is over: the outcome, its effects, and the way on to the Recap. */
+function ClosingCardPanel({ card, role }: { card: ClosingCard; role: string }) {
+  const packId = useGame(selectCulturePackId);
+  const skipRecap = useGame((s) => s.skipRecap);
+  return (
+    <section className="closing-card" aria-label="Conversation over" data-outcome={card.kind}>
+      <h2>{card.kind === 'success' ? 'Done!' : `The ${role} couldn’t understand you`}</h2>
+      <p>{outcomeLine(card, packId).join(' · ')}</p>
+      <div className="closing-card-actions">
+        <button type="button" onClick={skipRecap} autoFocus>
+          Skip Recap
+        </button>
+        {/* Recaps arrive in ticket 06. */}
+        <button type="button" className="primary" disabled title="Recaps are coming soon">
+          See Recap
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -75,6 +121,7 @@ export function ConversationColumn() {
   const lines = useGame(selectChatLines);
   const minute = useGame(selectClockMinute);
   const packId = useGame(selectCulturePackId);
+  const closingCard = useGame(selectClosingCard);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
@@ -94,11 +141,15 @@ export function ConversationColumn() {
 
   if (!conversation) return null;
   const npc = NAMED_NPCS[conversation.npcId];
+  const role = npc.role.charAt(0).toUpperCase() + npc.role.slice(1);
 
   return (
     <aside className="chat-column" aria-label="Conversation">
       <header className="chat-header">
-        <div className="chat-who">{npc.role.charAt(0).toUpperCase() + npc.role.slice(1)}</div>
+        <div className="chat-who">
+          <NpcFace role={npc.role} />
+          <span>{role}</span>
+        </div>
         <div className="chat-meta">
           {/* The café is the only staffed place until the whole town lands (ticket 13). */}
           {CULTURE_PACKS[packId].cafe.name} · {formatClock(minute)}
@@ -119,7 +170,7 @@ export function ConversationColumn() {
           <Bubble key={i} line={line} />
         ))}
       </div>
-      <TypedField />
+      {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <TypedField />}
     </aside>
   );
 }
