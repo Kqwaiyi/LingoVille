@@ -8,7 +8,7 @@ import {
   type RapierContext,
   type RapierRigidBody,
 } from '@react-three/rapier';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Vector3, type Group } from 'three';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
 import { selectArrival, selectPlaceId, selectWorldKeysOff, useGame, type Interactable } from '../store/index.ts';
@@ -141,16 +141,26 @@ export function Character() {
   return (
     <RigidBody ref={body} type="kinematicPosition" colliders={false} position={[...spawn]} enabledRotations={[false, false, false]}>
       <CapsuleCollider ref={collider} args={[CAPSULE.halfHeight, CAPSULE.radius]} />
-      <group ref={model} rotation-y={Math.PI}>
-        <mesh castShadow>
-          <capsuleGeometry args={[CAPSULE.radius, CAPSULE.halfHeight * 2, 4, 12]} />
-          <meshStandardMaterial color="#f2d16b" flatShading />
-        </mesh>
-        <mesh position={[0, 0.45, CAPSULE.radius]} castShadow>
-          <boxGeometry args={[0.18, 0.12, 0.2]} />
-          <meshStandardMaterial color="#5b4a3a" />
-        </mesh>
-      </group>
+      <CharacterModel ref={model} rotationY={Math.PI} />
     </RigidBody>
+  );
+}
+
+/** How high the middle of the Character's body stands above the floor. */
+export const STANDING_HEIGHT = CAPSULE.halfHeight + CAPSULE.radius;
+
+/** The Character's placeholder body until the Appearance Presets arrive (ticket 30). At rotation 0 it faces +z. */
+export function CharacterModel({ ref, rotationY = 0 }: { ref?: Ref<Group>; rotationY?: number }) {
+  return (
+    <group ref={ref} rotation-y={rotationY}>
+      <mesh castShadow>
+        <capsuleGeometry args={[CAPSULE.radius, CAPSULE.halfHeight * 2, 4, 12]} />
+        <meshStandardMaterial color="#f2d16b" flatShading />
+      </mesh>
+      <mesh position={[0, 0.45, CAPSULE.radius]} castShadow>
+        <boxGeometry args={[0.18, 0.12, 0.2]} />
+        <meshStandardMaterial color="#5b4a3a" />
+      </mesh>
+    </group>
   );
 }

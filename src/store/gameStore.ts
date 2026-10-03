@@ -49,7 +49,17 @@ import {
 } from '../voice/index.ts';
 import { browserDeviceSettings, type DeviceSettingsStore } from './deviceSettings.ts';
 import { browserJournal, journalPage, type Journal, type JournalEntry, type JournalPage, type NewJournalEntry } from './journal.ts';
-import { browserSaves, type Save, type Saves } from './saves.ts';
+import {
+  deleteSave,
+  exportRawSave,
+  exportSave,
+  importSave,
+  ImportRefused,
+  type ImportProblem,
+  type SaveFile,
+  type SlotStores,
+} from './saveFiles.ts';
+import { browserSaves, SLOT_IDS, type LoadedSave, type Saves, type Slot, type SlotId } from './saves.ts';
 
 /** The fixed setup every new game uses until New game setup lands (ticket 12). */
 export const DEV_SETUP: NewGameSetup = {
@@ -64,17 +74,51 @@ export const DEV_SETUP: NewGameSetup = {
 /** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
-/** The 4 save slots. New game takes the first free one until the slot cards land (ticket 08). */
-export const SLOT_IDS = ['slot-1', 'slot-2', 'slot-3', 'slot-4'] as const;
-
 /** Which screen shows: the title, or the game itself. */
 export type Screen = 'title' | 'playing';
+
+/** A slot on the title screen: empty, a save to play, or a save that can't be loaded at all. */
+export type SlotCard =
+  | { slotId: SlotId; status: 'empty' }
+  | {
+      slotId: SlotId;
+      status: 'ready';
+      characterName: string;
+      targetLanguage: LanguageCode;
+      culturePackId: LanguageCode;
+      day: number;
+      placeId: PlaceId;
+      moneyInShifts: number;
+      /** Real time, as an ISO string. */
+      lastPlayedAt: string;
+      /** It will load from this morning's backup. */
+      fromBackup: boolean;
+    }
+  | { slotId: SlotId; status: 'damaged'; characterName: string | null; lastPlayedAt: string };
+
+/** What came of the Player's last import, export or delete on the title screen. */
+export type TitleNotice =
+  | { kind: 'imported'; slotId: SlotId }
+  | { kind: 'importRefused'; problem: ImportProblem }
+  /** The file was fine, but it couldn't be stored. */
+  | { kind: 'importFailed' }
+  | { kind: 'exportFailed' }
+  | { kind: 'deleteFailed' };
 
 /** What the title screen can offer, once it has looked for saves. */
 export type TitleView =
   | { status: 'checking' }
-  | { status: 'ready'; canContinue: boolean; canStartNew: boolean }
-  | { status: 'failed'; message: string; canStartNew: boolean };
+  | {
+      status: 'ready';
+      slots: SlotCard[];
+      /** The most recently played slot, which Continue loads, or null with no saves. */
+      continueSlotId: SlotId | null;
+      /** The first empty slot, which New game and Import use, or null when all 4 are full. */
+      freeSlotId: SlotId | null;
+      notice: TitleNotice | null;
+    }
+  /** The saves couldn't be looked at at all. */
+  | { status: 'failed'; message: string };
 
 /** How the Character arrived in the world: the First Morning, or back from a save. The world picks the spawn point from it. */
 export type Arrival = 'newGame' | 'continued';
@@ -86,7 +130,7 @@ export type Interactable = 'tap' | NamedNpcId;
 export type ChatLine = TranscriptLine & { typed?: true };
 
 /** A short notice over the game that clears itself. */
-export type Toast = { kind: 'npcSteppedAway'; npcId: NamedNpcId } | { kind: 'recapSaved' };
+export type Toast = { kind: 'npcSteppedAway'; npcId: NamedNpcId } | { kind: 'recapSaved' } | { kind: 'loadedBackup' };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -140,7 +184,60 @@ export type GameStoreDeps = {
   saves: Saves;
   deviceSettings: DeviceSettingsStore;
   hearItSaid: HearItSaid;
+  /** Asks the browser to keep this site's data when space runs low. */
+  storage: StoragePersistence;
+  /** Hands the Player a file to keep. */
+  downloadFile: (file: SaveFile) => void;
 };
+
+/** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
+export type StoragePersistence = { persisted: () => Promise<boolean>; persist: () => Promise<boolean> };
+
+/** The device settings tooltip id that remembers the persist-refused callout was dismissed. */
+const PERSIST_REFUSED = 'persist-refused';
+
+/** Where the browser can't keep data on request, there's nothing to ask for or warn about. */
+const browserStorage: StoragePersistence = {
+  persisted: () => (typeof navigator !== 'undefined' && navigator.storage?.persisted ? navigator.storage.persisted() : Promise.resolve(true)),
+  persist: () => (typeof navigator !== 'undefined' && navigator.storage?.persist ? navigator.storage.persist() : Promise.resolve(true)),
+};
+
+function downloadInBrowser({ fileName, contents }: SaveFile) {
+  const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
+  const link = Object.assign(document.createElement('a'), { href: url, download: fileName });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** A slot's card on the title screen. */
+function slotCard(slot: Slot): SlotCard {
+  switch (slot.status) {
+    case 'empty':
+      return slot;
+    case 'damaged':
+      return { slotId: slot.slotId, status: 'damaged', characterName: slot.characterName, lastPlayedAt: slot.lastPlayedAt };
+    case 'ready': {
+      const { identity, clock, placeId, character } = slot.save.game;
+      return {
+        slotId: slot.slotId,
+        status: 'ready',
+        characterName: identity.characterName,
+        targetLanguage: identity.targetLanguage,
+        culturePackId: identity.culturePackId,
+        day: clock.day,
+        placeId,
+        moneyInShifts: character.moneyInShifts,
+        lastPlayedAt: slot.lastPlayedAt,
+        fromBackup: slot.fromBackup,
+      };
+    }
+  }
+}
+
+/** What the Player types to delete a save: the Character's name or, if the save is too damaged to tell, "delete". */
+export function nameToDelete(card: Exclude<SlotCard, { status: 'empty' }>) {
+  return card.characterName ?? 'delete';
+}
 
 async function requestRecapFromGateway(request: RecapRequest): Promise<Recap> {
   const res = await fetch('/api/recap', {
@@ -159,6 +256,8 @@ const BROWSER_DEPS: GameStoreDeps = {
   saves: browserSaves,
   deviceSettings: browserDeviceSettings,
   hearItSaid,
+  storage: browserStorage,
+  downloadFile: downloadInBrowser,
 };
 
 export type GameStore = {
@@ -185,12 +284,26 @@ export type GameStore = {
   voiceUnavailable: boolean;
   /** The full-screen Journal, while it is open. */
   journal: JournalView | null;
+  /** The browser refused to keep saves safe from clearing, and the Player hasn't dismissed the callout yet. */
+  persistCallout: boolean;
   /** Looks for saves and reads this browser's device settings, for the title screen. */
   openTitle: () => void;
   /** Continue: plays the most recently played save. */
   continueGame: () => void;
-  /** New game: the First Morning, from the fixed dev setup until New game setup lands (ticket 12). */
+  /** Load a save: plays the save in this slot. */
+  playSlot: (slotId: SlotId) => void;
+  /** New game: the First Morning in the first empty slot, from the fixed dev setup until New game setup lands (ticket 12). */
   newGame: () => void;
+  /** Downloads the slot as one file: its save, its Journal and its backups' metadata. */
+  exportSave: (slotId: SlotId) => void;
+  /** Downloads everything stored for a slot, as found, for a save that can't be loaded. */
+  exportRawSave: (slotId: SlotId) => void;
+  /** Imports an exported file's contents into the first empty slot. */
+  importSave: (contents: string) => void;
+  /** Deletes the slot's save, its backups and its Journal, if `typedName` is the Character's name. */
+  deleteSave: (slotId: SlotId, typedName: string) => void;
+  dismissTitleNotice: () => void;
+  dismissPersistCallout: () => void;
   /** Saves now, as the page is closed. */
   saveNow: () => void;
   /** Called once per rendered frame with the real time since the last one. */
@@ -242,9 +355,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   // The game as it was when the open conversation began: what a save holds until its outcome is decided.
   let gameBeforeConversation: GameState | null = null;
   let realMsSinceSave = 0;
-  // Found by the title screen, and played by Continue.
-  let latestSave: Save | null = null;
-  let freeSlot: string | null = null;
+  // Found by the title screen: what Continue and Load a save play.
+  let slots: Slot[] = [];
+  let askedToPersist = false;
+  const stores: SlotStores = { saves: deps.saves, journal: deps.journal };
 
   return createStore<GameStore>()((set, get) => {
     /**
@@ -254,6 +368,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const save = () => {
       const { screen, conversation, slotId } = get();
       if (screen !== 'playing') return;
+      askToPersist();
       const game = conversation && !conversation.outcome && gameBeforeConversation ? gameBeforeConversation : get().game;
       realMsSinceSave = 0;
       // Started at once: IndexedDB runs writes in the order they began, so an older game never lands after a newer one.
@@ -263,10 +378,86 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       );
     };
 
-    const play = (game: GameState, slotId: string, arrival: Arrival) => {
+    const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
       realMsSinceSave = 0;
-      set({ screen: 'playing', title: null, game, slotId, arrival });
+      set({ screen: 'playing', title: null, game, slotId, arrival, toast });
     };
+
+    const playLoaded = ({ save, fromBackup }: LoadedSave) =>
+      play(save.game, save.slotId, 'continued', fromBackup ? { kind: 'loadedBackup' } : null);
+
+    /** Shows the persist-refused callout, unless the Player has dismissed it before. */
+    const offerPersistCallout = () =>
+      deps.deviceSettings.load().then(
+        ({ tooltipsSeen }) => {
+          if (!tooltipsSeen.includes(PERSIST_REFUSED)) set({ persistCallout: true });
+        },
+        (error: unknown) => console.warn('[settings] could not be read:', error),
+      );
+
+    /** Offers the callout if saves aren't kept safe: checked, or with `ask`, asked for first. */
+    const checkPersisted = (ask: boolean) =>
+      deps.storage
+        .persisted()
+        .then((persisted) => persisted || (ask && deps.storage.persist()))
+        .then(
+          (kept) => {
+            if (!kept) void offerPersistCallout();
+          },
+          (error: unknown) => console.warn('[storage] could not check persistence:', error),
+        );
+
+    /** On the first write, asks the browser to keep saves from being cleared when space runs low. */
+    const askToPersist = () => {
+      if (askedToPersist) return;
+      askedToPersist = true;
+      void checkPersisted(true);
+    };
+
+    const readyTitle = () => {
+      const title = get().title;
+      return get().screen === 'title' && title?.status === 'ready' ? title : null;
+    };
+
+    /** Looks at every slot again, for the title screen. */
+    const checkSlots = (notice: TitleNotice | null = null) =>
+      deps.saves.slots().then(
+        (found) => {
+          slots = found;
+          if (get().screen !== 'title') return;
+          const played = found
+            .filter((slot) => slot.status !== 'empty')
+            .sort((a, b) => b.lastPlayedAt.localeCompare(a.lastPlayedAt));
+          set({
+            title: {
+              status: 'ready',
+              slots: found.map(slotCard),
+              continueSlotId: played[0]?.slotId ?? null,
+              freeSlotId: found.find((slot) => slot.status === 'empty')?.slotId ?? null,
+              notice,
+            },
+          });
+          // Saves from an earlier visit may not have been kept safe.
+          if (played.length > 0) void checkPersisted(false);
+        },
+        (error: unknown) => {
+          console.error('[save] the saves could not be read:', error);
+          slots = [];
+          set({ title: { status: 'failed', message: error instanceof Error ? error.message : String(error) } });
+        },
+      );
+
+    const setNotice = (notice: TitleNotice) => {
+      const title = readyTitle();
+      if (title) set({ title: { ...title, notice } });
+    };
+
+    /** Hands the Player a file made from a slot, or says it couldn't be made. */
+    const download = (make: () => Promise<SaveFile>) =>
+      make().then(deps.downloadFile, (error: unknown) => {
+        console.error('[save] could not export:', error);
+        setNotice({ kind: 'exportFailed' });
+      });
 
     const updateConversation = (change: Partial<Conversation>) => {
       const conversation = get().conversation;
@@ -303,6 +494,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const entry = (recap: Recap | null): NewJournalEntry => ({
         kind: 'goal',
         npcId: conversation.npcId,
+        npcName: game.people[conversation.npcId]?.knowsName ? CULTURE_PACKS[culturePackId].personas[conversation.npcId].name : null,
         interactionId: conversation.interaction.id,
         placeName: CULTURE_PACKS[culturePackId].cafe.name,
         day: game.clock.day,
@@ -483,35 +675,71 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       voiceUnavailable: false,
       nativeLanguage: DEV_NATIVE_LANGUAGE,
       journal: null,
+      persistCallout: false,
       openTitle: () => {
         set({ title: { status: 'checking' } });
-        const settings = deps.deviceSettings.load().then(
-          ({ nativeLanguage }) => set({ nativeLanguage }),
-          (error: unknown) => console.warn('[settings] could not be read:', error),
-        );
-        const slots = deps.saves.usedSlots().then(
-          (used) => (freeSlot = SLOT_IDS.find((slot) => !used.includes(slot)) ?? null),
-          () => (freeSlot = null),
-        );
-        const latest = deps.saves.mostRecent().then((found) => (latestSave = found));
-        Promise.all([latest, slots, settings]).then(
-          () => set({ title: { status: 'ready', canContinue: latestSave !== null, canStartNew: freeSlot !== null } }),
-          async (error: unknown) => {
-            console.error('[save] the latest save could not be loaded:', error);
-            await Promise.allSettled([slots, settings]);
-            const message = error instanceof Error ? error.message : String(error);
-            set({ title: { status: 'failed', message, canStartNew: freeSlot !== null } });
+        // The settings come first, so the title shows in the Player's language.
+        deps.deviceSettings
+          .load()
+          .then(
+            ({ nativeLanguage }) => set({ nativeLanguage }),
+            (error: unknown) => console.warn('[settings] could not be read:', error),
+          )
+          .then(() => checkSlots());
+      },
+      continueGame: () => {
+        const continueSlotId = readyTitle()?.continueSlotId;
+        if (continueSlotId) get().playSlot(continueSlotId);
+      },
+      playSlot: (slotId) => {
+        const slot = readyTitle() ? slots.find((s) => s.slotId === slotId) : undefined;
+        if (slot?.status === 'ready') playLoaded(slot);
+      },
+      newGame: () => {
+        const freeSlotId = readyTitle()?.freeSlotId;
+        if (!freeSlotId) return;
+        play(createSave(DEV_SETUP), freeSlotId, 'newGame');
+        save();
+      },
+      exportSave: (slotId) => void download(() => exportSave(stores, slotId)),
+      exportRawSave: (slotId) => void download(() => exportRawSave(stores, slotId)),
+      importSave: (contents) => {
+        const freeSlotId = readyTitle()?.freeSlotId;
+        if (!freeSlotId) return;
+        askToPersist();
+        importSave(stores, freeSlotId, contents).then(
+          () => checkSlots({ kind: 'imported', slotId: freeSlotId }),
+          (error: unknown) => {
+            console.warn('[save] import refused:', error instanceof Error ? error.message : error);
+            setNotice(error instanceof ImportRefused ? { kind: 'importRefused', problem: error.problem } : { kind: 'importFailed' });
           },
         );
       },
-      continueGame: () => {
-        if (get().screen === 'playing' || !latestSave) return;
-        play(latestSave.game, latestSave.slotId, 'continued');
+      deleteSave: (slotId, typedName) => {
+        const card = readyTitle()?.slots.find((slot) => slot.slotId === slotId);
+        if (!card || card.status === 'empty' || typedName.trim() !== nameToDelete(card)) return;
+        deleteSave(stores, slotId).then(
+          () => checkSlots(),
+          (error: unknown) => {
+            console.error('[save] could not delete:', error);
+            setNotice({ kind: 'deleteFailed' });
+          },
+        );
       },
-      newGame: () => {
-        if (get().screen === 'playing' || !freeSlot) return;
-        play(createSave(DEV_SETUP), freeSlot, 'newGame');
-        save();
+      dismissTitleNotice: () => {
+        const title = readyTitle();
+        if (title?.notice) set({ title: { ...title, notice: null } });
+      },
+      dismissPersistCallout: () => {
+        set({ persistCallout: false });
+        deps.deviceSettings
+          .load()
+          .then((settings) =>
+            settings.tooltipsSeen.includes(PERSIST_REFUSED)
+              ? undefined
+              : deps.deviceSettings.save({ ...settings, tooltipsSeen: [...settings.tooltipsSeen, PERSIST_REFUSED] }),
+          )
+          .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
       },
       saveNow: save,
       advance: (realDeltaMs) => {
@@ -668,6 +896,13 @@ export const selectScreen = (s: GameStore) => s.screen;
 export const selectTitle = (s: GameStore) => s.title;
 export const selectArrival = (s: GameStore) => s.arrival;
 export const selectSavedCount = (s: GameStore) => s.savedCount;
+export const selectPersistCallout = (s: GameStore) => s.persistCallout;
+/** The place the title screen shows: where the Continue save was left, or home. */
+export const selectTitlePlaceId = (s: GameStore): PlaceId => {
+  const title = s.title?.status === 'ready' ? s.title : null;
+  const card = title?.slots.find((slot) => slot.slotId === title.continueSlotId);
+  return card?.status === 'ready' ? card.placeId : 'home';
+};
 
 export const selectTimeScale = (s: GameStore) => {
   if (s.tabHidden || s.journal) return CLOCK.timeScale.paused;

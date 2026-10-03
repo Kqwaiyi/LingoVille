@@ -25,9 +25,10 @@ function Reading({ base, reading }: { base: string; reading: string }) {
   );
 }
 
-export function journalPageTitle(page: Pick<JournalPage, 'npcId' | 'placeName'>) {
+/** The NPC by the name the Character knew them by then, or by their role. */
+export function journalPageTitle(page: Pick<JournalPage, 'npcId' | 'npcName' | 'placeName'>) {
   const { role } = NAMED_NPCS[page.npcId];
-  return `${role.charAt(0).toUpperCase()}${role.slice(1)} · ${page.placeName}`;
+  return `${page.npcName ?? `${role.charAt(0).toUpperCase()}${role.slice(1)}`} · ${page.placeName}`;
 }
 
 export function journalPageWhen(page: Pick<JournalPage, 'day' | 'minuteOfDay'>) {

@@ -18,6 +18,7 @@ import {
   SAVE_SCHEMA_VERSION,
   type GameStoreDeps,
 } from './index.ts';
+import { recordingSaves } from './testSaves.ts';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -83,13 +84,11 @@ function cafe() {
     requestRecap,
     journal,
     saves: {
+      ...recordingSaves().saves,
       write: async (slotId, game) => {
         autosaves.push({ game, closingCardShown: selectClosingCard(store.getState()) !== null });
         return { schemaVersion: SAVE_SCHEMA_VERSION, slotId, createdAt: '', lastPlayedAt: '', game };
       },
-      load: async () => null,
-      mostRecent: async () => null,
-      usedSlots: async () => [],
     },
     hearItSaid: async (text, targetLanguage) => void said.push({ text, targetLanguage }),
   });
@@ -198,6 +197,36 @@ describe('the Recap', () => {
     expect(selectConversation(store.getState())).toBeNull();
     expect(shown?.status).toBe('ready');
     expect(await journal.list('slot-1')).toEqual([expect.objectContaining(shown?.status === 'ready' ? shown.entry : {})]);
+  });
+
+  it('keeps the NPC’s name in the Journal only once the Character knows it', async () => {
+    const stranger = cafe();
+    stranger.store.getState().talk();
+    stranger.npc.calls('serve_order', { items: [{ item: 'latte', quantity: 1 }] });
+    stranger.npc.says('ありがとうございました。');
+    await stranger.recaps[0]!.arrives(RECAP);
+
+    const regular = cafe();
+    const game = regular.store.getState().game;
+    const memory = {
+      familiarity: 4,
+      todaysGain: { day: 1, amount: 0 },
+      timesMet: 3,
+      knowsName: true,
+      usualOrder: null,
+      lastTopic: null,
+      favouriteKnown: false,
+      lastGiftDay: null,
+      registerOffered: false,
+    };
+    regular.store.setState({ game: { ...game, people: { barista: memory } } });
+    regular.store.getState().talk();
+    regular.npc.calls('serve_order', { items: [{ item: 'latte', quantity: 1 }] });
+    regular.npc.says('ありがとうございました。');
+    await regular.recaps[0]!.arrives(RECAP);
+
+    expect((await stranger.journal.list('slot-1'))[0]?.npcName).toBeNull();
+    expect((await regular.journal.list('slot-1'))[0]?.npcName).toBe(CULTURE_PACKS[DEV_SETUP.culturePackId].personas.barista.name);
   });
 
   it('Skip Recap still saves the Recap to the Journal when it arrives, and says so', async () => {

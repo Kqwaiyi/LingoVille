@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
-import { createStore, get, set } from 'idb-keyval';
+import { createStore, get, keys, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
 import { createSave, type GameState } from '../sim/index.ts';
-import { createSaves, DEV_SETUP, SAVE_SCHEMA_VERSION } from './index.ts';
+import { createSaves, DEV_SETUP, SAVE_SCHEMA_VERSION, SLOT_IDS } from './index.ts';
 
 let databases = 0;
 /** Saves over their own fresh IndexedDB database, with the raw store so a test can plant or read stored bytes. */
@@ -10,6 +10,14 @@ function freshSaves(now = () => new Date('2026-10-03T09:00:00Z')) {
   const raw = createStore(`saves-test-${++databases}`, 'saves');
   return { saves: createSaves(() => raw, { now }), raw };
 }
+
+/** Plants stored bytes as both the main save and this morning's backup, so a load can't fall back past them. */
+async function plant(raw: UseStore, slotId: string, stored: unknown) {
+  await set(slotId, stored, raw);
+  await set(`${slotId}/start-of-day`, stored, raw);
+}
+
+const garbled = { schemaVersion: SAVE_SCHEMA_VERSION, game: { garbled: true } };
 
 /** A game well under way, with every field group filled in. */
 function lived(): GameState {
@@ -54,6 +62,18 @@ function lived(): GameState {
   };
 }
 
+/** The same game, a few hours on. */
+const later = (game: GameState): GameState => ({ ...game, clock: { ...game.clock, minuteOfDay: game.clock.minuteOfDay + 180 } });
+/** The same game, just after midnight. */
+const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.clock.day + 1, minuteOfDay: 0 } });
+
+/** The game before saves had phrasebooks: version 1. */
+function beforePhrasebooks() {
+  const game: Partial<GameState> = lived();
+  delete game.phrasebook;
+  return game;
+}
+
 describe('saves', () => {
   it('loads back exactly the game that was saved, RNG state and phrasebook included', async () => {
     const { saves } = freshSaves();
@@ -62,22 +82,23 @@ describe('saves', () => {
     await saves.write('slot-1', game);
 
     const loaded = await saves.load('slot-1');
-    expect(loaded?.game).toEqual(game);
-    expect(loaded).toMatchObject({ schemaVersion: SAVE_SCHEMA_VERSION, slotId: 'slot-1' });
+    expect(loaded?.save.game).toEqual(game);
+    expect(loaded?.save).toMatchObject({ schemaVersion: SAVE_SCHEMA_VERSION, slotId: 'slot-1' });
+    expect(loaded?.fromBackup).toBe(false);
   });
 
   it('survives a reload: new saves over the same database read the same game', async () => {
     const { saves, raw } = freshSaves();
     await saves.write('slot-1', lived());
 
-    expect((await createSaves(() => raw).load('slot-1'))?.game).toEqual(lived());
+    expect((await createSaves(() => raw).load('slot-1'))?.save.game).toEqual(lived());
   });
 
   it('has nothing to load from an empty slot', async () => {
     const { saves } = freshSaves();
 
     expect(await saves.load('slot-1')).toBeNull();
-    expect(await saves.mostRecent()).toBeNull();
+    expect(await saves.slots()).toEqual(SLOT_IDS.map((slotId) => ({ slotId, status: 'empty' })));
   });
 
   it('keeps when the save was created, and stamps when it was last played on every write', async () => {
@@ -88,41 +109,42 @@ describe('saves', () => {
     clock = new Date('2026-10-04T20:30:00Z');
     await saves.write('slot-1', lived());
 
-    expect(await saves.load('slot-1')).toMatchObject({
+    expect((await saves.load('slot-1'))?.save).toMatchObject({
       createdAt: '2026-10-03T09:00:00.000Z',
       lastPlayedAt: '2026-10-04T20:30:00.000Z',
     });
   });
 
-  it('continues the most recently played slot', async () => {
+  it('lists every slot: empty, ready with when it was last played, or damaged', async () => {
     let clock = new Date('2026-10-03T09:00:00Z');
-    const { saves } = freshSaves(() => clock);
-
+    const { saves, raw } = freshSaves(() => clock);
     await saves.write('slot-1', createSave(DEV_SETUP));
     clock = new Date('2026-10-03T10:00:00Z');
-    await saves.write('slot-2', lived());
-    expect((await saves.mostRecent())?.slotId).toBe('slot-2');
+    await saves.write('slot-3', lived());
+    await plant(raw, 'slot-4', { ...garbled, lastPlayedAt: '2026-10-02T08:00:00.000Z' });
 
-    clock = new Date('2026-10-03T11:00:00Z');
-    await saves.write('slot-1', createSave(DEV_SETUP));
-    expect((await saves.mostRecent())?.slotId).toBe('slot-1');
-    expect((await saves.usedSlots()).sort()).toEqual(['slot-1', 'slot-2']);
+    const [one, two, three, four] = await saves.slots();
+
+    expect(one).toMatchObject({ slotId: 'slot-1', status: 'ready', lastPlayedAt: '2026-10-03T09:00:00.000Z', fromBackup: false });
+    expect(one?.status === 'ready' && one.save.game).toEqual(createSave(DEV_SETUP));
+    expect(two).toEqual({ slotId: 'slot-2', status: 'empty' });
+    expect(three).toMatchObject({ slotId: 'slot-3', status: 'ready', lastPlayedAt: '2026-10-03T10:00:00.000Z' });
+    expect(four).toMatchObject({ slotId: 'slot-4', status: 'damaged', lastPlayedAt: '2026-10-02T08:00:00.000Z', characterName: null });
+    expect(four?.status === 'damaged' && four.message).toMatch(/slot-4/);
   });
 
   it('upgrades an old save through the migrations, after backing up the bytes it found', async () => {
     const { saves, raw } = freshSaves();
-    const beforePhrasebooks: Partial<GameState> = lived();
-    delete beforePhrasebooks.phrasebook;
     const v1 = {
       schemaVersion: 1,
       slotId: 'slot-1',
       createdAt: '2026-10-01T09:00:00.000Z',
       lastPlayedAt: '2026-10-02T09:00:00.000Z',
-      game: beforePhrasebooks,
+      game: beforePhrasebooks(),
     };
     await set('slot-1', v1, raw);
 
-    const loaded = await saves.load('slot-1');
+    const loaded = (await saves.load('slot-1'))?.save;
 
     expect(loaded?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(loaded?.game).toEqual({ ...lived(), phrasebook: [] });
@@ -136,7 +158,7 @@ describe('saves', () => {
     const { saves, raw } = freshSaves();
     await saves.write('slot-1', lived());
     const stored = (await get<{ game: GameState }>('slot-1', raw))!;
-    await set('slot-1', { ...stored, game: { ...stored.game, placeId: 'library' } }, raw);
+    await plant(raw, 'slot-1', { ...stored, game: { ...stored.game, placeId: 'library' } });
 
     await expect(saves.load('slot-1')).rejects.toThrow(/slot-1.*placeId/s);
   });
@@ -146,11 +168,11 @@ describe('saves', () => {
     await saves.write('slot-1', lived());
     const stored = (await get<{ game: GameState }>('slot-1', raw))!;
 
-    await set('slot-1', { ...stored, game: { ...stored.game, people: { ghost: stored.game.people.barista } } }, raw);
+    await plant(raw, 'slot-1', { ...stored, game: { ...stored.game, people: { ghost: stored.game.people.barista } } });
     await expect(saves.load('slot-1')).rejects.toThrow(/people/);
 
     const inventory = [{ itemId: 'espresso-tonic', quantity: 1, expiresOnDay: null }];
-    await set('slot-1', { ...stored, game: { ...stored.game, possessions: { ...stored.game.possessions, inventory } } }, raw);
+    await plant(raw, 'slot-1', { ...stored, game: { ...stored.game, possessions: { ...stored.game.possessions, inventory } } });
     await expect(saves.load('slot-1')).rejects.toThrow(/inventory/);
   });
 
@@ -158,8 +180,112 @@ describe('saves', () => {
     const { saves, raw } = freshSaves();
     await saves.write('slot-1', lived());
     const stored = (await get<object>('slot-1', raw))!;
-    await set('slot-1', { ...stored, schemaVersion: SAVE_SCHEMA_VERSION + 1 }, raw);
+    await plant(raw, 'slot-1', { ...stored, schemaVersion: SAVE_SCHEMA_VERSION + 1 });
 
     await expect(saves.load('slot-1')).rejects.toThrow(/newer/);
+  });
+});
+
+describe('the start-of-day backup', () => {
+  it('is written with the first save of a slot, and rotated only at the first save of each new day', async () => {
+    const { saves, raw } = freshSaves();
+    const morning = lived();
+
+    await saves.write('slot-1', morning);
+    await saves.write('slot-1', later(morning));
+    expect((await get<{ game: GameState }>('slot-1/start-of-day', raw))?.game).toEqual(morning);
+
+    await saves.write('slot-1', nextDay(morning));
+    await saves.write('slot-1', later(nextDay(morning)));
+    expect((await get<{ game: GameState }>('slot-1/start-of-day', raw))?.game).toEqual(nextDay(morning));
+  });
+
+  it('is loaded instead when the main save can’t be, and says so', async () => {
+    const { saves, raw } = freshSaves();
+    const morning = lived();
+    await saves.write('slot-1', morning);
+    await saves.write('slot-1', later(morning));
+    await set('slot-1', garbled, raw);
+
+    const loaded = await saves.load('slot-1');
+
+    expect(loaded?.fromBackup).toBe(true);
+    expect(loaded?.save.game).toEqual(morning);
+    expect((await saves.slots())[0]).toMatchObject({ status: 'ready', fromBackup: true });
+  });
+
+  it('is upgraded through the migrations like any save', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', 'not a save at all', raw);
+    await set('slot-1/start-of-day', { schemaVersion: 1, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforePhrasebooks() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual({ ...lived(), phrasebook: [] });
+  });
+
+  it('when it can’t be loaded either, the slot fails naming itself, and nothing is deleted', async () => {
+    const { saves, raw } = freshSaves();
+    await plant(raw, 'slot-1', garbled);
+
+    await expect(saves.load('slot-1')).rejects.toThrow(/slot-1/);
+    expect(await get('slot-1', raw)).toEqual(garbled);
+    expect(await get('slot-1/start-of-day', raw)).toEqual(garbled);
+  });
+
+  it('once play goes on from it, the damaged main save is kept aside instead of written over', async () => {
+    const { saves, raw } = freshSaves();
+    await saves.write('slot-1', lived());
+    await set('slot-1', garbled, raw);
+
+    await saves.write('slot-1', later(lived()));
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(later(lived()));
+    const aside = (await saves.backups('slot-1')).find((backup) => backup.name.startsWith('damaged-'));
+    expect(await get(`slot-1/${aside?.name}`, raw)).toEqual(garbled);
+  });
+});
+
+describe('a slot', () => {
+  it('describes its backups by name, version, day and when they were played', async () => {
+    const { saves } = freshSaves();
+    await saves.write('slot-1', lived());
+
+    expect(await saves.backups('slot-1')).toEqual([
+      { name: 'start-of-day', schemaVersion: SAVE_SCHEMA_VERSION, day: 3, lastPlayedAt: '2026-10-03T09:00:00.000Z' },
+    ]);
+  });
+
+  it('hands over everything it stores, as found, for Export raw', async () => {
+    const { saves, raw } = freshSaves();
+    await saves.write('slot-1', lived());
+    await set('slot-1', 'garbled', raw);
+
+    const found = await saves.raw('slot-1');
+
+    expect(found.save).toBe('garbled');
+    expect(Object.keys(found.backups)).toEqual(['start-of-day']);
+  });
+
+  it('can be removed with its backups, leaving the other slots alone', async () => {
+    const { saves, raw } = freshSaves();
+    await saves.write('slot-1', lived());
+    await saves.write('slot-2', lived());
+    await set('slot-1/pre-migration-v1', {}, raw);
+
+    await saves.remove('slot-1');
+
+    expect(await saves.load('slot-1')).toBeNull();
+    expect((await keys(raw)).sort()).toEqual(['slot-2', 'slot-2/start-of-day']);
+  });
+
+  it('takes a restored save only while empty, as the save it was, now in this slot', async () => {
+    const { saves } = freshSaves();
+    const original = await saves.write('slot-1', lived());
+
+    const restored = await saves.restore('slot-2', original);
+
+    expect(restored).toEqual({ ...original, slotId: 'slot-2' });
+    expect((await saves.load('slot-2'))?.save).toEqual(restored);
+    expect((await saves.backups('slot-2')).map((backup) => backup.name)).toEqual(['start-of-day']);
+    await expect(saves.restore('slot-1', original)).rejects.toThrow(/slot-1.*empty/);
   });
 });

@@ -654,56 +654,309 @@ body,
 
 /* --- Title screen ------------------------------------------------------------ */
 
+/* The menu and panel sit over the live town, with a dark gradient on the left so they stay readable. */
 .title-screen {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 440px) 1fr;
   align-items: center;
-  padding-left: clamp(16px, 8vw, 96px);
-  background: linear-gradient(90deg, #141824 0%, #2a3247 55%, #cfe3f2 100%);
+  gap: clamp(16px, 4vw, 56px);
+  padding: 0 clamp(16px, 6vw, 80px);
+  background: linear-gradient(90deg, rgba(12, 15, 24, 0.94) 0%, rgba(12, 15, 24, 0.78) 38%, rgba(12, 15, 24, 0) 72%);
   color: var(--hud-ink);
 }
 
-.title-menu {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  max-width: 320px;
-}
-
 .title-menu h1 {
-  margin: 0 0 12px;
+  margin: 0 0 28px;
   font-size: 40px;
   letter-spacing: 0.02em;
 }
 
-.title-menu button {
-  min-width: 200px;
-  padding: 10px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
+.title-menu ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.title-menu li > button {
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--hud-muted);
   font: inherit;
+  font-size: 20px;
   text-align: left;
   cursor: pointer;
 }
 
-.title-menu button.primary {
-  border-color: var(--ok);
-  background: var(--ok);
-  color: #1d2433;
-  font-weight: 600;
+.title-menu li > button[aria-current] {
+  color: var(--hud-ink);
+  font-weight: 700;
 }
 
-.title-menu button:disabled {
+.title-menu li > button[aria-disabled] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.title-menu li > button:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 4px;
 }
 
 .title-note {
   margin: 0;
   font-size: 13px;
   color: var(--hud-muted);
+}
+
+.title-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 22px 24px;
+  border-radius: 16px;
+  background: rgba(20, 24, 36, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.title-panel h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.title-panel p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--hud-muted);
+}
+
+.title-panel button,
+.persist-callout button,
+.delete-dialog button {
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.title-panel button.primary {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: #1d2433;
+  font-weight: 600;
+}
+
+.title-panel button.danger,
+.delete-dialog button.danger {
+  border-color: var(--low);
+  color: var(--low);
+}
+
+.title-panel button:disabled,
+.delete-dialog button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.title-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: stretch;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.title-panel .title-notice {
+  color: var(--hud-ink);
+}
+
+.title-panel .title-notice-close {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+}
+
+.slot-summary,
+.slot-damaged {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.slot-summary strong,
+.slot-damaged strong {
+  font-size: 17px;
+}
+
+.slot-when {
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.slot-backup {
+  font-size: 13px;
+  color: #f2d16b;
+}
+
+.slot-damaged strong {
+  color: #f2d16b;
+}
+
+.slot-actions {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.slot-row .slot-actions {
+  margin-top: 0;
+}
+
+.slot-row .slot-damaged {
+  grid-column: 2 / -1;
+}
+
+.slot-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hud-muted);
+}
+
+.slot-empty {
+  grid-column: 2 / -1;
+  color: var(--hud-muted);
+}
+
+.slot-more {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #1d2433;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.title-keys {
+  position: absolute;
+  left: clamp(16px, 6vw, 80px);
+  bottom: 20px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.title-keys kbd,
+.title-screen kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  font: inherit;
+}
+
+.persist-callout {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.persist-callout p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.delete-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: #1d2433;
+  color: var(--hud-ink);
+}
+
+.delete-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.delete-dialog p {
+  margin: 0;
+  color: var(--hud-muted);
+}
+
+.delete-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.delete-dialog input {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+}
+
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .title-screen {
+    grid-template-columns: 1fr;
+    align-content: center;
+  }
 }

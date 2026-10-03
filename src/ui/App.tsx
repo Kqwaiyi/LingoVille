@@ -6,6 +6,7 @@ import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
+import { PersistCallout } from './PersistCallout.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
@@ -26,18 +27,23 @@ function usePauseAndSaveWhenHidden() {
   }, [setTabHidden, saveNow]);
 }
 
+/** The live town is always there: behind the title screen first, then under the HUD. */
 export function App() {
   usePauseAndSaveWhenHidden();
   const screen = useGame(selectScreen);
-  return screen === 'title' ? <TitleScreen /> : <Game />;
-}
-
-function Game() {
   const talking = useGame(selectConversation) !== null;
 
   return (
     <main className="game" data-talking={talking || undefined}>
       <Scene />
+      {screen === 'title' ? <TitleScreen /> : <Hud />}
+    </main>
+  );
+}
+
+function Hud() {
+  return (
+    <>
       <GatewayStatus />
       <InteractionPrompt />
       <Dock />
@@ -45,6 +51,7 @@ function Game() {
       <Toast />
       <Journal />
       <VoiceUnavailableScreen />
-    </main>
+      <PersistCallout />
+    </>
   );
 }

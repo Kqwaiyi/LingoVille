@@ -6,7 +6,7 @@ import { selectToast, selectVoiceUnavailable, useGame } from '../store/index.ts'
 
 const TOAST_MS = 5_000;
 
-/** A notice at the top of the screen that clears itself, such as a network abandonment or a skipped Recap. */
+/** A notice at the top of the screen that clears itself, such as a network abandonment, a skipped Recap or a load from the backup. */
 export function Toast() {
   const toast = useGame(selectToast);
   const dismissToast = useGame((s) => s.dismissToast);
@@ -20,9 +20,9 @@ export function Toast() {
   if (!toast) return null;
   return (
     <div className="toast" role="status">
-      {toast.kind === 'recapSaved'
-        ? 'Recap saved to your Journal'
-        : `The ${NAMED_NPCS[toast.npcId].role} had to step away. Nothing was lost.`}
+      {toast.kind === 'recapSaved' && 'Recap saved to your Journal'}
+      {toast.kind === 'loadedBackup' && 'Loaded this morning’s save'}
+      {toast.kind === 'npcSteppedAway' && `The ${NAMED_NPCS[toast.npcId].role} had to step away. Nothing was lost.`}
     </div>
   );
 }

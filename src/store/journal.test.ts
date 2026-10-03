@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { createStore, set } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
-import { createJournal, JOURNAL_SCHEMA_VERSION, type NewJournalEntry } from './index.ts';
+import { createJournal, JOURNAL_SCHEMA_VERSION, parseJournalEntry, type NewJournalEntry } from './index.ts';
 
 let databases = 0;
 /** A Journal over its own fresh IndexedDB database, with the raw store so a test can plant stored bytes. */
@@ -13,6 +13,7 @@ function freshJournal() {
 const entry = (day: number, outcome = `Ordered a latte on day ${day}.`): NewJournalEntry => ({
   kind: 'goal',
   npcId: 'barista',
+  npcName: '佐藤',
   interactionId: 'order-drink',
   placeName: 'ほしコーヒー',
   day,
@@ -110,5 +111,49 @@ describe('the Journal', () => {
     await set('slot-1', [good, { ...good, schemaVersion: JOURNAL_SCHEMA_VERSION + 1 }], raw);
 
     await expect(journal.list('slot-1')).rejects.toThrow(/slot-1/);
+  });
+
+  it('reads an entry from before NPC names were kept as one with no name, and leaves the stored entry as it was', async () => {
+    const { journal, raw } = freshJournal();
+    const good = await journal.append('slot-1', entry(2));
+    const v1: Record<string, unknown> = { ...(await journal.append('slot-1', entry(1))), schemaVersion: 1 };
+    delete v1.npcName;
+    await set('slot-1', [v1, good], raw);
+
+    const [newest, oldest] = await journal.list('slot-1');
+
+    expect(oldest).toEqual({ ...v1, schemaVersion: JOURNAL_SCHEMA_VERSION, npcName: null });
+    expect(newest).toEqual(good);
+    expect(await journal.raw('slot-1')).toEqual([v1, good]);
+  });
+
+  it('reads any one entry through the same migrations, refusing one it doesn’t know', async () => {
+    const { journal } = freshJournal();
+    const good = await journal.append('slot-1', entry(1));
+
+    expect(parseJournalEntry({ ...good, schemaVersion: 1, npcName: undefined })).toEqual({ ...good, npcName: null });
+    expect(() => parseJournalEntry({ ...good, schemaVersion: JOURNAL_SCHEMA_VERSION + 1 })).toThrow(/newer/);
+    expect(() => parseJournalEntry('a page torn out')).toThrow();
+  });
+
+  it('takes a whole restored Journal for a slot, in place of any it had', async () => {
+    const { journal } = freshJournal();
+    const entries = [await journal.append('slot-1', entry(1)), await journal.append('slot-1', entry(2))];
+    await journal.append('slot-2', entry(9));
+
+    await journal.restore('slot-2', entries);
+
+    expect(await journal.list('slot-2')).toEqual(await journal.list('slot-1'));
+  });
+
+  it('can be removed for one slot, leaving the others alone', async () => {
+    const { journal } = freshJournal();
+    await journal.append('slot-1', entry(1));
+    await journal.append('slot-2', entry(2));
+
+    await journal.remove('slot-1');
+
+    expect(await journal.list('slot-1')).toEqual([]);
+    expect(await journal.list('slot-2')).toHaveLength(1);
   });
 });

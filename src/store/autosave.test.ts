@@ -1,40 +1,8 @@
-import 'fake-indexeddb/auto';
-import { createStore } from 'idb-keyval';
 import { describe, expect, it, vi } from 'vitest';
-import { CLOCK, createSave, SAVE, type GameState } from '../sim/index.ts';
+import { CLOCK, createSave, SAVE } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
-import {
-  createDeviceSettings,
-  createGameStore,
-  createSaves,
-  DEFAULT_DEVICE_SETTINGS,
-  DEV_SETUP,
-  SAVE_SCHEMA_VERSION,
-  selectArrival,
-  selectMoneyInShifts,
-  selectPlaceId,
-  selectSavedCount,
-  selectScreen,
-  selectTitle,
-  type GameStoreDeps,
-  type Saves,
-} from './index.ts';
-
-
-/** Saves that only remember what they were asked to write. */
-function recordingSaves() {
-  const written: { slotId: string; game: GameState }[] = [];
-  const saves: Saves = {
-    write: async (slotId, game) => {
-      written.push({ slotId, game });
-      return { schemaVersion: SAVE_SCHEMA_VERSION, slotId, createdAt: '', lastPlayedAt: '', game };
-    },
-    load: async () => null,
-    mostRecent: async () => null,
-    usedSlots: async () => [],
-  };
-  return { saves, written };
-}
+import { createGameStore, DEV_SETUP, selectSavedCount } from './index.ts';
+import { recordingSaves } from './testSaves.ts';
 
 /** A barista the test speaks for. */
 function fakeBarista() {
@@ -60,18 +28,6 @@ function fakeBarista() {
     };
   };
   return { npc, openVoiceSession };
-}
-
-let databases = 0;
-/** Deps over a fresh IndexedDB database each: the browser after a reload is a new store over the same deps. */
-function freshBrowser(): Partial<GameStoreDeps> {
-  const n = ++databases;
-  return {
-    saves: createSaves(() => createStore(`autosave-saves-${n}`, 'saves')),
-    deviceSettings: createDeviceSettings(() => createStore(`autosave-device-${n}`, 'settings')),
-    journal: { append: async (_, entry) => ({ ...entry, schemaVersion: 1, id: '', writtenAt: '', noHelpNeeded: true }), list: async () => [] },
-    requestRecap: () => new Promise(() => {}),
-  };
 }
 
 function playing() {
@@ -187,109 +143,7 @@ describe('autosave', () => {
   });
 });
 
-/** Opens the title screen and waits until it has looked for saves. */
-async function openTitle(store: ReturnType<typeof createGameStore>) {
-  store.getState().openTitle();
-  await vi.waitFor(() => expect(selectTitle(store.getState())?.status).not.toBe('checking'));
-}
-
 /** Waits until this many saves have finished. */
 async function saved(store: ReturnType<typeof createGameStore>, times: number) {
   await vi.waitFor(() => expect(selectSavedCount(store.getState())).toBe(times));
 }
-
-describe('the title screen', () => {
-  it('offers only New game on a browser with no saves', async () => {
-    const store = createGameStore(null, freshBrowser());
-    expect(selectScreen(store.getState())).toBe('title');
-
-    await openTitle(store);
-
-    expect(selectTitle(store.getState())).toEqual({ status: 'ready', canContinue: false, canStartNew: true });
-  });
-
-  it('New game starts the First Morning in a free slot and saves it at once', async () => {
-    const browser = freshBrowser();
-    const store = createGameStore(null, browser);
-    await openTitle(store);
-
-    store.getState().newGame();
-    await saved(store, 1);
-
-    expect(selectScreen(store.getState())).toBe('playing');
-    expect(selectArrival(store.getState())).toBe('newGame');
-    expect(store.getState().game).toEqual(createSave(DEV_SETUP));
-    expect((await browser.saves!.mostRecent())?.game).toEqual(createSave(DEV_SETUP));
-  });
-
-  it('after a reload, Continue puts the Character back where they were, with everything as it was', async () => {
-    const browser = freshBrowser();
-    const before = createGameStore(null, browser);
-    await openTitle(before);
-    before.getState().newGame();
-    before.getState().enterPlace('cafe');
-    before.getState().advance(CLOCK.maxRealDeltaMs);
-    before.setState({ game: { ...before.getState().game, character: { ...before.getState().game.character, moneyInShifts: 1.2 } } });
-    before.getState().saveNow();
-    await saved(before, 3);
-    const game = before.getState().game;
-
-    const after = createGameStore(null, browser);
-    await openTitle(after);
-    expect(selectTitle(after.getState())).toMatchObject({ status: 'ready', canContinue: true });
-    after.getState().continueGame();
-
-    expect(selectScreen(after.getState())).toBe('playing');
-    expect(selectArrival(after.getState())).toBe('continued');
-    expect(selectPlaceId(after.getState())).toBe('cafe');
-    expect(selectMoneyInShifts(after.getState())).toBe(1.2);
-    expect(after.getState().game).toEqual(game);
-  });
-
-  it('a reload mid-conversation comes back as if it never happened', async () => {
-    const browser = freshBrowser();
-    const { npc, openVoiceSession } = fakeBarista();
-    const before = createGameStore(null, { ...browser, openVoiceSession });
-    await openTitle(before);
-    before.getState().newGame();
-    before.getState().enterPlace('cafe');
-    const atTheCounter = before.getState().game;
-    before.getState().setInteractable('barista');
-    before.getState().talk();
-    npc.says('いらっしゃいませ！');
-    before.getState().advance(CLOCK.maxRealDeltaMs);
-    before.getState().saveNow();
-    await saved(before, 3);
-
-    const after = createGameStore(null, browser);
-    await openTitle(after);
-    after.getState().continueGame();
-
-    expect(after.getState().game).toEqual(atTheCounter);
-    expect(after.getState().conversation).toBeNull();
-  });
-
-  it('keeps Recaps in the Native Language from this browser’s device settings', async () => {
-    const browser = freshBrowser();
-    await browser.deviceSettings!.save({ ...DEFAULT_DEVICE_SETTINGS, nativeLanguage: 'de' });
-    const store = createGameStore(null, browser);
-
-    await openTitle(store);
-
-    expect(store.getState().nativeLanguage).toBe('de');
-  });
-
-  it('shows why the latest save couldn’t be loaded, and still allows a new game', async () => {
-    const browser = freshBrowser();
-    const broken: Saves = { ...browser.saves!, mostRecent: () => Promise.reject(new Error('The save in slot-1 can’t be loaded')) };
-    const store = createGameStore(null, { ...browser, saves: broken });
-
-    await openTitle(store);
-
-    expect(selectTitle(store.getState())).toEqual({
-      status: 'failed',
-      message: 'The save in slot-1 can’t be loaded',
-      canStartNew: true,
-    });
-  });
-});

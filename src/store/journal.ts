@@ -1,4 +1,4 @@
-import { createStore, get, update, type UseStore } from 'idb-keyval';
+import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 
@@ -7,7 +7,7 @@ import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
-export const JOURNAL_SCHEMA_VERSION = 1;
+export const JOURNAL_SCHEMA_VERSION = 2;
 
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
@@ -21,6 +21,8 @@ const JournalEntrySchema = z.object({
   writtenAt: z.string(),
   kind: z.literal('goal'),
   npcId: z.enum(NPC_IDS),
+  /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
+  npcName: z.string().nullable(),
   interactionId: z.enum(INTERACTION_IDS),
   placeName: z.string(),
   /** The game time the conversation ended. */
@@ -53,11 +55,43 @@ export function journalPage(entry: NewJournalEntry): JournalPage {
   return { ...entry, noHelpNeeded: entry.helpLog.length === 0 };
 }
 
+/** A stored entry in some older shape. Migrations only touch what changed. */
+type StoredEntry = { schemaVersion: number } & Record<string, unknown>;
+
+/**
+ * Ordered migrations, apart from the save's: `MIGRATIONS[n]` upgrades an entry
+ * from version n + 1 to n + 2. Entries are migrated as they're read and never
+ * rewritten, so the Journal stays as it was written.
+ */
+const MIGRATIONS: readonly ((entry: StoredEntry) => StoredEntry)[] = [
+  // 1 → 2: entries keep the NPC's name. Older ones never knew it.
+  (entry) => ({ ...entry, schemaVersion: 2, npcName: null }),
+];
+
+/** Reads one stored entry as an entry of today's version, through the migrations. Throws, saying why, if it can't. */
+export function parseJournalEntry(raw: unknown): JournalEntry {
+  const from = typeof raw === 'object' && raw !== null && 'schemaVersion' in raw ? raw.schemaVersion : undefined;
+  if (typeof from !== 'number') throw new Error('it has no schemaVersion');
+  if (from > JOURNAL_SCHEMA_VERSION) throw new Error(`it was written by a newer version of the game (v${from})`);
+  if (from < 1) throw new Error(`schemaVersion ${from} was never used`);
+  let entry = raw as StoredEntry;
+  for (let version = from; version < JOURNAL_SCHEMA_VERSION; version++) entry = MIGRATIONS[version - 1]!(entry);
+  const parsed = JournalEntrySchema.safeParse(entry);
+  if (!parsed.success) throw new Error(z.prettifyError(parsed.error));
+  return parsed.data;
+}
+
 export type Journal = {
   /** Adds an entry to the slot's Journal, and returns it as stored. */
   append(slotId: string, entry: NewJournalEntry): Promise<JournalEntry>;
   /** Every entry in the slot's Journal, newest first. Rejects, naming the slot, if any entry can't be read. */
   list(slotId: string): Promise<JournalEntry[]>;
+  /** The slot's entries as stored, oldest first, readable or not. */
+  raw(slotId: string): Promise<unknown[]>;
+  /** Puts a whole Journal, oldest first, into a slot, in place of any it had. */
+  restore(slotId: string, entries: JournalEntry[]): Promise<void>;
+  /** Removes the slot's Journal. */
+  remove(slotId: string): Promise<void>;
 };
 
 export function createJournal(openStore: () => UseStore): Journal {
@@ -77,11 +111,21 @@ export function createJournal(openStore: () => UseStore): Journal {
     },
     list: async (slotId) => {
       const raw = (await get<unknown[]>(slotId, entries())) ?? [];
-      const parsed = raw.map((entry) => JournalEntrySchema.safeParse(entry));
-      const bad = parsed.findIndex((result) => !result.success);
-      if (bad >= 0) throw new Error(`The Journal for ${slotId} can't be read: entry ${bad + 1} ${parsed[bad]!.error!.message}`);
-      return parsed.map((result) => result.data!).reverse();
+      return raw
+        .map((entry, i) => {
+          try {
+            return parseJournalEntry(entry);
+          } catch (error) {
+            throw new Error(`The Journal for ${slotId} can't be read: entry ${i + 1} ${error instanceof Error ? error.message : error}`);
+          }
+        })
+        .reverse();
     },
+    raw: async (slotId) => (await get<unknown[]>(slotId, entries())) ?? [],
+    restore: async (slotId, restored) => {
+      await set(slotId, restored.map((entry) => JournalEntrySchema.parse(entry)), entries());
+    },
+    remove: (slotId) => del(slotId, entries()),
   };
 }
 
