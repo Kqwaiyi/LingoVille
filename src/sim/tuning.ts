@@ -28,6 +28,14 @@ export const CLOCK = {
   faintWakeAt: 8 * MINUTES_PER_HOUR,
 } as const;
 
+// --- Moving around the town -------------------------------------------------
+
+export const MOVEMENT = {
+  walkSpeedMetresPerSecond: 4,
+  /** How close the Character must be to use something with E. */
+  interactRangeMetres: 1.6,
+} as const;
+
 // --- First Morning ----------------------------------------------------------
 
 export const FIRST_MORNING = {
@@ -48,6 +56,8 @@ export const WELL_BEING = {
   thirstFullToEmptyGameMinutes: 12 * MINUTES_PER_HOUR,
   /** Health drain while Hunger or Thirst is at 0, at Fitness 0. */
   healthFullToEmptyWhileDeprivedGameMinutes: 12 * MINUTES_PER_HOUR,
+  /** A Well-being gauge at or below this shows the warning colour. */
+  lowWarningAt: 0.25 * METER_MAX,
 } as const;
 
 // --- Economy (prices as ratios of one Shift's base pay) ---------------------

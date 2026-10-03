@@ -1,2 +1,21 @@
 // Public interface of the store module. Other modules import from here.
-export {};
+export {
+  createGameStore,
+  DEV_SETUP,
+  gameStore,
+  selectClockMinute,
+  selectCulturePackId,
+  selectDay,
+  selectHealth,
+  selectHunger,
+  selectInteractable,
+  selectMood,
+  selectMoneyInShifts,
+  selectPlaceId,
+  selectThirst,
+  selectTimeScale,
+  selectWeekday,
+  useGame,
+  type GameStore,
+  type Interactable,
+} from './gameStore.ts';

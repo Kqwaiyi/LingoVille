@@ -1,0 +1,134 @@
+:root {
+  --hud-bg: rgba(20, 24, 36, 0.88);
+  --hud-ink: #fff;
+  --hud-muted: #b9c0d0;
+  --hud-track: #39415a;
+  --ok: #6fcf8e;
+  --low: #e8785f;
+  --mood: #8f7ae0;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.game {
+  position: fixed;
+  inset: 0;
+}
+
+.dev-status {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  margin: 0;
+  font-size: 12px;
+  color: #445;
+}
+
+.dock {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 18px 18px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 18px;
+  user-select: none;
+}
+
+.ring {
+  --tone: var(--ok);
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--tone) var(--fill), var(--hud-track) 0);
+}
+
+.ring[data-tone='low'] {
+  --tone: var(--low);
+}
+
+.ring[data-tone='mood'] {
+  --tone: var(--mood);
+}
+
+.ring::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: #141824;
+}
+
+.ring-icon {
+  position: relative;
+  font-size: 20px;
+}
+
+.ring-label {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--hud-muted);
+  white-space: nowrap;
+}
+
+.dock-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dock-time {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-day {
+  font-size: 12px;
+  color: var(--hud-muted);
+  white-space: nowrap;
+}
+
+.dock-money {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.prompt kbd {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--hud-muted);
+  border-radius: 4px;
+  font-family: inherit;
+}

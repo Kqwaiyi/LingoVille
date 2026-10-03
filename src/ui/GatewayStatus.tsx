@@ -23,7 +23,7 @@ export function GatewayStatus() {
   }, []);
 
   return (
-    <p role="status">
+    <p role="status" className="dev-status">
       {status.kind === 'checking' && 'Checking gateway…'}
       {status.kind === 'reachable' && `Gateway reachable${status.mock ? ' (mock mode)' : ''}`}
       {status.kind === 'unreachable' && 'Gateway unreachable'}
