@@ -6,7 +6,7 @@
 
 **Spec:** [spec.md](../spec.md): Architecture and modules; Testing Decisions
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] One `npm run dev` starts Vite and the gateway, and the page shows that the gateway is reachable.
 - [x] The gateway reads the Gemini key only from a gitignored `.env`, with a committed example file. The key never reaches the browser bundle.
