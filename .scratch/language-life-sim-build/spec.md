@@ -1,9 +1,9 @@
 # Spec: Language-learning life sim
 
 Status: ready-for-agent
-Map: [Language-learning life sim](map.md)
+Map: [Language-learning life sim](../language-life-sim/map.md)
 
-This spec puts the 16 resolved tickets on the map into one place. Each decision links back to the ticket it came from, and terms follow `CONTEXT.md`. Where two tickets disagree, the later ticket wins; [Further Notes](#further-notes) lists every such case and every question that is still open.
+This spec puts the 16 resolved tickets on the map into one place. Each decision links back to the ticket it came from, and terms follow `CONTEXT.md`. Where two tickets disagree, the later ticket wins; [Further Notes](#further-notes) lists every such case, and the questions no ticket answered, which the dev decided before ticketing. Build tickets are in [issues/](issues/).
 
 ## Problem Statement
 
@@ -72,7 +72,7 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 37. As a Player, I want the clock and decay to slow to ¼ speed during any conversation, so that taking my time to speak is never punished.
 38. As a Player, I want time and Patience to stop while the Help tab is open, so that looking something up is free.
 39. As a Player, I want the game to pause when I switch tabs, so that the Character doesn't starve while I'm away.
-40. As a Player, I want to sleep at home and skip to morning with a small Mood boost, so that days have a rhythm.
+40. As a Player, I want to go to bed at home from 20:00 and wake at 07:00 with a small Mood boost, so that days have a rhythm.
 41. As a Player, I want staying up past about 2am to drain Mood fast, so that late nights have a cost I can see coming.
 42. As a Player, I want Mood to rise from understood conversations, Small Talk, Comfort Purchases and the bathhouse, and fall from failures, unmet needs and overwork, so that how I live shapes how the Character feels.
 43. As a Player, I want low Mood to reduce Shift pay and Life Skill gain, so that looking after Mood matters.
@@ -134,7 +134,7 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 ### Help
 
 89. As a Player, I want a Help tab in the conversation column (H toggles it) with hints for this moment: a full model sentence, its translation and 🔊, so that I can always find something to say.
-90. As a Player, I want the place's phrasebook in the Help tab, so that I can browse useful phrases.
+90. As a Player, I want the place's phrasebook and my own saved words in the Help tab, so that I can browse useful phrases.
 91. As a Player, I want hear-it-said on any hint, phrase, correction or new word, voiced by Gemini TTS, so that I can copy the pronunciation in every language.
 92. As a Player, I want Translate under every NPC line, showing the Native Language line underneath, so that I'm never lost.
 93. As a Player, I want Replay under every NPC line, so that I can hear it again.
@@ -151,9 +151,9 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 101. As a Player, I want the Recap to treat a likely mishearing as a pronunciation point (e.g. *yī bǎi* where *yī bēi* was meant), so that noisy transcripts become useful feedback.
 102. As a Player, I want a loading state while the Recap is generated (about 6 s), started the moment the conversation ends, so that the wait feels short.
 103. As a Player, I want to skip any Recap and still have it saved to my Journal, so that I'm never forced to reflect.
-104. As a Player, I want "+ Phrasebook" on each new word, so that I can collect words I want to keep.
+104. As a Player, I want "+ Phrasebook" on each new word to add it to my personal phrasebook, so that I can collect words I want to keep.
 105. As a Player, I want Small Talk to get a lighter Recap, so that casual chats aren't turned into lessons.
-106. As a Player, I want Shift Recaps to queue and open when the Shift ends, so that work isn't interrupted.
+106. As a Player, I want one combined Recap for the whole Shift, opened when the Shift ends, so that work isn't interrupted.
 107. As a Player, I want the Recap to look like a lined Journal page in the chat column, so that I understand it becomes my Journal.
 108. As a Player, I want J to open a full-screen Journal (an entry list on the left, newest first; the selected entry on the right), so that I can review what I've learned.
 109. As a Player, I want Journal entries kept in the language they were written in, even if I later change my Native Language, so that history isn't rewritten.
@@ -189,7 +189,7 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 133. As a Player, I want to ask the landlord for more time in the Target Language, so that negotiating is a skill worth having.
 134. As a Player, I want to arrange to pay a hospital bill in instalments, so that Fainting doesn't wipe me out.
 135. As a Player, I want 5 Comfort Purchases (café cake or a special drink, a book or magazine, a bathhouse visit, a restaurant meal, flowers or a gift), so that I can spend on feeling good.
-136. As a Player, I want gym membership (about 0.5 Shift a month) to unlock one gym session a day that builds Fitness and lifts Mood, so that I can invest in the Character's health.
+136. As a Player, I want gym membership (about 0.5 Shift for 30 days, renewed by asking the attendant) to unlock one gym session a day that builds Fitness and lifts Mood, so that I can invest in the Character's health.
 137. As a Player, I want trams to be free, so that the only cost of travel is time.
 138. As a Player, I want prices that look natural in each currency (¥, 元, €, £), so that each Culture Pack feels real.
 
@@ -228,7 +228,7 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 160. As a Player, I want a title screen with a menu on the left (Continue, Load a save, New game, Import a save, Settings) over the live town, with my Character standing in the right third, so that the game greets me with my own life.
 161. As a Player, I want the centre panel to follow the highlighted menu item and to navigate with ↑ ↓ Enter Esc, so that the menu feels like a console game.
 162. As a Player, I want New game greyed out with "Delete a save to start a new one" when all 4 slots are full, so that I know why.
-163. As a Player, I want volume sliders (Master, Music, Ambient, Voice, UI), the input mode, push-to-talk vs open mic, reading aids on/off and tooltips on/off kept per browser, so that my device settings follow me across saves.
+163. As a Player, I want volume sliders (Master, Music, Ambient, Voice, UI), the input mode, push-to-talk vs open mic, reading aids on/off, show romaji on/off and tooltips on/off kept per browser, so that my device settings follow me across saves.
 164. As a Player, I want a Retry microphone button in Settings, so that I can switch to Speaking once my mic works.
 165. As a Player, I want to hide reading aids (pinyin, furigana), so that I can push myself to read without them.
 166. As a Player, I want a credits screen, so that CC-BY asset creators are credited.
@@ -236,7 +236,7 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 ### Reading aids and text
 
 167. As a Chinese learner, I want pinyin with tone marks over every NPC line, accurate even for polyphonic characters, so that I can read along.
-168. As a Japanese learner, I want furigana over kanji (and romaji where shown), so that I can read along.
+168. As a Japanese learner, I want furigana over kanji, and an optional romaji line I can turn on in Settings, so that I can read along.
 169. As a Player, I want reading aids to appear immediately and quietly improve about a second later, so that I never wait to read.
 170. As a Player, I want the Journal to keep the improved reading aids, so that what I review is accurate.
 
@@ -266,7 +266,7 @@ A single-player, low-poly 3D, desktop-browser life sim that runs locally on the 
 
 ## Implementation Decisions
 
-### Architecture and modules ([Technical architecture](issues/10-technical-architecture.md), [Web 3D stack](issues/04-web-3d-stack.md))
+### Architecture and modules ([Technical architecture](../language-life-sim/issues/10-technical-architecture.md), [Web 3D stack](../language-life-sim/issues/04-web-3d-stack.md))
 
 - **Stack:** Vite + React + strict TypeScript, a single-page app with no router. The 3D scene is React Three Fiber + drei + @react-three/rapier on **Three.js r186** (pin it, because r186 changed the shadow APIs), with Rapier's kinematic character controller. Babylon.js is the documented fallback only. State is in Zustand. Menus and overlays are React DOM over the canvas.
 - **One npm package, with these modules:**
@@ -293,19 +293,19 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - The store calls these functions and saves. The world and UI read state through selectors only.
 - All randomness (Illness rolls, the Shift customer mix, Shift Customer looks and voices) comes from a seeded RNG whose state lives in the save.
 
-### Time and clock ([Core loop](issues/01-core-loop-and-economy.md), [Anatomy](issues/02-anatomy-of-an-interaction.md), [Technical architecture](issues/10-technical-architecture.md))
+### Time and clock ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md), [Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md), [Technical architecture](../language-life-sim/issues/10-technical-architecture.md))
 
 - Game time advances in `useFrame` as real delta × time scale. The scale is **1** normally (1 real min = 1 game hour, so about 24 real min per day), **¼** in any conversation, and **0** while paused, while the Help tab is open, and while the tab is hidden. Real delta is capped at 250 ms.
-- Sleep happens at home, skips to morning and gives a small Mood boost, and decay pauses during sleep. After about 2am, Mood drains fast. There is no Energy meter.
-- Places have opening hours (table below). A Culture Pack can override them.
+- Sleep happens in the bed at home, which is usable from **20:00**. Sleeping always skips to **07:00** the next morning (going to bed late still wakes at 07:00) and gives a small Mood boost; decay pauses during sleep. There are no naps. After about 2am, Mood drains fast. There is no Energy meter.
+- Places have opening hours (table below). A Culture Pack can override them. **Closing time only stops new conversations and new Shifts from starting:** a conversation or Shift already under way runs to its end.
 
-### Well-being and Mood ([Core loop](issues/01-core-loop-and-economy.md))
+### Well-being and Mood ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md))
 
 - Well-being is Health, Hunger and Thirst. Hunger goes from full to empty in about 1 game day, and Thirst in about ½ day. Health falls only while Hunger or Thirst is at 0 (to nothing in about ½ day; Fitness slows this) or during an Illness. When Health reaches 0, the Character faints.
 - **Fainting:** the Character wakes in hospital at 08:00 the next day, losing the rest of the current day. The bill is about 1.5 Shifts, and it can become debt. Mood takes a hit, and the nurse greets the Character.
 - **Mood** is one meter. It goes up from successful conversations, Small Talk, Comfort Purchases, the bathhouse, the gym, sleep and good home meals (Cooking 5). It goes down from failures, unmet needs, overwork, debt and staying up late. A **Mood modifier** multiplies Shift pay and Life Skill XP.
 
-### Economy ([Core loop](issues/01-core-loop-and-economy.md), [Town and content](issues/07-town-and-content-scope.md), [Proficiency](issues/08-life-skills-and-proficiency.md))
+### Economy ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md), [Town and content](../language-life-sim/issues/07-town-and-content-scope.md), [Proficiency](../language-life-sim/issues/08-life-skills-and-proficiency.md))
 
 - This is an open-ended sandbox with no win state, promotions or unlocks. Money comes only from Jobs.
 - **Every price is authored once as a ratio of one Shift's base pay**, converted by each pack's anchor and rounded to local price points:
@@ -320,6 +320,8 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - **Ratio ladder:** groceries ~0.06 per meal; convenience bento ~0.12; café drink ~0.07; café food ~0.1; restaurant meal ~0.25 (a Comfort Purchase); Comfort Purchases 0.1–0.3; weekly rent 2.0 at full price; Fainting bill ~1.5; doctor + medicine well below 1.5; gym membership ~0.5 per month; tap water and trams free. Survival target ~0.5 per day; ~4 Shifts in 7 days covers survival plus rent.
 - **Rent** is weekly and first due at the end of day 7. Unpaid rent becomes debt, with a Mood penalty and a landlord reminder. Extensions are negotiated (#17). There is no eviction.
 - **Hospital bills** can become debt or a payment plan (#15). Debt carries forward.
+- **Debt is repaid at the counter, never from Shift pay.** Rent debt is cleared by paying the landlord (#16). Hospital debt is paid at reception (#15 accepts payment in full as well as a plan); a payment plan's weekly instalments are taken automatically on rent day, and a missed instalment stays as debt.
+- **Gym membership** lasts 30 in-game days and is never charged automatically. When it expires, gym sessions are refused until the Player renews by talking to the attendant (a short renewal path on #22). It never becomes debt.
 - **Newcomer Discount and Shift stakes, by Proficiency Step** (both ratchet to the highest step reached):
 
   | Step | Starting Patience | Newcomer Discount | Stake multiplier | Dock per failed customer |
@@ -333,7 +335,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
 
 - Each Newcomer Discount step-down is announced by the landlord in conversation, never as a number.
 
-### Town and places ([Town and content](issues/07-town-and-content-scope.md))
+### Town and places ([Town and content](../language-life-sim/issues/07-town-and-content-scope.md))
 
 | Place | Default hours | NPCs |
 |---|---|---|
@@ -353,7 +355,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - Each counter has one staff role and no shift changes. Trams are fast travel.
 - **NPCs who start conversations themselves:** Shift Customers during a Shift; the landlord in the hallway when you leave home (rent due and unpaid, or a Newcomer Discount step-down); the doctor or nurse calling your name in the waiting room; the nurse when you wake from Fainting; park regulars waving you over at most once a day. No one else approaches the Character.
 
-### Goal Interactions ([Anatomy](issues/02-anatomy-of-an-interaction.md), [Voice prototype](issues/06-voice-conversation-prototype.md), [Town and content](issues/07-town-and-content-scope.md), [Onboarding](issues/09-onboarding-and-native-language.md))
+### Goal Interactions ([Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md), [Voice prototype](../language-life-sim/issues/06-voice-conversation-prototype.md), [Town and content](../language-life-sim/issues/07-town-and-content-scope.md), [Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md))
 
 - **Authored as data** (`defineInteraction`): place, NPC id/role, **one** goal in plain words, facts the NPC knows (pulled from the Culture Pack), a completion function with typed arguments, a band (B/I/A), and the effect on success. One Zod schema generates both the Live tool declaration and the argument validator.
 - **Flow:**
@@ -383,14 +385,14 @@ The `sim` module exposes pure functions over one state object. The exact names a
   | 12 | Clinic | Check in at reception | `register_patient(reason)` | I | queued for doctor |
   | 13 | Clinic | Describe symptoms | `diagnose(illness)` | I | prescription |
   | 14 | Clinic | Get medicine | `dispense(medicine)` | B | cures if it matches the Illness |
-  | 15 | Clinic | Hospital bill in instalments | `set_payment_plan(weeks)` | A | debt spread out |
+  | 15 | Clinic | Settle the hospital bill, in full or in instalments | `set_payment_plan(weeks)` (0 = pay now) | A | debt paid or spread out |
   | 16 | Home | Pay rent | `accept_rent(amount)` | B | debt cleared |
   | 17 | Home | Ask for more time | `grant_extension(days)` | A | no Mood penalty for the extension |
   | 18 | Bookshop | Buy a book/magazine | `complete_purchase` | B | Comfort Purchase |
   | 19 | Bookshop | Buy a wrapped gift | `complete_purchase(wrap)` | I | gift item |
   | 20 | Bookshop | Recommendation by taste | `complete_purchase` | A | Comfort Purchase |
   | 21 | Bathhouse | Buy entry | `admit(options)` | B | Mood ↑↑ |
-  | 22 | Bathhouse | Join the gym, ask about the rules | `register_member()` | I | gym access, membership charged |
+  | 22 | Bathhouse | Join or renew at the gym, ask about the rules | `register_member()` | I | 30 days' gym access, membership charged |
   | 23 | Town office | Register your address | `register_resident(fields)` | A | flavour only |
   | 24 | Post office | Send a parcel home | `ship(destination, speed)` | I | Mood ↑ |
   | 25 | Tram stop | Which tram goes to a place | `give_directions(stop)` | B | route marker |
@@ -398,7 +400,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
 
 - **Small Talk:** pressing E on any idle Named NPC (no queue, not mid-order) starts it. There is no goal or completion function and it cannot fail. The NPC wraps up after about 6–8 exchanges or when busy. Mood rises per understood exchange, under the per-NPC daily cap shared with Familiarity. If the Player states a goal, the NPC points them to the counter; it doesn't switch modes. Small Talk gets a lighter Recap.
 
-### Jobs and Shifts ([Anatomy](issues/02-anatomy-of-an-interaction.md), [Town and content](issues/07-town-and-content-scope.md), [Proficiency](issues/08-life-skills-and-proficiency.md), [Help economics](issues/12-help-economics.md))
+### Jobs and Shifts ([Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md), [Town and content](../language-life-sim/issues/07-town-and-content-scope.md), [Proficiency](../language-life-sim/issues/08-life-skills-and-proficiency.md), [Help economics](../language-life-sim/issues/12-help-economics.md))
 
 - There are three Jobs: barista (café), cashier (supermarket) and server (restaurant). Each is gained through its hiring Goal Interaction. After that, E at the staff door during opening hours starts a Shift. There's at most one Shift a day and no schedule.
 - A Shift has **5–8 Shift Customers** (defined by count, not clock time). Each Shift Customer is anonymous, with a random Appearance Preset (pack-weighted) and voice, and no memory. The customer greets first, holds a hidden order and can be asked to repeat or clarify (Patience as usual). The Player fills the order through a Job action, and success is an **exact data check** with no model judgement.
@@ -419,9 +421,9 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - **A tap-translated Shift Customer served correctly** pays the normal per-customer amount minus **half** the failure dock, and gives no listening evidence.
 - **Network abandonment** replaces the customer, who doesn't count. Player abandonment counts as a failure.
 - The Shift saves after every customer. A reload ends the Shift with pay for the customers already served.
-- Shift Recaps queue until the Shift ends.
+- **One combined Shift Recap:** a single `/api/recap` call over the whole Shift's transcript when it ends, giving up to 3 corrections across all customers, new words, one Journal entry and one CEFR estimate.
 
-### Language Proficiency ([Proficiency](issues/08-life-skills-and-proficiency.md), [Help economics](issues/12-help-economics.md))
+### Language Proficiency ([Proficiency](../language-life-sim/issues/08-life-skills-and-proficiency.md), [Help economics](../language-life-sim/issues/12-help-economics.md))
 
 - A hidden continuous score, sorted into six **Proficiency Steps** (A1–C2). There's one per save, and it is never shown.
 - The starting step comes from the self-assessment: "Never studied it" → A1, "I know the basics" → A2, "I can hold simple conversations" → B1, "I'm comfortable" → B2. C1 and C2 can only be earned.
@@ -429,17 +431,17 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - The current step (with a buffer at boundaries) drives NPC adaptation and Patience in both directions. The **highest step reached** drives the Newcomer Discount and Shift stakes, which ratchet.
 - **NPC adaptation** by step: the CEFR level in the prompt sets vocabulary and grammar; sentence length and how much the NPC says per turn; "slowly and clearly" at A1–A2 and natural speed from B2 up; choices offered up front at low steps; one simpler rephrase at A1–A2 the first time the Player seems lost. NPCs never switch to the Native Language.
 
-### Life Skills ([Proficiency](issues/08-life-skills-and-proficiency.md))
+### Life Skills ([Proficiency](../language-life-sim/issues/08-life-skills-and-proficiency.md))
 
 - Five Life Skills: **Cooking, Fitness, Barista, Cashier, Server**. Each has levels 0–5, shown as stars. XP needed rises per level, XP gain is multiplied by the Mood modifier, and there's no decay. Goal Interactions and Small Talk never raise Life Skills.
 - **Job skills:** XP per customer served successfully. +6% pay per level. Help with the mechanics only (grouped grid and remembered size; coin suggestions; quick-pick dietary notes), never with understanding.
 - **Cooking:** XP per home-cooked meal, at most 3 a day; level 5 takes about 3–4 in-game weeks. It sets how much Hunger a meal restores (at level 0, less than a bento; at level 5, more, plus a small Mood lift) and lowers food poisoning risk from groceries that are going off.
 - **Fitness:** one gym session a day (about 1 game hour) with membership, giving XP and a small Mood lift. It lowers Illness chance (up to −40% at level 5) and slows the Health drain at zero Hunger or Thirst.
 
-### Illness ([Core loop](issues/01-core-loop-and-economy.md), [Town and content](issues/07-town-and-content-scope.md))
+### Illness ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md), [Town and content](../language-life-sim/issues/07-town-and-content-scope.md))
 
 - Random, about once every 1–2 in-game weeks, more likely at low Well-being, less likely with Fitness. Rolled from the saved RNG.
-- It drains Health slowly and lowers Mood, and leads to Fainting if left untreated. Diagnosis (#13) is correct only if the symptoms were conveyed. The wrong medicine doesn't cure.
+- It drains Health slowly and lowers Mood, and leads to Fainting if left untreated. Diagnosis (#13) is correct only if the symptoms were conveyed. The wrong medicine doesn't cure. The right medicine cures at once, **except flu**: the fever reducer stops the Health drain at once, but the flu clears only after the next sleep.
 
   | Illness | Symptoms | Medicine |
   |---|---|---|
@@ -448,7 +450,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
   | Food poisoning | stomach ache, nausea (more likely from expired or cheap food) | stomach medicine |
   | Hay fever | sneezing, itchy eyes | antihistamine |
 
-### Named NPCs, Familiarity and NPC Memory ([NPC identity and memory](issues/11-npc-identity-and-memory.md))
+### Named NPCs, Familiarity and NPC Memory ([NPC identity and memory](../language-life-sim/issues/11-npc-identity-and-memory.md))
 
 - About **15 Named NPCs**: every counter's staff, 3–4 park regulars and the landlord. Each has a stable NPC id and one persona (name, age, temperament, quirks, one favourite gift), localised per Culture Pack with a local name and dressing. Personas are Zod-typed content.
 - **Familiarity:** hidden points read as three tiers (stranger → acquaintance → friend), never shown, and never decaying. Sources: understood Small Talk exchanges (most), gifts (a one-off bump, once per NPC per week, bigger for the favourite) and successful Goal Interactions with that NPC (a little). Gain shares a per-NPC daily cap with Small Talk Mood. Tune it so friend takes about 1–2 in-game weeks of regular visits.
@@ -470,36 +472,40 @@ The `sim` module exposes pure functions over one state object. The exact names a
   Nothing else is free-form. With no record, the NPC treats the Character as a stranger.
 - "The usual?" accepted counts as a normal success, with small level evidence because the Player said so little.
 
-### Help ([Anatomy](issues/02-anatomy-of-an-interaction.md), [Help economics](issues/12-help-economics.md), [HUD and conversation UI](issues/15-hud-and-conversation-ui.md))
+### Help ([Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md), [Help economics](../language-life-sim/issues/12-help-economics.md), [HUD and conversation UI](../language-life-sim/issues/15-hud-and-conversation-ui.md))
 
-- Help is a **tab** in the conversation column (H toggles it). It shows "The conversation waits while Help is open", hints for this moment (a full model sentence, its Native Language translation and 🔊), then the place's phrasebook. **Translate** and **🔊 Replay** sit under every NPC line.
+- Help is a **tab** in the conversation column (H toggles it). It shows "The conversation waits while Help is open", hints for this moment (a full model sentence, its Native Language translation and 🔊), then the place's phrasebook, then the Player's personal phrasebook. **Translate** and **🔊 Replay** sit under every NPC line.
+- **Hints are generated** by `/api/hint` when the Help tab opens: 2–3 full model sentences with Native Language translations, built from the goal, the facts, the step and the transcript so far. Nothing is authored per interaction.
+- **Translate** shows the Native Language translation that `/api/annotate` already returned for that line, so it is instant.
+- **Phrasebooks:** each place has an authored phrasebook per Culture Pack (content). The **personal phrasebook** is a list in the save, filled by "+ Phrasebook" on Recap new words, and shown in the Help tab and in a Phrasebook view in the Journal.
 - Help is free (no money, no Mood, no reduction in Small Talk Mood) and **the same at every step**.
 - Each conversation records a **Help log**: the hints and phrasebook entries shown, and which NPC lines were translated, ordered relative to the turns. It goes to the Recap call. A player turn that closely repeats a hint shown just before it counts for **little**; a translated NPC line counts for **nothing** as listening evidence; turns with no Help count in full.
 - In Shifts, hints for the Player's own lines are free. Translating a customer is handled as described under Jobs and Shifts.
 - The only display is the **"No Help needed"** sticker when the Help log is empty.
 
-### Recap and Journal ([Anatomy](issues/02-anatomy-of-an-interaction.md), [Help economics](issues/12-help-economics.md), [Save model](issues/13-save-model.md), [HUD](issues/15-hud-and-conversation-ui.md))
+### Recap and Journal ([Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md), [Help economics](../language-life-sim/issues/12-help-economics.md), [Save model](../language-life-sim/issues/13-save-model.md), [HUD](../language-life-sim/issues/15-hud-and-conversation-ui.md))
 
 - The gateway's `/api/recap` call (`generateContent` + `responseSchema`, flash-class model, about 6 s) starts as soon as the conversation ends. **Input:** the transcript with PLAYER lines marked as possibly misheard, the Help log, the interaction, the step and the Native Language. **Output schema:** outcome line; `corrections[]` (≤ 3: said / more natural / one-line why, in the Native Language); `newWords[]` (base, reading, gloss); `cefrEstimate`; optional `lastTopic`. A likely mishearing is treated as a pronunciation point.
-- **Order of events:** apply the outcome → autosave → closing card (outcome, effects, Skip Recap / See Recap) → Recap in the column as a lined Journal page (outcome; corrections with 🔊; new words with `<ruby>`, 🔊 and + Phrasebook; Done; "No Help needed" sticker top-right). Skipping shows "Recap saved to your Journal". Small Talk gets a lighter Recap. Shift Recaps queue.
+- **Order of events:** apply the outcome → autosave → closing card (outcome, effects, Skip Recap / See Recap) → Recap in the column as a lined Journal page (outcome; corrections with 🔊; new words with `<ruby>`, 🔊 and + Phrasebook; Done; "No Help needed" sticker top-right). Skipping shows "Recap saved to your Journal". Small Talk gets a lighter Recap. A Shift gets one combined Recap when it ends.
 - **Journal:** an **append-only IndexedDB store keyed by slot**, separate from the save. Each entry has its own `schemaVersion`, Zod schema and migrations, and holds **rendered** text: the Recap, annotated lines with reading aids, the Help log, the "No Help needed" flag and the Native Language it was written in. There's no size cap. J opens it full-screen in two panes.
 
-### Voice pipeline and Gemini gateway ([Gemini voice](issues/03-gemini-voice-capabilities.md), [Voice prototype](issues/06-voice-conversation-prototype.md), [Technical architecture](issues/10-technical-architecture.md))
+### Voice pipeline and Gemini gateway ([Gemini voice](../language-life-sim/issues/03-gemini-voice-capabilities.md), [Voice prototype](../language-life-sim/issues/06-voice-conversation-prototype.md), [Technical architecture](../language-life-sim/issues/10-technical-architecture.md))
 
 - **Gateway:** a small Node app on one port. It reads the key from `.env` and holds no game state. Vite proxies `/api` to it, and one `npm run dev` starts both.
   - `POST /api/token`: a one-use ephemeral token (v1beta `auth_tokens`) plus the Live model ID.
   - `POST /api/recap`: as above.
   - `POST /api/tts`: hear-it-said via Gemini TTS.
-  - `POST /api/annotate`: `{base, reading}` segments for one line (flash-lite + `responseSchema`).
-  - Model IDs, voices per language and endpoint versions live **only** in the gateway config. Current choices: `gemini-3.8-live`, `gemini-3.8-flash` (Recap), flash-lite (annotate), `gemini-3.8-flash-lite-tts`, and `gemini-3.8-pro` (eval judge only).
+  - `POST /api/annotate`: for every NPC line in every language, a Native Language `translation`; for zh and ja also `{base, reading}` segments (flash-lite + `responseSchema`).
+  - `POST /api/hint`: 2–3 hint sentences with translations for the current moment (flash-lite + `responseSchema`).
+  - Model IDs, voices per language and endpoint versions live **only** in the gateway config. Current choices: `gemini-3.8-live`, `gemini-3.8-flash` (Recap), flash-lite (annotate and hints), `gemini-3.8-flash-lite-tts`, and `gemini-3.8-pro` (eval judge only).
 - **Live session:** one `gemini-3.8-live` session per conversation, connecting to the v1beta `BidiGenerateContentConstrained` endpoint with the token. Transcription is on both ways. Push-to-talk uses `activityStart`/`activityEnd` with automatic activity detection off; open mic uses automatic detection. The Target Language is set in the system instruction, since there's no language-code setting.
 - **`VoiceSession` class** (the only code that touches the socket): `connect`, push-to-talk start/end, open mic, `sendText` (Typed Fallback), and events for input/output transcripts, tool calls, mic level and usage. It's ported from the prototype: an AudioWorklet downsamples the mic to 16 kHz PCM, and 24 kHz PCM plays through a scheduled AudioBufferSource queue. Token usage is accumulated per turn.
 - **Connection failure:** retry once with a fresh token, seeding the transcript so far. If that fails, the conversation ends as a **network abandonment**: no Patience or Mood loss, no Recap, an "NPC had to step away" toast, and a replacement in Shifts. The "Voice service unavailable" screen appears only when no token can be minted.
 - **Hear-it-said** clips are cached in IndexedDB by a hash of `(text, voice)`, in a store separate from saves and never exported.
-- **Mock mode** (`GEMINI_MOCK=1`): the gateway returns canned Recaps, TTS and annotations, and `VoiceSession` uses a scripted fake NPC that accepts typed input and fires completion functions on keywords.
+- **Mock mode** (`GEMINI_MOCK=1`): the gateway returns canned Recaps, hints, TTS and annotations (with translations), and `VoiceSession` uses a scripted fake NPC that accepts typed input and fires completion functions on keywords.
 - **Cost:** about $0.012 per conversation minute. Latency was measured at about 0.9 s median.
 
-### NPC prompt assembly ([Technical architecture](issues/10-technical-architecture.md), [NPC identity and memory](issues/11-npc-identity-and-memory.md))
+### NPC prompt assembly ([Technical architecture](../language-life-sim/issues/10-technical-architecture.md), [NPC identity and memory](../language-life-sim/issues/11-npc-identity-and-memory.md))
 
 - `buildNpcSession(interaction, culturePack, proficiencyStep, npc, context)` returns `{systemInstruction, tools, voice}`. It's pure and snapshot-tested for each language × step.
 - The system instruction is an **English meta-prompt** made of ordered pure blocks:
@@ -512,26 +518,27 @@ The `sim` module exposes pure functions over one state object. The exact names a
   7. the situation (time of day)
 - The Character's money is **never** in the prompt; the sim checks affordability. Tools are the interaction's completion function, `not_understood(reason)`, and for Named NPCs `learn_name` and `reveal_favourite`. Shift Customer sessions carry the hidden order as the customer's own goal.
 
-### Reading aids ([Reading aids](issues/05-reading-aids.md), [Technical architecture](issues/10-technical-architecture.md), [AI quality evaluation](issues/14-ai-quality-evaluation.md), [HUD](issues/15-hud-and-conversation-ui.md))
+### Reading aids ([Reading aids](../language-life-sim/issues/05-reading-aids.md), [Technical architecture](../language-life-sim/issues/10-technical-architecture.md), [AI quality evaluation](../language-life-sim/issues/14-ai-quality-evaluation.md), [HUD](../language-life-sim/issues/15-hud-and-conversation-ui.md))
 
-- zh and ja only. An NPC line appears **immediately** with library readings (`pinyin-pro` for zh; lazily loaded `kuroshiro` for ja, with `wanakana` for romaji). In parallel the finished line goes to `/api/annotate`. The Gemini segments replace the library readings (about 1 s later) **only if all four checks pass**:
+- zh and ja only. An NPC line appears **immediately** with library readings (`pinyin-pro` for zh; `kuroshiro` for ja, with `wanakana` for romaji). In parallel the finished line goes to `/api/annotate`. The Gemini segments replace the library readings (about 1 s later) **only if all four checks pass**:
   1. the `base` segments concatenated equal the line exactly;
   2. readings are in the right script (zh: pinyin syllables with tone marks; ja: kana only);
   3. the length is plausible (zh: one syllable per hanzi; ja: kana-only segments read as themselves);
   4. zh only: the reading agrees with `pinyin-pro`, except on its known polyphonic characters.
 - Rendering uses DOM `<ruby>` built with `textContent` **in the chat column** (not floating over the scene). Only a small "speaking…" indicator is anchored to the NPC. Reading aids can be hidden (a device setting). The Recap and Journal store the annotated version.
+- **Japanese display:** furigana over kanji by default. A separate **Show romaji** device setting (off by default) adds a romaji line under each Japanese line, derived from the readings with `wanakana`. Hiding reading aids hides both.
 - **World text:** signs and menus are canvas textures generated from Culture Pack strings. Pointing at one in range shows a tooltip with the reading aid and Translate, using authored glosses.
 
-### Content model ([Technical architecture](issues/10-technical-architecture.md) and others)
+### Content model ([Technical architecture](../language-life-sim/issues/10-technical-architecture.md) and others)
 
 - Zod-typed TypeScript content:
   - Goal Interactions and hiring interactions
   - Shift customer templates
   - Culture Packs (menus and goods with prices as Shift ratios, currency and rounding rules, customs, sign strings, opening-hour overrides, ambient one-shots, item glosses for the three other Native Languages, persona localisations, persona × pack → Appearance Preset table, Shift Customer appearance weights)
-  - Illnesses, Comfort Purchases, places and hours, Named NPC personas, the Appearance Preset pool
+  - Illnesses, Comfort Purchases, places and hours, place phrasebooks (per place, per pack, with glosses), Named NPC personas, the Appearance Preset pool
 - A Vitest check validates every schema and cross-reference: every item an interaction refers to exists in every pack, every persona has a localisation and appearance in every pack, every gloss exists in all three other Native Languages, and every price ratio converts.
 
-### Save model ([Save model](issues/13-save-model.md))
+### Save model ([Save model](../language-life-sim/issues/13-save-model.md))
 
 - **4 slots**, each holding one Save in any Target Language. Continue loads the most recent. IndexedDB via `idb-keyval`.
 - **Save object** (a few KB, `schemaVersion`, Zod-validated, ordered migrations):
@@ -542,16 +549,17 @@ The `sim` module exposes pure functions over one state object. The exact names a
   - *Obligations*: rent day, amount owed, debts (rent, hospital), payment plans.
   - *Progression*: Proficiency score, highest step reached, Newcomer Discount step, XP for 5 Life Skills, daily Cooking and gym counters.
   - *Possessions & status*: inventory (item id, quantity, expiry day), gym membership expiry, address registered, Jobs hired, Shift in progress (customers served, pay so far).
+  - *Phrasebook*: the personal phrasebook (text, reading, gloss in the Native Language it was saved in, day added).
   - *Onboarding*: First Morning progress.
   - *People*: one NPC Memory record per Named NPC, plus the daily cap counters.
 - **Content by id, never copied.** Migrations remap or drop renamed ids. An unknown id on load **fails loudly**.
 - **Autosave triggers:** after each outcome (before the Recap), at sleep or a new day, at doors, on `visibilitychange`→hidden and `pagehide`, and every ~2 real minutes. "Saved ✓" appears briefly in the dock, silently. A conversation is never saved in progress. A Shift saves after each customer. On load, the Character spawns at the saved place's entrance, or in bed if at home.
-- **Device settings** (one record per browser, outside saves): Native Language, volumes (Master, Music, Ambient, Voice, UI), input mode (mic or Typed Fallback), push-to-talk vs open mic, reading aids on/off, tooltips on/off, tooltips seen, mic check passed.
+- **Device settings** (one record per browser, outside saves): Native Language, volumes (Master, Music, Ambient, Voice, UI), input mode (mic or Typed Fallback), push-to-talk vs open mic, reading aids on/off, show romaji on/off, tooltips on/off, tooltips seen, mic check passed.
 - **Backups:** a pre-migration backup, and one start-of-day backup per slot rotated at sleep. Load falls back from main → start-of-day ("Loaded this morning's save") → a "This save couldn't be loaded" card with Export raw and Delete. Nothing is deleted automatically.
 - **Export:** one JSON per slot (`insomniacs-<name>-<lang>-day<N>.json`) with the save, its Journal and backup metadata. **Import** into an empty slot only, through the same Zod/migration path. **Delete** needs the Character's name typed and removes the save, its backups and its Journal. There's no reset.
 - `navigator.storage.persist()` is called on the first write. If it's refused, a one-time dismissable callout appears.
 
-### Onboarding ([Onboarding](issues/09-onboarding-and-native-language.md), [NPC identity](issues/11-npc-identity-and-memory.md), [Art and audio](issues/16-art-and-audio-direction.md))
+### Onboarding ([Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md), [NPC identity](../language-life-sim/issues/11-npc-identity-and-memory.md), [Art and audio](../language-life-sim/issues/16-art-and-audio-direction.md))
 
 - **Five setup screens**, all in the Native Language:
   1. Native Language (first `ja`/`zh`/`en`/`de` base tag in `navigator.languages`, otherwise English)
@@ -563,7 +571,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - **Contextual one-time tooltips** cover Shifts, Fainting, the Journal (after the first Recap closes), open mic and the Typed Fallback. They fire even if the tutorial was skipped.
 - The Gemini key is a developer setup step, not part of onboarding.
 
-### UI and HUD ([HUD and conversation UI](issues/15-hud-and-conversation-ui.md))
+### UI and HUD ([HUD and conversation UI](../language-life-sim/issues/15-hud-and-conversation-ui.md))
 
 - **World:** a bottom-centre dock with four ring gauges (Health, Hunger, Thirst, Mood with a face), the clock (time; "Day N · weekday"), money, and "Saved ✓" under the clock. A place and opening-hours line sits above the dock. The First Morning banner is at the top centre, with an arrow and distance plus a world marker. Tooltip cards sit above the dock with "Got it". "Press E to talk — <role>" appears near NPCs.
 - **Conversation:** a chat column on the right (~40% of the screen, ≤ ~420 px). Its header shows the NPC name or role, the place and the time, with Chat | Help tabs and Leave (Esc). NPC lines are left bubbles with `<ruby>`, Translate and 🔊 Replay. Player lines are right bubbles headed "Heard as". The input bar has the mic button (held with Space; red with a live dot while listening) and the always-present typed field. With the mic off, the "🎤 off. Enable in Settings" chip appears, at most once a day. The dock shrinks and centres on the area left of the column. The 3D scene stays visible.
@@ -573,7 +581,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - **Left to the build, reusing these patterns:** the Settings contents, the pause menu, the Job action UIs (grid, scanner/coin tray, order pad), the Fainting and hospital screens, the skills page (stars) and the credits screen. Check German string lengths in the dock and column.
 - **No Patience or Language Proficiency anywhere on screen.**
 
-### Art and audio ([Art and audio direction](issues/16-art-and-audio-direction.md), [Web 3D stack](issues/04-web-3d-stack.md))
+### Art and audio ([Art and audio direction](../language-life-sim/issues/16-art-and-audio-direction.md), [Web 3D stack](../language-life-sim/issues/04-web-3d-stack.md))
 
 - **Cozy pastel** low-poly: Kenney and Quaternius (CC0) assets recoloured to one shared ~24-colour palette, with flat shading and gentle distance fog. Four keyframed lighting presets (morning, midday, golden hour, night) are blended by sun angle and colour. Windows and street lights switch on at dusk, and a lit window means the place is open. No weather.
 - **Characters:** one Quaternius base rig and animation library for the Character, Named NPCs and Shift Customers. The Appearance Preset pool covers ~4 body/face presets, hair style and colour, and skin tone. Named NPCs keep their build and role signifier in every pack; looks come from the persona × pack table. Shift Customers are randomised with pack weights.
@@ -583,11 +591,11 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - **UI sounds:** click, money in/out, a success chime, a gentle failure tone, a Journal page-turn, and a subtle Patience-low cue. Saved ✓ makes no sound.
 - **Sourcing:** CC0 first. CC-BY is allowed with an in-game credits screen and `CREDITS.md`. AI-generated music is an acceptable fallback.
 
-### UI localization ([Technical architecture](issues/10-technical-architecture.md))
+### UI localization ([Technical architecture](../language-life-sim/issues/10-technical-architecture.md))
 
 - react-i18next with typed resources for each Native Language (ja, zh, en, de). Settings calls `changeLanguage()` to switch live. This covers UI strings only: NPC speech is generated, and item names and glosses live in the Culture Packs.
 
-### AI quality evaluation ([AI quality evaluation](issues/14-ai-quality-evaluation.md))
+### AI quality evaluation ([AI quality evaluation](../language-life-sim/issues/14-ai-quality-evaluation.md))
 
 - `npm run eval` lives in a top-level `evals/` folder that never ships. It imports the real `ai` builders and `content`.
 - **Cases** are Zod-typed, by kind and language: NPC (interaction id, step, script of player turns tagged `clean`/`noisy`/`gibberish`, expected outcome), Recap (canned transcript + Help log + expected step) and annotate (line + gold readings). Start with about 6–10 NPC cases per language, more for zh and ja. Inputs are mostly `sendText` turns, using real garbled transcripts from the prototype, plus gitignored recordings of the dev with a committed manifest; missing audio is skipped.
@@ -615,9 +623,9 @@ The `sim` module exposes pure functions over one state object. The exact names a
 
 **Seams, as agreed with the dev:**
 
-1. **`sim` public API (primary seam, Vitest).** Nearly all game rules are tested here: Well-being decay and Health drain; Fainting (wake time, bill, debt, Mood); the ¼-speed conversation clock as a `tick` caller contract; rent due, debt, extension and payment plans; Newcomer Discount and stakes ratcheting while NPC behaviour follows the current step; Shift pay (including docks, the half-dock for translated customers, network replacement, the never-below-0 floor and a mid-Shift reload); the Shift customer mix (seeded RNG); Proficiency updates (fast start, short-conversation weighting, `not_understood` evidence, Help only reducing weight); Life Skill XP and caps (Cooking 3 a day, one gym session a day, the Mood modifier); Illness onset (seeded, Well-being and Fitness modifiers) and cure only by matching medicine; Familiarity tiers, the shared daily cap, no decay, gifts once a week, the favourite bonus, `usualOrder` after 3 identical orders, and `learn_name` checks; affordability checks on completion arguments; and First Morning starting state and the Patience floor.
+1. **`sim` public API (primary seam, Vitest).** Nearly all game rules are tested here: Well-being decay and Health drain; Fainting (wake time, bill, debt, Mood); the ¼-speed conversation clock as a `tick` caller contract; rent due, debt, extension, payment plans with instalments on rent day, and repayment only at the counter; the bed window (from 20:00) and waking at 07:00; closing time never ending a Shift in progress; gym membership expiry and renewal; Newcomer Discount and stakes ratcheting while NPC behaviour follows the current step; Shift pay (including docks, the half-dock for translated customers, network replacement, the never-below-0 floor and a mid-Shift reload); the Shift customer mix (seeded RNG); Proficiency updates (fast start, short-conversation weighting, `not_understood` evidence, Help only reducing weight); Life Skill XP and caps (Cooking 3 a day, one gym session a day, the Mood modifier); Illness onset (seeded, Well-being and Fitness modifiers) and cure only by matching medicine (flu clearing only after the next sleep); Familiarity tiers, the shared daily cap, no decay, gifts once a week, the favourite bonus, `usualOrder` after 3 identical orders, and `learn_name` checks; affordability checks on completion arguments; and First Morning starting state and the Patience floor.
 2. **`content` validation (Vitest).** Every schema passes; cross-references hold in all four packs; glosses are complete; prices convert and round; every interaction's tool declaration and argument validator come from one schema.
-3. **`ai` builders (Vitest).** Snapshot `buildNpcSession` for each language × step (and for stranger vs friend memory blocks), the Recap request builder and the annotate request builder. The **annotate validator's four rules** are tested as a table of passing and failing cases, using the known library misreadings (长得, 还钱, 一日中, この方) as fixtures.
+3. **`ai` builders (Vitest).** Snapshot `buildNpcSession` for each language × step (and for stranger vs friend memory blocks), the Recap request builder (including the combined Shift Recap), the hint request builder and the annotate request builder. The **annotate validator's four rules** are tested as a table of passing and failing cases, using the known library misreadings (长得, 还钱, 一日中, この方) as fixtures.
 4. **`store` load path (Vitest).** Zod validation, ordered migrations, the pre-migration backup, fallback to the start-of-day backup, unknown content ids failing loudly, export → import round trip into an empty slot, import rejecting a bad file, and Journal entries migrating independently.
 5. **Playwright smoke in mock mode (top seam).** Setup (5 screens) → First Morning → café order via the Typed Fallback against the scripted fake NPC → closing card → Recap → Journal entry exists → reload → Continue lands in the same state. Add a mic-denied path and a network-abandonment path. No automated 3D visual tests.
 6. **`npm run eval` (real models).** Covers model quality only, as described above. It is not part of the test suite.
@@ -644,37 +652,37 @@ The `sim` module exposes pure functions over one state object. The exact names a
 
 These are earlier statements replaced by a later ticket. The spec above already follows the later one.
 
-- Shift length "about 4 in-game hours" ([Core loop](issues/01-core-loop-and-economy.md)) → defined by **5–8 customers** ([Anatomy](issues/02-anatomy-of-an-interaction.md)).
-- NPC text bubbles over the 3D scene via CSS2DRenderer (map Notes, [Reading aids](issues/05-reading-aids.md), [Technical architecture](issues/10-technical-architecture.md)) → **chat column** ([HUD](issues/15-hud-and-conversation-ui.md)).
-- Help as a "side panel" ([Anatomy](issues/02-anatomy-of-an-interaction.md)) → **a tab in the chat column** ([HUD](issues/15-hud-and-conversation-ui.md)).
-- First Morning prompt "pinned in a corner" ([Onboarding](issues/09-onboarding-and-native-language.md)) → **top-centre banner** ([HUD](issues/15-hud-and-conversation-ui.md)).
-- Four setup screens ([Onboarding](issues/09-onboarding-and-native-language.md)) → **five**, with the name on the self-assessment screen ([NPC identity](issues/11-npc-identity-and-memory.md)) and a separate Appearance step ([Art and audio](issues/16-art-and-audio-direction.md)).
-- Small Talk only in the park; gifts as a stub ([Town and content](issues/07-town-and-content-scope.md)) → **any idle Named NPC**, with real gift effects ([NPC identity](issues/11-npc-identity-and-memory.md)).
-- "The save defaults to the Typed Fallback" ([Onboarding](issues/09-onboarding-and-native-language.md)) → the input mode is a **device setting**, outside saves ([Save model](issues/13-save-model.md)).
-- A catalogue of 25 Goal Interactions (map, [Town and content](issues/07-town-and-content-scope.md)) → **28**, adding 3 hiring interactions ([Onboarding](issues/09-onboarding-and-native-language.md)). The map's Decisions line still says 25.
-- kuroshiro as an on-demand fallback only ([Reading aids](issues/05-reading-aids.md)) → the **immediate** ja library reading ([Technical architecture](issues/10-technical-architecture.md)). This means its ~18 MB dictionary loads in every Japanese session; served from localhost that's acceptable, but it should be preloaded during setup or loading rather than on the first line.
+- Shift length "about 4 in-game hours" ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md)) → defined by **5–8 customers** ([Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md)).
+- NPC text bubbles over the 3D scene via CSS2DRenderer (map Notes, [Reading aids](../language-life-sim/issues/05-reading-aids.md), [Technical architecture](../language-life-sim/issues/10-technical-architecture.md)) → **chat column** ([HUD](../language-life-sim/issues/15-hud-and-conversation-ui.md)).
+- Help as a "side panel" ([Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md)) → **a tab in the chat column** ([HUD](../language-life-sim/issues/15-hud-and-conversation-ui.md)).
+- First Morning prompt "pinned in a corner" ([Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md)) → **top-centre banner** ([HUD](../language-life-sim/issues/15-hud-and-conversation-ui.md)).
+- Four setup screens ([Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md)) → **five**, with the name on the self-assessment screen ([NPC identity](../language-life-sim/issues/11-npc-identity-and-memory.md)) and a separate Appearance step ([Art and audio](../language-life-sim/issues/16-art-and-audio-direction.md)).
+- Small Talk only in the park; gifts as a stub ([Town and content](../language-life-sim/issues/07-town-and-content-scope.md)) → **any idle Named NPC**, with real gift effects ([NPC identity](../language-life-sim/issues/11-npc-identity-and-memory.md)).
+- "The save defaults to the Typed Fallback" ([Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md)) → the input mode is a **device setting**, outside saves ([Save model](../language-life-sim/issues/13-save-model.md)).
+- A catalogue of 25 Goal Interactions (map, [Town and content](../language-life-sim/issues/07-town-and-content-scope.md)) → **28**, adding 3 hiring interactions ([Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md)). The map's Decisions line still says 25.
+- kuroshiro as an on-demand fallback only ([Reading aids](../language-life-sim/issues/05-reading-aids.md)) → the **immediate** ja library reading ([Technical architecture](../language-life-sim/issues/10-technical-architecture.md)). This means its ~18 MB dictionary loads in every Japanese session; served from localhost that's acceptable, but it should be preloaded during setup or loading rather than on the first line.
 
 ### Small decisions made while assembling
 
-- Opening the Help tab sets the clock scale to 0 as well as freezing Patience. This follows [Onboarding](issues/09-onboarding-and-native-language.md)'s prompt text, "time and Patience pause", which is stronger than [Anatomy](issues/02-anatomy-of-an-interaction.md)'s "Patience frozen".
+- Opening the Help tab sets the clock scale to 0 as well as freezing Patience. This follows [Onboarding](../language-life-sim/issues/09-onboarding-and-native-language.md)'s prompt text, "time and Patience pause", which is stronger than [Anatomy](../language-life-sim/issues/02-anatomy-of-an-interaction.md)'s "Patience frozen".
 - While the typed field has focus, Space types a space and doesn't trigger push-to-talk. Otherwise the Space and T hotkeys clash.
-- The "daily Familiarity cap" in [Save model](issues/13-save-model.md) is read as the **per-NPC, per-day** cap from [NPC identity](issues/11-npc-identity-and-memory.md), stored as a counter on each NPC Memory record.
-- At A1–A2 the failure dock is zero, so a tap-translated Shift Customer pays in full at those steps. That follows from [Help economics](issues/12-help-economics.md) plus the step table, and is intended to be gentle.
+- The "daily Familiarity cap" in [Save model](../language-life-sim/issues/13-save-model.md) is read as the **per-NPC, per-day** cap from [NPC identity](../language-life-sim/issues/11-npc-identity-and-memory.md), stored as a counter on each NPC Memory record.
+- At A1–A2 the failure dock is zero, so a tap-translated Shift Customer pays in full at those steps. That follows from [Help economics](../language-life-sim/issues/12-help-economics.md) plus the step table, and is intended to be gentle.
 
-### Open questions (not decided in any ticket; candidates for new map tickets)
+### Decisions made before ticketing
 
-1. **Where do contextual hints come from?** [Anatomy](issues/02-anatomy-of-an-interaction.md) says they're "generated from the goal and facts", but the gateway has no hint endpoint. Should they be authored per interaction, or generated by a new `/api/hint`?
-2. **How does Translate work on NPC lines?** NPC lines are generated, and the authored glosses cover items and signs only. Options: add a translation field to `/api/annotate` (it already runs on every line, but not for en/de), or add a `/api/translate`.
-3. **The personal phrasebook isn't in the save.** "+ Phrasebook" exists in the Recap, but the [Save model](issues/13-save-model.md) has no phrasebook field, and the place phrasebooks aren't in the content list.
-4. **Mood numbers:** the Mood scale, the size of each Mood change, the overwork penalty (working 5–6 days a week), the debt penalty, and the Mood modifier curve for pay and XP.
-5. **Other tuning numbers:** the Life Skill XP curve, Familiarity tier thresholds, the Illness base rate formula, grocery expiry times, and Health drain rate during an Illness.
-6. **Gym membership renewal:** is it charged automatically each month (and can it become debt), or renewed by talking to the attendant?
-7. **What "rest" means for flu.** Is sleep required for the cure, or is it flavour?
-8. **Closing time during a Shift or a conversation.** Does it end the Shift early with pay so far, or let the current Shift finish?
-9. **Sleep rules:** when the Character can go to bed and what time they wake.
-10. **Japanese reading-aid display:** furigana only, a romaji line, or both, and whether romaji is a separate setting from "reading aids on/off".
-11. **Shift Recaps:** one Recap per Shift Customer (5–8 calls, ~6 s each, all queued) or one combined Shift Recap.
-12. "Helping NPCs pays off in Mood and relationships" ([Core loop](issues/01-core-loop-and-economy.md)) isn't defined by any interaction. Drop it, or define it.
-13. **How debt gets repaid.** Is it paid off through the landlord's or reception's Goal Interactions only, or taken automatically from Shift pay?
+No ticket answered these. The dev decided them on 2026-10-03, before the build tickets were cut, and the sections above already follow them.
 
-None of these block the first slices: the `sim` core, content schemas, the gateway, `VoiceSession`, the café order loop, saves and the HUD. Each can be decided as its slice comes up.
+1. **Hints** come from a new `/api/hint` call, generated for the moment. Nothing is authored per interaction.
+2. **Translate on NPC lines** is a `translation` field on `/api/annotate`, which now runs for every NPC line in all four languages.
+3. **Phrasebooks:** the personal phrasebook is a list in the save, shown in the Help tab and the Journal. Place phrasebooks are authored content per place and pack.
+4. **Mood numbers** (the scale, the size of each change, the overwork and debt penalties, the modifier curve) start as defaults in one tuning module and are adjusted in playtesting.
+5. **Other tuning numbers** (the Life Skill XP curve, Familiarity thresholds, the Illness base rate, grocery expiry, Health drain during Illness) likewise start as defaults in the tuning module. Tests import them rather than copying them.
+6. **Gym membership** lasts 30 days and is renewed by talking to the attendant. It is never charged automatically and never becomes debt.
+7. **Flu "rest":** the fever reducer stops the Health drain, and the flu clears after the next sleep.
+8. **Closing time** stops new conversations and Shifts from starting. Anything already under way finishes.
+9. **Sleep:** the bed is usable from 20:00, and the Character always wakes at 07:00. No naps.
+10. **Japanese reading aids:** furigana by default, plus a separate "Show romaji" setting, off by default.
+11. **Shift Recaps:** one combined Recap per Shift.
+12. **"Helping NPCs pays off in Mood and relationships"** ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md)) is dropped. Small Talk, gifts and regular visits cover relationships.
+13. **Debt** is repaid at the counter (the landlord for rent, reception for hospital bills), never taken from Shift pay. Payment-plan instalments come out automatically on rent day.

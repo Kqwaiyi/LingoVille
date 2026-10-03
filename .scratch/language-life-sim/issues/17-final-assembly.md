@@ -19,10 +19,6 @@ Resolved on 2026-10-03 by `/to-spec`: **[spec.md](../../language-life-sim-build/
 
 **Contradictions between tickets** are listed in the spec's Further Notes under "Superseded decisions" (9 cases, where the later ticket wins), along with 4 small decisions made during assembly.
 
-**Unanswered questions** (13) are listed in the spec's Further Notes under "Open questions". **Deviation from this ticket's instruction:** they do *not* go back onto the map. That would reopen a map whose destination has been reached. Instead, `/to-tickets` will:
-- turn tuning numbers into defaults in one tuning module, to adjust during playtesting;
-- turn design gaps into small `ready-for-human` decision tickets, each blocking only the build slice that needs it.
+**Unanswered questions** (13) did *not* go back onto the map, which would have reopened a map whose destination had been reached. **Deviation from this ticket's instruction:** instead, the human answered all 13 on 2026-10-03, before the build tickets were cut. Tuning numbers became defaults in one tuning module, to adjust in playtesting. The answers are written into the spec's Further Notes under "Decisions made before ticketing", so no build ticket waits on a decision.
 
-Hints, Translate on NPC lines and the personal phrasebook touch the first conversation slice, so they will block early.
-
-**Location:** the spec and its build tickets live in their own folder, `.scratch/language-life-sim-build/` (tickets numbered 01–39 there). This map folder holds only the decision tickets (01–17), all now closed.
+**Location:** the spec and its build tickets live in their own folder, `.scratch/language-life-sim-build/` (35 tickets, numbered 01–35 in `issues/` there). This map folder holds only the decision tickets (01–17), all now closed.
