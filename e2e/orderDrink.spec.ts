@@ -20,7 +20,6 @@ test('ordering a drink with the Typed Fallback: read-back, confirm, closing card
   await expect(closingCard(page)).toBeVisible();
   await expect(closingCard(page).getByText('Hot latte · −¥450 · Mood ↑')).toBeVisible();
   await expect(money(page)).toHaveText('¥9,750');
-  await expect(closingCard(page).getByRole('button', { name: 'See Recap' })).toBeDisabled();
 
   await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
   await expect(column(page)).toBeHidden();

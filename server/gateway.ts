@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { z } from 'zod';
+import { buildRecapRequest, RecapRequestSchema, recapSchemaFor, type Recap } from '../src/ai/index.ts';
 import {
   DEFAULT_GATEWAY_PORT,
   ENDPOINT_VERSIONS,
@@ -106,7 +108,107 @@ async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingM
   }
 }
 
+/** Calls `generateContent` on a model. Throws with Gemini's answer, for the gateway log, when it fails. */
+async function generateContent(apiKey: string, deps: GatewayDeps, model: string, body: unknown) {
+  const upstream = await deps.fetch(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const answer = (await upstream.json()) as {
+    candidates?: { content?: { parts?: { text?: string; inlineData?: { data?: string } }[] } }[];
+  };
+  if (!upstream.ok) throw new Error(`${model} ${upstream.status}: ${JSON.stringify(answer)}`);
+  const parts = answer.candidates?.[0]?.content?.parts ?? [];
+  return { parts, answer };
+}
+
+const MOCK_RECAP: Recap = {
+  outcome: 'You ordered a hot latte and paid. Nicely done!',
+  corrections: [
+    { said: 'ホットラテ ください', natural: 'ホットラテをください', why: 'Add を after the thing you are asking for.' },
+    { said: 'はい', natural: 'はい、お願いします', why: 'お願いします makes a yes to an offer sound polite.' },
+  ],
+  newWords: [
+    { base: 'いらっしゃいませ', reading: 'いらっしゃいませ', gloss: 'welcome (said by shop staff)' },
+    { base: 'よろしいですか', reading: 'よろしいですか', gloss: 'is that all right? (polite)' },
+  ],
+  cefrEstimate: 'A1',
+  lastTopic: 'a hot latte',
+};
+
+/** POST /api/recap: a Recap of a conversation, built from the transcript, the Help log, the interaction, the step and the Native Language. */
+async function recap(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
+  const request = RecapRequestSchema.safeParse(await readJson(req));
+  if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
+  if (env.mock) return sendJson(res, 200, MOCK_RECAP);
+  if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
+
+  try {
+    const { parts, answer } = await generateContent(env.apiKey, deps, MODELS.recap, buildRecapRequest(request.data));
+    const text = parts.map((part) => part.text ?? '').join('');
+    const checked = recapSchemaFor(request.data.kind).safeParse(JSON.parse(text || 'null'));
+    if (!checked.success) throw new Error(`${MODELS.recap} answered something that is not a Recap: ${JSON.stringify(answer)}`);
+    return sendJson(res, 200, checked.data);
+  } catch (error) {
+    console.warn('[gateway] could not write a Recap:', error instanceof Error ? error.message : error);
+    return sendJson(res, 502, { error: 'recap_unavailable' });
+  }
+}
+
+// Gemini TTS answers with 16-bit mono PCM at this rate.
+const TTS_SAMPLE_RATE = 24_000;
+
+/** A short, soft beep: the canned hear-it-said clip in mock mode. */
+function mockClip() {
+  const samples = new Int16Array(TTS_SAMPLE_RATE / 4);
+  for (let i = 0; i < samples.length; i++) samples[i] = Math.round(Math.sin((2 * Math.PI * 440 * i) / TTS_SAMPLE_RATE) * 0x0800);
+  return Buffer.from(samples.buffer).toString('base64');
+}
+
+// Hear-it-said is for a phrase or a sentence, never a speech.
+const TtsRequestSchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  targetLanguage: z.enum(Object.keys(VOICES) as [TargetLanguage, ...TargetLanguage[]]),
+});
+
+// The part of Gemini's TTS answer the gateway uses.
+const TtsAnswerSchema = z.object({ inlineData: z.object({ data: z.string().min(1) }) });
+
+/** POST /api/tts: hear-it-said, a phrase said aloud in the voice for its language, as base64 PCM. */
+async function tts(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
+  const request = TtsRequestSchema.safeParse(await readJson(req));
+  if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
+  const { text, targetLanguage } = request.data;
+  if (env.mock) return sendJson(res, 200, { audio: mockClip(), sampleRate: TTS_SAMPLE_RATE });
+  if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
+
+  try {
+    const { parts, answer } = await generateContent(env.apiKey, deps, MODELS.tts, {
+      contents: [{ role: 'user', parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES[targetLanguage] } } },
+      },
+    });
+    const audio = parts.map((part) => TtsAnswerSchema.safeParse(part)).find((part) => part.success);
+    if (!audio?.success) throw new Error(`${MODELS.tts} gave no audio: ${JSON.stringify(answer)}`);
+    return sendJson(res, 200, { audio: audio.data.inlineData.data, sampleRate: TTS_SAMPLE_RATE });
+  } catch (error) {
+    console.warn('[gateway] could not say a phrase:', error instanceof Error ? error.message : error);
+    return sendJson(res, 502, { error: 'tts_unavailable' });
+  }
+}
+
 const REAL_DEPS: GatewayDeps = { fetch: (...args) => globalThis.fetch(...args), now: () => Date.now() };
+
+type Route = (env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>;
+
+const ROUTES: Record<string, Route> = {
+  '/api/token': mintToken,
+  '/api/recap': recap,
+  '/api/tts': tts,
+};
 
 export function createGateway(env: GatewayEnv, deps: GatewayDeps = REAL_DEPS): http.Server {
   return http.createServer((req, res) => {
@@ -115,9 +217,10 @@ export function createGateway(env: GatewayEnv, deps: GatewayDeps = REAL_DEPS): h
     if (req.method === 'GET' && pathname === '/api/health') {
       return sendJson(res, 200, { ok: true, mock: env.mock, keyConfigured: env.apiKey !== undefined });
     }
-    if (req.method === 'POST' && pathname === '/api/token') {
-      mintToken(env, deps, req, res).catch((error) => {
-        console.error('[gateway] /api/token failed:', error);
+    const route = req.method === 'POST' ? ROUTES[pathname] : undefined;
+    if (route) {
+      route(env, deps, req, res).catch((error) => {
+        console.error(`[gateway] ${pathname} failed:`, error);
         if (!res.headersSent) sendJson(res, 500, { error: 'internal' });
       });
       return;

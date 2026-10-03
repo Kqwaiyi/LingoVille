@@ -242,7 +242,7 @@ describe('Patience', () => {
     store.getState().sendTypedLine('...');
 
     expect(fake.sent.at(-1)).toBe(OUT_OF_PATIENCE_SCENE);
-    expect(selectChatLines(store.getState()).at(-1)).toEqual({ speaker: 'player', text: '...' });
+    expect(selectChatLines(store.getState()).at(-1)).toEqual({ speaker: 'player', text: '...', typed: true });
     fake.says('申し訳ございません…。');
     expect(selectClosingCard(store.getState())?.kind).toBe('failure');
   });

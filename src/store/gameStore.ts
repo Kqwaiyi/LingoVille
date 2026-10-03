@@ -1,6 +1,14 @@
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
-import { buildNpcSession, NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, type NpcSession, type ToolResponse } from '../ai/index.ts';
+import {
+  buildNpcSession,
+  NOT_UNDERSTOOD_TOOL,
+  OUT_OF_PATIENCE_SCENE,
+  type NpcSession,
+  type Recap,
+  type RecapRequest,
+  type ToolResponse,
+} from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction, type NamedNpcId } from '../content/index.ts';
 import {
   applyInteractionOutcome,
@@ -18,6 +26,7 @@ import {
   tick,
   weekdayOf,
   type GameState,
+  type LanguageCode,
   type NewGameSetup,
   type NpcExpression,
   type OutcomeResult,
@@ -26,15 +35,18 @@ import {
 } from '../sim/index.ts';
 import {
   addUsage,
+  hearItSaid,
   NO_USAGE,
   openVoiceSession,
   VoiceServiceUnavailableError,
   type OpenVoiceSession,
   type TokenUsage,
+  type HearItSaid,
   type ToolCall,
   type TranscriptLine,
   type VoiceSession,
 } from '../voice/index.ts';
+import { browserJournal, journalPage, type Journal, type JournalEntry, type JournalPage, type NewJournalEntry } from './journal.ts';
 
 /** The fixed setup every new game uses until New game setup lands (ticket 12). */
 export const DEV_SETUP: NewGameSetup = {
@@ -46,13 +58,26 @@ export const DEV_SETUP: NewGameSetup = {
   rngSeed: 20261003,
 };
 
+/** The Native Language until device settings and New game setup land (tickets 07 and 12). */
+export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
+
+/** The one save slot until save slots land (ticket 08). */
+export const DEV_SLOT_ID = 'slot-1';
+
 /** Something in the world the Character is close enough to use with E: the tap, or an NPC to talk to. */
 export type Interactable = 'tap' | NamedNpcId;
 
-export type ChatLine = TranscriptLine;
+/** A line of the conversation. A typed player line is marked, so the Recap knows it wasn't misheard. */
+export type ChatLine = TranscriptLine & { typed?: true };
 
 /** A short notice over the game that clears itself. */
-export type Toast = { kind: 'npcSteppedAway'; npcId: NamedNpcId };
+export type Toast = { kind: 'npcSteppedAway'; npcId: NamedNpcId } | { kind: 'recapSaved' };
+
+/** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
+export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
+
+/** The full-screen Journal: its entries, newest first, or null while they load. */
+export type JournalView = { entries: JournalEntry[] | null; failed: boolean };
 
 /** How a Goal Interaction ended, and its effects, for the closing card. */
 export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }>;
@@ -62,6 +87,8 @@ export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }
  * before the outcome is decided changes nothing.
  */
 export type Conversation = {
+  /** Tells this conversation apart from later ones, so a late Recap only lands where it belongs. */
+  id: number;
   npcId: NamedNpcId;
   interaction: Interaction;
   lines: ChatLine[];
@@ -83,15 +110,47 @@ export type Conversation = {
   outcome: ClosingCard | null;
   /** The session is over and the closing card shows. */
   closed: boolean;
+  /** Started as soon as the session is over, if the outcome was decided. */
+  recap: RecapView | null;
+  /** See Recap was chosen: the Recap shows in the column instead of the chat. */
+  showingRecap: boolean;
 };
 
 export type GameStoreDeps = {
   /** How a conversation reaches its NPC. In mock mode the gateway hands it the scripted fake NPC. */
   openVoiceSession: OpenVoiceSession;
+  /** Asks the gateway for a Recap. Rejects if none can be written. */
+  requestRecap: (request: RecapRequest) => Promise<Recap>;
+  journal: Journal;
+  slotId: string;
+  /** Called once an outcome is applied, before the closing card. Autosave arrives in ticket 07. */
+  autosave: (game: GameState) => void;
+  hearItSaid: HearItSaid;
+};
+
+async function requestRecapFromGateway(request: RecapRequest): Promise<Recap> {
+  const res = await fetch('/api/recap', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) throw new Error(`No Recap: the gateway answered ${res.status}`);
+  return (await res.json()) as Recap;
+}
+
+const BROWSER_DEPS: GameStoreDeps = {
+  openVoiceSession,
+  requestRecap: requestRecapFromGateway,
+  journal: browserJournal,
+  slotId: DEV_SLOT_ID,
+  autosave: () => {},
+  hearItSaid,
 };
 
 export type GameStore = {
   game: GameState;
+  /** The Player's own language, which Recaps are written in. */
+  nativeLanguage: LanguageCode;
   tabHidden: boolean;
   interactable: Interactable | null;
   conversation: Conversation | null;
@@ -102,6 +161,8 @@ export type GameStore = {
   toast: Toast | null;
   /** No token could be minted for a conversation, so the "Voice service unavailable" screen shows. */
   voiceUnavailable: boolean;
+  /** The full-screen Journal, while it is open. */
+  journal: JournalView | null;
   /** Called once per rendered frame with the real time since the last one. */
   advance: (realDeltaMs: number) => void;
   setTabHidden: (hidden: boolean) => void;
@@ -120,8 +181,17 @@ export type GameStore = {
    * at no cost. During the goodbye it skips to the closing card, and on the card it closes it.
    */
   leaveConversation: () => void;
-  /** Closes the closing card without a Recap. */
+  /** Closes the closing card without showing the Recap. It is still saved to the Journal. */
   skipRecap: () => void;
+  /** Shows the Recap in the column, or its loading state until it arrives. */
+  seeRecap: () => void;
+  /** Done: closes the Recap and the conversation. */
+  closeRecap: () => void;
+  /** 🔊: says a phrase aloud in the Target Language. */
+  hearItSaid: (text: string) => void;
+  /** J: opens the full-screen Journal, outside conversations. */
+  openJournal: () => void;
+  closeJournal: () => void;
   setTyping: (typing: boolean) => void;
   dismissToast: () => void;
   dismissVoiceUnavailable: () => void;
@@ -130,9 +200,11 @@ export type GameStore = {
 const isNpc = (interactable: Interactable | null): interactable is NamedNpcId =>
   interactable !== null && interactable in NAMED_NPCS;
 
-export function createGameStore(initial: GameState, deps: GameStoreDeps = { openVoiceSession }) {
+export function createGameStore(initial: GameState, overrides: Partial<GameStoreDeps> = {}) {
+  const deps: GameStoreDeps = { ...BROWSER_DEPS, ...overrides };
   // The live session belongs to the open conversation; it never goes into state.
   let voice: VoiceSession | null = null;
+  let conversations = 0;
 
   return createStore<GameStore>()((set, get) => {
     const updateConversation = (change: Partial<Conversation>) => {
@@ -140,10 +212,64 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
       if (conversation) set({ conversation: { ...conversation, ...change } });
     };
 
-    /** The outcome is decided and applied. The NPC says goodbye next, then the closing card shows. */
+    /** The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. */
     const settleOutcome = (game: GameState, outcome: ClosingCard) => {
       set({ game });
+      deps.autosave(game);
       updateConversation({ outcome });
+    };
+
+    const updateRecap = (conversationId: number, recap: RecapView) => {
+      if (get().conversation?.id === conversationId) updateConversation({ recap });
+    };
+
+    /**
+     * Starts writing the Recap the moment the conversation ends. It goes to the
+     * Journal whether or not the Player looks at it, and shows in the column only
+     * while this conversation is still open.
+     */
+    const writeRecap = (conversation: Conversation, outcome: ClosingCard) => {
+      const { game, nativeLanguage } = get();
+      const { culturePackId, targetLanguage } = game.identity;
+      const transcript = conversation.lines.map(({ speaker, text, typed }) => (typed ? { speaker, text, typed } : { speaker, text }));
+      const request: RecapRequest = {
+        kind: 'goal',
+        culturePackId,
+        step: game.proficiencyStep,
+        nativeLanguage,
+        conversation: { interactionId: conversation.interaction.id, outcome: outcome.kind, transcript, helpLog: [] },
+      };
+      const entry = (recap: Recap | null): NewJournalEntry => ({
+        kind: 'goal',
+        npcId: conversation.npcId,
+        interactionId: conversation.interaction.id,
+        placeName: CULTURE_PACKS[culturePackId].cafe.name,
+        day: game.clock.day,
+        minuteOfDay: game.clock.minuteOfDay,
+        targetLanguage,
+        nativeLanguage,
+        outcome: outcome.kind,
+        recap: recap && { outcome: recap.outcome, corrections: recap.corrections, newWords: recap.newWords },
+        lines: transcript,
+        helpLog: [],
+      });
+
+      updateConversation({ recap: { status: 'writing' } });
+      deps
+        .requestRecap(request)
+        .then(
+          (recap) => {
+            updateRecap(conversation.id, { status: 'ready', entry: journalPage(entry(recap)) });
+            return entry(recap);
+          },
+          (error: unknown) => {
+            console.warn('[recap] could not be written:', error instanceof Error ? error.message : error);
+            updateRecap(conversation.id, { status: 'failed' });
+            return entry(null);
+          },
+        )
+        .then((written) => deps.journal.append(deps.slotId, written))
+        .catch((error: unknown) => console.error('[journal] could not save an entry:', error));
     };
 
     /**
@@ -187,6 +313,8 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
       closeSession();
       updateConversation({ closed: true, npcLine: null, listening: false });
       set({ typing: false, micLevel: 0 });
+      const conversation = get().conversation;
+      if (conversation?.outcome && !conversation.recap) writeRecap(conversation, conversation.outcome);
     };
 
     /** Closes the session and clears the conversation away, with whatever else should show instead. */
@@ -286,6 +414,8 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
       micLevel: 0,
       toast: null,
       voiceUnavailable: false,
+      nativeLanguage: DEV_NATIVE_LANGUAGE,
+      journal: null,
       advance: (realDeltaMs) => {
         const dt = gameMinutesFor(realDeltaMs, selectTimeScale(get()));
         if (dt > 0) set({ game: tick(get().game, dt) });
@@ -307,7 +437,7 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
 
       talk: () => {
         const { interactable, conversation, game } = get();
-        if (conversation || !isNpc(interactable)) return;
+        if (conversation || get().journal || !isNpc(interactable)) return;
         const npc = NAMED_NPCS[interactable];
         const interaction = Object.values(INTERACTIONS).find((i) => i.npcId === npc.id)!;
         const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
@@ -317,6 +447,7 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
         set({
           voiceUnavailable: false,
           conversation: {
+            id: ++conversations,
             npcId: npc.id,
             interaction,
             lines: [],
@@ -329,6 +460,8 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
             patience: startPatience(game.proficiencyStep),
             outcome: null,
             closed: false,
+            recap: null,
+            showingRecap: false,
           },
         });
         openSession(npcSession);
@@ -339,7 +472,7 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
         if (!canTakeTurn(conversation) || !voice || line === '') return;
         const turn: Conversation = {
           ...conversation,
-          lines: [...conversation.lines, { speaker: 'player', text: line }],
+          lines: [...conversation.lines, { speaker: 'player', text: line, typed: true }],
           npcLine: null,
           heardLine: null,
           patience: newPlayerTurn(conversation.patience),
@@ -378,7 +511,34 @@ export function createGameStore(initial: GameState, deps: GameStoreDeps = { open
         if (conversation?.outcome && !conversation.closed) showClosingCard();
         else endConversation();
       },
-      skipRecap: () => endConversation(),
+      skipRecap: () => {
+        const writing = get().conversation?.recap;
+        endConversation();
+        if (writing) set({ toast: { kind: 'recapSaved' } });
+      },
+      seeRecap: () => {
+        if (get().conversation?.recap) updateConversation({ showingRecap: true });
+      },
+      closeRecap: () => endConversation(),
+      hearItSaid: (text) => {
+        deps
+          .hearItSaid(text, get().game.identity.targetLanguage)
+          .catch((error: unknown) => console.warn('[hear-it-said]', error instanceof Error ? error.message : error));
+      },
+      openJournal: () => {
+        if (get().conversation || get().journal) return;
+        set({ journal: { entries: null, failed: false } });
+        deps.journal.list(deps.slotId).then(
+          (entries) => {
+            if (get().journal) set({ journal: { entries, failed: false } });
+          },
+          (error: unknown) => {
+            console.error('[journal] could not be read:', error);
+            if (get().journal) set({ journal: { entries: [], failed: true } });
+          },
+        );
+      },
+      closeJournal: () => set({ journal: null }),
       setTyping: (typing) => set({ typing }),
       dismissToast: () => set({ toast: null }),
       dismissVoiceUnavailable: () => set({ voiceUnavailable: false }),
@@ -396,7 +556,7 @@ export function useGame<T>(selector: (state: GameStore) => T): T {
 // --- Selectors: the only way world and UI read game state -------------------
 
 export const selectTimeScale = (s: GameStore) => {
-  if (s.tabHidden) return CLOCK.timeScale.paused;
+  if (s.tabHidden || s.journal) return CLOCK.timeScale.paused;
   return s.conversation ? CLOCK.timeScale.conversation : CLOCK.timeScale.normal;
 };
 export const selectHealth = (s: GameStore) => s.game.character.health;
@@ -415,6 +575,8 @@ export const selectConversation = (s: GameStore) => s.conversation;
 const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;
 export const selectTyping = (s: GameStore) => s.typing;
+/** Keys belong to the UI, not the world: the typed field has focus, or the Journal is open. */
+export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;
@@ -423,6 +585,9 @@ export const selectToast = (s: GameStore) => s.toast;
 export const selectVoiceUnavailable = (s: GameStore) => s.voiceUnavailable;
 /** The closing card, once the session is over. */
 export const selectClosingCard = (s: GameStore) => (s.conversation?.closed ? s.conversation.outcome : null);
+/** The Recap in the column, once See Recap is chosen. */
+export const selectRecap = (s: GameStore) => (s.conversation?.showingRecap ? s.conversation.recap : null);
+export const selectJournal = (s: GameStore) => s.journal;
 /** The NPC's face: Patience shows only like this, never as a number. */
 export const selectNpcExpression = (s: GameStore): NpcExpression | null =>
   s.conversation ? npcExpression(s.conversation.patience) : null;

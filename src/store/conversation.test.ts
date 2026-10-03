@@ -87,7 +87,7 @@ describe('talking to an NPC', () => {
 
     expect(fake.sent).toEqual(['コーヒー ください']);
     expect(selectChatLines(store.getState()).slice(1)).toEqual([
-      { speaker: 'player', text: 'コーヒー ください' },
+      { speaker: 'player', text: 'コーヒー ください', typed: true },
       { speaker: 'npc', text: 'はい。' },
     ]);
   });

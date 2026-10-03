@@ -13,3 +13,15 @@ export {
   type ToolResponse,
   type VoiceRequest,
 } from './npcSession.ts';
+export {
+  buildRecapRequest,
+  RecapRequestSchema,
+  RecapSchema,
+  recapSchemaFor,
+  type HelpLogEntry,
+  type Recap,
+  type RecapConversation,
+  type RecapLine,
+  type RecapRequest,
+  type RecapRequestBody,
+} from './recap.ts';

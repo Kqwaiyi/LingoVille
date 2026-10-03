@@ -11,7 +11,7 @@ import {
 import { useEffect, useMemo, useRef } from 'react';
 import { Vector3, type Group } from 'three';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
-import { selectTyping, useGame, type Interactable } from '../store/index.ts';
+import { selectWorldKeysOff, useGame, type Interactable } from '../store/index.ts';
 import type { Control } from './controls.ts';
 import { BARISTA, devSpawnPlace, HOME_TAP, placeAt, SPAWN_POINTS, type Vec3 } from './town.ts';
 
@@ -76,8 +76,8 @@ export function Character() {
   const { world } = useRapier();
   const enterPlace = useGame((s) => s.enterPlace);
   const setInteractable = useGame((s) => s.setInteractable);
-  // Letters typed into the chat field must not walk the Character away.
-  const typing = useGame(selectTyping);
+  // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
+  const keysOff = useGame(selectWorldKeysOff);
 
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.
@@ -101,7 +101,7 @@ export function Character() {
     const { yaw, pitch } = orbit.current;
 
     // Walk relative to the camera: forward is away from it, across the ground.
-    const keys = typing ? { forward: false, back: false, left: false, right: false } : getKeys();
+    const keys = keysOff ? { forward: false, back: false, left: false, right: false } : getKeys();
     const ahead = Number(keys.forward) - Number(keys.back);
     const across = Number(keys.right) - Number(keys.left);
     const move = scratch.move.set(

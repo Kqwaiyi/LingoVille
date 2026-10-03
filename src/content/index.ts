@@ -17,4 +17,4 @@ export { interactionFacts } from './facts.ts';
 export { INTERACTIONS } from './interactions.ts';
 export { NAMED_NPCS, type NamedNpc, type NamedNpcId } from './npcs.ts';
 export { PLACE_HOURS, type OpeningHours } from './places.ts';
-export { toToolDeclaration, type FunctionDeclaration, type ToolSchema } from './toolDeclaration.ts';
+export { toGeminiSchema, toToolDeclaration, type FunctionDeclaration, type ToolSchema } from './toolDeclaration.ts';

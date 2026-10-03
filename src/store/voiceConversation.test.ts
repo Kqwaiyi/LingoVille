@@ -228,7 +228,7 @@ describe('a dropped connection', () => {
     expect(dropped.closed).toBe(true);
     expect(npc.latest.options?.resumeFrom).toEqual([
       { speaker: 'npc', text: 'いらっしゃいませ！' },
-      { speaker: 'player', text: 'ラテ' },
+      { speaker: 'player', text: 'ラテ', typed: true },
     ]);
     expect(selectReconnecting(store.getState())).toBe(true);
 
@@ -238,7 +238,7 @@ describe('a dropped connection', () => {
     expect(selectReconnecting(store.getState())).toBe(false);
     expect(selectChatLines(store.getState())).toEqual([
       { speaker: 'npc', text: 'いらっしゃいませ！' },
-      { speaker: 'player', text: 'ラテ' },
+      { speaker: 'player', text: 'ラテ', typed: true },
       { speaker: 'npc', text: 'お待たせしました。' },
     ]);
   });

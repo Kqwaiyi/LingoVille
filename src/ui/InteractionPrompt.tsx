@@ -1,15 +1,15 @@
 import { useEffect } from 'react';
 import { NAMED_NPCS } from '../content/index.ts';
-import { selectConversation, selectInteractable, selectTyping, useGame } from '../store/index.ts';
+import { selectConversation, selectInteractable, selectWorldKeysOff, useGame } from '../store/index.ts';
 
 /** "Press E to …" while the Character is close enough to use something, and E to use it. */
 export function InteractionPrompt() {
   const interactable = useGame(selectInteractable);
   const talking = useGame(selectConversation) !== null;
-  const typing = useGame(selectTyping);
+  const keysOff = useGame(selectWorldKeysOff);
   const drinkWater = useGame((s) => s.drinkWater);
   const talk = useGame((s) => s.talk);
-  const active = interactable !== null && !talking && !typing;
+  const active = interactable !== null && !talking && !keysOff;
 
   useEffect(() => {
     if (!active) return;

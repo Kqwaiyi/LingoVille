@@ -60,6 +60,14 @@ function toToolSchema(json: JsonSchema): ToolSchema {
   return schema;
 }
 
+/**
+ * Converts a Zod schema to the OpenAPI subset Gemini accepts, for a `responseSchema`
+ * whose answers the same Zod schema then validates.
+ */
+export function toGeminiSchema(schema: z.ZodType): ToolSchema {
+  return toToolSchema(z.toJSONSchema(schema, { io: 'output' }) as JsonSchema);
+}
+
 /** Builds a function declaration from the Zod schema that also validates its arguments. */
 export function toToolDeclaration(name: string, description: string, args: z.ZodObject): FunctionDeclaration {
   const parameters = toToolSchema(z.toJSONSchema(args, { io: 'input' }) as JsonSchema);

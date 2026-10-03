@@ -1,0 +1,229 @@
+import { z } from 'zod';
+import {
+  CULTURE_PACKS,
+  INTERACTIONS,
+  NAMED_NPCS,
+  toGeminiSchema,
+  type CulturePack,
+  type NamedNpcId,
+  type ToolSchema,
+} from '../content/index.ts';
+import type { LanguageCode, ProficiencyStep } from '../sim/index.ts';
+
+const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const satisfies readonly LanguageCode[];
+const STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const satisfies readonly ProficiencyStep[];
+const INTERACTION_IDS = Object.values(INTERACTIONS).map((interaction) => interaction.id) as [string, ...string[]];
+const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
+
+/** One line of a conversation as the Recap reads it. A player line is what the NPC heard, unless it was typed. */
+const RecapLineSchema = z.object({
+  speaker: z.enum(['npc', 'player']),
+  text: z.string(),
+  typed: z.boolean().optional(),
+});
+
+/** Help the Player used, placed after the transcript line it followed. Filled in by the Help tab (ticket 09). */
+const HelpLogEntrySchema = z.object({
+  afterLine: z.int().min(0),
+  kind: z.enum(['hint', 'phrasebook', 'translate']),
+  text: z.string(),
+});
+
+const RecapConversationSchema = z.object({
+  interactionId: z.enum(INTERACTION_IDS),
+  outcome: z.enum(['success', 'failure']),
+  transcript: z.array(RecapLineSchema),
+  helpLog: z.array(HelpLogEntrySchema),
+});
+
+const shared = {
+  culturePackId: z.enum(LANGUAGES),
+  step: z.enum(STEPS),
+  nativeLanguage: z.enum(LANGUAGES),
+};
+
+/** What `/api/recap` takes. The gateway validates requests with it, and builds the prompt from them. */
+export const RecapRequestSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('goal'), ...shared, conversation: RecapConversationSchema }),
+  z.object({
+    kind: z.literal('smallTalk'),
+    ...shared,
+    npcId: z.enum(NPC_IDS),
+    transcript: z.array(RecapLineSchema),
+    helpLog: z.array(HelpLogEntrySchema),
+  }),
+  z.object({ kind: z.literal('shift'), ...shared, customers: z.array(RecapConversationSchema).min(1) }),
+]);
+
+export type RecapLine = z.infer<typeof RecapLineSchema>;
+export type HelpLogEntry = z.infer<typeof HelpLogEntrySchema>;
+export type RecapConversation = z.infer<typeof RecapConversationSchema>;
+export type RecapRequest = z.infer<typeof RecapRequestSchema>;
+
+/** How much each kind of Recap may hold. Small Talk gets a lighter one, so a casual chat isn't turned into a lesson. */
+const LIMITS: Record<RecapRequest['kind'], { corrections: number; newWords: number }> = {
+  goal: { corrections: 3, newWords: 5 },
+  smallTalk: { corrections: 1, newWords: 3 },
+  shift: { corrections: 3, newWords: 6 },
+};
+
+function recapSchema(limits: { corrections: number; newWords: number }) {
+  return z.object({
+    outcome: z.string().describe('One line on how it went, in the Native Language.'),
+    corrections: z
+      .array(
+        z.object({
+          said: z.string().describe('What the learner said, as heard, in the Target Language.'),
+          natural: z.string().describe('A more natural way to say it, in the Target Language.'),
+          why: z.string().describe('One line on why, in the Native Language.'),
+        }),
+      )
+      .max(limits.corrections),
+    newWords: z
+      .array(
+        z.object({
+          base: z.string().describe('The word or phrase, in the Target Language.'),
+          reading: z.string().describe('Pinyin with tone marks for Chinese, hiragana for Japanese, otherwise empty.'),
+          gloss: z.string().describe('Its meaning, in the Native Language.'),
+        }),
+      )
+      .max(limits.newWords),
+    cefrEstimate: z.enum(STEPS).describe("The CEFR level this conversation's evidence suggests."),
+    lastTopic: z.string().optional().describe('What the conversation was about, in a few words of English.'),
+  });
+}
+
+/** What `/api/recap` answers for a Goal Interaction. Every kind of Recap has this shape. */
+export const RecapSchema = recapSchema(LIMITS.goal);
+export type Recap = z.infer<typeof RecapSchema>;
+
+/** The schema a Recap of this kind must match, sized for its kind. The gateway checks Gemini's answer against it. */
+export function recapSchemaFor(kind: RecapRequest['kind']) {
+  return recapSchema(LIMITS[kind]);
+}
+
+/** A Gemini `generateContent` body with a `responseSchema`. */
+export type RecapRequestBody = {
+  systemInstruction: { parts: { text: string }[] };
+  contents: { role: 'user'; parts: { text: string }[] }[];
+  generationConfig: { responseMimeType: 'application/json'; responseSchema: ToolSchema };
+};
+
+const OUTCOMES = { success: 'succeeded', failure: 'failed' } as const;
+
+function block(heading: string, lines: string[]) {
+  return `${heading}\n${lines.join('\n')}`;
+}
+
+const HELP_KINDS: Record<HelpLogEntry['kind'], string> = {
+  hint: 'hint shown',
+  phrasebook: 'phrasebook entry shown',
+  translate: 'translated NPC line',
+};
+
+function transcriptLines(transcript: RecapLine[]) {
+  const speaker = (line: RecapLine) => {
+    if (line.speaker === 'npc') return 'NPC';
+    return line.typed ? 'PLAYER (typed)' : 'PLAYER (heard as, may be misheard)';
+  };
+  return transcript.map((line, i) => `${i + 1}. ${speaker(line)}: ${line.text}`);
+}
+
+function helpLines(helpLog: HelpLogEntry[]) {
+  if (helpLog.length === 0) return ['Help used: none.'];
+  return ['Help used:', ...helpLog.map(({ afterLine, kind, text }) => `- after line ${afterLine}: ${HELP_KINDS[kind]}: ${text}`)];
+}
+
+function conversationBlock(heading: string, conversation: RecapConversation, pack: CulturePack) {
+  const interaction = Object.values(INTERACTIONS).find((i) => i.id === conversation.interactionId)!;
+  const { role } = NAMED_NPCS[interaction.npcId];
+  return block(heading, [
+    `With the ${role} at ${pack.cafe.name}. The ${role}'s goal: ${interaction.goal} Outcome: ${OUTCOMES[conversation.outcome]}.`,
+    ...transcriptLines(conversation.transcript),
+    ...helpLines(conversation.helpLog),
+  ]);
+}
+
+function coachBlock(request: RecapRequest, pack: CulturePack) {
+  const native = CULTURE_PACKS[request.nativeLanguage].languageName;
+  const what = {
+    goal: 'one conversation',
+    smallTalk: 'one Small Talk chat: a casual conversation with no goal, which cannot fail',
+    shift: 'a whole work Shift, where the learner was the staff member serving several customers',
+  }[request.kind];
+  return block('WHO YOU ARE', [
+    `You are a warm, encouraging language coach. Your learner speaks ${native} and is learning ${pack.languageName} ` +
+      `by living in a small town in ${pack.setting}. Their level is about CEFR ${request.step}.`,
+    `Write a short Recap of ${what}, for them to read straight afterwards and keep in their Journal.`,
+  ]);
+}
+
+function readingBlock() {
+  return block('HOW TO READ THE TRANSCRIPT', [
+    '- NPC lines are exactly what the NPC said.',
+    '- "PLAYER (heard as, may be misheard)" lines are what speech recognition heard the learner say. They may be wrong.',
+    '- "PLAYER (typed)" lines were typed by the learner, exactly as written.',
+    '- When a heard line has a word that sounds close to what the learner most likely meant but is wrong in context ' +
+      '(for example yī bǎi, "a hundred", where yī bēi, "a cup", was meant), treat it as a pronunciation point: ' +
+      'a correction whose "said" is what was heard, whose "natural" is what they meant, and whose "why" says how to say it ' +
+      'so it is heard right. Never blame them for a typo-like word they probably said correctly.',
+    '- A player turn that closely repeats a hint shown just before it shows little about what they can do alone. ' +
+      'An NPC line they had translated shows nothing about their listening.',
+  ]);
+}
+
+function writeBlock(request: RecapRequest, pack: CulturePack) {
+  const native = CULTURE_PACKS[request.nativeLanguage].languageName;
+  const target = pack.languageName;
+  const limits = LIMITS[request.kind];
+  const lines = [
+    `- outcome: one friendly line in ${native} on how it went.`,
+    `- corrections: at most ${limits.corrections}, the most useful only. "said" is the learner's words and "natural" a more natural ` +
+      `way to say it at their level, both in ${target}. "why" is one short line in ${native}. If nothing needs correcting, give none.`,
+    `- newWords: at most ${limits.newWords} words or phrases from the conversation worth keeping, mostly ones the NPC used. ` +
+      `"base" in ${target}, "reading" as pinyin with tone marks for Chinese or hiragana for Japanese (otherwise empty), ` +
+      `"gloss" in ${native}.`,
+    '- cefrEstimate: the CEFR level the learner showed in this conversation.',
+    '- lastTopic: what the conversation was about, in a few words of English, if it had a topic worth remembering.',
+    `Write every explanation in ${native}, never in ${target}. Write examples only in ${target}.`,
+  ];
+  if (request.kind === 'smallTalk') {
+    lines.push('Keep it light: this was a chat, not a lesson. Correct only what would really help, and celebrate what went well.');
+  }
+  if (request.kind === 'shift') {
+    lines.push('Write one combined Recap for the whole Shift: the outcome line sums up how the customers went.');
+  }
+  return block('WHAT TO WRITE', lines);
+}
+
+function conversationsText(request: RecapRequest, pack: CulturePack) {
+  switch (request.kind) {
+    case 'goal':
+      return conversationBlock('THE CONVERSATION', request.conversation, pack);
+    case 'smallTalk': {
+      const { role } = NAMED_NPCS[request.npcId];
+      return block('THE CHAT', [
+        `Small Talk with the ${role} at ${pack.cafe.name}.`,
+        ...transcriptLines(request.transcript),
+        ...helpLines(request.helpLog),
+      ]);
+    }
+    case 'shift':
+      return request.customers.map((customer, i) => conversationBlock(`CUSTOMER ${i + 1}`, customer, pack)).join('\n\n');
+  }
+}
+
+/**
+ * The Gemini `generateContent` body for a Recap: an English meta-prompt, the
+ * transcript and Help log, and a `responseSchema` sized for the kind of Recap.
+ * Pure: the same request always gives the same body.
+ */
+export function buildRecapRequest(request: RecapRequest): RecapRequestBody {
+  const pack = CULTURE_PACKS[request.culturePackId];
+  const systemInstruction = [coachBlock(request, pack), readingBlock(), writeBlock(request, pack)].join('\n\n');
+  return {
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    contents: [{ role: 'user', parts: [{ text: conversationsText(request, pack) }] }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(recapSchemaFor(request.kind)) },
+  };
+}

@@ -431,3 +431,216 @@ body,
   font: inherit;
   cursor: pointer;
 }
+
+/* --- Recap and Journal ------------------------------------------------------ */
+
+.recap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recap-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.recap-writing {
+  margin: 24px 0;
+  text-align: center;
+  color: #7b8496;
+}
+
+.recap-actions {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--rule);
+}
+
+/* A lined Journal page: ruled lines every line-height, and a margin rule on the left. */
+.journal-page {
+  --line: 26px;
+  position: relative;
+  padding: 10px 14px 18px 30px;
+  border-radius: 6px;
+  background-color: #fffdf8;
+  background-image:
+    linear-gradient(to right, transparent 20px, #f0b8a8 20px, #f0b8a8 21px, transparent 21px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line) - 1px), #dfe6f0 calc(var(--line) - 1px), #dfe6f0 var(--line));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  color: var(--ink);
+  line-height: var(--line);
+}
+
+.journal-page h3,
+.journal-page h4,
+.journal-page p,
+.journal-page ul {
+  margin: 0;
+}
+
+.journal-page h3 {
+  font-size: 16px;
+}
+
+.journal-page h4 {
+  margin-top: var(--line);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b6a55;
+}
+
+.journal-page-header p {
+  font-size: 13px;
+  color: #7b8496;
+}
+
+.journal-sticker {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--ok);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 22px;
+  transform: rotate(4deg);
+}
+
+.journal-outcome {
+  margin-top: var(--line) !important;
+  font-size: 15px;
+}
+
+.journal-page ul {
+  padding: 0;
+  list-style: none;
+}
+
+.journal-corrections li + li {
+  margin-top: 6px;
+}
+
+.journal-said {
+  color: #8a5a44;
+}
+
+.journal-natural {
+  font-weight: 600;
+}
+
+.journal-why,
+.journal-gloss {
+  font-size: 14px;
+  color: #4a5266;
+}
+
+.journal-words ruby rt {
+  font-size: 11px;
+}
+
+.hear-it-said {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The full-screen Journal: the entry list on the left, the selected entry on the right. */
+.journal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f4ede0;
+  color: var(--ink);
+}
+
+.journal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.journal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.journal-close {
+  padding: 6px 12px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.journal-close kbd {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #7b8496;
+}
+
+.journal-panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+}
+
+.journal-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--rule);
+}
+
+.journal-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-list button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 24px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.journal-list button[aria-current] {
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.journal-list button span {
+  font-size: 13px;
+  color: #7b8496;
+}
+
+.journal-empty {
+  margin: 16px 24px;
+  color: #7b8496;
+}
+
+.journal-selected {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.journal-selected .journal-page {
+  max-width: 640px;
+}

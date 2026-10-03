@@ -11,12 +11,15 @@ import {
   selectMicLevel,
   selectNpcExpression,
   selectReconnecting,
+  selectRecap,
   selectTyping,
   useGame,
   type ChatLine,
   type ClosingCard,
+  type RecapView,
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
+import { JournalPageView } from './JournalPage.tsx';
 
 // English until the i18n module lands (ticket 12).
 
@@ -55,6 +58,7 @@ function outcomeLine(card: ClosingCard, packId: LanguageCode) {
 function ClosingCardPanel({ card, role }: { card: ClosingCard; role: string }) {
   const packId = useGame(selectCulturePackId);
   const skipRecap = useGame((s) => s.skipRecap);
+  const seeRecap = useGame((s) => s.seeRecap);
   return (
     <section className="closing-card" aria-label="Conversation over" data-outcome={card.kind}>
       <h2>{card.kind === 'success' ? 'Done!' : `The ${role} couldn’t understand you`}</h2>
@@ -63,9 +67,35 @@ function ClosingCardPanel({ card, role }: { card: ClosingCard; role: string }) {
         <button type="button" onClick={skipRecap} autoFocus>
           Skip Recap
         </button>
-        {/* Recaps arrive in ticket 06. */}
-        <button type="button" className="primary" disabled title="Recaps are coming soon">
+        <button type="button" className="primary" onClick={seeRecap}>
           See Recap
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** The Recap in the column, as a lined Journal page, with a loading state while it is written. */
+function RecapPanel({ recap }: { recap: RecapView }) {
+  const closeRecap = useGame((s) => s.closeRecap);
+  return (
+    <section className="recap" aria-label="Recap" aria-busy={recap.status === 'writing'}>
+      <div className="recap-body">
+        {recap.status === 'writing' && (
+          <p className="recap-writing" role="status">
+            Writing your Recap…
+          </p>
+        )}
+        {recap.status === 'failed' && (
+          <p className="recap-writing" role="status">
+            The Recap couldn’t be written this time. The conversation is saved to your Journal.
+          </p>
+        )}
+        {recap.status === 'ready' && <JournalPageView page={recap.entry} />}
+      </div>
+      <div className="closing-card-actions recap-actions">
+        <button type="button" className="primary" onClick={closeRecap} autoFocus>
+          Done
         </button>
       </div>
     </section>
@@ -196,6 +226,7 @@ export function ConversationColumn() {
   const packId = useGame(selectCulturePackId);
   const closingCard = useGame(selectClosingCard);
   const reconnecting = useGame(selectReconnecting);
+  const recap = useGame(selectRecap);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
@@ -239,17 +270,23 @@ export function ConversationColumn() {
           </button>
         </div>
       </header>
-      <div className="chat-log" role="log" aria-label="Chat" ref={log}>
-        {lines.map((line, i) => (
-          <Bubble key={i} line={line} />
-        ))}
-        {reconnecting && (
-          <p className="chat-notice" role="status">
-            Reconnecting…
-          </p>
-        )}
-      </div>
-      {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <InputBar />}
+      {recap ? (
+        <RecapPanel recap={recap} />
+      ) : (
+        <>
+          <div className="chat-log" role="log" aria-label="Chat" ref={log}>
+            {lines.map((line, i) => (
+              <Bubble key={i} line={line} />
+            ))}
+            {reconnecting && (
+              <p className="chat-notice" role="status">
+                Reconnecting…
+              </p>
+            )}
+          </div>
+          {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <InputBar />}
+        </>
+      )}
     </aside>
   );
 }

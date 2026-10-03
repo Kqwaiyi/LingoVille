@@ -9,6 +9,7 @@ import {
   MODELS,
   VOICES,
 } from './config.ts';
+import { buildRecapRequest, RecapSchema, type Recap, type RecapRequest } from '../src/ai/index.ts';
 import { createGateway, readGatewayEnv } from './gateway.ts';
 
 describe('readGatewayEnv', () => {
@@ -194,5 +195,198 @@ describe('POST /api/token', () => {
 
     expect((await askForToken(base, { voice: { targetLanguage: 'fr', npcId: 'barista' } })).status).toBe(400);
     expect((await askForToken(base, 'not json')).status).toBe(400);
+  });
+});
+
+/** Starts gateways whose Gemini is a fake fetch, recording what each gateway asked it. */
+function gatewayWithFakeGemini() {
+  let close: (() => Promise<void>) | undefined;
+  afterEach(async () => {
+    await close?.();
+    close = undefined;
+  });
+
+  function fakeGemini(answer: () => Response) {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return answer();
+    }) as typeof globalThis.fetch;
+    return { calls, fetch };
+  }
+
+  async function start(env: Record<string, string>, gemini: ReturnType<typeof fakeGemini>) {
+    const server = createGateway(readGatewayEnv(env), { fetch: gemini.fetch, now: () => 0 });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    close = () => new Promise((resolve) => server.close(() => resolve()));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  }
+
+  const post = (base: string, path: string, body: unknown) =>
+    fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+  const offline = () =>
+    fakeGemini(() => {
+      throw new Error('no network in mock mode');
+    });
+
+  return { fakeGemini, start, post, offline };
+}
+
+/** Gemini's generateContent answer carrying one text part. */
+const geminiText = (text: string) => Response.json({ candidates: [{ content: { parts: [{ text }] } }] });
+
+describe('POST /api/recap', () => {
+  const { fakeGemini, start, post, offline } = gatewayWithFakeGemini();
+
+  const REQUEST: RecapRequest = {
+    kind: 'goal',
+    culturePackId: 'ja',
+    step: 'A1',
+    nativeLanguage: 'en',
+    conversation: {
+      interactionId: 'order-drink',
+      outcome: 'success',
+      transcript: [
+        { speaker: 'npc', text: 'いらっしゃいませ！' },
+        { speaker: 'player', text: 'ラテ ください', typed: true },
+      ],
+      helpLog: [],
+    },
+  };
+
+  const RECAP: Recap = {
+    outcome: 'You ordered a hot latte.',
+    corrections: [{ said: 'ラテ ください', natural: 'ラテをください', why: 'を marks what you want.' }],
+    newWords: [{ base: 'いらっしゃいませ', reading: 'いらっしゃいませ', gloss: 'welcome (to a shop)' }],
+    cefrEstimate: 'A1',
+  };
+
+  it('asks the Recap model for the built request, and returns its checked answer', async () => {
+    const gemini = fakeGemini(() => geminiText(JSON.stringify(RECAP)));
+    const base = await start({ GEMINI_API_KEY: 'secret-key-value' }, gemini);
+
+    const res = await post(base, '/api/recap', REQUEST);
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(text)).toEqual(RECAP);
+    expect(text).not.toContain('secret-key-value');
+    expect(gemini.calls).toHaveLength(1);
+    const { url, init } = gemini.calls[0]!;
+    expect(url).toBe(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${MODELS.recap}:generateContent`);
+    expect(new Headers(init.headers).get('x-goog-api-key')).toBe('secret-key-value');
+    expect(JSON.parse(String(init.body))).toEqual(buildRecapRequest(REQUEST));
+  });
+
+  it('checks a combined Shift Recap against the Shift limits, not one conversation’s', async () => {
+    const shift: RecapRequest = { kind: 'shift', culturePackId: 'ja', step: 'A1', nativeLanguage: 'en', customers: [REQUEST.conversation] };
+    const maxWords = buildRecapRequest(shift).generationConfig.responseSchema.properties!.newWords!.maxItems!;
+    const recap = { ...RECAP, newWords: Array.from({ length: maxWords }, () => RECAP.newWords[0]!) };
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText(JSON.stringify(recap))));
+
+    const res = await post(base, '/api/recap', shift);
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).newWords).toHaveLength(maxWords);
+  });
+
+  it('answers with a canned Recap and no network in mock mode', async () => {
+    const gemini = offline();
+    const base = await start({ GEMINI_MOCK: '1' }, gemini);
+
+    const res = await post(base, '/api/recap', REQUEST);
+
+    expect(res.status).toBe(200);
+    expect(RecapSchema.safeParse(await res.json()).success).toBe(true);
+    expect(gemini.calls).toEqual([]);
+  });
+
+  it('rejects a request it cannot build a Recap from', async () => {
+    const base = await start({ GEMINI_MOCK: '1' }, offline());
+
+    expect((await post(base, '/api/recap', { ...REQUEST, nativeLanguage: 'fr' })).status).toBe(400);
+    expect((await post(base, '/api/recap', 'not json')).status).toBe(400);
+  });
+
+  it('reports the Recap unavailable when Gemini answers something that is not a Recap', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText('{"outcome": 3}')));
+
+    const res = await post(base, '/api/recap', REQUEST);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'recap_unavailable' });
+  });
+
+  it('reports the Recap unavailable when Gemini refuses', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => Response.json({ error: {} }, { status: 429 })));
+
+    const res = await post(base, '/api/recap', REQUEST);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'recap_unavailable' });
+  });
+
+  it('needs a key outside mock mode', async () => {
+    const gemini = offline();
+    const base = await start({}, gemini);
+
+    const res = await post(base, '/api/recap', REQUEST);
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'no_api_key' });
+    expect(gemini.calls).toEqual([]);
+  });
+});
+
+describe('POST /api/tts', () => {
+  const { fakeGemini, start, post, offline } = gatewayWithFakeGemini();
+
+  const geminiAudio = (data: string) =>
+    Response.json({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data } }] } }] });
+
+  it('asks the TTS model to say the text in the voice for the language, and returns the audio', async () => {
+    const gemini = fakeGemini(() => geminiAudio('AAAAAA=='));
+    const base = await start({ GEMINI_API_KEY: 'k' }, gemini);
+
+    const res = await post(base, '/api/tts', { text: 'ラテをください', targetLanguage: 'ja' });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ audio: 'AAAAAA==', sampleRate: 24_000 });
+    const { url, init } = gemini.calls[0]!;
+    expect(url).toBe(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${MODELS.tts}:generateContent`);
+    const sent = JSON.parse(String(init.body));
+    expect(JSON.stringify(sent.contents)).toContain('ラテをください');
+    expect(sent.generationConfig.responseModalities).toEqual(['AUDIO']);
+    expect(sent.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(VOICES.ja);
+  });
+
+  it('answers with canned audio and no network in mock mode', async () => {
+    const gemini = offline();
+    const base = await start({ GEMINI_MOCK: '1' }, gemini);
+
+    const res = await post(base, '/api/tts', { text: 'Hallo', targetLanguage: 'de' });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.sampleRate).toBe(24_000);
+    expect(Buffer.from(body.audio, 'base64').length).toBeGreaterThan(0);
+    expect(gemini.calls).toEqual([]);
+  });
+
+  it('rejects a request with no text or an unknown language', async () => {
+    const base = await start({ GEMINI_MOCK: '1' }, offline());
+
+    expect((await post(base, '/api/tts', { text: '', targetLanguage: 'ja' })).status).toBe(400);
+    expect((await post(base, '/api/tts', { text: 'Bonjour', targetLanguage: 'fr' })).status).toBe(400);
+  });
+
+  it('reports hear-it-said unavailable when Gemini gives no audio', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText('no audio here')));
+
+    const res = await post(base, '/api/tts', { text: 'Hallo', targetLanguage: 'de' });
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'tts_unavailable' });
   });
 });

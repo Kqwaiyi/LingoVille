@@ -1,4 +1,12 @@
 // Public interface of the voice module. Other modules import from here.
+export {
+  createHearItSaid,
+  hearItSaid,
+  type ClipCache,
+  type HearItSaid,
+  type HearItSaidClip,
+  type HearItSaidDeps,
+} from './hearItSaid.ts';
 export { MOCK_DROP_LINE, openMockVoiceSession } from './mockVoiceSession.ts';
 export { openVoiceSession } from './openVoiceSession.ts';
 export {
