@@ -6,7 +6,7 @@
 
 **Spec:** [spec.md](../spec.md): Voice pipeline and Gemini gateway
 
-**Status:** ready-for-human (only the manual check against real Gemini is left)
+**Status:** done
 
 - [x] `POST /api/token` mints a one-use ephemeral token (v1beta `auth_tokens`) and returns it with the Live model ID from the gateway config.
 - [x] The real `VoiceSession` is ported from the voice prototype (branch `prototype/voice-conversation`), and it is the only code that touches the socket:
@@ -17,4 +17,4 @@
 - [x] On a connection failure, the game retries once with a fresh token, seeding the transcript so far. A second failure is a network abandonment: no Patience or Mood loss, no Recap, and a toast.
 - [x] Token usage is accumulated per turn for each conversation.
 - [x] Playwright (mock mode): a scripted network drop produces the abandonment toast and no state change.
-- [ ] Manual check against real Gemini: order a drink by voice in at least one language.
+- [x] Manual check against real Gemini: order a drink by voice in at least one language.
