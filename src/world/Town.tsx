@@ -1,4 +1,7 @@
+import { Html } from '@react-three/drei';
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
+import type { NamedNpcId } from '../content/index.ts';
+import { selectNpcSpeaking, useGame } from '../store/index.ts';
 import { BARISTA, BUILDINGS, CAFE_COUNTER, GROUND_HALF_SIZE, HOME_BED, HOME_TAP, STREET, WALL, type Building, type Vec3 } from './town.ts';
 
 /** A solid greybox box that the Character collides with. */
@@ -14,8 +17,23 @@ function Block({ position, size, colour }: { position: Vec3; size: Vec3; colour:
   );
 }
 
+// English until the i18n module lands (ticket 12).
+
+/** A small "speaking…" over the NPC while a line of theirs is coming in. The words themselves are in the chat column. */
+function SpeakingIndicator({ npcId }: { npcId: NamedNpcId }) {
+  const speaking = useGame(selectNpcSpeaking) === npcId;
+  if (!speaking) return null;
+  return (
+    <Html position={[0, 1.2, 0]} center zIndexRange={[10, 0]}>
+      <span className="npc-speaking" role="status">
+        speaking…
+      </span>
+    </Html>
+  );
+}
+
 /** A greybox NPC: a capsule the Character can't walk through. */
-function Npc({ position, colour }: { position: Vec3; colour: string }) {
+function Npc({ npcId, position, colour }: { npcId: NamedNpcId; position: Vec3; colour: string }) {
   return (
     <group position={position}>
       <mesh castShadow>
@@ -23,6 +41,7 @@ function Npc({ position, colour }: { position: Vec3; colour: string }) {
         <meshStandardMaterial color={colour} flatShading />
       </mesh>
       <CapsuleCollider args={[0.5, 0.35]} />
+      <SpeakingIndicator npcId={npcId} />
     </group>
   );
 }
@@ -70,7 +89,7 @@ export function Town() {
       <Block position={HOME_TAP} size={[1.2, 1, 0.6]} colour="#8fa3b8" />
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={CAFE_COUNTER} size={[4, 1.1, 0.8]} colour="#8b6a4f" />
-      <Npc position={BARISTA} colour="#7fb3a3" />
+      <Npc npcId="barista" position={BARISTA} colour="#7fb3a3" />
     </RigidBody>
   );
 }

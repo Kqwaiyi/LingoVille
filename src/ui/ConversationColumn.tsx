@@ -8,12 +8,14 @@ import {
   selectConversation,
   selectCulturePackId,
   selectHelpOpen,
+  selectLineReading,
   selectListening,
   selectMicLevel,
   selectNativeLanguage,
   selectNpcExpression,
   selectReconnecting,
   selectRecap,
+  selectTargetLanguage,
   selectTranslation,
   selectTyping,
   useGame,
@@ -24,6 +26,7 @@ import {
 import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
+import { ReadingLine } from './Ruby.tsx';
 
 // English until the i18n module lands (ticket 12).
 
@@ -56,11 +59,12 @@ function NpcLineHelp({ index, text }: { index: number; text: string }) {
 }
 
 function Bubble({ line, index, finished }: { line: ChatLine; index: number; finished: boolean }) {
-  const packId = useGame(selectCulturePackId);
+  const language = useGame(selectTargetLanguage);
+  const reading = useGame(selectLineReading(index));
   if (line.speaker === 'npc') {
     return (
       <div className="bubble bubble-npc">
-        <span lang={packId}>{line.text}</span>
+        <ReadingLine language={language} text={line.text} segments={reading} />
         {finished && <NpcLineHelp index={index} text={line.text} />}
       </div>
     );

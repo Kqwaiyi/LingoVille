@@ -127,6 +127,17 @@ describe('the Journal', () => {
     expect(await journal.raw('slot-1')).toEqual([v1, good]);
   });
 
+  it('keeps NPC lines with their reading aids, and reads an entry from before readings were kept as one without them', async () => {
+    const { journal } = freshJournal();
+    const read = entry(1);
+    read.lines[0] = { ...read.lines[0]!, reading: [{ base: 'いらっしゃいませ', reading: '' }, { base: '！', reading: '' }] };
+    const stored = await journal.append('slot-1', read);
+    expect(stored.lines).toEqual(read.lines);
+
+    const v2 = await journal.append('slot-1', entry(2));
+    expect(parseJournalEntry({ ...v2, schemaVersion: 2 })).toEqual(v2);
+  });
+
   it('reads any one entry through the same migrations, refusing one it doesn’t know', async () => {
     const { journal } = freshJournal();
     const good = await journal.append('slot-1', entry(1));

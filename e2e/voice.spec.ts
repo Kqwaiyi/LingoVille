@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { chat, column, dock, field, GREETING, talkToTheBarista, typeLine, walkToTheBarista } from './barista.ts';
+import { column, dock, field, GREETING, npcLine, talkToTheBarista, typeLine, walkToTheBarista } from './barista.ts';
 
 // Typed to the fake barista, this drops its connection (mock mode only).
 const DROP = '#drop';
@@ -41,10 +41,10 @@ test('a dropped connection is retried, and the conversation carries on where it 
 
   await typeLine(page, DROP);
 
-  await expect(chat(page).getByText(RESUMED)).toBeVisible();
-  await expect(chat(page).getByText(GREETING)).toBeVisible();
+  await expect(npcLine(page, RESUMED)).toBeVisible();
+  await expect(npcLine(page, GREETING)).toBeVisible();
   await typeLine(page, 'ラテ ください');
-  await expect(chat(page).getByText('ホットラテですね。450円です。よろしいですか？')).toBeVisible();
+  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
 });
 
 test('a connection that drops and cannot come back is a network abandonment: a toast, and nothing changes', async ({ page }) => {

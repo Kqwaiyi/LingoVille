@@ -3,6 +3,7 @@ import { CULTURE_PACKS, formatLocalMoney } from '../content/index.ts';
 import type { LanguageCode, PlaceId } from '../sim/index.ts';
 import {
   nameToDelete,
+  selectReadingAids,
   selectTitle,
   useGame,
   type ImportProblem,
@@ -42,6 +43,37 @@ const IMPORT_REFUSED: Record<ImportProblem, string> = {
 };
 
 const slotNumber = (slotId: SlotId) => slotId.replace('slot-', '');
+
+/** The device settings there are so far, kept for this browser. Volume and speaking come with ticket 33. */
+function SettingsPanel() {
+  const readingAids = useGame(selectReadingAids);
+  const setReadingAids = useGame((s) => s.setReadingAids);
+  return (
+    <>
+      <h2>Settings</h2>
+      <p>Kept for this browser, whichever save you play.</p>
+      <label className="title-toggle">
+        <input type="checkbox" checked={readingAids.show} onChange={(e) => setReadingAids({ show: e.target.checked })} />
+        <span>
+          Reading aids
+          <small>Pinyin over Chinese, furigana over Japanese.</small>
+        </span>
+      </label>
+      <label className="title-toggle">
+        <input
+          type="checkbox"
+          checked={readingAids.show && readingAids.romaji}
+          disabled={!readingAids.show}
+          onChange={(e) => setReadingAids({ romaji: e.target.checked })}
+        />
+        <span>
+          Show romaji
+          <small>A romaji line under each Japanese line.</small>
+        </span>
+      </label>
+    </>
+  );
+}
 
 function noticeText(notice: TitleNotice) {
   switch (notice.kind) {
@@ -226,15 +258,7 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
             {full && <p className="title-note">Delete a save to import one</p>}
           </>
         )}
-        {current === 'settings' && (
-          <>
-            <h2>Settings</h2>
-            <p>Volume, speaking and reading aids, kept for this browser. Coming in a later build.</p>
-            <button type="button" className="primary" disabled>
-              Open Settings
-            </button>
-          </>
-        )}
+        {current === 'settings' && <SettingsPanel />}
       </section>
 
       <input

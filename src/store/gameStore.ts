@@ -2,8 +2,11 @@ import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import {
   buildNpcSession,
+  checkReadings,
+  hasReadingAids,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
+  wordReading,
   type AnnotateRequest,
   type Annotation,
   type HelpLogEntry,
@@ -13,6 +16,7 @@ import {
   type NpcSession,
   type Recap,
   type RecapRequest,
+  type Segment,
   type ToolResponse,
 } from '../ai/index.ts';
 import {
@@ -63,7 +67,8 @@ import {
   type TranscriptLine,
   type VoiceSession,
 } from '../voice/index.ts';
-import { browserDeviceSettings, type DeviceSettingsStore } from './deviceSettings.ts';
+import { browserDeviceSettings, DEFAULT_DEVICE_SETTINGS, type DeviceSettingsStore } from './deviceSettings.ts';
+import { browserLibraryReadings, type LibraryReadings } from './libraryReadings.ts';
 import { browserJournal, journalPage, type Journal, type JournalEntry, type JournalPage, type NewJournalEntry } from './journal.ts';
 import {
   deleteSave,
@@ -160,6 +165,12 @@ export type HintsView = { status: 'loading' } | { status: 'ready'; hints: Hint[]
 /** An NPC line's Native Language translation, from `/api/annotate`. */
 export type TranslationView = { status: 'loading' } | { status: 'ready'; text: string } | { status: 'failed' };
 
+/** An NPC line's reading aid: the library's at first, then the model's once it passes the checks. */
+export type LineReading = { segments: Segment[]; corrected: boolean };
+
+/** The reading aids device settings. Hiding reading aids hides romaji too. */
+export type ReadingAidsSettings = { show: boolean; romaji: boolean };
+
 /** A word from a Recap, kept with "+ Phrasebook". */
 export type NewWord = Recap['newWords'][number];
 
@@ -206,6 +217,8 @@ export type Conversation = {
   annotations: Partial<Record<number, TranslationView>>;
   /** The NPC lines the Player pressed Translate on. */
   translated: number[];
+  /** Each NPC line's reading aid, by line index, for zh and ja. */
+  readings: Partial<Record<number, LineReading>>;
   /** The Help used so far, in order, placed relative to the turns. It goes to the Recap. */
   helpLog: HelpLogEntry[];
 };
@@ -219,6 +232,8 @@ export type GameStoreDeps = {
   requestHints: (request: HintRequest) => Promise<Hint[]>;
   /** Asks the gateway to annotate a finished NPC line. Rejects if it can't. */
   requestAnnotation: (request: AnnotateRequest) => Promise<Annotation>;
+  /** The library readings an NPC line shows the moment it appears. */
+  readings: LibraryReadings;
   journal: Journal;
   saves: Saves;
   deviceSettings: DeviceSettingsStore;
@@ -294,6 +309,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   requestRecap: (request) => askGateway<Recap>('/api/recap', request),
   requestHints: async (request) => (await askGateway<Hints>('/api/hint', request)).hints,
   requestAnnotation: (request) => askGateway<Annotation>('/api/annotate', request),
+  readings: browserLibraryReadings,
   journal: browserJournal,
   saves: browserSaves,
   deviceSettings: browserDeviceSettings,
@@ -314,6 +330,8 @@ export type GameStore = {
   game: GameState;
   /** The Player's own language, which Recaps are written in. */
   nativeLanguage: LanguageCode;
+  /** Whether readings show over zh and ja lines, and romaji under ja ones. A device setting. */
+  readingAids: ReadingAidsSettings;
   tabHidden: boolean;
   interactable: Interactable | null;
   conversation: Conversation | null;
@@ -378,6 +396,8 @@ export type GameStore = {
   toggleHelp: () => void;
   /** Translate under a finished NPC line: shows its Native Language translation. */
   translateLine: (line: number) => void;
+  /** Shows or hides reading aids, or romaji, and keeps the choice on this device. */
+  setReadingAids: (change: Partial<ReadingAidsSettings>) => void;
   /** "+ Phrasebook" on a Recap's new word: keeps it in the personal phrasebook. */
   addToPhrasebook: (word: NewWord, glossLanguage: LanguageCode) => void;
   /** J: opens the full-screen Journal, outside conversations. */
@@ -407,6 +427,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let slots: Slot[] = [];
   let askedToPersist = false;
   const stores: SlotStores = { saves: deps.saves, journal: deps.journal };
+  // Each conversation's NPC line readings and the annotations still on their way, kept past
+  // the conversation's end until its Journal entry is written, so the Journal keeps the corrected readings.
+  const lineReadings = new Map<number, { readings: Conversation['readings']; annotating: Promise<unknown>[] }>();
 
   return createStore<GameStore>()((set, get) => {
     /**
@@ -429,6 +452,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
       realMsSinceSave = 0;
       set({ screen: 'playing', title: null, game, slotId, arrival, toast });
+      // While the town loads, so the first line doesn't wait for a dictionary.
+      deps.readings.preload(game.identity.targetLanguage).then(
+        () => {
+          // A line that came in before the library had loaded gets its reading now.
+          const conversation = get().conversation;
+          conversation?.lines.forEach((line, i) => line.speaker === 'npc' && !conversation.readings[i] && readLine(conversation, i));
+        },
+        (error: unknown) => console.warn('[readings] the library could not load:', error instanceof Error ? error.message : error),
+      );
     };
 
     const playLoaded = ({ save, fromBackup }: LoadedSave) =>
@@ -550,10 +582,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         targetLanguage,
         nativeLanguage,
         outcome: outcome.kind,
-        recap: recap && { outcome: recap.outcome, corrections: recap.corrections, newWords: recap.newWords },
-        lines: transcript,
+        recap: recap && { outcome: recap.outcome, corrections: recap.corrections, newWords: recap.newWords.map(checkedWord) },
+        lines: transcript.map((line, i) => {
+          const reading = (lineReadings.get(conversation.id)?.readings ?? conversation.readings)[i];
+          return reading && line.speaker === 'npc' ? { ...line, reading: reading.segments } : line;
+        }),
         helpLog: conversation.helpLog,
       });
+      /** A new word with its reading if that passes the checks, or with the library's. */
+      const checkedWord = (word: NewWord): NewWord =>
+        hasReadingAids(targetLanguage)
+          ? { ...word, reading: wordReading(targetLanguage, word, deps.readings.read(targetLanguage, word.base)) }
+          : word;
 
       updateConversation({ recap: { status: 'writing' } });
       deps
@@ -561,16 +601,21 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         .then(
           (recap) => {
             updateRecap(conversation.id, { status: 'ready', entry: journalPage(entry(recap)) });
-            return entry(recap);
+            return recap;
           },
           (error: unknown) => {
             console.warn('[recap] could not be written:', error instanceof Error ? error.message : error);
             updateRecap(conversation.id, { status: 'failed' });
-            return entry(null);
+            return null;
           },
         )
-        .then((written) => deps.journal.append(get().slotId, written))
-        .catch((error: unknown) => console.error('[journal] could not save an entry:', error));
+        // The Journal keeps the corrected readings, so it waits for the last lines' annotations.
+        .then(async (recap) => {
+          await Promise.allSettled(lineReadings.get(conversation.id)?.annotating ?? []);
+          return deps.journal.append(get().slotId, entry(recap));
+        })
+        .catch((error: unknown) => console.error('[journal] could not save an entry:', error))
+        .finally(() => lineReadings.delete(conversation.id));
     };
 
     /**
@@ -654,22 +699,51 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       return { ...conversation, hints: { atLine, view: { status: 'loading' } } };
     };
 
-    /** Asks for a finished NPC line's annotation, so Translate is instant. */
+    /** Keeps a line's reading for its conversation, and shows it while the conversation is open. */
+    const keepReading = (conversationId: number, line: number, reading: LineReading) => {
+      const kept = lineReadings.get(conversationId);
+      if (!kept) return;
+      kept.readings = { ...kept.readings, [line]: reading };
+      const current = get().conversation;
+      if (current?.id === conversationId) set({ conversation: { ...current, readings: kept.readings } });
+    };
+
+    /** The library's reading of an NPC line as it comes in, unless the model's has already replaced it. */
+    const readLine = (conversation: Conversation, line: number) => {
+      const language = get().game.identity.targetLanguage;
+      if (!hasReadingAids(language) || conversation.readings[line]?.corrected) return;
+      const segments = deps.readings.read(language, conversation.lines[line]!.text);
+      if (segments) keepReading(conversation.id, line, { segments, corrected: false });
+    };
+
+    /**
+     * Asks for a finished NPC line's annotation, so Translate is instant. For zh
+     * and ja, the model's reading replaces the library's if it passes the checks.
+     */
     const annotate = (conversationId: number, line: number, text: string) => {
       if (text.trim() === '') return;
       const { game, nativeLanguage } = get();
+      const { targetLanguage } = game.identity;
       const landed = (view: TranslationView) => {
         const current = get().conversation;
         if (current?.id === conversationId) set({ conversation: { ...current, annotations: { ...current.annotations, [line]: view } } });
       };
       landed({ status: 'loading' });
-      deps.requestAnnotation({ targetLanguage: game.identity.targetLanguage, nativeLanguage, line: text }).then(
-        ({ translation }) => landed({ status: 'ready', text: translation }),
+      const asked = deps.requestAnnotation({ targetLanguage, nativeLanguage, line: text }).then(
+        ({ translation, segments }) => {
+          landed({ status: 'ready', text: translation });
+          if (!segments || !hasReadingAids(targetLanguage)) return;
+          // The gateway reads the line without the transcript's spaces at either end.
+          const check = checkReadings(targetLanguage, text.trim(), segments);
+          if (check.ok) keepReading(conversationId, line, { segments, corrected: true });
+          else console.warn('[annotate] the model’s reading failed a check, so the library’s stays:', check.rule, check.detail);
+        },
         (error: unknown) => {
           console.warn('[annotate] no translation:', error instanceof Error ? error.message : error);
           landed({ status: 'failed' });
         },
       );
+      lineReadings.get(conversationId)?.annotating.push(asked);
     };
 
     const closeSession = () => {
@@ -688,6 +762,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     /** Closes the session and clears the conversation away, with whatever else should show instead. */
     const dropConversation = (instead: Partial<Pick<GameStore, 'toast' | 'voiceUnavailable'>> = {}) => {
       closeSession();
+      // With no outcome there's no Journal entry to keep the readings for.
+      const conversation = get().conversation;
+      if (conversation && !conversation.outcome) lineReadings.delete(conversation.id);
       set({ conversation: null, typing: false, micLevel: 0, ...instead });
     };
 
@@ -728,7 +805,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         {
           onOutputTranscript: live((current, text: string) => {
             const { lines, index } = addPiece(current.lines, current.npcLine, 'npc', text);
-            set({ conversation: { ...current, lines, npcLine: index } });
+            const conversation = { ...current, lines, npcLine: index };
+            set({ conversation });
+            readLine(conversation, index);
           }),
           onInputTranscript: live((current, text: string) => {
             const { lines, index } = addPiece(current.lines, current.heardLine, 'player', text);
@@ -736,10 +815,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           }),
           onTurnComplete: live((current) => {
             const finished = current.npcLine;
+            // Asked first, so the Journal entry the goodbye starts waits for its reading too.
+            if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
             // Once the outcome is decided, the turn that just ended was the goodbye.
             if (current.outcome) showClosingCard();
-            else set({ conversation: { ...current, npcLine: null } });
-            if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
+            else updateConversation({ npcLine: null });
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
           onMicLevel: live((current, level: number) => {
@@ -791,6 +871,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       toast: null,
       voiceUnavailable: false,
       nativeLanguage: DEV_NATIVE_LANGUAGE,
+      readingAids: { show: DEFAULT_DEVICE_SETTINGS.readingAids, romaji: DEFAULT_DEVICE_SETTINGS.showRomaji },
       journal: null,
       persistCallout: false,
       openTitle: () => {
@@ -799,7 +880,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         deps.deviceSettings
           .load()
           .then(
-            ({ nativeLanguage }) => set({ nativeLanguage }),
+            ({ nativeLanguage, readingAids, showRomaji }) => set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji } }),
             (error: unknown) => console.warn('[settings] could not be read:', error),
           )
           .then(() => checkSlots());
@@ -894,6 +975,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const npc = NAMED_NPCS[interactable];
         const interaction = Object.values(INTERACTIONS).find((i) => i.npcId === npc.id)!;
         gameBeforeConversation = game;
+        const id = ++conversations;
+        lineReadings.set(id, { readings: {}, annotating: [] });
         const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
           clock: game.clock,
         });
@@ -901,7 +984,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({
           voiceUnavailable: false,
           conversation: {
-            id: ++conversations,
+            id,
             npcId: npc.id,
             interaction,
             lines: [],
@@ -920,6 +1003,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             hints: null,
             annotations: {},
             translated: [],
+            readings: {},
             helpLog: [],
           },
         });
@@ -1012,6 +1096,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const annotation = conversation.annotations[line];
         if (!annotation || annotation.status === 'failed') annotate(conversation.id, line, npcLine.text);
       },
+      setReadingAids: (change) => {
+        const readingAids = { ...get().readingAids, ...change };
+        set({ readingAids });
+        deps.deviceSettings
+          .load()
+          .then((settings) => deps.deviceSettings.save({ ...settings, readingAids: readingAids.show, showRomaji: readingAids.romaji }))
+          .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+      },
       addToPhrasebook: (word, glossLanguage) => {
         const game = addToPhrasebook(get().game, { text: word.base, reading: word.reading, gloss: word.gloss, glossLanguage });
         if (game === get().game) return;
@@ -1070,6 +1162,7 @@ export const selectThirst = (s: GameStore) => s.game.character.thirst;
 export const selectMood = (s: GameStore) => s.game.character.mood;
 export const selectMoneyInShifts = (s: GameStore) => s.game.character.moneyInShifts;
 export const selectCulturePackId = (s: GameStore) => s.game.identity.culturePackId;
+export const selectTargetLanguage = (s: GameStore) => s.game.identity.targetLanguage;
 export const selectDay = (s: GameStore) => s.game.clock.day;
 export const selectWeekday = (s: GameStore) => weekdayOf(s.game.clock.day);
 /** Whole game minutes since midnight, so the clock re-renders once a game minute. */
@@ -1108,6 +1201,15 @@ export const selectTranslation =
   (line: number) =>
   (s: GameStore): TranslationView | null =>
     s.conversation?.translated.includes(line) ? (s.conversation.annotations[line] ?? TRANSLATING) : null;
+export const selectReadingAids = (s: GameStore) => s.readingAids;
+/** An NPC line's reading aid, unless reading aids are hidden. */
+export const selectLineReading =
+  (line: number) =>
+  (s: GameStore): Segment[] | null =>
+    s.readingAids.show ? (s.conversation?.readings[line]?.segments ?? null) : null;
+/** The NPC partway through saying a line, for the "speaking…" indicator over them. */
+export const selectNpcSpeaking = (s: GameStore): NamedNpcId | null =>
+  s.conversation && !s.conversation.closed && s.conversation.npcLine !== null ? s.conversation.npcId : null;
 const NO_PHRASES: readonly PlacePhrase[] = [];
 /** The phrasebook for the place the Character is at. */
 export const selectPlacePhrasebook = (s: GameStore): readonly PlacePhrase[] => {

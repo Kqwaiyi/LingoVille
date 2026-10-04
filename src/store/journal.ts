@@ -1,5 +1,6 @@
 import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
+import { SegmentSchema } from '../ai/index.ts';
 import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 
 // The Journal: every Recap the Player has had, kept per slot in its own IndexedDB
@@ -7,7 +8,7 @@ import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
-export const JOURNAL_SCHEMA_VERSION = 2;
+export const JOURNAL_SCHEMA_VERSION = 3;
 
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
@@ -39,7 +40,15 @@ const JournalEntrySchema = z.object({
       newWords: z.array(z.object({ base: z.string(), reading: z.string(), gloss: z.string() })),
     })
     .nullable(),
-  lines: z.array(z.object({ speaker: z.enum(['npc', 'player']), text: z.string(), typed: z.boolean().optional() })),
+  lines: z.array(
+    z.object({
+      speaker: z.enum(['npc', 'player']),
+      text: z.string(),
+      typed: z.boolean().optional(),
+      /** An NPC line's reading aid (zh and ja), as corrected by the time the entry was written. */
+      reading: z.array(SegmentSchema).optional(),
+    }),
+  ),
   helpLog: z.array(z.object({ afterLine: z.int().min(0), kind: z.enum(['hint', 'phrasebook', 'translate']), text: z.string() })),
   noHelpNeeded: z.boolean(),
 });
@@ -66,6 +75,8 @@ type StoredEntry = { schemaVersion: number } & Record<string, unknown>;
 const MIGRATIONS: readonly ((entry: StoredEntry) => StoredEntry)[] = [
   // 1 → 2: entries keep the NPC's name. Older ones never knew it.
   (entry) => ({ ...entry, schemaVersion: 2, npcName: null }),
+  // 2 → 3: NPC lines may keep their reading aid. Older ones have none.
+  (entry) => ({ ...entry, schemaVersion: 3 }),
 ];
 
 /** Reads one stored entry as an entry of today's version, through the migrations. Throws, saying why, if it can't. */

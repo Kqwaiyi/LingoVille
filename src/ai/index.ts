@@ -28,9 +28,24 @@ export {
 export {
   AnnotateRequestSchema,
   AnnotationSchema,
+  annotationSchemaFor,
   buildAnnotateRequest,
   type Annotation,
   type AnnotateRequest,
 } from './annotate.ts';
 export { buildHintRequest, HintRequestSchema, HintsSchema, type Hint, type HintRequest, type Hints } from './hint.ts';
 export type { GenerateContentBody } from './common.ts';
+export {
+  alignFurigana,
+  hasReadingAids,
+  libraryKana,
+  libraryPinyin,
+  READING_LANGUAGES,
+  romaji,
+  rubyUnits,
+  SegmentSchema,
+  type KanaToken,
+  type ReadingLanguage,
+  type Segment,
+} from './readings.ts';
+export { checkReadings, wordReading, type ReadingCheck, type ReadingRule } from './annotateValidator.ts';

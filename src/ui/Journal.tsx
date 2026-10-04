@@ -37,7 +37,7 @@ function PhrasebookView() {
           {[...phrasebook].reverse().map((entry) => (
             <li key={`${entry.text}-${entry.glossLanguage}`}>
               <span className="journal-phrase" lang={packId}>
-                <Reading base={entry.text} reading={entry.reading} />
+                <Reading base={entry.text} reading={entry.reading} language={packId} />
               </span>{' '}
               <HearItSaid text={entry.text} />{' '}
               <span className="journal-gloss" lang={entry.glossLanguage}>
@@ -105,7 +105,7 @@ export function Journal() {
               ))}
             </ul>
           </nav>
-          <div className="journal-selected">{selected && <JournalPageView page={selected} />}</div>
+          <div className="journal-selected">{selected && <JournalPageView page={selected} withConversation />}</div>
         </div>
       )}
     </section>

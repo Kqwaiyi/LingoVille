@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { chat, column, dock, talkToTheBarista, typeLine } from './barista.ts';
+import { column, dock, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 import { startNewGame, titleMenu } from './title.ts';
 
 const money = (page: Page) => dock(page).getByLabel('Money');
@@ -29,7 +29,7 @@ test('the game saves itself, with a brief "Saved ✓" under the clock', async ({
 test('order a drink, reload, Continue: the money and the place are as they were', async ({ page }) => {
   await talkToTheBarista(page);
   await typeLine(page, 'ホットラテ ください');
-  await expect(chat(page).getByText('ホットラテですね。450円です。よろしいですか？')).toBeVisible();
+  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
   await typeLine(page, 'はい');
   await expect(closingCard(page)).toBeVisible();
   await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
@@ -48,7 +48,7 @@ test('order a drink, reload, Continue: the money and the place are as they were'
 test('a reload mid-conversation comes back as if the conversation never happened', async ({ page }) => {
   await talkToTheBarista(page);
   await typeLine(page, 'ホットラテ ください');
-  await expect(chat(page).getByText('ホットラテですね。450円です。よろしいですか？')).toBeVisible();
+  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
 
   await reloadAndContinue(page);
 

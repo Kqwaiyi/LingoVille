@@ -10,8 +10,9 @@ import {
   VOICES,
 } from './config.ts';
 import {
-  AnnotationSchema,
+  annotationSchemaFor,
   buildAnnotateRequest,
+  checkReadings,
   buildHintRequest,
   buildRecapRequest,
   HintsSchema,
@@ -423,14 +424,23 @@ describe('POST /api/annotate', () => {
 
   const REQUEST: AnnotateRequest = { targetLanguage: 'zh', nativeLanguage: 'en', line: '一杯热拿铁，对吗？' };
 
-  it('asks the annotate model for the built request, and returns its checked translation', async () => {
-    const gemini = fakeGemini(() => geminiText(JSON.stringify({ translation: 'One hot latte, right?' })));
+  const SEGMENTS = [
+    { base: '一杯', reading: 'yì bēi' },
+    { base: '热拿铁', reading: 'rè ná tiě' },
+    { base: '，', reading: '' },
+    { base: '对吗', reading: 'duì ma' },
+    { base: '？', reading: '' },
+  ];
+
+  it('asks the annotate model for the built request, and returns its checked translation and readings', async () => {
+    const answer = { translation: 'One hot latte, right?', segments: SEGMENTS };
+    const gemini = fakeGemini(() => geminiText(JSON.stringify(answer)));
     const base = await start({ GEMINI_API_KEY: 'k' }, gemini);
 
     const res = await post(base, '/api/annotate', REQUEST);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ translation: 'One hot latte, right?' });
+    expect(await res.json()).toEqual(answer);
     const { url, init } = gemini.calls[0]!;
     expect(url).toBe(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${MODELS.annotate}:generateContent`);
     expect(JSON.parse(String(init.body))).toEqual(buildAnnotateRequest(REQUEST));
@@ -444,8 +454,29 @@ describe('POST /api/annotate', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(AnnotationSchema.safeParse(body).success).toBe(true);
+    expect(annotationSchemaFor(targetLanguage).safeParse(body).success).toBe(true);
     expect(gemini.calls).toEqual([]);
+  });
+
+  it.each([
+    { targetLanguage: 'zh', line: '欢迎光临！您想喝点什么？' },
+    { targetLanguage: 'ja', line: 'いらっしゃいませ！ご注文はお決まりですか？' },
+  ] as const)('answers $targetLanguage readings that pass the checks in mock mode', async ({ targetLanguage, line }) => {
+    const base = await start({ GEMINI_MOCK: '1' }, offline());
+
+    const res = await post(base, '/api/annotate', { ...REQUEST, targetLanguage, line });
+    const { segments } = await res.json();
+
+    expect(checkReadings(targetLanguage, line, segments)).toEqual({ ok: true });
+  });
+
+  it('still answers the translation when Gemini leaves out a zh line’s readings', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText(JSON.stringify({ translation: 'One hot latte?' }))));
+
+    const res = await post(base, '/api/annotate', REQUEST);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ translation: 'One hot latte?' });
   });
 
   it('rejects an empty line', async () => {

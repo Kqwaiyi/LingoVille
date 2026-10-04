@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CULTURE_PACKS } from '../content/index.ts';
-import { AnnotateRequestSchema, AnnotationSchema, buildAnnotateRequest, type AnnotateRequest } from './index.ts';
+import { AnnotateRequestSchema, annotationSchemaFor, buildAnnotateRequest, type AnnotateRequest } from './index.ts';
 
 const LINES: AnnotateRequest[] = [
   { targetLanguage: 'ja', nativeLanguage: 'en', line: 'ホットラテですね。450円です。よろしいですか？' },
@@ -22,10 +22,16 @@ describe('buildAnnotateRequest', () => {
     expect(body.systemInstruction.parts[0]!.text).toContain(CULTURE_PACKS.en.languageName);
   });
 
-  it('answers with a translation', () => {
-    expect(buildAnnotateRequest(LINES[1]!).generationConfig.responseSchema.required).toEqual(['translation']);
-    expect(AnnotationSchema.safeParse({ translation: 'One hot latte.' }).success).toBe(true);
-    expect(AnnotationSchema.safeParse({}).success).toBe(false);
+  it('answers with a translation, and segments with readings for zh and ja', () => {
+    expect(buildAnnotateRequest(LINES[0]!).generationConfig.responseSchema.required).toEqual(['translation', 'segments']);
+    expect(buildAnnotateRequest(LINES[1]!).generationConfig.responseSchema.required).toEqual(['translation', 'segments']);
+    expect(buildAnnotateRequest(LINES[2]!).generationConfig.responseSchema.required).toEqual(['translation']);
+    expect(annotationSchemaFor('de').safeParse({ translation: 'One hot latte.' }).success).toBe(true);
+    expect(annotationSchemaFor('de').safeParse({}).success).toBe(false);
+    expect(annotationSchemaFor('zh').safeParse({ translation: 'One hot latte.' }).success).toBe(false);
+    expect(
+      annotationSchemaFor('zh').safeParse({ translation: 'Hot.', segments: [{ base: '热', reading: 'rè' }] }).success,
+    ).toBe(true);
   });
 
   it('accepts only a line in a language it knows', () => {

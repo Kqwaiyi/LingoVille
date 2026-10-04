@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { chat, column, talkToTheBarista, typeLine } from './barista.ts';
+import { column, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 
 // What the gateway's canned Recap says in mock mode.
 const OUTCOME = 'You ordered a hot latte and paid. Nicely done!';
@@ -10,7 +10,7 @@ const journal = (page: Page) => page.getByRole('dialog', { name: 'Journal' });
 async function orderALatte(page: Page) {
   await talkToTheBarista(page);
   await typeLine(page, 'ホットラテ ください');
-  await expect(chat(page).getByText('ホットラテですね。450円です。よろしいですか？')).toBeVisible();
+  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
   await typeLine(page, 'はい');
   await expect(closingCard(page)).toBeVisible();
 }

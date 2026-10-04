@@ -5,6 +5,11 @@ export const column = (page: Page) => page.getByRole('complementary', { name: 'C
 export const chat = (page: Page) => column(page).getByRole('log', { name: 'Chat' });
 export const field = (page: Page) => column(page).getByRole('textbox', { name: 'Typed reply' });
 export const dock = (page: Page) => page.getByRole('region', { name: 'Dock' });
+/**
+ * A finished NPC line in the chat. Its text is interleaved with its reading aid
+ * (注文ちゅうもん), so it's found by the plain line its 🔊 Replay says.
+ */
+export const npcLine = (page: Page, text: string) => chat(page).getByRole('button', { name: `Replay “${text}”`, exact: true });
 
 // What the scripted fake barista says in the ja pack (mock mode).
 export const GREETING = 'いらっしゃいませ！ご注文はお決まりですか？';
@@ -23,7 +28,7 @@ export async function talkToTheBarista(page: Page) {
   await page.keyboard.press('KeyE');
   await expect(column(page)).toBeVisible();
   // The barista always speaks first.
-  await expect(chat(page).getByText(GREETING)).toBeVisible();
+  await expect(npcLine(page, GREETING)).toBeVisible();
 }
 
 /** The Typed Fallback: T focuses the field, then the line is typed and sent with Enter. */

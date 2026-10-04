@@ -16,6 +16,28 @@ exports[`buildAnnotateRequest > asks for a de translation of a zh NPC line 1`] =
     "responseMimeType": "application/json",
     "responseSchema": {
       "properties": {
+        "segments": {
+          "description": "The whole line, split into words, each with its reading.",
+          "items": {
+            "properties": {
+              "base": {
+                "description": "A word or run of characters from the line, exactly as written.",
+                "type": "STRING",
+              },
+              "reading": {
+                "description": "How the word is read, or empty when it needs no reading.",
+                "type": "STRING",
+              },
+            },
+            "required": [
+              "base",
+              "reading",
+            ],
+            "type": "OBJECT",
+          },
+          "minItems": 1,
+          "type": "ARRAY",
+        },
         "translation": {
           "description": "The line, translated into the Native Language.",
           "type": "STRING",
@@ -23,6 +45,7 @@ exports[`buildAnnotateRequest > asks for a de translation of a zh NPC line 1`] =
       },
       "required": [
         "translation",
+        "segments",
       ],
       "type": "OBJECT",
     },
@@ -33,7 +56,9 @@ exports[`buildAnnotateRequest > asks for a de translation of a zh NPC line 1`] =
         "text": "WHAT TO DO
 The text is one line said by a member of staff in a small town, in Mandarin Chinese, to a learner who speaks German.
 - translation: what the line means, in natural German. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
-Write only in German. Never add notes or explanations.",
+- segments: the whole line split into words, in order. Joined together, the "base" texts must be exactly the line, including punctuation, spaces and numbers.
+- reading: the pinyin of the word with tone marks (zhǎng, not zhang3), one syllable per hanzi, separated by spaces. Use the reading the word has in this sentence (长得 zhǎng de, 还钱 huán qián), and a neutral tone where it is said with one. Punctuation, numbers and Latin letters get an empty reading.
+Write the translation only in German. Never add notes or explanations.",
       },
     ],
   },
@@ -56,6 +81,28 @@ exports[`buildAnnotateRequest > asks for a en translation of a ja NPC line 1`] =
     "responseMimeType": "application/json",
     "responseSchema": {
       "properties": {
+        "segments": {
+          "description": "The whole line, split into words, each with its reading.",
+          "items": {
+            "properties": {
+              "base": {
+                "description": "A word or run of characters from the line, exactly as written.",
+                "type": "STRING",
+              },
+              "reading": {
+                "description": "How the word is read, or empty when it needs no reading.",
+                "type": "STRING",
+              },
+            },
+            "required": [
+              "base",
+              "reading",
+            ],
+            "type": "OBJECT",
+          },
+          "minItems": 1,
+          "type": "ARRAY",
+        },
         "translation": {
           "description": "The line, translated into the Native Language.",
           "type": "STRING",
@@ -63,6 +110,7 @@ exports[`buildAnnotateRequest > asks for a en translation of a ja NPC line 1`] =
       },
       "required": [
         "translation",
+        "segments",
       ],
       "type": "OBJECT",
     },
@@ -73,7 +121,9 @@ exports[`buildAnnotateRequest > asks for a en translation of a ja NPC line 1`] =
         "text": "WHAT TO DO
 The text is one line said by a member of staff in a small town, in Japanese, to a learner who speaks British English.
 - translation: what the line means, in natural British English. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
-Write only in British English. Never add notes or explanations.",
+- segments: the whole line split into words, in order. Joined together, the "base" texts must be exactly the line, including punctuation, spaces and numbers.
+- reading: for a word with kanji, the whole word in hiragana, read as it is in this sentence (一日中 いちにちじゅう, この方 このかた). Words with no kanji, punctuation and numbers get an empty reading.
+Write the translation only in British English. Never add notes or explanations.",
       },
     ],
   },
@@ -113,7 +163,7 @@ exports[`buildAnnotateRequest > asks for a ja translation of a en NPC line 1`] =
         "text": "WHAT TO DO
 The text is one line said by a member of staff in a small town, in British English, to a learner who speaks Japanese.
 - translation: what the line means, in natural Japanese. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
-Write only in Japanese. Never add notes or explanations.",
+Write the translation only in Japanese. Never add notes or explanations.",
       },
     ],
   },
@@ -153,7 +203,7 @@ exports[`buildAnnotateRequest > asks for a zh translation of a de NPC line 1`] =
         "text": "WHAT TO DO
 The text is one line said by a member of staff in a small town, in German, to a learner who speaks Mandarin Chinese.
 - translation: what the line means, in natural Mandarin Chinese. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
-Write only in Mandarin Chinese. Never add notes or explanations.",
+Write the translation only in Mandarin Chinese. Never add notes or explanations.",
       },
     ],
   },

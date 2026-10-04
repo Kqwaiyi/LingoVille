@@ -48,7 +48,7 @@ function PlacePhrasebook() {
         {phrases.map((phrase) => (
           <li key={phrase.text}>
             <p className="help-phrase" lang={packId}>
-              <Reading base={phrase.text} reading={phrase.reading} /> <HearItSaid text={phrase.text} />
+              <Reading base={phrase.text} reading={phrase.reading} language={packId} /> <HearItSaid text={phrase.text} />
             </p>
             {phrase.glosses[nativeLanguage] && <p className="help-gloss">{phrase.glosses[nativeLanguage]}</p>}
           </li>
@@ -71,7 +71,7 @@ function MyPhrasebook() {
           {phrasebook.map((entry) => (
             <li key={`${entry.text}-${entry.glossLanguage}`}>
               <p className="help-phrase" lang={packId}>
-                <Reading base={entry.text} reading={entry.reading} /> <HearItSaid text={entry.text} />
+                <Reading base={entry.text} reading={entry.reading} language={packId} /> <HearItSaid text={entry.text} />
               </p>
               <p className="help-gloss" lang={entry.glossLanguage}>
                 {entry.gloss}

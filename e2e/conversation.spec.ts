@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { chat, column, dock, field, talkToTheBarista } from './barista.ts';
+import { chat, column, dock, field, npcLine, talkToTheBarista } from './barista.ts';
 
 // The fake barista reads back an order it recognises, even typed in romaji with a loanword.
 const READ_BACK = 'ホットラテですね。450円です。よろしいですか？';
@@ -34,7 +34,7 @@ test('T focuses the typed field, Space types a space, and Enter sends a line the
   await expect(field(page)).toHaveValue('');
   await expect(chat(page).getByText('Heard as')).toBeVisible();
   await expect(chat(page).getByText('latte kudasai')).toBeVisible();
-  await expect(chat(page).getByText(READ_BACK)).toBeVisible();
+  await expect(npcLine(page, READ_BACK)).toBeVisible();
   // Typing never walked the Character away from the counter.
   await expect(column(page)).toBeVisible();
 });

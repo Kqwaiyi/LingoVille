@@ -278,6 +278,28 @@ body,
   cursor: default;
 }
 
+/* Reading aids: pinyin or furigana over the NPC's line, and an optional romaji line under a Japanese one. */
+/* A reading wider than its kanji overhangs it, rather than spacing the kanji apart. */
+ruby {
+  ruby-align: center;
+}
+
+.reading-line {
+  line-height: 1.9;
+}
+
+.bubble ruby rt,
+.journal-lines ruby rt {
+  font-size: 10px;
+  color: #7b8496;
+}
+
+.romaji-line {
+  display: block;
+  font-size: 13px;
+  color: #4a5266;
+}
+
 /* Translate shows the Native Language line under the NPC's. */
 .bubble-translation {
   margin: 6px 0 0;
@@ -653,6 +675,38 @@ body,
   font-size: 11px;
 }
 
+/* The conversation itself, folded away under the Recap. */
+.journal-lines {
+  margin-top: var(--line);
+  font-size: 15px;
+}
+
+.journal-lines summary {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b6a55;
+  cursor: pointer;
+}
+
+.journal-lines ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-lines li[data-speaker='player'] {
+  color: #4a5266;
+}
+
+.journal-line-speaker {
+  display: block;
+  font-size: 11px;
+  line-height: 18px;
+  color: #7b8496;
+  text-transform: capitalize;
+}
+
 .hear-it-said {
   padding: 0 4px;
   border: 0;
@@ -911,6 +965,28 @@ body,
   color: var(--hud-muted);
 }
 
+.title-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.title-toggle input {
+  margin-top: 4px;
+  accent-color: var(--ok);
+}
+
+.title-toggle input:disabled + span {
+  opacity: 0.45;
+}
+
+.title-toggle small {
+  display: block;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
 .title-panel button,
 .persist-callout button,
 .delete-dialog button {
@@ -1134,4 +1210,15 @@ body,
     grid-template-columns: 1fr;
     align-content: center;
   }
+}
+
+/* Anchored to the NPC in the scene while a line of theirs is coming in. */
+.npc-speaking {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
 }

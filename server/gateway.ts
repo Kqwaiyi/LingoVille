@@ -8,12 +8,14 @@ import {
   buildRecapRequest,
   HintRequestSchema,
   HintsSchema,
+  libraryPinyin,
   RecapRequestSchema,
   recapSchemaFor,
   type Annotation,
   type GenerateContentBody,
   type Hints,
   type Recap,
+  type Segment,
 } from '../src/ai/index.ts';
 import {
   DEFAULT_GATEWAY_PORT,
@@ -235,7 +237,34 @@ const hint: Route = (env, deps, req, res) =>
     },
   );
 
-/** POST /api/annotate: an NPC line's Native Language translation, as soon as the line is finished. */
+// Canned ja readings for the scripted fake barista's lines that mock mode corrects. Any other ja line
+// gets no usable reading, which the browser's checks reject, so the library reading stays.
+const MOCK_JA_READINGS: Record<string, Segment[]> = {
+  'いらっしゃいませ！ご注文はお決まりですか？': [
+    { base: 'いらっしゃいませ', reading: '' },
+    { base: '！', reading: '' },
+    { base: 'ご注文', reading: 'ごちゅうもん' },
+    { base: 'は', reading: '' },
+    { base: 'お決まり', reading: 'おきまり' },
+    { base: 'ですか', reading: '' },
+    { base: '？', reading: '' },
+  ],
+  'すみません、よくわかりませんでした。': [
+    { base: 'すみません', reading: '' },
+    { base: '、', reading: '' },
+    { base: 'よく', reading: '' },
+    { base: 'わかりませんでした', reading: '' },
+    { base: '。', reading: '' },
+  ],
+};
+
+function mockSegments(targetLanguage: TargetLanguage, line: string): Segment[] | undefined {
+  if (targetLanguage === 'zh') return libraryPinyin(line);
+  if (targetLanguage === 'ja') return MOCK_JA_READINGS[line] ?? [{ base: line, reading: '' }];
+  return undefined;
+}
+
+/** POST /api/annotate: an NPC line's Native Language translation and, for zh and ja, its readings, as soon as the line is finished. */
 const annotate: Route = (env, deps, req, res) =>
   promptedEndpoint(
     { env, deps, req, res },
@@ -245,7 +274,10 @@ const annotate: Route = (env, deps, req, res) =>
       request: AnnotateRequestSchema,
       build: buildAnnotateRequest,
       answer: () => AnnotationSchema,
-      mock: (request): Annotation => ({ translation: `Mock translation: ${request.line}` }),
+      mock: (request): Annotation => {
+        const segments = mockSegments(request.targetLanguage, request.line);
+        return { translation: `Mock translation: ${request.line}`, ...(segments && { segments }) };
+      },
     },
   );
 

@@ -1,6 +1,8 @@
 import { NAMED_NPCS } from '../content/index.ts';
-import { selectInPhrasebook, useGame, type JournalPage, type NewWord } from '../store/index.ts';
+import type { LanguageCode } from '../sim/index.ts';
+import { selectInPhrasebook, selectReadingAids, useGame, type JournalPage, type NewWord } from '../store/index.ts';
 import { formatClock } from './format.ts';
+import { ReadingLine, RubyText } from './Ruby.tsx';
 
 // English until the i18n module lands (ticket 12).
 
@@ -14,14 +16,28 @@ export function HearItSaid({ text }: { text: string }) {
   );
 }
 
-/** A word with its reading over it, when it has one. */
-export function Reading({ base, reading }: { base: string; reading: string }) {
-  if (!reading || reading === base) return <>{base}</>;
+/** A word with its reading over it, when it has one and reading aids show. */
+export function Reading({ base, reading, language }: { base: string; reading: string; language: LanguageCode }) {
+  const { show } = useGame(selectReadingAids);
+  if (!show || !reading || reading === base) return <>{base}</>;
+  return <RubyText language={language} segments={[{ base, reading }]} />;
+}
+
+/** The conversation as it was said, with the NPC's lines as corrected by the time the page was written. */
+function ConversationLines({ page }: { page: JournalPage }) {
+  const { role } = NAMED_NPCS[page.npcId];
   return (
-    <ruby>
-      {base}
-      <rt>{reading}</rt>
-    </ruby>
+    <details className="journal-lines">
+      <summary>The conversation</summary>
+      <ol>
+        {page.lines.map((line, i) => (
+          <li key={i} data-speaker={line.speaker}>
+            <span className="journal-line-speaker">{line.speaker === 'npc' ? (page.npcName ?? role) : 'You'}</span>
+            <ReadingLine language={page.targetLanguage} text={line.text} segments={line.reading} />
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 
@@ -54,9 +70,10 @@ export function journalPageWhen(page: Pick<JournalPage, 'day' | 'minuteOfDay'>) 
 
 /**
  * One Recap as a lined Journal page: the outcome, up to three corrections and
- * new words. The same page shows in the conversation column and in the Journal.
+ * new words. The same page shows in the conversation column and in the Journal,
+ * where the conversation itself can be read back with its corrected reading aids.
  */
-export function JournalPageView({ page }: { page: JournalPage }) {
+export function JournalPageView({ page, withConversation = false }: { page: JournalPage; withConversation?: boolean }) {
   const { recap } = page;
   return (
     <article className="journal-page" lang={page.nativeLanguage} aria-label="Journal page">
@@ -93,7 +110,7 @@ export function JournalPageView({ page }: { page: JournalPage }) {
                 {recap.newWords.map((word, i) => (
                   <li key={i}>
                     <span lang={page.targetLanguage}>
-                      <Reading base={word.base} reading={word.reading} />
+                      <Reading base={word.base} reading={word.reading} language={page.targetLanguage} />
                     </span>{' '}
                     <HearItSaid text={word.base} /> <span className="journal-gloss">{word.gloss}</span>{' '}
                     <AddToPhrasebook word={word} glossLanguage={page.nativeLanguage} />
@@ -106,6 +123,7 @@ export function JournalPageView({ page }: { page: JournalPage }) {
       ) : (
         <p className="journal-outcome">No Recap could be written for this conversation.</p>
       )}
+      {withConversation && page.lines.length > 0 && <ConversationLines page={page} />}
     </article>
   );
 }

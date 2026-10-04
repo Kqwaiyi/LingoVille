@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { chat, column, GREETING, talkToTheBarista, typeLine } from './barista.ts';
+import { chat, column, GREETING, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 
 // What the gateway answers in mock mode for the ja pack.
 const HINT = 'ホットラテをください。';
@@ -28,7 +28,7 @@ test('H opens Help with hints for this moment and the café phrasebook, and the 
   expect((await said).postDataJSON()).toEqual({ text: HINT, targetLanguage: 'ja' });
 
   await page.keyboard.press('KeyH');
-  await expect(chat(page).getByText(GREETING)).toBeVisible();
+  await expect(npcLine(page, GREETING)).toBeVisible();
 });
 
 test('Translate shows the Native Language line under an NPC line, and 🔊 Replay says it again', async ({ page }) => {
@@ -49,7 +49,7 @@ test('a Recap where Help was used has no sticker, and + Phrasebook keeps a word 
 
   // Saying the hint goes back to the chat, and the order goes on from there.
   await typeLine(page, HINT);
-  await expect(chat(page).getByText('ホットラテですね。450円です。よろしいですか？')).toBeVisible();
+  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
   await typeLine(page, 'はい');
   const closingCard = column(page).getByRole('region', { name: 'Conversation over' });
   await closingCard.getByRole('button', { name: 'See Recap' }).click();
@@ -70,7 +70,7 @@ test('a Recap where Help was used has no sticker, and + Phrasebook keeps a word 
 
   // The kept word is in the Help tab of the next conversation too.
   await page.keyboard.press('KeyE');
-  await expect(chat(page).getByText(GREETING)).toBeVisible();
+  await expect(npcLine(page, GREETING)).toBeVisible();
   await page.keyboard.press('KeyH');
   await expect(help(page).getByRole('region', { name: 'My phrasebook' }).getByText('welcome (said by shop staff)')).toBeVisible();
 });
