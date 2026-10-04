@@ -4,10 +4,15 @@ import { defineConfig, devices } from '@playwright/test';
 const WEB_PORT = '5180';
 const GATEWAY_PORT = '8790';
 
+// Headless Chromium draws WebGL in software by default, which makes every frame of the 3D scene,
+// and so every Playwright action, slow. These flags put it on the GPU; without one it falls back
+// to software as before. D3D11 is the ANGLE backend that finds the discrete GPU on Windows.
+const GPU_ARGS = ['--enable-gpu', ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : [])];
+
 export default defineConfig({
   testDir: './e2e',
-  // Every test boots the 3D scene with software WebGL. In parallel that swamps a laptop and tests
-  // time out, so they run one at a time. Pass `--workers=N` to try more on a bigger machine.
+  // Every test boots the 3D scene, which can swamp a laptop without a GPU, so they run one at a
+  // time. Pass `--workers=N` to try more.
   workers: 1,
   timeout: 60_000,
   reporter: 'list',
@@ -22,7 +27,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         // A fake mic, already allowed, that beeps about once a second, so the mic check can hear it.
         permissions: ['microphone'],
-        launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] },
+        launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', ...GPU_ARGS] },
       },
     },
   ],

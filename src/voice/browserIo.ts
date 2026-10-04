@@ -8,6 +8,8 @@ const MIC_RATE = 16_000;
 const MIC_CONSTRAINTS: MediaStreamConstraints = { audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } };
 /** How often the mic check reads the level: about as often as the worklet reports it. */
 const MIC_CHECK_INTERVAL_MS = 100;
+/** The mic check's level is the loudest stretch this long, in samples, since the last reading. */
+const MIC_CHECK_WINDOW = 2_048;
 /** The mic level shown to the Player, from 0 to 1: the RMS loudness, scaled up so speech fills most of it. */
 const MIC_LEVEL_GAIN = 4;
 const NPC_RATE = 24_000;
@@ -159,12 +161,20 @@ export const openBrowserMic: OpenMic = async (onLevel) => {
   try {
     context = new AudioContext();
     const analyser = context.createAnalyser();
+    // Each reading covers all the audio since the one before, so a short sound between readings isn't missed.
+    const sinceLastReading = (context.sampleRate * MIC_CHECK_INTERVAL_MS) / 1000 + MIC_CHECK_WINDOW;
+    analyser.fftSize = Math.min(32_768, 2 ** Math.ceil(Math.log2(sinceLastReading)));
     context.createMediaStreamSource(stream).connect(analyser);
     const samples = new Float32Array(analyser.fftSize);
     const timer = setInterval(() => {
       analyser.getFloatTimeDomainData(samples);
-      const energy = samples.reduce((sum, sample) => sum + sample * sample, 0);
-      onLevel(Math.min(1, Math.sqrt(energy / samples.length) * MIC_LEVEL_GAIN));
+      let loudest = 0;
+      for (let start = 0; start + MIC_CHECK_WINDOW <= samples.length; start += MIC_CHECK_WINDOW / 4) {
+        let energy = 0;
+        for (let i = start; i < start + MIC_CHECK_WINDOW; i++) energy += samples[i]! * samples[i]!;
+        loudest = Math.max(loudest, energy);
+      }
+      onLevel(Math.min(1, Math.sqrt(loudest / MIC_CHECK_WINDOW) * MIC_LEVEL_GAIN));
     }, MIC_CHECK_INTERVAL_MS);
     void context.resume();
     return () => {

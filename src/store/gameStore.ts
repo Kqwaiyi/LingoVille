@@ -604,16 +604,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       void checkPersisted(true);
     };
 
-    // Device settings change one at a time, each from the one before, so a quick run of changes never loses one.
+    // Each device settings change starts writing at once, from the one before, so neither a quick run of
+    // changes nor a reload right after one loses it. Reads wait for the writes still going.
     let settingsWrites: Promise<unknown> = Promise.resolve();
     const updateDeviceSettings = (change: (settings: DeviceSettings) => DeviceSettings | null) => {
-      settingsWrites = settingsWrites
-        .then(() => deps.deviceSettings.load())
-        .then((settings) => {
-          const changed = change(settings);
-          return changed && deps.deviceSettings.save(changed);
-        })
-        .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+      const written = deps.deviceSettings.update(change).catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+      settingsWrites = settingsWrites.then(() => written);
     };
 
     const answerSetup = (answers: Partial<Setup>) => {

@@ -57,4 +57,38 @@ describe('device settings', () => {
 
     expect(await settings.load()).toEqual(DEFAULT_DEVICE_SETTINGS);
   });
+
+  it('change from the record a reload reads back, whether or not this page has read it', async () => {
+    const { settings, raw } = fresh();
+    await set('device', { ...DEFAULT_DEVICE_SETTINGS, inputMode: 'typed' }, raw);
+
+    await settings.update((current) => ({ ...current, showRomaji: true }));
+    await settings.update((current) => ({ ...current, tooltipsSeen: [...current.tooltipsSeen, 'walk'] }));
+    await settings.update(() => null);
+
+    expect(await createDeviceSettings(() => raw).load()).toEqual({
+      ...DEFAULT_DEVICE_SETTINGS,
+      inputMode: 'typed',
+      showRomaji: true,
+      tooltipsSeen: ['walk'],
+    });
+  });
+
+  it('keep a quick run of changes, each from the one before, even with a read still going', async () => {
+    const { settings, raw } = fresh();
+    await settings.load();
+
+    const reading = settings.load();
+    const first = settings.update((current) => ({ ...current, readingAids: false }));
+    const second = settings.update((current) => ({ ...current, showRomaji: true }));
+    await Promise.all([reading, first, second]);
+    await settings.update((current) => ({ ...current, micCheckPassed: true }));
+
+    expect(await createDeviceSettings(() => raw).load()).toEqual({
+      ...DEFAULT_DEVICE_SETTINGS,
+      readingAids: false,
+      showRomaji: true,
+      micCheckPassed: true,
+    });
+  });
 });
