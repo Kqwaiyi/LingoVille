@@ -14,6 +14,10 @@ Uses the five default triage roles as-is (`needs-triage`, `needs-info`, `ready-f
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Implementation
+
+Implementation is test-first: load the `tdd` skill and work red→green at the seams named in the feature's `spec.md` (under `.scratch/<feature>/`).
+
 ## Code layout and commands
 
 Modules live in `src/` (`sim`, `content`, `ai`, `voice`, `world`, `ui`, `i18n`, `store`), the Gemini gateway in `server/`, the eval harness in `evals/` Playwright smoke tests in `e2e/` and repo-wide guardrail tests (lint boundaries) in `tooling/`. **Each folder has an `AGENTS.md` with its rule and how to test it. Read it before editing that folder.** Game numbers live only in `src/sim/tuning.ts`.
