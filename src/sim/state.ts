@@ -53,6 +53,8 @@ export type NewGameSetup = {
   /** From the self-assessment. */
   startingStep: StartingStep;
   appearancePresetId: AppearancePresetId;
+  /** The Player chose "Skip tutorial" on the last setup screen. */
+  skipFirstMorning: boolean;
   rngSeed: number;
 };
 
@@ -101,7 +103,7 @@ export type GameState = {
   };
   /** The personal phrasebook. */
   phrasebook: PhrasebookEntry[];
-  onboarding: { firstMorningStepsDone: number };
+  onboarding: { firstMorningStepsDone: number; firstMorningSkipped: boolean };
   /** One NPC Memory record per Named NPC the Character has met. */
   people: Partial<Record<NamedNpcId, NpcMemory>>;
 };
@@ -139,7 +141,7 @@ export function createSave(setup: NewGameSetup): GameState {
     },
     possessions: { inventory: [], gymMembershipUntilDay: null, addressRegistered: false, jobsHired: [], shift: null },
     phrasebook: [],
-    onboarding: { firstMorningStepsDone: 0 },
+    onboarding: { firstMorningStepsDone: 0, firstMorningSkipped: setup.skipFirstMorning },
     people: {},
   };
 }

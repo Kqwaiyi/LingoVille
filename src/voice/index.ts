@@ -7,12 +7,14 @@ export {
   type HearItSaidClip,
   type HearItSaidDeps,
 } from './hearItSaid.ts';
+export { openBrowserMic } from './browserIo.ts';
 export { MOCK_DROP_LINE, openMockVoiceSession } from './mockVoiceSession.ts';
 export { openVoiceSession } from './openVoiceSession.ts';
 export {
   addUsage,
   NO_USAGE,
   VoiceServiceUnavailableError,
+  type OpenMic,
   type OpenVoiceSession,
   type TokenUsage,
   type ToolCall,

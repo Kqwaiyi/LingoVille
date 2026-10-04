@@ -1,28 +1,34 @@
-import { useEffect, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { APPEARANCE_PRESET_IDS } from '../content/index.ts';
 import { languageEndonym, Trans, useTranslation } from '../i18n/index.ts';
 import { LANGUAGE_CODES, STARTING_STEPS } from '../sim/index.ts';
 import {
+  selectMicLevel,
   selectNativeLanguage,
   selectSetup,
   selectSetupCanGoOn,
+  selectSetupIsLast,
   selectTargetLanguages,
-  SETUP_STEPS,
   useGame,
   type Setup,
 } from '../store/index.ts';
 
 /**
  * New game setup, one screen at a time: the Native Language, the Target
- * Language, the self-assessment and name, then the Appearance Preset. ↑ ↓
- * choose, Enter goes on and Esc goes back (from the first screen, to the title).
+ * Language, the self-assessment and name, the Appearance Preset, then the mic
+ * check (unless this browser has passed it). ↑ ↓ choose, Enter goes on and Esc
+ * goes back (from the first screen, to the title).
  */
 export function SetupScreen() {
   const { t } = useTranslation();
   const setup = useGame(selectSetup);
   const canGoOn = useGame(selectSetupCanGoOn);
+  const last = useGame(selectSetupIsLast);
   const setupNext = useGame((s) => s.setupNext);
   const setupBack = useGame((s) => s.setupBack);
+  const skipMicCheck = useGame((s) => s.skipMicCheck);
+  const start = useRef<HTMLButtonElement>(null);
+  const micCheckDone = setup?.step === 'micCheck' && canGoOn;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -32,8 +38,12 @@ export function SetupScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, [setupBack]);
 
+  // Once the mic check is done, Enter starts rather than skips.
+  useEffect(() => {
+    if (micCheckDone) start.current?.focus();
+  }, [micCheckDone]);
+
   if (!setup) return null;
-  const last = setup.step === SETUP_STEPS.at(-1);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -54,11 +64,20 @@ export function SetupScreen() {
         {setup.step === 'targetLanguage' && <TargetLanguage setup={setup} />}
         {setup.step === 'aboutYou' && <AboutYou setup={setup} />}
         {setup.step === 'appearance' && <Appearance setup={setup} />}
+        {setup.step === 'micCheck' && <MicCheck setup={setup} />}
+        {/* On the mic check, or on the appearance for a browser that has passed it. */}
+        {last && <SkipTutorial setup={setup} />}
         <div className="setup-actions">
           <button type="button" onClick={setupBack}>
             {t('setup.back')}
           </button>
-          <button type="submit" className="primary" disabled={!canGoOn}>
+          {setup.step === 'micCheck' && (
+            // Focused, so Enter skips until the check is done.
+            <button type="button" className="setup-skip" onClick={skipMicCheck} autoFocus>
+              {t('setup.micCheck.skip')}
+            </button>
+          )}
+          <button ref={start} type="submit" className="primary" disabled={!canGoOn}>
             {last ? t('setup.start') : t('setup.next')}
           </button>
         </div>
@@ -208,5 +227,50 @@ function Appearance({ setup }: { setup: Setup }) {
         ))}
       </fieldset>
     </>
+  );
+}
+
+/**
+ * Screen 5: the mic check. A live level meter while the mic listens; it passes
+ * once it hears the Player. Without a mic the game goes on in the Typed
+ * Fallback. Skip goes on at any time.
+ */
+function MicCheck({ setup }: { setup: Setup }) {
+  const { t } = useTranslation();
+  const level = useGame(selectMicLevel);
+  const percent = Math.round(level * 100);
+
+  return (
+    <>
+      <Heading title={t('setup.micCheck.heading')} body={t('setup.micCheck.body')} />
+      <p className="setup-tip">{t('setup.micCheck.headphones')}</p>
+      {setup.mic !== 'unavailable' && (
+        <div
+          className="mic-meter"
+          role="meter"
+          aria-label={t('setup.micCheck.level')}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          data-heard={setup.mic === 'heard' || undefined}
+          style={{ '--level': level } as CSSProperties}
+        />
+      )}
+      <p className="setup-mic-status" role="status" data-status={setup.mic}>
+        {setup.mic && t(`setup.micCheck.status.${setup.mic}`)}
+      </p>
+    </>
+  );
+}
+
+/** "Skip tutorial", on the last setup screen: the game starts without the First Morning. */
+function SkipTutorial({ setup }: { setup: Setup }) {
+  const { t } = useTranslation();
+  const chooseSkipFirstMorning = useGame((s) => s.chooseSkipFirstMorning);
+  return (
+    <label className="setup-skip-tutorial">
+      <input type="checkbox" checked={setup.skipFirstMorning} onChange={(e) => chooseSkipFirstMorning(e.target.checked)} />
+      {t('setup.skipTutorial')}
+    </label>
   );
 }

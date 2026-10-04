@@ -1,9 +1,15 @@
 import type { LiveAudio, LiveSocket, LiveSocketHandlers } from './liveSession.ts';
+import type { OpenMic } from './voiceSession.ts';
 
 // The browser edges of the Live session. Ported from the voice prototype; the
 // protocol logic around them is in liveSession.ts and tested without a browser.
 
 const MIC_RATE = 16_000;
+const MIC_CONSTRAINTS: MediaStreamConstraints = { audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } };
+/** How often the mic check reads the level: about as often as the worklet reports it. */
+const MIC_CHECK_INTERVAL_MS = 100;
+/** The mic level shown to the Player, from 0 to 1: the RMS loudness, scaled up so speech fills most of it. */
+const MIC_LEVEL_GAIN = 4;
 const NPC_RATE = 24_000;
 /** ~100 ms of mic audio per message. */
 const MIC_CHUNK_SAMPLES = 1_600;
@@ -39,7 +45,7 @@ class MicCapture extends AudioWorkletProcessor {
       this.energy += sample * sample;
       this.out[this.length++] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
       if (this.length === this.out.length) {
-        const level = Math.min(1, Math.sqrt(this.energy / this.length) * 4);
+        const level = Math.min(1, Math.sqrt(this.energy / this.length) * ${MIC_LEVEL_GAIN});
         this.port.postMessage({ pcm: this.out.buffer, level }, [this.out.buffer]);
         this.out = new Int16Array(${MIC_CHUNK_SAMPLES});
         this.length = 0;
@@ -83,9 +89,7 @@ export function createBrowserAudio(): LiveAudio {
 
   return {
     startMic: async (onChunk) => {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-      });
+      const stream = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
       if (closed) return stream.getTracks().forEach((track) => track.stop());
       mic = stream;
       const moduleUrl = URL.createObjectURL(new Blob([MIC_WORKLET], { type: 'text/javascript' }));
@@ -145,6 +149,35 @@ export function createBrowserAudio(): LiveAudio {
     },
   };
 }
+
+/** The browser's mic, for the mic check: its level on the same scale as a conversation's. */
+export const openBrowserMic: OpenMic = async (onLevel) => {
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error('this browser has no mic access');
+  const stream = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+  const stopStream = () => stream.getTracks().forEach((track) => track.stop());
+  let context: AudioContext;
+  try {
+    context = new AudioContext();
+    const analyser = context.createAnalyser();
+    context.createMediaStreamSource(stream).connect(analyser);
+    const samples = new Float32Array(analyser.fftSize);
+    const timer = setInterval(() => {
+      analyser.getFloatTimeDomainData(samples);
+      const energy = samples.reduce((sum, sample) => sum + sample * sample, 0);
+      onLevel(Math.min(1, Math.sqrt(energy / samples.length) * MIC_LEVEL_GAIN));
+    }, MIC_CHECK_INTERVAL_MS);
+    void context.resume();
+    return () => {
+      clearInterval(timer);
+      stopStream();
+      void context.close();
+    };
+  } catch (error) {
+    // Opened but unusable: the mic is let go, or the browser would keep showing it as in use.
+    stopStream();
+    throw error;
+  }
+};
 
 export function openBrowserSocket(url: string, handlers: LiveSocketHandlers): LiveSocket {
   const socket = new WebSocket(url);

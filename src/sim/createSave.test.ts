@@ -75,4 +75,9 @@ describe('createSave', () => {
     expect(state.onboarding.firstMorningStepsDone).toBe(0);
     expect(state.people).toEqual({});
   });
+
+  it('plays the First Morning, unless the Player chose Skip tutorial in setup', () => {
+    expect(createSave(setup).onboarding.firstMorningSkipped).toBe(false);
+    expect(createSave({ ...setup, skipFirstMorning: true }).onboarding).toEqual({ firstMorningStepsDone: 0, firstMorningSkipped: true });
+  });
 });

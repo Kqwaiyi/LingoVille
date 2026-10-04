@@ -4,10 +4,11 @@ import { DEV_SETUP, type createGameStore } from './gameStore.ts';
 /**
  * New game, through every setup screen with the dev setup's answers (or the
  * ones given): from the title screen, once it's ready, to the First Morning.
- * The save's RNG seed is whatever the store's `newRngSeed` gives.
+ * The mic check, if it shows, is skipped. The save's RNG seed is whatever the
+ * store's `newRngSeed` gives.
  */
 export function setUpNewGame(store: ReturnType<typeof createGameStore>, answers: Partial<Omit<NewGameSetup, 'rngSeed'>> = {}) {
-  const { targetLanguage, startingStep, characterName, appearancePresetId } = { ...DEV_SETUP, ...answers };
+  const { targetLanguage, startingStep, characterName, appearancePresetId, skipFirstMorning } = { ...DEV_SETUP, ...answers };
   const s = () => store.getState();
   s().newGame();
   s().setupNext();
@@ -18,4 +19,7 @@ export function setUpNewGame(store: ReturnType<typeof createGameStore>, answers:
   s().setupNext();
   s().chooseAppearance(appearancePresetId);
   s().setupNext();
+  if (s().setup?.step !== 'micCheck') return;
+  s().chooseSkipFirstMorning(skipFirstMorning);
+  s().skipMicCheck();
 }

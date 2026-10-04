@@ -70,6 +70,15 @@ export type VoiceSessionEvents = {
 export type VoiceSessionOptions = {
   /** The conversation so far, when this session replaces one that dropped. The NPC doesn't greet again. */
   resumeFrom?: TranscriptLine[];
+  /** The Player is in the Typed Fallback: the session never asks for the mic. */
+  typedOnly?: boolean;
 };
+
+/**
+ * Opens the mic for the mic check and reports how loud it is, from 0 to 1, on
+ * the same scale as a conversation's mic level, until the returned function
+ * closes it. Rejects if the Player refuses the mic or has none.
+ */
+export type OpenMic = (onLevel: (level: number) => void) => Promise<() => void>;
 
 export type OpenVoiceSession = (session: NpcSession, events: VoiceSessionEvents, options?: VoiceSessionOptions) => VoiceSession;

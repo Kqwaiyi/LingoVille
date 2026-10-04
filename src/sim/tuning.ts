@@ -106,6 +106,12 @@ export const CHARACTER_NAME = {
   maxLength: 20,
 } as const;
 
+/** The mic check, the last screen of New game setup. */
+export const MIC_CHECK = {
+  /** How loud a sound must be, on the mic meter's 0–1 scale, for the check to have heard the Player. */
+  heardLevel: 0.15,
+} as const;
+
 /** Patience, Newcomer Discount and Shift stakes by Proficiency Step. */
 export const PROFICIENCY_STEP_TABLE: Record<
   ProficiencyStep,

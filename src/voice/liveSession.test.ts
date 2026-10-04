@@ -47,6 +47,7 @@ function fakeAudio({ micAllowed = true } = {}) {
     played: [] as string[],
     stoppedPlayback: 0,
     closed: false,
+    micAsked: 0,
     onChunk: null as ((pcm: string, level: number) => void) | null,
     drainWaiters: [] as (() => void)[],
     playing: false,
@@ -59,6 +60,7 @@ function fakeAudio({ micAllowed = true } = {}) {
   };
   const live: LiveAudio = {
     startMic: async (onChunk) => {
+      audio.micAsked++;
       if (!micAllowed) throw new DOMException('Permission denied', 'NotAllowedError');
       audio.onChunk = onChunk;
     },
@@ -106,11 +108,11 @@ function listen() {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-async function connected({ resumeFrom, micAllowed }: { resumeFrom?: TranscriptLine[]; micAllowed?: boolean } = {}) {
+async function connected({ resumeFrom, micAllowed, typedOnly }: { resumeFrom?: TranscriptLine[]; micAllowed?: boolean; typedOnly?: boolean } = {}) {
   const { server, openSocket } = fakeServer();
   const { audio, createAudio } = fakeAudio({ micAllowed });
   const game = listen();
-  const session = openLiveSession(TOKEN, npcSession, game.events, { resumeFrom }, { openSocket, createAudio });
+  const session = openLiveSession(TOKEN, npcSession, game.events, { resumeFrom, typedOnly }, { openSocket, createAudio });
   const connecting = session.connect();
   await flush();
   server.open();
@@ -314,6 +316,17 @@ describe('Live VoiceSession', () => {
 
     session.sendText('Kaffee bitte');
 
+    expect(server.conversation.at(-1)).toEqual({
+      clientContent: { turns: [{ role: 'user', parts: [{ text: 'Kaffee bitte' }] }], turnComplete: true },
+    });
+  });
+
+  it('in the Typed Fallback, never asks for the mic', async () => {
+    const { server, audio, session } = await connected({ typedOnly: true });
+
+    session.sendText('Kaffee bitte');
+
+    expect(audio.micAsked).toBe(0);
     expect(server.conversation.at(-1)).toEqual({
       clientContent: { turns: [{ role: 'user', parts: [{ text: 'Kaffee bitte' }] }], turnComplete: true },
     });

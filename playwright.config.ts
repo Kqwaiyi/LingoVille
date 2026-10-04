@@ -15,7 +15,17 @@ export default defineConfig({
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // A fake mic, already allowed, that beeps about once a second, so the mic check can hear it.
+        permissions: ['microphone'],
+        launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] },
+      },
+    },
+  ],
   webServer: {
     command: 'npm run dev',
     url: `http://localhost:${WEB_PORT}`,

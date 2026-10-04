@@ -9,6 +9,7 @@ import {
   selectConversation,
   selectCulturePackId,
   selectHelpOpen,
+  selectInputMode,
   selectLineReading,
   selectListening,
   selectMicLevel,
@@ -276,10 +277,19 @@ function MicButton() {
   );
 }
 
+/** In the Typed Fallback, a chip says the mic is off where the mic button would be. */
 function InputBar() {
+  const { t } = useTranslation();
+  const inputMode = useGame(selectInputMode);
   return (
     <div className="chat-input">
-      <MicButton />
+      {inputMode === 'typed' ? (
+        <span className="mic-off" title={t('chat.micOffHint')}>
+          {t('chat.micOff')}
+        </span>
+      ) : (
+        <MicButton />
+      )}
       <TypedField />
     </div>
   );

@@ -48,6 +48,15 @@ test('through the setup screens into the town, as the Character the Player descr
   await expect(page.getByRole('radio', { name: /^Look \d$/ })).toHaveCount(4);
   await expect(page.getByRole('radio', { name: 'Look 1' })).toBeChecked();
   await page.getByRole('radio', { name: 'Look 3' }).check();
+  await button(page, 'Next').click();
+
+  // Screen 5: the mic check, with a live level, until it hears the smoke's fake mic beep.
+  await expect(heading(page, 'Let’s check your mic')).toBeVisible();
+  await expect(page.getByText('Headphones work best, so the mic doesn’t hear the game.')).toBeVisible();
+  await expect(page.getByRole('meter', { name: 'Mic level' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Skip the tutorial' })).not.toBeChecked();
+  await expect(button(page, 'Skip')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Heard you! Your mic works.' })).toBeVisible();
   await button(page, 'Start').click();
 
   // In the German pack's town, with its money.
@@ -103,5 +112,8 @@ test('German fits every setup screen', async ({ page }) => {
   expect(await overflowing(panel)).toEqual([]);
   await weiter.click();
   await expect(heading(page, 'Wie sieht Maximilian-Alexander aus?')).toBeVisible();
+  expect(await overflowing(panel)).toEqual([]);
+  await weiter.click();
+  await expect(heading(page, 'Kurzer Mikrofontest')).toBeVisible();
   expect(await overflowing(panel)).toEqual([]);
 });

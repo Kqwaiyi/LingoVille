@@ -18,7 +18,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 2;
+export const SAVE_SCHEMA_VERSION = 3;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -81,7 +81,7 @@ const GameStateSchema = z.object({
   phrasebook: z.array(
     z.object({ text: z.string(), reading: z.string(), gloss: z.string(), glossLanguage: z.enum(LANGUAGE_CODES), dayAdded: day }),
   ),
-  onboarding: z.object({ firstMorningStepsDone: z.int().min(0) }),
+  onboarding: z.object({ firstMorningStepsDone: z.int().min(0), firstMorningSkipped: z.boolean() }),
   people: z.partialRecord(z.enum(NPC_IDS), NpcMemorySchema),
 }) satisfies z.ZodType<GameState>;
 
@@ -110,6 +110,12 @@ type StoredSave = { schemaVersion: number; game: Record<string, unknown> } & Rec
 const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
   // 1 → 2: saves gain the personal phrasebook, empty.
   (save) => ({ ...save, schemaVersion: 2, game: { ...save.game, phrasebook: [] } }),
+  // 2 → 3: the First Morning can be skipped from setup. No save so far skipped it.
+  (save) => ({
+    ...save,
+    schemaVersion: 3,
+    game: { ...save.game, onboarding: { ...(save.game.onboarding as object), firstMorningSkipped: false } },
+  }),
 ];
 
 /** A loose look at a stored field, for bytes that may not be a readable save. */

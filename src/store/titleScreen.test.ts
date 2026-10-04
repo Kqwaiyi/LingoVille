@@ -2,8 +2,8 @@ import 'fake-indexeddb/auto';
 import { createStore, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it, vi } from 'vitest';
 import { APPEARANCE_PRESET_IDS } from '../content/index.ts';
-import { CHARACTER_NAME, CLOCK, createSave, STARTING_STEPS, type GameState } from '../sim/index.ts';
-import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
+import { CHARACTER_NAME, CLOCK, createSave, MIC_CHECK, STARTING_STEPS, type GameState } from '../sim/index.ts';
+import type { OpenMic, OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from '../voice/index.ts';
 import {
   createDeviceSettings,
   createGameStore,
@@ -13,6 +13,9 @@ import {
   DEV_SETUP,
   SAVE_SCHEMA_VERSION,
   selectArrival,
+  selectInputMode,
+  selectListening,
+  selectMicLevel,
   selectMoneyInShifts,
   selectNativeLanguage,
   selectPersistCallout,
@@ -21,6 +24,7 @@ import {
   selectScreen,
   selectSetup,
   selectSetupCanGoOn,
+  selectSetupIsLast,
   selectTargetLanguages,
   selectTitle,
   selectToast,
@@ -36,13 +40,15 @@ import { setUpNewGame } from './testSetup.ts';
 function fakeBarista() {
   const npc = {
     events: null as VoiceSessionEvents | null,
+    options: undefined as VoiceSessionOptions | undefined,
     says(text: string) {
       npc.events!.onOutputTranscript(text);
       npc.events!.onTurnComplete();
     },
   };
-  const openVoiceSession: OpenVoiceSession = (_, events) => {
+  const openVoiceSession: OpenVoiceSession = (_, events, options) => {
     npc.events = events;
+    npc.options = options;
     return {
       connect: async () => {},
       startTalking: () => {},
@@ -55,7 +61,26 @@ function fakeBarista() {
   return { npc, openVoiceSession };
 }
 
-type Browser = Required<Pick<GameStoreDeps, 'saves' | 'journal' | 'deviceSettings' | 'storage' | 'downloadFile'>> &
+/** The browser's mic: one the test speaks into, or, if not `allowed`, one the Player refused or doesn't have. */
+function fakeMic({ allowed = true } = {}) {
+  const mic = {
+    asked: 0,
+    open: false,
+    onLevel: null as ((level: number) => void) | null,
+    /** The Player makes a sound this loud, from 0 to 1. */
+    hears: (level: number) => mic.open && mic.onLevel?.(level),
+  };
+  const openMic: OpenMic = async (onLevel) => {
+    mic.asked++;
+    if (!allowed) throw new DOMException('Permission denied', 'NotAllowedError');
+    mic.open = true;
+    mic.onLevel = onLevel;
+    return () => (mic.open = false);
+  };
+  return { mic, openMic };
+}
+
+type Browser = Required<Pick<GameStoreDeps, 'saves' | 'journal' | 'deviceSettings' | 'storage' | 'downloadFile' | 'openMic'>> &
   Partial<GameStoreDeps> & {
     rawSaves: UseStore;
     downloads: SaveFile[];
@@ -92,6 +117,7 @@ function freshBrowser({
       },
     },
     downloadFile: (file) => void downloads.push(file),
+    openMic: fakeMic().openMic,
     requestRecap: () => new Promise(() => {}),
     newRngSeed: () => DEV_SETUP.rngSeed,
   };
@@ -374,8 +400,10 @@ describe('New game setup', () => {
     store.getState().setupNext();
     steps.push(step(store));
     store.getState().setupNext();
+    steps.push(step(store));
+    store.getState().skipMicCheck();
 
-    expect(steps).toEqual(['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance']);
+    expect(steps).toEqual(['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance', 'micCheck']);
     expect(selectScreen(store.getState())).toBe('playing');
   });
 
@@ -393,6 +421,7 @@ describe('New game setup', () => {
       culturePackId: 'zh',
       startingStep: 'B2',
       appearancePresetId: 'preset-3',
+      skipFirstMorning: false,
       rngSeed: 42,
     });
     expect(store.getState().game).toEqual(game);
@@ -498,6 +527,180 @@ describe('New game setup', () => {
 
     expect(selectNativeLanguage(second.getState())).toBe('ja');
     expect(selectSetup(second.getState())).toMatchObject({ step: 'nativeLanguage', targetLanguage: null, characterName: '', startingStep: null });
+  });
+});
+
+describe('the mic check', () => {
+  /** New game, through setup's other screens to the mic check. */
+  async function atTheMicCheck(browser = freshBrowser(), deps: Partial<GameStoreDeps> = {}) {
+    const store = createGameStore(null, { ...browser, ...deps });
+    await openTitle(store);
+    store.getState().newGame();
+    store.getState().setupNext();
+    store.getState().chooseTargetLanguage('ja');
+    store.getState().setupNext();
+    store.getState().chooseStartingStep('A1');
+    store.getState().nameCharacter('Sam');
+    store.getState().setupNext();
+    store.getState().setupNext();
+    return store;
+  }
+  const setup = (store: ReturnType<typeof createGameStore>) => selectSetup(store.getState());
+  const canGoOn = (store: ReturnType<typeof createGameStore>) => selectSetupCanGoOn(store.getState());
+  const quiet = MIC_CHECK.heardLevel / 4;
+
+  it('comes after the appearance, listens, and shows how loud the Player is', async () => {
+    const { mic, openMic } = fakeMic();
+    const store = await atTheMicCheck(freshBrowser(), { openMic });
+    expect(setup(store)?.step).toBe('micCheck');
+
+    await vi.waitFor(() => expect(setup(store)?.mic).toBe('listening'));
+    mic.hears(quiet);
+
+    expect(selectMicLevel(store.getState())).toBe(quiet);
+    expect(setup(store)?.mic).toBe('listening');
+    expect(mic.asked).toBe(1);
+  });
+
+  it('passes once it hears the Player, and keeps that and the mic as the input mode in this browser’s device settings', async () => {
+    const browser = freshBrowser();
+    const { mic, openMic } = fakeMic();
+    const store = await atTheMicCheck(browser, { openMic });
+    await vi.waitFor(() => expect(mic.open).toBe(true));
+    expect(canGoOn(store)).toBe(false);
+
+    mic.hears(MIC_CHECK.heardLevel);
+
+    expect(setup(store)?.mic).toBe('heard');
+    expect(canGoOn(store)).toBe(true);
+    expect(selectSetupIsLast(store.getState())).toBe(true);
+    await vi.waitFor(async () => expect(await browser.deviceSettings.load()).toMatchObject({ micCheckPassed: true, inputMode: 'mic' }));
+    store.getState().setupNext();
+    expect(selectScreen(store.getState())).toBe('playing');
+    expect(mic.open).toBe(false);
+    expect(selectMicLevel(store.getState())).toBe(0);
+  });
+
+  it('a denied or missing mic puts this browser in the Typed Fallback, with nothing in the way of starting', async () => {
+    const browser = freshBrowser();
+    const store = await atTheMicCheck(browser, fakeMic({ allowed: false }));
+
+    await vi.waitFor(() => expect(setup(store)?.mic).toBe('unavailable'));
+
+    expect(selectInputMode(store.getState())).toBe('typed');
+    expect(canGoOn(store)).toBe(true);
+    await vi.waitFor(async () => expect(await browser.deviceSettings.load()).toMatchObject({ micCheckPassed: false, inputMode: 'typed' }));
+    store.getState().setupNext();
+    expect(selectScreen(store.getState())).toBe('playing');
+  });
+
+  it('Skip starts the game without waiting, closing the mic and leaving the device settings as they were', async () => {
+    const browser = freshBrowser();
+    const { mic, openMic } = fakeMic();
+    const store = await atTheMicCheck(browser, { openMic });
+    await vi.waitFor(() => expect(mic.open).toBe(true));
+
+    store.getState().skipMicCheck();
+
+    expect(selectScreen(store.getState())).toBe('playing');
+    expect(mic.open).toBe(false);
+    await saved(store, 1);
+    expect(await browser.deviceSettings.load()).toMatchObject({ micCheckPassed: false, inputMode: 'mic' });
+  });
+
+  it('Skip while the browser is still asking for the mic: the mic is closed as soon as it opens', async () => {
+    let grant: (close: () => void) => void = () => {};
+    let closed = false;
+    const store = await atTheMicCheck(freshBrowser(), { openMic: () => new Promise((resolve) => (grant = resolve)) });
+
+    store.getState().skipMicCheck();
+    grant(() => (closed = true));
+
+    await vi.waitFor(() => expect(closed).toBe(true));
+    expect(selectScreen(store.getState())).toBe('playing');
+  });
+
+  it('a mic refused after Skip still puts this browser in the Typed Fallback', async () => {
+    const browser = freshBrowser();
+    let refuse: (error: Error) => void = () => {};
+    const store = await atTheMicCheck(browser, { openMic: () => new Promise((_, reject) => (refuse = reject)) });
+
+    store.getState().skipMicCheck();
+    refuse(new DOMException('Permission denied', 'NotAllowedError'));
+
+    await vi.waitFor(() => expect(selectInputMode(store.getState())).toBe('typed'));
+    await vi.waitFor(async () => expect(await browser.deviceSettings.load()).toMatchObject({ inputMode: 'typed' }));
+  });
+
+  it('Back closes the mic and returns to the appearance; Next opens it again', async () => {
+    const { mic, openMic } = fakeMic();
+    const store = await atTheMicCheck(freshBrowser(), { openMic });
+    await vi.waitFor(() => expect(mic.open).toBe(true));
+    mic.hears(quiet);
+
+    store.getState().setupBack();
+
+    expect(setup(store)).toMatchObject({ step: 'appearance' });
+    expect(mic.open).toBe(false);
+    expect(selectMicLevel(store.getState())).toBe(0);
+    store.getState().setupNext();
+    await vi.waitFor(() => expect(mic.open).toBe(true));
+    expect(mic.asked).toBe(2);
+  });
+
+  it('Skip tutorial goes into the save, so the First Morning is skipped', async () => {
+    const store = await atTheMicCheck();
+    expect(setup(store)?.skipFirstMorning).toBe(false);
+
+    store.getState().chooseSkipFirstMorning(true);
+    store.getState().skipMicCheck();
+
+    expect(store.getState().game.onboarding.firstMorningSkipped).toBe(true);
+  });
+
+  it('a browser that has passed the mic check skips it on its next New game', async () => {
+    const browser = freshBrowser();
+    const first = fakeMic();
+    const firstGame = await atTheMicCheck(browser, { openMic: first.openMic });
+    await vi.waitFor(() => expect(first.mic.open).toBe(true));
+    first.mic.hears(1);
+    firstGame.getState().setupNext();
+    await saved(firstGame, 1);
+
+    const second = fakeMic();
+    const store = createGameStore(null, { ...browser, openMic: second.openMic });
+    await openTitle(store);
+    setUpNewGame(store, { characterName: 'Mika' });
+
+    expect(selectScreen(store.getState())).toBe('playing');
+    expect(store.getState().game.identity.characterName).toBe('Mika');
+    expect(second.mic.asked).toBe(0);
+  });
+
+  it('in the Typed Fallback, conversations never ask for the mic, and holding Space doesn’t listen', async () => {
+    const { npc, openVoiceSession } = fakeBarista();
+    const store = await atTheMicCheck(freshBrowser(), { ...fakeMic({ allowed: false }), openVoiceSession });
+    await vi.waitFor(() => expect(setup(store)?.mic).toBe('unavailable'));
+    store.getState().setupNext();
+    store.getState().enterPlace('cafe');
+    store.getState().setInteractable('barista');
+
+    store.getState().talk();
+    npc.says('いらっしゃいませ！');
+    store.getState().startTalking();
+
+    expect(npc.options?.typedOnly).toBe(true);
+    expect(selectListening(store.getState())).toBe(false);
+  });
+
+  it('a reload keeps the Typed Fallback', async () => {
+    const browser = freshBrowser();
+    await browser.deviceSettings.save({ ...DEFAULT_DEVICE_SETTINGS, inputMode: 'typed' });
+    const store = createGameStore(null, browser);
+
+    await openTitle(store);
+
+    expect(selectInputMode(store.getState())).toBe('typed');
   });
 });
 

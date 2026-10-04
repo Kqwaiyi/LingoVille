@@ -32,7 +32,7 @@ export async function startNewGame(page: Page, { path = '/', ...answers }: NewGa
   await goThroughSetup(page, answers);
 }
 
-/** From the Native Language screen, through the rest of setup to the First Morning. */
+/** From the Native Language screen, through the rest of setup to the First Morning, skipping the mic check if it shows. */
 export async function goThroughSetup(page: Page, { native, target = 'ja', level = 0, name = 'Sam', look = 0 }: Omit<NewGame, 'path'> = {}) {
   const choices = page.getByRole('radio');
   const nameField = page.getByRole('textbox');
@@ -51,4 +51,9 @@ export async function goThroughSetup(page: Page, { native, target = 'ja', level 
   await choices.nth(look).check();
   await page.keyboard.press('Enter');
   await expect(choices).toHaveCount(0);
+  // The mic check, unless this browser has passed it: Skip has focus, so Enter skips it.
+  const skipTutorial = page.getByRole('checkbox');
+  if (!(await skipTutorial.isVisible())) return;
+  await page.keyboard.press('Enter');
+  await expect(skipTutorial).toBeHidden();
 }

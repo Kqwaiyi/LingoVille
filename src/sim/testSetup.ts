@@ -7,5 +7,6 @@ export const TEST_SETUP: NewGameSetup = {
   culturePackId: 'ja',
   startingStep: 'A1',
   appearancePresetId: 'preset-1',
+  skipFirstMorning: false,
   rngSeed: 1,
 };

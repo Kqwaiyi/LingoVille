@@ -44,6 +44,7 @@ import {
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
+  MIC_CHECK,
   losePatience,
   newPlayerTurn,
   npcExpression,
@@ -65,8 +66,10 @@ import {
   addUsage,
   hearItSaid,
   NO_USAGE,
+  openBrowserMic,
   openVoiceSession,
   VoiceServiceUnavailableError,
+  type OpenMic,
   type OpenVoiceSession,
   type TokenUsage,
   type HearItSaid,
@@ -96,6 +99,7 @@ export const DEV_SETUP: NewGameSetup = {
   culturePackId: 'ja',
   startingStep: 'A1',
   appearancePresetId: 'preset-1',
+  skipFirstMorning: false,
   rngSeed: 20261003,
 };
 
@@ -105,9 +109,18 @@ export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 /** Which screen shows: the title, New game setup, or the game itself. */
 export type Screen = 'title' | 'setup' | 'playing';
 
-/** New game setup's screens, in order. The mic check comes after them (ticket 12c). */
-export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance'] as const;
+/** New game setup's screens, in order. A browser that has passed the mic check skips it. */
+export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance', 'micCheck'] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
+
+/** Speaking with the mic, or the Typed Fallback. A device setting. */
+export type InputMode = DeviceSettings['inputMode'];
+
+/**
+ * The mic check: waiting for the browser to open the mic, listening for the
+ * Player, heard them, or no mic to be had (refused or missing).
+ */
+export type MicCheckStatus = 'asking' | 'listening' | 'heard' | 'unavailable';
 
 /** New game setup, while it shows: the slot the new game goes into, the screen showing and the answers so far. */
 export type Setup = {
@@ -118,6 +131,10 @@ export type Setup = {
   startingStep: StartingStep | null;
   characterName: string;
   appearancePresetId: AppearancePresetId;
+  /** The mic check, while its screen shows. */
+  mic: MicCheckStatus | null;
+  /** "Skip tutorial": the game starts without the First Morning. */
+  skipFirstMorning: boolean;
 };
 
 /** A slot on the title screen: empty, a save to play, or a save that can't be loaded at all. */
@@ -278,6 +295,8 @@ export type GameStoreDeps = {
   downloadFile: (file: SaveFile) => void;
   /** The RNG seed for a new game. */
   newRngSeed: () => number;
+  /** Opens the mic for the mic check. */
+  openMic: OpenMic;
 };
 
 /** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
@@ -353,6 +372,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   storage: browserStorage,
   downloadFile: downloadInBrowser,
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
+  openMic: openBrowserMic,
 };
 
 export type GameStore = {
@@ -371,12 +391,16 @@ export type GameStore = {
   nativeLanguage: LanguageCode;
   /** Whether readings show over zh and ja lines, and romaji under ja ones. A device setting. */
   readingAids: ReadingAidsSettings;
+  /** Speaking with the mic, or the Typed Fallback. A device setting. */
+  inputMode: InputMode;
+  /** This browser has heard the Player in a mic check, so New game skips it. A device setting. */
+  micCheckPassed: boolean;
   tabHidden: boolean;
   interactable: Interactable | null;
   conversation: Conversation | null;
   /** The typed field has focus, so keys type into it instead of moving or acting. */
   typing: boolean;
-  /** How loud the Player is while push-to-talk is held, from 0 to 1. */
+  /** How loud the Player is while push-to-talk is held, or on the mic check, from 0 to 1. */
   micLevel: number;
   toast: Toast | null;
   /** No token could be minted for a conversation, so the "Voice service unavailable" screen shows. */
@@ -404,10 +428,14 @@ export type GameStore = {
   /** Names the Character, cut to the longest a name may be. */
   nameCharacter: (characterName: string) => void;
   chooseAppearance: (appearancePresetId: AppearancePresetId) => void;
+  /** "Skip tutorial", on the last setup screen: whether the game starts without the First Morning. */
+  chooseSkipFirstMorning: (skip: boolean) => void;
   /** On to the next setup screen once this one is answered; after the last, the First Morning in its slot. */
   setupNext: () => void;
   /** Back to the setup screen before, keeping the answers; from the first, to the title screen. */
   setupBack: () => void;
+  /** Skip on the mic check: starts the game without waiting for the mic, and leaves the input mode as it was. */
+  skipMicCheck: () => void;
   /** Downloads the slot as one file: its save, its Journal and its backups' metadata. */
   exportSave: (slotId: SlotId) => void;
   /** Downloads everything stored for a slot, as found, for a save that can't be loaded. */
@@ -591,6 +619,72 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const answerSetup = (answers: Partial<Setup>) => {
       const setup = get().setup;
       if (get().screen === 'setup' && setup) set({ setup: { ...setup, ...answers } });
+    };
+
+    // The mic check's mic, while its screen shows. Each check is its own run, so a late answer from one already left is ignored.
+    let micCheckRun = 0;
+    let closeMicCheck: (() => void) | null = null;
+    const onMicCheck = (run: number) => run === micCheckRun && get().setup?.step === 'micCheck';
+
+    const setInputMode = (inputMode: InputMode, micCheckPassed = get().micCheckPassed) => {
+      set({ inputMode, micCheckPassed });
+      updateDeviceSettings((settings) => ({ ...settings, inputMode, micCheckPassed }));
+    };
+
+    const startMicCheck = () => {
+      const run = ++micCheckRun;
+      deps
+        .openMic((level) => {
+          if (!onMicCheck(run)) return;
+          set({ micLevel: level });
+          if (level < MIC_CHECK.heardLevel || get().setup?.mic === 'heard') return;
+          answerSetup({ mic: 'heard' });
+          setInputMode('mic', true);
+        })
+        .then(
+          (close) => {
+            if (!onMicCheck(run)) return close();
+            closeMicCheck = close;
+            if (get().setup?.mic === 'asking') answerSetup({ mic: 'listening' });
+          },
+          (error: unknown) => {
+            console.warn('[mic] none to be had, so the Typed Fallback:', error instanceof Error ? error.message : error);
+            // Refused after Skip is still refused.
+            setInputMode('typed');
+            if (onMicCheck(run)) answerSetup({ mic: 'unavailable' });
+          },
+        );
+    };
+
+    const stopMicCheck = () => {
+      micCheckRun++;
+      closeMicCheck?.();
+      closeMicCheck = null;
+      set({ micLevel: 0 });
+    };
+
+    /** Setup is over: the First Morning starts in its slot, saved at once. */
+    const startNewGame = (setup: Setup) => {
+      stopMicCheck();
+      const { targetLanguage, startingStep, characterName, appearancePresetId, skipFirstMorning } = setup;
+      set({ setup: null });
+      // The pre-selected language counts as chosen too, so it no longer follows the browser's.
+      const nativeLanguage = get().nativeLanguage;
+      updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
+      play(
+        createSave({
+          characterName: characterName.trim(),
+          targetLanguage: targetLanguage!,
+          culturePackId: targetLanguage!,
+          startingStep: startingStep!,
+          appearancePresetId,
+          skipFirstMorning,
+          rngSeed: deps.newRngSeed(),
+        }),
+        setup.slotId,
+        'newGame',
+      );
+      save();
     };
 
     const readyTitle = () => {
@@ -927,7 +1021,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           onUsage: live((current, turn: TokenUsage) => set({ conversation: { ...current, usage: addUsage(current.usage, turn) } })),
           onDisconnect: live((current) => connectionFailed(current, npcSession)),
         },
-        { resumeFrom },
+        { resumeFrom, typedOnly: get().inputMode === 'typed' },
       );
       voice = session;
       session.connect().then(
@@ -972,6 +1066,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       voiceUnavailable: false,
       nativeLanguage: DEV_NATIVE_LANGUAGE,
       readingAids: { show: DEFAULT_DEVICE_SETTINGS.readingAids, romaji: DEFAULT_DEVICE_SETTINGS.showRomaji },
+      inputMode: DEFAULT_DEVICE_SETTINGS.inputMode,
+      micCheckPassed: DEFAULT_DEVICE_SETTINGS.micCheckPassed,
       journal: null,
       persistCallout: false,
       sign: null,
@@ -981,7 +1077,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         settingsWrites
           .then(() => deps.deviceSettings.load())
           .then(
-            ({ nativeLanguage, readingAids, showRomaji }) => set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji } }),
+            ({ nativeLanguage, readingAids, showRomaji, inputMode, micCheckPassed }) =>
+              set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed }),
             (error: unknown) => console.warn('[settings] could not be read:', error),
           )
           .then(() => checkSlots());
@@ -1008,6 +1105,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             startingStep: null,
             characterName: '',
             appearancePresetId: APPEARANCE_PRESET_IDS[0],
+            mic: null,
+            skipFirstMorning: false,
           },
         });
       },
@@ -1023,36 +1122,26 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       chooseStartingStep: (startingStep) => answerSetup({ startingStep }),
       nameCharacter: (characterName) => answerSetup({ characterName: [...characterName.trimStart()].slice(0, CHARACTER_NAME.maxLength).join('') }),
       chooseAppearance: (appearancePresetId) => answerSetup({ appearancePresetId }),
+      chooseSkipFirstMorning: (skipFirstMorning) => answerSetup({ skipFirstMorning }),
       setupNext: () => {
-        const { setup, nativeLanguage } = get();
+        const { setup, nativeLanguage, micCheckPassed } = get();
         if (get().screen !== 'setup' || !setup || !setupAnswered(setup, nativeLanguage)) return;
-        const next = SETUP_STEPS[SETUP_STEPS.indexOf(setup.step) + 1];
-        if (next) return set({ setup: { ...setup, step: next } });
-
-        const { targetLanguage, startingStep, characterName, appearancePresetId } = setup;
-        set({ setup: null });
-        // The pre-selected language counts as chosen too, so it no longer follows the browser's.
-        updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
-        play(
-          createSave({
-            characterName: characterName.trim(),
-            targetLanguage: targetLanguage!,
-            culturePackId: targetLanguage!,
-            startingStep: startingStep!,
-            appearancePresetId,
-            rngSeed: deps.newRngSeed(),
-          }),
-          setup.slotId,
-          'newGame',
-        );
-        save();
+        const next = nextSetupStep(setup.step, micCheckPassed);
+        if (!next) return startNewGame(setup);
+        set({ setup: { ...setup, step: next, mic: next === 'micCheck' ? 'asking' : null } });
+        if (next === 'micCheck') startMicCheck();
       },
       setupBack: () => {
         const setup = get().setup;
         if (get().screen !== 'setup' || !setup) return;
+        if (setup.step === 'micCheck') stopMicCheck();
         const before = SETUP_STEPS[SETUP_STEPS.indexOf(setup.step) - 1];
-        if (before) return set({ setup: { ...setup, step: before } });
+        if (before) return set({ setup: { ...setup, step: before, mic: null } });
         set({ screen: 'title', setup: null, title: { status: 'checking' } });
+      },
+      skipMicCheck: () => {
+        const setup = get().setup;
+        if (get().screen === 'setup' && setup?.step === 'micCheck') startNewGame(setup);
       },
       exportSave: (slotId) => void download(() => exportSave(stores, slotId)),
       exportRawSave: (slotId) => void download(() => exportRawSave(stores, slotId)),
@@ -1200,7 +1289,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       startTalking: () => {
         const conversation = get().conversation;
-        if (!canTakeTurn(conversation) || !voice || conversation.listening) return;
+        if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed') return;
         voice.startTalking();
         // A new turn: anything the NPC says next starts a new line, and so does what it hears.
         set({
@@ -1307,6 +1396,12 @@ export function useGame<T>(selector: (state: GameStore) => T): T {
 
 export const selectScreen = (s: GameStore) => s.screen;
 
+/** The setup screen after this one, if any. A browser that has passed the mic check skips it. */
+function nextSetupStep(step: SetupStep, micCheckPassed: boolean): SetupStep | undefined {
+  const next = SETUP_STEPS[SETUP_STEPS.indexOf(step) + 1];
+  return next === 'micCheck' && micCheckPassed ? undefined : next;
+}
+
 /** Whether the setup screen showing has what it needs to go on. */
 function setupAnswered(setup: Setup, nativeLanguage: LanguageCode) {
   switch (setup.step) {
@@ -1317,12 +1412,18 @@ function setupAnswered(setup: Setup, nativeLanguage: LanguageCode) {
       return setup.targetLanguage !== null && setup.targetLanguage !== nativeLanguage;
     case 'aboutYou':
       return setup.startingStep !== null && setup.characterName.trim() !== '';
+    // Start waits for the check to hear the Player or find no mic; Skip doesn't.
+    case 'micCheck':
+      return setup.mic === 'heard' || setup.mic === 'unavailable';
   }
 }
 
 /** New game setup, while it shows: its screen and the answers so far. */
 export const selectSetup = (s: GameStore) => s.setup;
 export const selectSetupCanGoOn = (s: GameStore) => s.setup !== null && setupAnswered(s.setup, s.nativeLanguage);
+/** Whether the setup screen showing is the last, so going on starts the game. */
+export const selectSetupIsLast = (s: GameStore) => s.setup !== null && !nextSetupStep(s.setup.step, s.micCheckPassed);
+export const selectInputMode = (s: GameStore) => s.inputMode;
 const TARGET_LANGUAGES = Object.fromEntries(
   LANGUAGE_CODES.map((native) => [native, LANGUAGE_CODES.filter((language) => language !== native)]),
 ) as Record<LanguageCode, LanguageCode[]>;

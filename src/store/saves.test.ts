@@ -45,7 +45,7 @@ function lived(): GameState {
       shift: { jobId: 'barista', customersServed: 2, payInShifts: 0.3 },
     },
     phrasebook: [{ text: 'ラテ', reading: 'らて', gloss: 'latte', glossLanguage: 'en', dayAdded: 1 }],
-    onboarding: { firstMorningStepsDone: 2 },
+    onboarding: { firstMorningStepsDone: 2, firstMorningSkipped: false },
     people: {
       barista: {
         familiarity: 4,
@@ -67,9 +67,15 @@ const later = (game: GameState): GameState => ({ ...game, clock: { ...game.clock
 /** The same game, just after midnight. */
 const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.clock.day + 1, minuteOfDay: 0 } });
 
+/** The game before the First Morning could be skipped: version 2. */
+function beforeSkippingFirstMornings() {
+  const game = lived();
+  return { ...game, onboarding: { firstMorningStepsDone: game.onboarding.firstMorningStepsDone } };
+}
+
 /** The game before saves had phrasebooks: version 1. */
 function beforePhrasebooks() {
-  const game: Partial<GameState> = lived();
+  const game: Partial<ReturnType<typeof beforeSkippingFirstMornings>> = beforeSkippingFirstMornings();
   delete game.phrasebook;
   return game;
 }
@@ -152,6 +158,13 @@ describe('saves', () => {
     expect(await get('slot-1/pre-migration-v1', raw)).toEqual(v1);
     // The upgraded save is stored, so the next load needs no migration.
     expect(await get('slot-1', raw)).toMatchObject({ schemaVersion: SAVE_SCHEMA_VERSION });
+  });
+
+  it('upgrades a save from before the First Morning could be skipped as one that wasn’t skipped', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 2, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeSkippingFirstMornings() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {

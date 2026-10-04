@@ -137,13 +137,15 @@ export function openLiveSession(
         const liveAudio = deps.createAudio();
         audio = liveAudio;
         // Without a mic the Typed Fallback still works, so a refusal doesn't stop the conversation.
-        liveAudio
-          .startMic((pcm, level) => {
-            if (!listening) return;
-            events.onMicLevel(level);
-            send({ realtimeInput: { audio: { data: pcm, mimeType: MIC_MIME_TYPE } } });
-          })
-          .catch((error) => console.warn('[voice] no mic; only the typed reply works:', error));
+        if (!options.typedOnly) {
+          liveAudio
+            .startMic((pcm, level) => {
+              if (!listening) return;
+              events.onMicLevel(level);
+              send({ realtimeInput: { audio: { data: pcm, mimeType: MIC_MIME_TYPE } } });
+            })
+            .catch((error) => console.warn('[voice] no mic; only the typed reply works:', error));
+        }
 
         const timeout = setTimeout(() => fail(new Error('Live setup timed out')), SETUP_TIMEOUT_MS);
         const settle = () => {
