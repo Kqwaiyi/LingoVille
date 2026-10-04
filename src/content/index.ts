@@ -16,5 +16,6 @@ export {
 export { interactionFacts } from './facts.ts';
 export { INTERACTIONS } from './interactions.ts';
 export { NAMED_NPCS, type NamedNpc, type NamedNpcId } from './npcs.ts';
+export { PLACE_PHRASEBOOKS, placePhrasebook, placePhrasebookSchema, type PlacePhrase } from './phrasebooks.ts';
 export { PLACE_HOURS, type OpeningHours } from './places.ts';
 export { toGeminiSchema, toToolDeclaration, type FunctionDeclaration, type ToolSchema } from './toolDeclaration.ts';

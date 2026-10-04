@@ -1,0 +1,161 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildAnnotateRequest > asks for a de translation of a zh NPC line 1`] = `
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "一杯热拿铁，二十八块。对吗？",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "properties": {
+        "translation": {
+          "description": "The line, translated into the Native Language.",
+          "type": "STRING",
+        },
+      },
+      "required": [
+        "translation",
+      ],
+      "type": "OBJECT",
+    },
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "WHAT TO DO
+The text is one line said by a member of staff in a small town, in Mandarin Chinese, to a learner who speaks German.
+- translation: what the line means, in natural German. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
+Write only in German. Never add notes or explanations.",
+      },
+    ],
+  },
+}
+`;
+
+exports[`buildAnnotateRequest > asks for a en translation of a ja NPC line 1`] = `
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "ホットラテですね。450円です。よろしいですか？",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "properties": {
+        "translation": {
+          "description": "The line, translated into the Native Language.",
+          "type": "STRING",
+        },
+      },
+      "required": [
+        "translation",
+      ],
+      "type": "OBJECT",
+    },
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "WHAT TO DO
+The text is one line said by a member of staff in a small town, in Japanese, to a learner who speaks British English.
+- translation: what the line means, in natural British English. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
+Write only in British English. Never add notes or explanations.",
+      },
+    ],
+  },
+}
+`;
+
+exports[`buildAnnotateRequest > asks for a ja translation of a en NPC line 1`] = `
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "One hot latte, that's £3.40. Is that right?",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "properties": {
+        "translation": {
+          "description": "The line, translated into the Native Language.",
+          "type": "STRING",
+        },
+      },
+      "required": [
+        "translation",
+      ],
+      "type": "OBJECT",
+    },
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "WHAT TO DO
+The text is one line said by a member of staff in a small town, in British English, to a learner who speaks Japanese.
+- translation: what the line means, in natural Japanese. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
+Write only in Japanese. Never add notes or explanations.",
+      },
+    ],
+  },
+}
+`;
+
+exports[`buildAnnotateRequest > asks for a zh translation of a de NPC line 1`] = `
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Einmal Latte macchiato für 3,40 €, richtig?",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "properties": {
+        "translation": {
+          "description": "The line, translated into the Native Language.",
+          "type": "STRING",
+        },
+      },
+      "required": [
+        "translation",
+      ],
+      "type": "OBJECT",
+    },
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "WHAT TO DO
+The text is one line said by a member of staff in a small town, in German, to a learner who speaks Mandarin Chinese.
+- translation: what the line means, in natural Mandarin Chinese. Keep its tone (polite or casual), its numbers and its prices, and translate the meaning rather than word by word.
+Write only in Mandarin Chinese. Never add notes or explanations.",
+      },
+    ],
+  },
+}
+`;

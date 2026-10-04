@@ -119,6 +119,14 @@ export const PROFICIENCY = {
   startingScore: { A1: 0.5, A2: 1.5, B1: 2.5, B2: 3.5, C1: 4.5, C2: 5.5 } satisfies Record<ProficiencyStep, number>,
 } as const;
 
+/** How Help discounts a conversation as Proficiency evidence (default). Help only ever reduces weight. */
+export const HELP_EVIDENCE = {
+  /** A player turn that closely repeats a hint or phrase shown just before it counts this much. */
+  copiedTurnWeight: 0.1,
+  /** How alike a turn and a hint must be (Dice similarity of letter pairs, 0–1) to count as a close repeat. */
+  closeRepeatSimilarity: 0.6,
+} as const;
+
 // --- Mood (default: open question 4) ----------------------------------------
 
 export const MOOD = {

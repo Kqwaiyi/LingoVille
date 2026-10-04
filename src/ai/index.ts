@@ -25,3 +25,12 @@ export {
   type RecapRequest,
   type RecapRequestBody,
 } from './recap.ts';
+export {
+  AnnotateRequestSchema,
+  AnnotationSchema,
+  buildAnnotateRequest,
+  type Annotation,
+  type AnnotateRequest,
+} from './annotate.ts';
+export { buildHintRequest, HintRequestSchema, HintsSchema, type Hint, type HintRequest, type Hints } from './hint.ts';
+export type { GenerateContentBody } from './common.ts';

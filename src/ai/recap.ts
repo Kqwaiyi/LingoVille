@@ -1,28 +1,23 @@
 import { z } from 'zod';
+import { CULTURE_PACKS, NAMED_NPCS, toGeminiSchema, type CulturePack, type NamedNpcId } from '../content/index.ts';
 import {
-  CULTURE_PACKS,
-  INTERACTIONS,
-  NAMED_NPCS,
-  toGeminiSchema,
-  type CulturePack,
-  type NamedNpcId,
-  type ToolSchema,
-} from '../content/index.ts';
-import type { LanguageCode, ProficiencyStep } from '../sim/index.ts';
+  block,
+  InteractionIdSchema,
+  interactionById,
+  LanguageSchema,
+  StepSchema,
+  transcriptLines,
+  TranscriptLineSchema,
+  type GenerateContentBody,
+  type TranscriptLine,
+} from './common.ts';
 
-const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const satisfies readonly LanguageCode[];
-const STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const satisfies readonly ProficiencyStep[];
-const INTERACTION_IDS = Object.values(INTERACTIONS).map((interaction) => interaction.id) as [string, ...string[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
 
-/** One line of a conversation as the Recap reads it. A player line is what the NPC heard, unless it was typed. */
-const RecapLineSchema = z.object({
-  speaker: z.enum(['npc', 'player']),
-  text: z.string(),
-  typed: z.boolean().optional(),
-});
+/** One line of a conversation as the Recap reads it. */
+const RecapLineSchema = TranscriptLineSchema;
 
-/** Help the Player used, placed after the transcript line it followed. Filled in by the Help tab (ticket 09). */
+/** Help the Player used, placed after the transcript line it followed: `afterLine` is how many lines there were. */
 const HelpLogEntrySchema = z.object({
   afterLine: z.int().min(0),
   kind: z.enum(['hint', 'phrasebook', 'translate']),
@@ -30,16 +25,16 @@ const HelpLogEntrySchema = z.object({
 });
 
 const RecapConversationSchema = z.object({
-  interactionId: z.enum(INTERACTION_IDS),
+  interactionId: InteractionIdSchema,
   outcome: z.enum(['success', 'failure']),
   transcript: z.array(RecapLineSchema),
   helpLog: z.array(HelpLogEntrySchema),
 });
 
 const shared = {
-  culturePackId: z.enum(LANGUAGES),
-  step: z.enum(STEPS),
-  nativeLanguage: z.enum(LANGUAGES),
+  culturePackId: LanguageSchema,
+  step: StepSchema,
+  nativeLanguage: LanguageSchema,
 };
 
 /** What `/api/recap` takes. The gateway validates requests with it, and builds the prompt from them. */
@@ -55,7 +50,7 @@ export const RecapRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('shift'), ...shared, customers: z.array(RecapConversationSchema).min(1) }),
 ]);
 
-export type RecapLine = z.infer<typeof RecapLineSchema>;
+export type RecapLine = TranscriptLine;
 export type HelpLogEntry = z.infer<typeof HelpLogEntrySchema>;
 export type RecapConversation = z.infer<typeof RecapConversationSchema>;
 export type RecapRequest = z.infer<typeof RecapRequestSchema>;
@@ -88,7 +83,7 @@ function recapSchema(limits: { corrections: number; newWords: number }) {
         }),
       )
       .max(limits.newWords),
-    cefrEstimate: z.enum(STEPS).describe("The CEFR level this conversation's evidence suggests."),
+    cefrEstimate: StepSchema.describe("The CEFR level this conversation's evidence suggests."),
     lastTopic: z.string().optional().describe('What the conversation was about, in a few words of English.'),
   });
 }
@@ -103,17 +98,9 @@ export function recapSchemaFor(kind: RecapRequest['kind']) {
 }
 
 /** A Gemini `generateContent` body with a `responseSchema`. */
-export type RecapRequestBody = {
-  systemInstruction: { parts: { text: string }[] };
-  contents: { role: 'user'; parts: { text: string }[] }[];
-  generationConfig: { responseMimeType: 'application/json'; responseSchema: ToolSchema };
-};
+export type RecapRequestBody = GenerateContentBody;
 
 const OUTCOMES = { success: 'succeeded', failure: 'failed' } as const;
-
-function block(heading: string, lines: string[]) {
-  return `${heading}\n${lines.join('\n')}`;
-}
 
 const HELP_KINDS: Record<HelpLogEntry['kind'], string> = {
   hint: 'hint shown',
@@ -121,21 +108,13 @@ const HELP_KINDS: Record<HelpLogEntry['kind'], string> = {
   translate: 'translated NPC line',
 };
 
-function transcriptLines(transcript: RecapLine[]) {
-  const speaker = (line: RecapLine) => {
-    if (line.speaker === 'npc') return 'NPC';
-    return line.typed ? 'PLAYER (typed)' : 'PLAYER (heard as, may be misheard)';
-  };
-  return transcript.map((line, i) => `${i + 1}. ${speaker(line)}: ${line.text}`);
-}
-
 function helpLines(helpLog: HelpLogEntry[]) {
   if (helpLog.length === 0) return ['Help used: none.'];
   return ['Help used:', ...helpLog.map(({ afterLine, kind, text }) => `- after line ${afterLine}: ${HELP_KINDS[kind]}: ${text}`)];
 }
 
 function conversationBlock(heading: string, conversation: RecapConversation, pack: CulturePack) {
-  const interaction = Object.values(INTERACTIONS).find((i) => i.id === conversation.interactionId)!;
+  const interaction = interactionById(conversation.interactionId);
   const { role } = NAMED_NPCS[interaction.npcId];
   return block(heading, [
     `With the ${role} at ${pack.cafe.name}. The ${role}'s goal: ${interaction.goal} Outcome: ${OUTCOMES[conversation.outcome]}.`,

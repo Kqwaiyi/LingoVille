@@ -264,6 +264,110 @@ body,
   opacity: 0.75;
 }
 
+.chat-tabs [role='tab'] kbd {
+  margin-left: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+
+.chat-tabs [role='tab']:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Translate shows the Native Language line under the NPC's. */
+.bubble-translation {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--rule);
+  font-size: 14px;
+  color: #4a5266;
+}
+
+.bubble-actions {
+  display: flex;
+  gap: 4px;
+  margin: 4px -6px -4px;
+}
+
+.bubble-actions button {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: #7b8496;
+  cursor: pointer;
+}
+
+.bubble-actions button:hover {
+  background: #f4ede0;
+  color: var(--ink);
+}
+
+/* --- Help -------------------------------------------------------------------- */
+
+.help {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+
+.help-waits {
+  position: sticky;
+  top: 0;
+  margin: 0 -16px 4px;
+  padding: 8px 16px;
+  background: #fff3e6;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: #8a5a2b;
+}
+
+.help-section h4 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7b8496;
+}
+
+.help-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.help-phrase {
+  margin: 0;
+  font-size: 17px;
+}
+
+.help-phrase ruby rt {
+  font-size: 10px;
+  color: #7b8496;
+}
+
+.help-gloss,
+.help-note {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: #4a5266;
+}
+
+.help-note {
+  color: #7b8496;
+}
+
 .chat-input {
   display: flex;
   align-items: center;
@@ -557,6 +661,23 @@ body,
   cursor: pointer;
 }
 
+.journal-keep {
+  padding: 0 8px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.journal-kept {
+  font-size: 12px;
+  color: #3f8f5b;
+}
+
 /* The full-screen Journal: the entry list on the left, the selected entry on the right. */
 .journal {
   position: absolute;
@@ -578,6 +699,60 @@ body,
 .journal-header h2 {
   margin: 0;
   font-size: 20px;
+}
+
+.journal-views {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 24px;
+}
+
+.journal-views button {
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  color: #7b8496;
+  cursor: pointer;
+}
+
+.journal-views [aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.journal-phrasebook {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.journal-phrasebook ul {
+  max-width: 640px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-phrasebook li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.journal-phrase {
+  font-size: 18px;
+}
+
+.journal-added {
+  margin-left: auto;
+  font-size: 12px;
+  color: #7b8496;
 }
 
 .journal-close {

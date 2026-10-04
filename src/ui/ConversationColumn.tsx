@@ -7,11 +7,14 @@ import {
   selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectHelpOpen,
   selectListening,
   selectMicLevel,
+  selectNativeLanguage,
   selectNpcExpression,
   selectReconnecting,
   selectRecap,
+  selectTranslation,
   selectTyping,
   useGame,
   type ChatLine,
@@ -19,12 +22,49 @@ import {
   type RecapView,
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
+import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
 
 // English until the i18n module lands (ticket 12).
 
-function Bubble({ line }: { line: ChatLine }) {
-  if (line.speaker === 'npc') return <div className="bubble bubble-npc">{line.text}</div>;
+/** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
+function NpcLineHelp({ index, text }: { index: number; text: string }) {
+  const translation = useGame(selectTranslation(index));
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const translateLine = useGame((s) => s.translateLine);
+  const hearItSaid = useGame((s) => s.hearItSaid);
+  return (
+    <>
+      {translation?.status === 'ready' && (
+        <p className="bubble-translation" lang={nativeLanguage}>
+          {translation.text}
+        </p>
+      )}
+      {translation?.status === 'loading' && <p className="bubble-translation">Translating…</p>}
+      <div className="bubble-actions">
+        {translation?.status !== 'ready' && translation?.status !== 'loading' && (
+          <button type="button" onClick={() => translateLine(index)}>
+            {translation?.status === 'failed' ? 'Couldn’t translate. Try again' : 'Translate'}
+          </button>
+        )}
+        <button type="button" aria-label={`Replay “${text}”`} onClick={() => hearItSaid(text)}>
+          🔊 Replay
+        </button>
+      </div>
+    </>
+  );
+}
+
+function Bubble({ line, index, finished }: { line: ChatLine; index: number; finished: boolean }) {
+  const packId = useGame(selectCulturePackId);
+  if (line.speaker === 'npc') {
+    return (
+      <div className="bubble bubble-npc">
+        <span lang={packId}>{line.text}</span>
+        {finished && <NpcLineHelp index={index} text={line.text} />}
+      </div>
+    );
+  }
   return (
     <div className="bubble bubble-player">
       <small>Heard as</small>
@@ -227,7 +267,10 @@ export function ConversationColumn() {
   const closingCard = useGame(selectClosingCard);
   const reconnecting = useGame(selectReconnecting);
   const recap = useGame(selectRecap);
+  const helpOpen = useGame(selectHelpOpen);
+  const typing = useGame(selectTyping);
   const leaveConversation = useGame((s) => s.leaveConversation);
+  const toggleHelp = useGame((s) => s.toggleHelp);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
 
@@ -240,9 +283,19 @@ export function ConversationColumn() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, leaveConversation]);
 
+  // H toggles Help, unless the typed field has focus.
+  useEffect(() => {
+    if (!open || typing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'KeyH' && !e.repeat) toggleHelp();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, typing, toggleHelp]);
+
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
-  }, [lines]);
+  }, [lines, helpOpen]);
 
   if (!conversation) return null;
   const npc = NAMED_NPCS[conversation.npcId];
@@ -261,8 +314,17 @@ export function ConversationColumn() {
         </div>
         <div className="chat-tabs">
           <div role="tablist" aria-label="Conversation tabs">
-            <button type="button" role="tab" aria-selected="true">
+            <button type="button" role="tab" aria-selected={!helpOpen} onClick={() => helpOpen && toggleHelp()}>
               Chat
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={helpOpen}
+              disabled={conversation.closed}
+              onClick={() => !helpOpen && toggleHelp()}
+            >
+              Help <kbd>H</kbd>
             </button>
           </div>
           <button type="button" className="chat-leave" onClick={leaveConversation}>
@@ -274,16 +336,20 @@ export function ConversationColumn() {
         <RecapPanel recap={recap} />
       ) : (
         <>
-          <div className="chat-log" role="log" aria-label="Chat" ref={log}>
-            {lines.map((line, i) => (
-              <Bubble key={i} line={line} />
-            ))}
-            {reconnecting && (
-              <p className="chat-notice" role="status">
-                Reconnecting…
-              </p>
-            )}
-          </div>
+          {helpOpen ? (
+            <HelpPanel />
+          ) : (
+            <div className="chat-log" role="log" aria-label="Chat" ref={log}>
+              {lines.map((line, i) => (
+                <Bubble key={i} line={line} index={i} finished={i !== conversation.npcLine} />
+              ))}
+              {reconnecting && (
+                <p className="chat-notice" role="status">
+                  Reconnecting…
+                </p>
+              )}
+            </div>
+          )}
           {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <InputBar />}
         </>
       )}

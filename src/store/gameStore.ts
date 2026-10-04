@@ -4,13 +4,28 @@ import {
   buildNpcSession,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
+  type AnnotateRequest,
+  type Annotation,
+  type HelpLogEntry,
+  type Hint,
+  type HintRequest,
+  type Hints,
   type NpcSession,
   type Recap,
   type RecapRequest,
   type ToolResponse,
 } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction, type NamedNpcId } from '../content/index.ts';
 import {
+  CULTURE_PACKS,
+  INTERACTIONS,
+  NAMED_NPCS,
+  placePhrasebook,
+  type Interaction,
+  type NamedNpcId,
+  type PlacePhrase,
+} from '../content/index.ts';
+import {
+  addToPhrasebook,
   applyInteractionOutcome,
   CLOCK,
   createSave,
@@ -32,6 +47,7 @@ import {
   type NpcExpression,
   type OutcomeResult,
   type Patience,
+  type PhrasebookEntry,
   type PlaceId,
 } from '../sim/index.ts';
 import {
@@ -138,6 +154,15 @@ export type RecapView = { status: 'writing' } | { status: 'ready'; entry: Journa
 /** The full-screen Journal: its entries, newest first, or null while they load. */
 export type JournalView = { entries: JournalEntry[] | null; failed: boolean };
 
+/** Help's hints for one moment of the conversation: being written, ready, or not to be had. */
+export type HintsView = { status: 'loading' } | { status: 'ready'; hints: Hint[] } | { status: 'failed' };
+
+/** An NPC line's Native Language translation, from `/api/annotate`. */
+export type TranslationView = { status: 'loading' } | { status: 'ready'; text: string } | { status: 'failed' };
+
+/** A word from a Recap, kept with "+ Phrasebook". */
+export type NewWord = Recap['newWords'][number];
+
 /** How a Goal Interaction ended, and its effects, for the closing card. */
 export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }>;
 
@@ -173,6 +198,16 @@ export type Conversation = {
   recap: RecapView | null;
   /** See Recap was chosen: the Recap shows in the column instead of the chat. */
   showingRecap: boolean;
+  /** Which tab of the column shows. While Help shows, the conversation waits: no time passes and Patience is frozen. */
+  tab: 'chat' | 'help';
+  /** The hints for the moment Help was last opened at: `atLine` is how many lines the conversation had then. */
+  hints: { atLine: number; view: HintsView } | null;
+  /** Each finished NPC line's annotation, by line index, asked for as the line finished. */
+  annotations: Partial<Record<number, TranslationView>>;
+  /** The NPC lines the Player pressed Translate on. */
+  translated: number[];
+  /** The Help used so far, in order, placed relative to the turns. It goes to the Recap. */
+  helpLog: HelpLogEntry[];
 };
 
 export type GameStoreDeps = {
@@ -180,6 +215,10 @@ export type GameStoreDeps = {
   openVoiceSession: OpenVoiceSession;
   /** Asks the gateway for a Recap. Rejects if none can be written. */
   requestRecap: (request: RecapRequest) => Promise<Recap>;
+  /** Asks the gateway for Help's hints for this moment. Rejects if there are none to be had. */
+  requestHints: (request: HintRequest) => Promise<Hint[]>;
+  /** Asks the gateway to annotate a finished NPC line. Rejects if it can't. */
+  requestAnnotation: (request: AnnotateRequest) => Promise<Annotation>;
   journal: Journal;
   saves: Saves;
   deviceSettings: DeviceSettingsStore;
@@ -239,19 +278,22 @@ export function nameToDelete(card: Exclude<SlotCard, { status: 'empty' }>) {
   return card.characterName ?? 'delete';
 }
 
-async function requestRecapFromGateway(request: RecapRequest): Promise<Recap> {
-  const res = await fetch('/api/recap', {
+/** POSTs a request to one of the gateway's prompted endpoints, and returns its answer. */
+async function askGateway<Answer>(path: string, request: unknown): Promise<Answer> {
+  const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   });
-  if (!res.ok) throw new Error(`No Recap: the gateway answered ${res.status}`);
-  return (await res.json()) as Recap;
+  if (!res.ok) throw new Error(`${path}: the gateway answered ${res.status}`);
+  return (await res.json()) as Answer;
 }
 
 const BROWSER_DEPS: GameStoreDeps = {
   openVoiceSession,
-  requestRecap: requestRecapFromGateway,
+  requestRecap: (request) => askGateway<Recap>('/api/recap', request),
+  requestHints: async (request) => (await askGateway<Hints>('/api/hint', request)).hints,
+  requestAnnotation: (request) => askGateway<Annotation>('/api/annotate', request),
   journal: browserJournal,
   saves: browserSaves,
   deviceSettings: browserDeviceSettings,
@@ -332,6 +374,12 @@ export type GameStore = {
   closeRecap: () => void;
   /** 🔊: says a phrase aloud in the Target Language. */
   hearItSaid: (text: string) => void;
+  /** H or the Help tab: opens Help, where the conversation waits, or goes back to the chat. */
+  toggleHelp: () => void;
+  /** Translate under a finished NPC line: shows its Native Language translation. */
+  translateLine: (line: number) => void;
+  /** "+ Phrasebook" on a Recap's new word: keeps it in the personal phrasebook. */
+  addToPhrasebook: (word: NewWord, glossLanguage: LanguageCode) => void;
   /** J: opens the full-screen Journal, outside conversations. */
   openJournal: () => void;
   closeJournal: () => void;
@@ -489,7 +537,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         culturePackId,
         step: game.proficiencyStep,
         nativeLanguage,
-        conversation: { interactionId: conversation.interaction.id, outcome: outcome.kind, transcript, helpLog: [] },
+        conversation: { interactionId: conversation.interaction.id, outcome: outcome.kind, transcript, helpLog: conversation.helpLog },
       };
       const entry = (recap: Recap | null): NewJournalEntry => ({
         kind: 'goal',
@@ -504,7 +552,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         outcome: outcome.kind,
         recap: recap && { outcome: recap.outcome, corrections: recap.corrections, newWords: recap.newWords },
         lines: transcript,
-        helpLog: [],
+        helpLog: conversation.helpLog,
       });
 
       updateConversation({ recap: { status: 'writing' } });
@@ -530,7 +578,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * the interaction. Returns whether the NPC is now out of Patience.
      */
     const notUnderstood = (conversation: Conversation) => {
-      if (conversation.outcome) return isOutOfPatience(conversation.patience);
+      // Patience is frozen while Help is open.
+      if (conversation.outcome || conversation.tab === 'help') return isOutOfPatience(conversation.patience);
       const patience = losePatience(conversation.patience);
       updateConversation({ patience });
       if (!isOutOfPatience(patience)) return false;
@@ -555,6 +604,72 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         default:
           throw new Error(`A completion can't end as ${result.kind}`);
       }
+    };
+
+    /** Adds Help to the log, placed after the lines so far. Help already logged at this moment isn't logged twice. */
+    const logHelp = (conversation: Conversation, kind: HelpLogEntry['kind'], texts: string[]): Conversation => {
+      const afterLine = conversation.lines.length;
+      const logged = (text: string) =>
+        conversation.helpLog.some((entry) => entry.afterLine === afterLine && entry.kind === kind && entry.text === text);
+      const fresh = [...new Set(texts)].filter((text) => !logged(text));
+      if (fresh.length === 0) return conversation;
+      return { ...conversation, helpLog: [...conversation.helpLog, ...fresh.map((text) => ({ afterLine, kind, text }))] };
+    };
+
+    /** The hints are Help used once they show in the open Help tab. */
+    const logShownHints = (conversation: Conversation): Conversation => {
+      const { hints } = conversation;
+      if (conversation.tab !== 'help' || hints?.view.status !== 'ready') return conversation;
+      return logHelp(
+        conversation,
+        'hint',
+        hints.view.hints.map((hint) => hint.text),
+      );
+    };
+
+    /** Asks for hints for this moment. They land only if the conversation hasn't moved on since. */
+    const askForHints = (conversation: Conversation): Conversation => {
+      const { game, nativeLanguage } = get();
+      const atLine = conversation.lines.length;
+      const landed = (view: HintsView) => {
+        const current = get().conversation;
+        if (current?.id !== conversation.id || current.hints?.atLine !== atLine) return;
+        set({ conversation: logShownHints({ ...current, hints: { atLine, view } }) });
+      };
+      deps
+        .requestHints({
+          culturePackId: game.identity.culturePackId,
+          step: game.proficiencyStep,
+          nativeLanguage,
+          interactionId: conversation.interaction.id,
+          transcript: conversation.lines.map(({ speaker, text, typed }) => (typed ? { speaker, text, typed } : { speaker, text })),
+        })
+        .then(
+          (hints) => landed({ status: 'ready', hints }),
+          (error: unknown) => {
+            console.warn('[help] no hints:', error instanceof Error ? error.message : error);
+            landed({ status: 'failed' });
+          },
+        );
+      return { ...conversation, hints: { atLine, view: { status: 'loading' } } };
+    };
+
+    /** Asks for a finished NPC line's annotation, so Translate is instant. */
+    const annotate = (conversationId: number, line: number, text: string) => {
+      if (text.trim() === '') return;
+      const { game, nativeLanguage } = get();
+      const landed = (view: TranslationView) => {
+        const current = get().conversation;
+        if (current?.id === conversationId) set({ conversation: { ...current, annotations: { ...current.annotations, [line]: view } } });
+      };
+      landed({ status: 'loading' });
+      deps.requestAnnotation({ targetLanguage: game.identity.targetLanguage, nativeLanguage, line: text }).then(
+        ({ translation }) => landed({ status: 'ready', text: translation }),
+        (error: unknown) => {
+          console.warn('[annotate] no translation:', error instanceof Error ? error.message : error);
+          landed({ status: 'failed' });
+        },
+      );
     };
 
     const closeSession = () => {
@@ -620,9 +735,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             set({ conversation: { ...current, lines, heardLine: index } });
           }),
           onTurnComplete: live((current) => {
+            const finished = current.npcLine;
             // Once the outcome is decided, the turn that just ended was the goodbye.
             if (current.outcome) showClosingCard();
             else set({ conversation: { ...current, npcLine: null } });
+            if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
           onMicLevel: live((current, level: number) => {
@@ -799,6 +916,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             closed: false,
             recap: null,
             showingRecap: false,
+            tab: 'chat',
+            hints: null,
+            annotations: {},
+            translated: [],
+            helpLog: [],
           },
         });
         openSession(npcSession);
@@ -809,6 +931,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!canTakeTurn(conversation) || !voice || line === '') return;
         const turn: Conversation = {
           ...conversation,
+          // Taking a turn ends the wait.
+          tab: 'chat',
           lines: [...conversation.lines, { speaker: 'player', text: line, typed: true }],
           npcLine: null,
           heardLine: null,
@@ -830,6 +954,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({
           conversation: {
             ...conversation,
+            tab: 'chat',
             listening: true,
             npcLine: null,
             heardLine: null,
@@ -861,6 +986,37 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         deps
           .hearItSaid(text, get().game.identity.targetLanguage)
           .catch((error: unknown) => console.warn('[hear-it-said]', error instanceof Error ? error.message : error));
+      },
+      toggleHelp: () => {
+        const conversation = get().conversation;
+        if (!conversation || conversation.closed) return;
+        if (conversation.tab === 'help') return updateConversation({ tab: 'chat' });
+        const { game } = get();
+        const { hints } = conversation;
+        const fresh = hints?.atLine === conversation.lines.length && hints.view.status !== 'failed';
+        // Opening Help shows the place's phrasebook and the personal one, then this moment's hints.
+        const open = logHelp({ ...conversation, tab: 'help' }, 'phrasebook', [
+          ...placePhrasebook(game.identity.culturePackId, game.placeId).map((phrase) => phrase.text),
+          ...game.phrasebook.map((entry) => entry.text),
+        ]);
+        set({ conversation: fresh ? logShownHints(open) : askForHints(open) });
+      },
+      translateLine: (line) => {
+        const conversation = get().conversation;
+        const npcLine = conversation?.lines[line];
+        if (!conversation || npcLine?.speaker !== 'npc' || line === conversation.npcLine) return;
+        let next = conversation.translated.includes(line) ? conversation : { ...conversation, translated: [...conversation.translated, line] };
+        // The Recap was asked for as the session closed: reading back afterwards isn't Help used in the conversation.
+        if (!conversation.closed) next = logHelp(next, 'translate', [npcLine.text]);
+        if (next !== conversation) set({ conversation: next });
+        const annotation = conversation.annotations[line];
+        if (!annotation || annotation.status === 'failed') annotate(conversation.id, line, npcLine.text);
+      },
+      addToPhrasebook: (word, glossLanguage) => {
+        const game = addToPhrasebook(get().game, { text: word.base, reading: word.reading, gloss: word.gloss, glossLanguage });
+        if (game === get().game) return;
+        set({ game });
+        save();
       },
       openJournal: () => {
         if (get().conversation || get().journal) return;
@@ -905,7 +1061,7 @@ export const selectTitlePlaceId = (s: GameStore): PlaceId => {
 };
 
 export const selectTimeScale = (s: GameStore) => {
-  if (s.tabHidden || s.journal) return CLOCK.timeScale.paused;
+  if (s.tabHidden || s.journal || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
   return s.conversation ? CLOCK.timeScale.conversation : CLOCK.timeScale.normal;
 };
 export const selectHealth = (s: GameStore) => s.game.character.health;
@@ -940,3 +1096,26 @@ export const selectJournal = (s: GameStore) => s.journal;
 /** The NPC's face: Patience shows only like this, never as a number. */
 export const selectNpcExpression = (s: GameStore): NpcExpression | null =>
   s.conversation ? npcExpression(s.conversation.patience) : null;
+export const selectNativeLanguage = (s: GameStore) => s.nativeLanguage;
+/** The Help tab shows, and the conversation waits. */
+export const selectHelpOpen = (s: GameStore) => s.conversation?.tab === 'help';
+/** The hints for the moment Help was opened at, while it is open. The NPC finishing a line meanwhile doesn't hide them. */
+export const selectHints = (s: GameStore): HintsView | null =>
+  s.conversation?.tab === 'help' ? (s.conversation.hints?.view ?? null) : null;
+const TRANSLATING: TranslationView = { status: 'loading' };
+/** An NPC line's translation, once the Player has pressed Translate on it. */
+export const selectTranslation =
+  (line: number) =>
+  (s: GameStore): TranslationView | null =>
+    s.conversation?.translated.includes(line) ? (s.conversation.annotations[line] ?? TRANSLATING) : null;
+const NO_PHRASES: readonly PlacePhrase[] = [];
+/** The phrasebook for the place the Character is at. */
+export const selectPlacePhrasebook = (s: GameStore): readonly PlacePhrase[] => {
+  const phrases = placePhrasebook(s.game.identity.culturePackId, s.game.placeId);
+  return phrases.length > 0 ? phrases : NO_PHRASES;
+};
+/** The personal phrasebook, oldest first. */
+export const selectPhrasebook = (s: GameStore): readonly PhrasebookEntry[] => s.game.phrasebook;
+/** A word is already kept in the personal phrasebook, glossed in this Native Language. */
+export const selectInPhrasebook = (text: string, glossLanguage: LanguageCode) => (s: GameStore) =>
+  s.game.phrasebook.some((entry) => entry.text === text && entry.glossLanguage === glossLanguage);

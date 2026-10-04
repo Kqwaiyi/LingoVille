@@ -1,6 +1,20 @@
 import http from 'node:http';
 import { z } from 'zod';
-import { buildRecapRequest, RecapRequestSchema, recapSchemaFor, type Recap } from '../src/ai/index.ts';
+import {
+  AnnotateRequestSchema,
+  AnnotationSchema,
+  buildAnnotateRequest,
+  buildHintRequest,
+  buildRecapRequest,
+  HintRequestSchema,
+  HintsSchema,
+  RecapRequestSchema,
+  recapSchemaFor,
+  type Annotation,
+  type GenerateContentBody,
+  type Hints,
+  type Recap,
+} from '../src/ai/index.ts';
 import {
   DEFAULT_GATEWAY_PORT,
   ENDPOINT_VERSIONS,
@@ -108,6 +122,8 @@ async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingM
   }
 }
 
+type Route = (env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>;
+
 /** Calls `generateContent` on a model. Throws with Gemini's answer, for the gateway log, when it fails. */
 async function generateContent(apiKey: string, deps: GatewayDeps, model: string, body: unknown) {
   const upstream = await deps.fetch(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${model}:generateContent`, {
@@ -137,24 +153,101 @@ const MOCK_RECAP: Recap = {
   lastTopic: 'a hot latte',
 };
 
-/** POST /api/recap: a Recap of a conversation, built from the transcript, the Help log, the interaction, the step and the Native Language. */
-async function recap(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
-  const request = RecapRequestSchema.safeParse(await readJson(req));
+/**
+ * Answers a prompted endpoint: validates the request, builds the body with the
+ * builder from `ai`, and checks the model's JSON answer against its schema.
+ * Gemini's own answer stays in the gateway log.
+ */
+async function promptedEndpoint<Request, Answer>(
+  { env, deps, req, res }: { env: GatewayEnv; deps: GatewayDeps; req: http.IncomingMessage; res: http.ServerResponse },
+  endpoint: {
+    name: string;
+    model: string;
+    request: z.ZodType<Request>;
+    build: (request: Request) => GenerateContentBody;
+    answer: (request: Request) => z.ZodType<Answer>;
+    mock: (request: Request) => Answer;
+  },
+) {
+  const request = endpoint.request.safeParse(await readJson(req));
   if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
-  if (env.mock) return sendJson(res, 200, MOCK_RECAP);
+  if (env.mock) return sendJson(res, 200, endpoint.mock(request.data));
   if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
 
   try {
-    const { parts, answer } = await generateContent(env.apiKey, deps, MODELS.recap, buildRecapRequest(request.data));
+    const { parts, answer } = await generateContent(env.apiKey, deps, endpoint.model, endpoint.build(request.data));
     const text = parts.map((part) => part.text ?? '').join('');
-    const checked = recapSchemaFor(request.data.kind).safeParse(JSON.parse(text || 'null'));
-    if (!checked.success) throw new Error(`${MODELS.recap} answered something that is not a Recap: ${JSON.stringify(answer)}`);
+    const checked = endpoint.answer(request.data).safeParse(JSON.parse(text || 'null'));
+    if (!checked.success) throw new Error(`${endpoint.model} answered something that does not match its schema: ${JSON.stringify(answer)}`);
     return sendJson(res, 200, checked.data);
   } catch (error) {
-    console.warn('[gateway] could not write a Recap:', error instanceof Error ? error.message : error);
-    return sendJson(res, 502, { error: 'recap_unavailable' });
+    console.warn(`[gateway] /api/${endpoint.name} failed:`, error instanceof Error ? error.message : error);
+    return sendJson(res, 502, { error: `${endpoint.name}_unavailable` });
   }
 }
+
+/** POST /api/recap: a Recap of a conversation, built from the transcript, the Help log, the interaction, the step and the Native Language. */
+const recap: Route = (env, deps, req, res) =>
+  promptedEndpoint(
+    { env, deps, req, res },
+    {
+      name: 'recap',
+      model: MODELS.recap,
+      request: RecapRequestSchema,
+      build: buildRecapRequest,
+      answer: (request) => recapSchemaFor(request.kind),
+      mock: () => MOCK_RECAP,
+    },
+  );
+
+// Canned hints in mock mode: full sentences the scripted fake barista understands.
+const MOCK_HINTS: Record<TargetLanguage, Hints['hints']> = {
+  ja: [
+    { text: 'ホットラテをください。', translation: 'A hot latte, please.' },
+    { text: 'メニューをください。', translation: 'The menu, please.' },
+    { text: 'もう一度お願いします。', translation: 'Once more, please.' },
+  ],
+  zh: [
+    { text: '请给我一杯热拿铁。', translation: 'A hot latte, please.' },
+    { text: '请给我看一下菜单。', translation: 'The menu, please.' },
+  ],
+  en: [
+    { text: 'Could I have a latte, please?', translation: 'Could I have a latte, please?' },
+    { text: 'Could I see the menu, please?', translation: 'Could I see the menu, please?' },
+  ],
+  de: [
+    { text: 'Einen Latte, bitte.', translation: 'A latte, please.' },
+    { text: 'Kann ich bitte die Karte sehen?', translation: 'Can I see the menu, please?' },
+  ],
+};
+
+/** POST /api/hint: 2–3 hint sentences with translations, for the moment the Player opened Help. */
+const hint: Route = (env, deps, req, res) =>
+  promptedEndpoint(
+    { env, deps, req, res },
+    {
+      name: 'hint',
+      model: MODELS.hint,
+      request: HintRequestSchema,
+      build: buildHintRequest,
+      answer: () => HintsSchema,
+      mock: (request): Hints => ({ hints: MOCK_HINTS[request.culturePackId] }),
+    },
+  );
+
+/** POST /api/annotate: an NPC line's Native Language translation, as soon as the line is finished. */
+const annotate: Route = (env, deps, req, res) =>
+  promptedEndpoint(
+    { env, deps, req, res },
+    {
+      name: 'annotate',
+      model: MODELS.annotate,
+      request: AnnotateRequestSchema,
+      build: buildAnnotateRequest,
+      answer: () => AnnotationSchema,
+      mock: (request): Annotation => ({ translation: `Mock translation: ${request.line}` }),
+    },
+  );
 
 // Gemini TTS answers with 16-bit mono PCM at this rate.
 const TTS_SAMPLE_RATE = 24_000;
@@ -202,11 +295,11 @@ async function tts(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage
 
 const REAL_DEPS: GatewayDeps = { fetch: (...args) => globalThis.fetch(...args), now: () => Date.now() };
 
-type Route = (env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>;
-
 const ROUTES: Record<string, Route> = {
   '/api/token': mintToken,
   '/api/recap': recap,
+  '/api/hint': hint,
+  '/api/annotate': annotate,
   '/api/tts': tts,
 };
 

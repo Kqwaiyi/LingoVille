@@ -9,7 +9,20 @@ import {
   MODELS,
   VOICES,
 } from './config.ts';
-import { buildRecapRequest, RecapSchema, type Recap, type RecapRequest } from '../src/ai/index.ts';
+import {
+  AnnotationSchema,
+  buildAnnotateRequest,
+  buildHintRequest,
+  buildRecapRequest,
+  HintsSchema,
+  RecapSchema,
+  type AnnotateRequest,
+  type HintRequest,
+  type Hints,
+  type Recap,
+  type RecapRequest,
+} from '../src/ai/index.ts';
+import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import { createGateway, readGatewayEnv } from './gateway.ts';
 
 describe('readGatewayEnv', () => {
@@ -336,6 +349,118 @@ describe('POST /api/recap', () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'no_api_key' });
     expect(gemini.calls).toEqual([]);
+  });
+});
+
+describe('POST /api/hint', () => {
+  const { fakeGemini, start, post, offline } = gatewayWithFakeGemini();
+
+  const REQUEST: HintRequest = {
+    culturePackId: 'ja',
+    step: 'A1',
+    nativeLanguage: 'en',
+    interactionId: 'order-drink',
+    transcript: [{ speaker: 'npc', text: 'いらっしゃいませ！' }],
+  };
+
+  const HINTS: Hints = {
+    hints: [
+      { text: 'ホットラテをください。', translation: 'A hot latte, please.' },
+      { text: 'メニューをください。', translation: 'The menu, please.' },
+    ],
+  };
+
+  it('asks the hint model for the built request, and returns its checked hints', async () => {
+    const gemini = fakeGemini(() => geminiText(JSON.stringify(HINTS)));
+    const base = await start({ GEMINI_API_KEY: 'secret-key-value' }, gemini);
+
+    const res = await post(base, '/api/hint', REQUEST);
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(text)).toEqual(HINTS);
+    expect(text).not.toContain('secret-key-value');
+    const { url, init } = gemini.calls[0]!;
+    expect(url).toBe(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${MODELS.hint}:generateContent`);
+    expect(JSON.parse(String(init.body))).toEqual(buildHintRequest(REQUEST));
+  });
+
+  it.each(LANGUAGE_CODES)('answers with canned %s hints and no network in mock mode', async (culturePackId) => {
+    const gemini = offline();
+    const base = await start({ GEMINI_MOCK: '1' }, gemini);
+
+    const res = await post(base, '/api/hint', { ...REQUEST, culturePackId });
+
+    expect(res.status).toBe(200);
+    expect(HintsSchema.safeParse(await res.json()).success).toBe(true);
+    expect(gemini.calls).toEqual([]);
+  });
+
+  it('rejects a request it cannot build hints from', async () => {
+    const base = await start({ GEMINI_MOCK: '1' }, offline());
+
+    expect((await post(base, '/api/hint', { ...REQUEST, interactionId: 'nope' })).status).toBe(400);
+  });
+
+  it('reports hints unavailable when Gemini answers too few', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText(JSON.stringify({ hints: HINTS.hints.slice(0, 1) }))));
+
+    const res = await post(base, '/api/hint', REQUEST);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'hint_unavailable' });
+  });
+
+  it('needs a key outside mock mode', async () => {
+    const base = await start({}, offline());
+
+    expect((await post(base, '/api/hint', REQUEST)).status).toBe(503);
+  });
+});
+
+describe('POST /api/annotate', () => {
+  const { fakeGemini, start, post, offline } = gatewayWithFakeGemini();
+
+  const REQUEST: AnnotateRequest = { targetLanguage: 'zh', nativeLanguage: 'en', line: '一杯热拿铁，对吗？' };
+
+  it('asks the annotate model for the built request, and returns its checked translation', async () => {
+    const gemini = fakeGemini(() => geminiText(JSON.stringify({ translation: 'One hot latte, right?' })));
+    const base = await start({ GEMINI_API_KEY: 'k' }, gemini);
+
+    const res = await post(base, '/api/annotate', REQUEST);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ translation: 'One hot latte, right?' });
+    const { url, init } = gemini.calls[0]!;
+    expect(url).toBe(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${MODELS.annotate}:generateContent`);
+    expect(JSON.parse(String(init.body))).toEqual(buildAnnotateRequest(REQUEST));
+  });
+
+  it.each(LANGUAGE_CODES)('answers with a canned translation of a %s line and no network in mock mode', async (targetLanguage) => {
+    const gemini = offline();
+    const base = await start({ GEMINI_MOCK: '1' }, gemini);
+
+    const res = await post(base, '/api/annotate', { ...REQUEST, targetLanguage });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(AnnotationSchema.safeParse(body).success).toBe(true);
+    expect(gemini.calls).toEqual([]);
+  });
+
+  it('rejects an empty line', async () => {
+    const base = await start({ GEMINI_MOCK: '1' }, offline());
+
+    expect((await post(base, '/api/annotate', { ...REQUEST, line: '' })).status).toBe(400);
+  });
+
+  it('reports the annotation unavailable when Gemini answers no translation', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText('{}')));
+
+    const res = await post(base, '/api/annotate', REQUEST);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'annotate_unavailable' });
   });
 });
 

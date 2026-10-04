@@ -1,11 +1,11 @@
 import { NAMED_NPCS } from '../content/index.ts';
-import { useGame, type JournalPage } from '../store/index.ts';
+import { selectInPhrasebook, useGame, type JournalPage, type NewWord } from '../store/index.ts';
 import { formatClock } from './format.ts';
 
 // English until the i18n module lands (ticket 12).
 
 /** 🔊: hear a phrase said aloud. */
-function HearItSaid({ text }: { text: string }) {
+export function HearItSaid({ text }: { text: string }) {
   const hearItSaid = useGame((s) => s.hearItSaid);
   return (
     <button type="button" className="hear-it-said" aria-label={`Hear “${text}” said`} onClick={() => hearItSaid(text)}>
@@ -15,13 +15,30 @@ function HearItSaid({ text }: { text: string }) {
 }
 
 /** A word with its reading over it, when it has one. */
-function Reading({ base, reading }: { base: string; reading: string }) {
+export function Reading({ base, reading }: { base: string; reading: string }) {
   if (!reading || reading === base) return <>{base}</>;
   return (
     <ruby>
       {base}
       <rt>{reading}</rt>
     </ruby>
+  );
+}
+
+/** "+ Phrasebook": keeps a new word in the personal phrasebook, glossed in the page's Native Language. */
+function AddToPhrasebook({ word, glossLanguage }: { word: NewWord; glossLanguage: JournalPage['nativeLanguage'] }) {
+  const kept = useGame(selectInPhrasebook(word.base, glossLanguage));
+  const addToPhrasebook = useGame((s) => s.addToPhrasebook);
+  if (kept) return <span className="journal-kept">✓ In my phrasebook</span>;
+  return (
+    <button
+      type="button"
+      className="journal-keep"
+      aria-label={`Add “${word.base}” to my phrasebook`}
+      onClick={() => addToPhrasebook(word, glossLanguage)}
+    >
+      + Phrasebook
+    </button>
   );
 }
 
@@ -78,7 +95,8 @@ export function JournalPageView({ page }: { page: JournalPage }) {
                     <span lang={page.targetLanguage}>
                       <Reading base={word.base} reading={word.reading} />
                     </span>{' '}
-                    <HearItSaid text={word.base} /> <span className="journal-gloss">{word.gloss}</span>
+                    <HearItSaid text={word.base} /> <span className="journal-gloss">{word.gloss}</span>{' '}
+                    <AddToPhrasebook word={word} glossLanguage={page.nativeLanguage} />
                   </li>
                 ))}
               </ul>

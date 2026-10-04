@@ -1,7 +1,9 @@
 // Public interface of the sim module. Other modules import from here.
 export { gameMinutesFor, weekdayOf, WEEKDAYS, type Weekday } from './clock.ts';
+export { weighRecapEvidence, type EvidenceLine, type HelpShown, type RecapEvidence } from './helpEvidence.ts';
 export { applyInteractionOutcome, type InteractionOutcome, type OutcomeResult } from './interactionOutcome.ts';
 export { clampMeter } from './meters.ts';
+export { addToPhrasebook } from './phrasebook.ts';
 export {
   isOutOfPatience,
   isUnreadableTranscript,
