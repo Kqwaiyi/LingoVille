@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { startNewGame } from './title.ts';
+import { startNewGame, type Language } from './title.ts';
 
 export const column = (page: Page) => page.getByRole('complementary', { name: 'Conversation' });
 export const chat = (page: Page) => column(page).getByRole('log', { name: 'Chat' });
@@ -14,9 +14,9 @@ export const npcLine = (page: Page, text: string) => chat(page).getByRole('butto
 // What the scripted fake barista says in the ja pack (mock mode).
 export const GREETING = 'いらっしゃいませ！ご注文はお決まりですか？';
 
-/** Starts a new game at the café door (in the dev pack, or the one `pack` names) and walks up to the counter until the barista can be talked to. */
-export async function walkToTheBarista(page: Page, pack?: string) {
-  await startNewGame(page, pack ? `/?spawn=cafe&pack=${pack}` : '/?spawn=cafe');
+/** Starts a new game at the café door (learning Japanese, or the language `target` names) and walks up to the counter until the barista can be talked to. */
+export async function walkToTheBarista(page: Page, target?: Language) {
+  await startNewGame(page, { path: '/?spawn=cafe', target });
   await page.locator('canvas').click();
   await page.keyboard.down('KeyW');
   await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });

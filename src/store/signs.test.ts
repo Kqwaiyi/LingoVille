@@ -1,20 +1,8 @@
-import 'fake-indexeddb/auto';
-import { createStore } from 'idb-keyval';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { libraryPinyin, type Segment } from '../ai/index.ts';
 import { CULTURE_PACKS, worldSign } from '../content/index.ts';
 import { createSave, type LanguageCode } from '../sim/index.ts';
-import {
-  createDeviceSettings,
-  createGameStore,
-  createJournal,
-  createSaves,
-  DEV_SETUP,
-  devSetup,
-  selectSignTooltip,
-  selectTitle,
-  type LibraryReadings,
-} from './index.ts';
+import { createGameStore, DEV_SETUP, selectSignTooltip, type LibraryReadings } from './index.ts';
 import { recordingSaves } from './testSaves.ts';
 
 /** pinyin-pro for zh; ja's dictionary hasn't loaded, so it reads nothing yet. */
@@ -113,33 +101,5 @@ describe('pointing at a sign', () => {
     store.getState().pointAtSign('cafe-hours');
 
     expect(tooltip(store)?.translated).toBe(false);
-  });
-});
-
-describe('devSetup', () => {
-  it.each(['ja', 'zh', 'en', 'de'] as const)('?pack=%s starts the dev game in that Culture Pack and its language', (packId) => {
-    expect(devSetup(`?pack=${packId}`)).toEqual({ ...DEV_SETUP, culturePackId: packId, targetLanguage: packId });
-  });
-
-  it('keeps the usual dev setup without a known pack', () => {
-    expect(devSetup('')).toEqual(DEV_SETUP);
-    expect(devSetup('?pack=fr')).toEqual(DEV_SETUP);
-  });
-
-  it('starts New game in the pack the dev setup picks', async () => {
-    const store = createGameStore(null, {
-      saves: createSaves(() => createStore('signs-test-saves', 'saves')),
-      journal: createJournal(() => createStore('signs-test-journal', 'entries')),
-      storage: { persisted: async () => true, persist: async () => true },
-      deviceSettings: createDeviceSettings(() => createStore('signs-test-settings', 'settings')),
-      readings: library,
-      newGameSetup: () => devSetup('?pack=de'),
-    });
-    store.getState().openTitle();
-    await vi.waitFor(() => expect(selectTitle(store.getState())?.status).toBe('ready'));
-    store.getState().newGame();
-    store.getState().finishSetup();
-
-    expect(store.getState().game.identity).toMatchObject({ culturePackId: 'de', targetLanguage: 'de' });
   });
 });

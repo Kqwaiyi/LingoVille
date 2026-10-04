@@ -1,6 +1,6 @@
 import { createStore, delMany, entries, get, promisifyRequest, set, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
-import { ITEM_IDS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import { APPEARANCE_PRESET_IDS, ITEM_IDS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 import {
   DEBT_KINDS,
   ILLNESS_IDS,
@@ -45,8 +45,8 @@ const GameStateSchema = z.object({
     characterName: z.string(),
     targetLanguage: z.enum(LANGUAGE_CODES),
     culturePackId: z.enum(PACK_IDS),
-    // Checked against the Appearance Preset pool once it is content (ticket 30).
-    appearancePresetId: z.string(),
+    // Any id outside the Appearance Preset pool fails loudly. Every save so far holds preset-1, so no migration is needed.
+    appearancePresetId: z.enum(APPEARANCE_PRESET_IDS),
   }),
   clock: z.object({ day, minuteOfDay: z.number().min(0) }),
   placeId: z.enum(PLACE_IDS),

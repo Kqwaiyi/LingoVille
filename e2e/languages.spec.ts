@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { titleMenu } from './title.ts';
+import { goThroughSetup, startNewGame, titleMenu } from './title.ts';
 
 const choice = (page: Page, endonym: string) => page.getByRole('radio', { name: new RegExp(`^${endonym}`) });
 const next = (page: Page, name = 'Next') => page.getByRole('button', { name, exact: true });
@@ -72,7 +72,7 @@ test('choosing a language switches the whole UI at once, and this browser keeps 
   await expect(page.getByRole('heading', { name: '你读哪种语言最顺手？' })).toBeVisible();
   await choice(page, 'Deutsch').check();
   await expect(page.getByRole('heading', { name: 'Welche Sprache liest du am besten?' })).toBeVisible();
-  await next(page, 'Weiter').click();
+  await goThroughSetup(page);
 
   const dock = page.getByRole('region', { name: 'Leiste' });
   await expect(dock.getByRole('meter', { name: 'Gesundheit' })).toBeVisible();
@@ -94,10 +94,7 @@ test('Esc on the Native Language screen goes back to the title screen', async ({
 });
 
 test('German strings fit in the dock and the conversation column', async ({ page }) => {
-  await page.goto('/?spawn=cafe');
-  await titleMenu(page).getByRole('button', { name: 'New game' }).click();
-  await choice(page, 'Deutsch').check();
-  await next(page, 'Weiter').click();
+  await startNewGame(page, { path: '/?spawn=cafe', native: 'de' });
 
   const dock = page.getByRole('region', { name: 'Leiste' });
   await expect(dock.getByText('Tag 1 · Montag')).toBeVisible();

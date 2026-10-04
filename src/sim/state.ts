@@ -1,6 +1,6 @@
-import type { ItemId, NamedNpcId } from '../content/index.ts';
+import type { AppearancePresetId, ItemId, NamedNpcId } from '../content/index.ts';
 import { seedRng } from './rng.ts';
-import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep } from './tuning.ts';
+import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
 
 /** A Target Language, and the id of the Culture Pack set where it's spoken. */
 export const LANGUAGE_CODES = ['ja', 'zh', 'en', 'de'] as const;
@@ -51,8 +51,8 @@ export type NewGameSetup = {
   targetLanguage: LanguageCode;
   culturePackId: LanguageCode;
   /** From the self-assessment. */
-  startingStep: ProficiencyStep;
-  appearancePresetId: string;
+  startingStep: StartingStep;
+  appearancePresetId: AppearancePresetId;
   rngSeed: number;
 };
 
@@ -62,7 +62,7 @@ export type GameState = {
     characterName: string;
     targetLanguage: LanguageCode;
     culturePackId: LanguageCode;
-    appearancePresetId: string;
+    appearancePresetId: AppearancePresetId;
   };
   clock: { day: number; minuteOfDay: number };
   /** The Character's current place. Positions live in the world, not here. */

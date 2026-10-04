@@ -97,6 +97,15 @@ export const ECONOMY = {
 export const PROFICIENCY_STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 export type ProficiencyStep = (typeof PROFICIENCY_STEPS)[number];
 
+/** The steps the self-assessment in New game setup can start the Character at. */
+export const STARTING_STEPS = ['A1', 'A2', 'B1', 'B2'] as const satisfies readonly ProficiencyStep[];
+export type StartingStep = (typeof STARTING_STEPS)[number];
+
+export const CHARACTER_NAME = {
+  /** The longest name the Player can give the Character, in characters. */
+  maxLength: 20,
+} as const;
+
 /** Patience, Newcomer Discount and Shift stakes by Proficiency Step. */
 export const PROFICIENCY_STEP_TABLE: Record<
   ProficiencyStep,

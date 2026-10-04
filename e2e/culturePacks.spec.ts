@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { column, dock, npcLine, typeLine, walkToTheBarista } from './barista.ts';
+import { startNewGame, type Language } from './title.ts';
 
 const money = (page: Page) => dock(page).getByLabel('Money');
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
@@ -19,18 +20,6 @@ const PACKS = [
     after: '382元',
   },
   {
-    pack: 'en',
-    greeting: 'Hiya! What can I get you?',
-    order: 'A latte, please',
-    readBack: "One latte, that's £4.50. Is that right?",
-    yes: 'yes',
-    served: 'Lovely, here you go. Have a nice day!',
-    before: '£100',
-    // The en pack has no English glosses: an English speaker reads the menu as it is.
-    card: 'Latte · −£4.50 · Mood ↑',
-    after: '£95.50',
-  },
-  {
     pack: 'de',
     greeting: 'Hallo! Was darf’s sein?',
     order: 'Einen Latte, bitte',
@@ -41,7 +30,7 @@ const PACKS = [
     card: 'Latte macchiato · −4,50 € · Mood ↑',
     after: '95,50 €',
   },
-];
+] as const satisfies readonly { pack: Language; [said: string]: string }[];
 
 for (const p of PACKS) {
   test(`the café works in the ${p.pack} pack: local menu, local prices, local money`, async ({ page }) => {
@@ -59,6 +48,34 @@ for (const p of PACKS) {
     await expect(money(page)).toHaveText(p.after);
   });
 }
+
+// English can't be learnt in English, so the en pack is played by a German speaker, in a German UI.
+test('the café works in the en pack: local menu, local prices, local money', async ({ page }) => {
+  await startNewGame(page, { path: '/?spawn=cafe', native: 'de', target: 'en' });
+  const geld = page.getByRole('region', { name: 'Leiste' }).getByLabel('Geld');
+  const gespräch = page.getByRole('complementary', { name: 'Gespräch' });
+  const line = (text: string) => gespräch.getByRole('button', { name: `„${text}“ nochmal hören`, exact: true });
+  const say = async (text: string) => {
+    await page.keyboard.press('KeyT');
+    await gespräch.getByRole('textbox', { name: 'Getippte Antwort' }).fill(text);
+    await page.keyboard.press('Enter');
+  };
+  await page.locator('canvas').click();
+  await page.keyboard.down('KeyW');
+  await expect(page.getByText('um zu sprechen — Barista')).toBeVisible({ timeout: 5_000 });
+  await page.keyboard.up('KeyW');
+
+  await expect(geld).toHaveText('£100');
+  await page.keyboard.press('KeyE');
+  await expect(line('Hiya! What can I get you?')).toBeVisible();
+  await say('A latte, please');
+  await expect(line("One latte, that's £4.50. Is that right?")).toBeVisible();
+  await say('yes');
+  await expect(line('Lovely, here you go. Have a nice day!')).toBeVisible();
+
+  await expect(gespräch.getByRole('region', { name: 'Gespräch beendet' }).getByText('Latte · −£4.50 · Stimmung ↑')).toBeVisible();
+  await expect(geld).toHaveText('£95.50');
+});
 
 /** Sweeps the pointer across the scene, right of centre first where the menu board hangs, until a sign's tooltip shows. */
 async function pointAtASign(page: Page) {

@@ -20,11 +20,13 @@ import {
   type ToolResponse,
 } from '../ai/index.ts';
 import {
+  APPEARANCE_PRESET_IDS,
   CULTURE_PACKS,
   INTERACTIONS,
   NAMED_NPCS,
   placePhrasebook,
   worldSign,
+  type AppearancePresetId,
   type Interaction,
   type NamedNpcId,
   type PlacePhrase,
@@ -33,6 +35,7 @@ import {
 import {
   addToPhrasebook,
   applyInteractionOutcome,
+  CHARACTER_NAME,
   CLOCK,
   createSave,
   drinkWater,
@@ -56,6 +59,7 @@ import {
   type Patience,
   type PhrasebookEntry,
   type PlaceId,
+  type StartingStep,
 } from '../sim/index.ts';
 import {
   addUsage,
@@ -85,7 +89,7 @@ import {
 } from './saveFiles.ts';
 import { browserSaves, SLOT_IDS, type LoadedSave, type Saves, type Slot, type SlotId } from './saves.ts';
 
-/** The fixed setup every new game uses until the rest of New game setup lands (ticket 12b). */
+/** A fixed setup: the First Morning that stands in behind the title screen, and the one store tests play. */
 export const DEV_SETUP: NewGameSetup = {
   characterName: 'Sam',
   targetLanguage: 'ja',
@@ -95,25 +99,26 @@ export const DEV_SETUP: NewGameSetup = {
   rngSeed: 20261003,
 };
 
-/**
- * The dev setup, or in dev, the one `?pack=` asks for: `?pack=de` starts a new
- * game in the German pack, learning German. The rest of New game setup replaces it (ticket 12b).
- */
-export function devSetup(search: string): NewGameSetup {
-  const asked = new URLSearchParams(search).get('pack');
-  const pack = LANGUAGE_CODES.find((code) => code === asked);
-  if (!import.meta.env.DEV || !pack) return DEV_SETUP;
-  return { ...DEV_SETUP, culturePackId: pack, targetLanguage: pack };
-}
-
 /** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
 /** Which screen shows: the title, New game setup, or the game itself. */
 export type Screen = 'title' | 'setup' | 'playing';
 
-/** New game setup, while it shows: the slot the new game goes into. Its screens so far: the Native Language. */
-type Setup = { slotId: SlotId };
+/** New game setup's screens, in order. The mic check comes after them (ticket 12c). */
+export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance'] as const;
+export type SetupStep = (typeof SETUP_STEPS)[number];
+
+/** New game setup, while it shows: the slot the new game goes into, the screen showing and the answers so far. */
+export type Setup = {
+  slotId: SlotId;
+  step: SetupStep;
+  targetLanguage: LanguageCode | null;
+  /** From the self-assessment. */
+  startingStep: StartingStep | null;
+  characterName: string;
+  appearancePresetId: AppearancePresetId;
+};
 
 /** A slot on the title screen: empty, a save to play, or a save that can't be loaded at all. */
 export type SlotCard =
@@ -271,8 +276,8 @@ export type GameStoreDeps = {
   storage: StoragePersistence;
   /** Hands the Player a file to keep. */
   downloadFile: (file: SaveFile) => void;
-  /** What New game builds the save from, until the rest of New game setup asks the Player (ticket 12b). */
-  newGameSetup: () => NewGameSetup;
+  /** The RNG seed for a new game. */
+  newRngSeed: () => number;
 };
 
 /** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
@@ -347,7 +352,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   hearItSaid,
   storage: browserStorage,
   downloadFile: downloadInBrowser,
-  newGameSetup: () => devSetup(typeof window === 'undefined' ? '' : window.location.search),
+  newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
 };
 
 export type GameStore = {
@@ -392,10 +397,17 @@ export type GameStore = {
   newGame: () => void;
   /** Chooses the Native Language: the UI switches at once, and this browser's device settings keep it. */
   setNativeLanguage: (nativeLanguage: LanguageCode) => void;
-  /** Finishes setup: the First Morning in its slot, from the fixed dev setup until the other setup screens land (ticket 12b). */
-  finishSetup: () => void;
-  /** Back from setup to the title screen. */
-  leaveSetup: () => void;
+  /** Chooses the Target Language, which is also the Culture Pack. Never the Native Language. */
+  chooseTargetLanguage: (targetLanguage: LanguageCode) => void;
+  /** The self-assessment: the step the Player's description of their level maps to. */
+  chooseStartingStep: (startingStep: StartingStep) => void;
+  /** Names the Character, cut to the longest a name may be. */
+  nameCharacter: (characterName: string) => void;
+  chooseAppearance: (appearancePresetId: AppearancePresetId) => void;
+  /** On to the next setup screen once this one is answered; after the last, the First Morning in its slot. */
+  setupNext: () => void;
+  /** Back to the setup screen before, keeping the answers; from the first, to the title screen. */
+  setupBack: () => void;
   /** Downloads the slot as one file: its save, its Journal and its backups' metadata. */
   exportSave: (slotId: SlotId) => void;
   /** Downloads everything stored for a slot, as found, for a save that can't be loaded. */
@@ -574,6 +586,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           return changed && deps.deviceSettings.save(changed);
         })
         .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+    };
+
+    const answerSetup = (answers: Partial<Setup>) => {
+      const setup = get().setup;
+      if (get().screen === 'setup' && setup) set({ setup: { ...setup, ...answers } });
     };
 
     const readyTitle = () => {
@@ -981,24 +998,60 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const freeSlotId = readyTitle()?.freeSlotId;
         if (!freeSlotId) return;
         // The Native Language from the device settings: the one the browser suggests, until the Player chooses.
-        set({ screen: 'setup', title: null, setup: { slotId: freeSlotId } });
+        set({
+          screen: 'setup',
+          title: null,
+          setup: {
+            slotId: freeSlotId,
+            step: 'nativeLanguage',
+            targetLanguage: null,
+            startingStep: null,
+            characterName: '',
+            appearancePresetId: APPEARANCE_PRESET_IDS[0],
+          },
+        });
       },
       setNativeLanguage: (nativeLanguage) => {
-        set({ nativeLanguage });
+        const setup = get().setup;
+        // A Target Language can't be the Native Language, so one just made it is forgotten.
+        set({ nativeLanguage, setup: setup?.targetLanguage === nativeLanguage ? { ...setup, targetLanguage: null } : setup });
         updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
       },
-      finishSetup: () => {
-        const setup = get().setup;
-        if (get().screen !== 'setup' || !setup) return;
+      chooseTargetLanguage: (targetLanguage) => {
+        if (targetLanguage !== get().nativeLanguage) answerSetup({ targetLanguage });
+      },
+      chooseStartingStep: (startingStep) => answerSetup({ startingStep }),
+      nameCharacter: (characterName) => answerSetup({ characterName: [...characterName.trimStart()].slice(0, CHARACTER_NAME.maxLength).join('') }),
+      chooseAppearance: (appearancePresetId) => answerSetup({ appearancePresetId }),
+      setupNext: () => {
+        const { setup, nativeLanguage } = get();
+        if (get().screen !== 'setup' || !setup || !setupAnswered(setup, nativeLanguage)) return;
+        const next = SETUP_STEPS[SETUP_STEPS.indexOf(setup.step) + 1];
+        if (next) return set({ setup: { ...setup, step: next } });
+
+        const { targetLanguage, startingStep, characterName, appearancePresetId } = setup;
         set({ setup: null });
         // The pre-selected language counts as chosen too, so it no longer follows the browser's.
-        const { nativeLanguage } = get();
         updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
-        play(createSave(deps.newGameSetup()), setup.slotId, 'newGame');
+        play(
+          createSave({
+            characterName: characterName.trim(),
+            targetLanguage: targetLanguage!,
+            culturePackId: targetLanguage!,
+            startingStep: startingStep!,
+            appearancePresetId,
+            rngSeed: deps.newRngSeed(),
+          }),
+          setup.slotId,
+          'newGame',
+        );
         save();
       },
-      leaveSetup: () => {
-        if (get().screen !== 'setup') return;
+      setupBack: () => {
+        const setup = get().setup;
+        if (get().screen !== 'setup' || !setup) return;
+        const before = SETUP_STEPS[SETUP_STEPS.indexOf(setup.step) - 1];
+        if (before) return set({ setup: { ...setup, step: before } });
         set({ screen: 'title', setup: null, title: { status: 'checking' } });
       },
       exportSave: (slotId) => void download(() => exportSave(stores, slotId)),
@@ -1253,6 +1306,28 @@ export function useGame<T>(selector: (state: GameStore) => T): T {
 // --- Selectors: the only way world and UI read game state -------------------
 
 export const selectScreen = (s: GameStore) => s.screen;
+
+/** Whether the setup screen showing has what it needs to go on. */
+function setupAnswered(setup: Setup, nativeLanguage: LanguageCode) {
+  switch (setup.step) {
+    case 'nativeLanguage':
+    case 'appearance':
+      return true;
+    case 'targetLanguage':
+      return setup.targetLanguage !== null && setup.targetLanguage !== nativeLanguage;
+    case 'aboutYou':
+      return setup.startingStep !== null && setup.characterName.trim() !== '';
+  }
+}
+
+/** New game setup, while it shows: its screen and the answers so far. */
+export const selectSetup = (s: GameStore) => s.setup;
+export const selectSetupCanGoOn = (s: GameStore) => s.setup !== null && setupAnswered(s.setup, s.nativeLanguage);
+const TARGET_LANGUAGES = Object.fromEntries(
+  LANGUAGE_CODES.map((native) => [native, LANGUAGE_CODES.filter((language) => language !== native)]),
+) as Record<LanguageCode, LanguageCode[]>;
+/** The Target Languages on offer: every language but the Native Language. */
+export const selectTargetLanguages = (s: GameStore) => TARGET_LANGUAGES[s.nativeLanguage];
 export const selectTitle = (s: GameStore) => s.title;
 export const selectArrival = (s: GameStore) => s.arrival;
 export const selectSavedCount = (s: GameStore) => s.savedCount;

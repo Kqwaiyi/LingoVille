@@ -7,8 +7,8 @@ import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
-import { NativeLanguageScreen } from './NativeLanguageScreen.tsx';
 import { PersistCallout } from './PersistCallout.tsx';
+import { SetupScreen } from './SetupScreen.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
@@ -41,7 +41,7 @@ export function App() {
     <main className="game" data-talking={talking || undefined}>
       <Scene />
       {screen === 'title' && <TitleScreen />}
-      {screen === 'setup' && <NativeLanguageScreen />}
+      {screen === 'setup' && <SetupScreen />}
       {screen === 'playing' && <Hud />}
     </main>
   );

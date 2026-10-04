@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto';
 import { createStore, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it, vi } from 'vitest';
-import { CLOCK, createSave, type GameState } from '../sim/index.ts';
+import { APPEARANCE_PRESET_IDS } from '../content/index.ts';
+import { CHARACTER_NAME, CLOCK, createSave, STARTING_STEPS, type GameState } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
   createDeviceSettings,
@@ -18,6 +19,9 @@ import {
   selectPlaceId,
   selectSavedCount,
   selectScreen,
+  selectSetup,
+  selectSetupCanGoOn,
+  selectTargetLanguages,
   selectTitle,
   selectToast,
   SLOT_IDS,
@@ -26,6 +30,7 @@ import {
   type SaveFile,
   type TitleView,
 } from './index.ts';
+import { setUpNewGame } from './testSetup.ts';
 
 /** A barista the test speaks for. */
 function fakeBarista() {
@@ -88,6 +93,7 @@ function freshBrowser({
     },
     downloadFile: (file) => void downloads.push(file),
     requestRecap: () => new Promise(() => {}),
+    newRngSeed: () => DEV_SETUP.rngSeed,
   };
 }
 
@@ -175,9 +181,7 @@ describe('the title screen', () => {
     const store = createGameStore(null, browser);
     await openTitle(store);
 
-    store.getState().newGame();
-    expect(selectScreen(store.getState())).toBe('setup');
-    store.getState().finishSetup();
+    setUpNewGame(store);
     await saved(store, 1);
 
     expect(selectScreen(store.getState())).toBe('playing');
@@ -201,8 +205,7 @@ describe('the title screen', () => {
     const browser = freshBrowser();
     const before = createGameStore(null, browser);
     await openTitle(before);
-    before.getState().newGame();
-    before.getState().finishSetup();
+    setUpNewGame(before);
     before.getState().enterPlace('cafe');
     before.getState().advance(CLOCK.maxRealDeltaMs);
     before.setState({ game: { ...before.getState().game, character: { ...before.getState().game.character, moneyInShifts: 1.2 } } });
@@ -242,8 +245,7 @@ describe('the title screen', () => {
     const { npc, openVoiceSession } = fakeBarista();
     const before = createGameStore(null, { ...browser, openVoiceSession });
     await openTitle(before);
-    before.getState().newGame();
-    before.getState().finishSetup();
+    setUpNewGame(before);
     before.getState().enterPlace('cafe');
     const atTheCounter = before.getState().game;
     before.getState().setInteractable('barista');
@@ -323,9 +325,7 @@ describe('the Native Language screen', () => {
     const browser = freshBrowser({ languages });
     const store = createGameStore(null, browser);
     await openTitle(store);
-    store.getState().newGame();
-
-    store.getState().finishSetup();
+    setUpNewGame(store);
     await saved(store, 1);
     languages.splice(0, 1, 'ja-JP');
 
@@ -341,12 +341,163 @@ describe('the Native Language screen', () => {
     store.getState().newGame();
     store.getState().setNativeLanguage('ja');
 
-    store.getState().leaveSetup();
+    store.getState().setupBack();
 
     expect(selectScreen(store.getState())).toBe('title');
     expect(await openTitle(store)).toMatchObject({ continueSlotId: null, freeSlotId: 'slot-1' });
     expect(selectNativeLanguage(store.getState())).toBe('ja');
     expect(await browser.saves.load('slot-1')).toBeNull();
+  });
+});
+
+describe('New game setup', () => {
+  /** The title screen, then New game: setup on its first screen. */
+  async function inSetup(browser = freshBrowser()) {
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+    store.getState().newGame();
+    return store;
+  }
+  const step = (store: ReturnType<typeof createGameStore>) => selectSetup(store.getState())?.step;
+  const canGoOn = (store: ReturnType<typeof createGameStore>) => selectSetupCanGoOn(store.getState());
+
+  it('goes Native Language → Target Language → about you → appearance, then into the town', async () => {
+    const store = await inSetup();
+    const steps = [step(store)];
+    store.getState().setupNext();
+    steps.push(step(store));
+    store.getState().chooseTargetLanguage('de');
+    store.getState().setupNext();
+    steps.push(step(store));
+    store.getState().chooseStartingStep('A2');
+    store.getState().nameCharacter('Mika');
+    store.getState().setupNext();
+    steps.push(step(store));
+    store.getState().setupNext();
+
+    expect(steps).toEqual(['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance']);
+    expect(selectScreen(store.getState())).toBe('playing');
+  });
+
+  it('builds the save from the answers, in the chosen language’s Culture Pack', async () => {
+    const browser = freshBrowser();
+    const store = createGameStore(null, { ...browser, newRngSeed: () => 42 });
+    await openTitle(store);
+
+    setUpNewGame(store, { targetLanguage: 'zh', startingStep: 'B2', characterName: '  Mika ', appearancePresetId: 'preset-3' });
+    await saved(store, 1);
+
+    const game = createSave({
+      characterName: 'Mika',
+      targetLanguage: 'zh',
+      culturePackId: 'zh',
+      startingStep: 'B2',
+      appearancePresetId: 'preset-3',
+      rngSeed: 42,
+    });
+    expect(store.getState().game).toEqual(game);
+    expect((await browser.saves.load('slot-1'))?.save.game).toEqual(game);
+  });
+
+  it('offers only the three languages that aren’t the Native Language as the Target Language', async () => {
+    const store = await inSetup();
+    store.getState().setNativeLanguage('de');
+    store.getState().setupNext();
+
+    expect(selectTargetLanguages(store.getState())).toEqual(['ja', 'zh', 'en']);
+    store.getState().chooseTargetLanguage('de');
+    expect(selectSetup(store.getState())?.targetLanguage).toBeNull();
+    expect(canGoOn(store)).toBe(false);
+    store.getState().setupNext();
+    expect(step(store)).toBe('targetLanguage');
+
+    store.getState().chooseTargetLanguage('en');
+    expect(canGoOn(store)).toBe(true);
+  });
+
+  it('forgets the Target Language if the Player goes back and makes it their Native Language', async () => {
+    const store = await inSetup();
+    store.getState().setupNext();
+    store.getState().chooseTargetLanguage('ja');
+    store.getState().setupBack();
+
+    store.getState().setNativeLanguage('ja');
+    store.getState().setupNext();
+
+    expect(selectSetup(store.getState())?.targetLanguage).toBeNull();
+  });
+
+  it('the self-assessment starts the Character at A1, A2, B1 or B2', () => {
+    expect(STARTING_STEPS).toEqual(['A1', 'A2', 'B1', 'B2']);
+  });
+
+  it('needs a self-description and a name before going on, and a name of only spaces isn’t one', async () => {
+    const store = await inSetup();
+    store.getState().setupNext();
+    store.getState().chooseTargetLanguage('ja');
+    store.getState().setupNext();
+
+    expect(canGoOn(store)).toBe(false);
+    store.getState().chooseStartingStep('B1');
+    expect(canGoOn(store)).toBe(false);
+    store.getState().nameCharacter('   ');
+    store.getState().setupNext();
+    expect(step(store)).toBe('aboutYou');
+
+    store.getState().nameCharacter('Sam');
+    expect(canGoOn(store)).toBe(true);
+  });
+
+  it('keeps names to the longest a name may be', async () => {
+    const store = await inSetup();
+
+    store.getState().nameCharacter('x'.repeat(CHARACTER_NAME.maxLength + 5));
+
+    expect(selectSetup(store.getState())?.characterName).toHaveLength(CHARACTER_NAME.maxLength);
+  });
+
+  it('picks an Appearance Preset from the pool, the first one until the Player chooses', async () => {
+    const store = await inSetup();
+    expect(selectSetup(store.getState())?.appearancePresetId).toBe(APPEARANCE_PRESET_IDS[0]);
+
+    store.getState().chooseAppearance('preset-4');
+
+    expect(selectSetup(store.getState())?.appearancePresetId).toBe('preset-4');
+  });
+
+  it('Back goes to the screen before, keeping the answers, and from the first screen to the title', async () => {
+    const store = await inSetup();
+    store.getState().setupNext();
+    store.getState().chooseTargetLanguage('de');
+    store.getState().setupNext();
+    store.getState().chooseStartingStep('B1');
+    store.getState().nameCharacter('Mika');
+
+    store.getState().setupBack();
+    store.getState().setupBack();
+    store.getState().setupNext();
+    store.getState().setupNext();
+
+    expect(selectSetup(store.getState())).toMatchObject({ step: 'aboutYou', targetLanguage: 'de', startingStep: 'B1', characterName: 'Mika' });
+    store.getState().setupBack();
+    store.getState().setupBack();
+    store.getState().setupBack();
+    expect(selectScreen(store.getState())).toBe('title');
+  });
+
+  it('a second New game on the same browser pre-fills the Native Language chosen for the first, with fresh answers', async () => {
+    const browser = freshBrowser({ languages: ['en-GB'] });
+    const first = createGameStore(null, browser);
+    await openTitle(first);
+    first.getState().newGame();
+    first.getState().setNativeLanguage('ja');
+    setUpNewGame(first, { targetLanguage: 'de' });
+    await saved(first, 1);
+
+    const second = await inSetup(browser);
+
+    expect(selectNativeLanguage(second.getState())).toBe('ja');
+    expect(selectSetup(second.getState())).toMatchObject({ step: 'nativeLanguage', targetLanguage: null, characterName: '', startingStep: null });
   });
 });
 
@@ -451,8 +602,7 @@ describe('persistent storage', () => {
     const store = createGameStore(null, browser);
     await openTitle(store);
 
-    store.getState().newGame();
-    store.getState().finishSetup();
+    setUpNewGame(store);
     store.getState().saveNow();
     await saved(store, 2);
 
@@ -466,8 +616,7 @@ describe('persistent storage', () => {
     await openTitle(first);
     expect(selectPersistCallout(first.getState())).toBe(false);
 
-    first.getState().newGame();
-    first.getState().finishSetup();
+    setUpNewGame(first);
     await vi.waitFor(() => expect(selectPersistCallout(first.getState())).toBe(true));
 
     // Back on the title screen after a reload, it still shows.

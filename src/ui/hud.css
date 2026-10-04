@@ -1286,7 +1286,7 @@ ruby {
   align-items: stretch;
 }
 
-.language-choices {
+.setup-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -1295,7 +1295,7 @@ ruby {
   border: 0;
 }
 
-.language-choice {
+.setup-choice {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -1306,30 +1306,133 @@ ruby {
   cursor: pointer;
 }
 
-.language-choice:has(input:checked) {
+.setup-choice:has(input:checked) {
   border-color: var(--ok);
   background: rgba(111, 207, 142, 0.14);
 }
 
-.language-choice:has(input:focus-visible) {
+.setup-choice:has(input:focus-visible) {
   outline: 2px solid var(--ok);
   outline-offset: 2px;
 }
 
-.language-choice input {
+.setup-choice input {
   align-self: center;
   margin: 0;
   accent-color: var(--ok);
 }
 
-.language-choice span {
+.setup-choice span {
   font-size: 18px;
   font-weight: 600;
 }
 
-.language-choice small {
+.setup-choice small {
   font-size: 13px;
   color: var(--hud-muted);
+}
+
+/* Screens 2 and 3: one choice per row, as each carries a sentence. */
+.setup-choices-single {
+  grid-template-columns: 1fr;
+}
+
+.setup-choice .setup-sentence {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.setup-choices-presets {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.setup-choices-presets .setup-choice {
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The preset input sits under its picture, which is what's clicked. */
+.setup-choices-presets .setup-choice input {
+  order: 1;
+}
+
+/* Placeholder Appearance Presets until the characters arrive (ticket 30a): a head and shoulders in each preset's colours. */
+.appearance-placeholder {
+  --skin: #f1c9a5;
+  --hair: #3b2a20;
+  --top: #7aa7d9;
+  position: relative;
+  width: 56px;
+  height: 64px;
+}
+
+.appearance-placeholder::before,
+.appearance-placeholder::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+}
+
+/* The head, with its hair as a thick top border. */
+.appearance-placeholder::before {
+  top: 2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border-top: 9px solid var(--hair);
+  background: var(--skin);
+}
+
+.appearance-placeholder::after {
+  bottom: 0;
+  width: 52px;
+  height: 26px;
+  border-radius: 26px 26px 6px 6px;
+  background: var(--top);
+}
+
+.appearance-placeholder[data-preset='preset-2'] {
+  --skin: #c98e62;
+  --hair: #1d1a1a;
+  --top: #e39a6f;
+}
+
+.appearance-placeholder[data-preset='preset-3'] {
+  --skin: #f5d7bd;
+  --hair: #c9863f;
+  --top: #8fc79a;
+}
+
+.appearance-placeholder[data-preset='preset-4'] {
+  --skin: #8a5a3c;
+  --hair: #5b3a6e;
+  --top: #d9c46f;
+}
+
+.setup-name {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--hud-muted);
+}
+
+.setup-name input {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hud-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.setup-name input:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
 }
 
 .setup-actions {

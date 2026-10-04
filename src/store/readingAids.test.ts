@@ -17,6 +17,7 @@ import {
   type GameStoreDeps,
   type LibraryReadings,
 } from './index.ts';
+import { setUpNewGame } from './testSetup.ts';
 import { recordingSaves } from './testSaves.ts';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -283,8 +284,7 @@ describe('preloading the library', () => {
     store.getState().openTitle();
     await vi.waitFor(() => expect(store.getState().title?.status).toBe('ready'));
 
-    store.getState().newGame();
-    store.getState().finishSetup();
+    setUpNewGame(store);
 
     expect(library.preloaded).toEqual([DEV_SETUP.targetLanguage]);
   });
@@ -306,8 +306,7 @@ describe('preloading the library', () => {
     const store = createGameStore(null, { saves, deviceSettings, readings: library, openVoiceSession, requestAnnotation: () => new Promise(() => {}) });
     store.getState().openTitle();
     await vi.waitFor(() => expect(store.getState().title?.status).toBe('ready'));
-    store.getState().newGame();
-    store.getState().finishSetup();
+    setUpNewGame(store);
     store.getState().enterPlace('cafe');
     store.getState().setInteractable('barista');
     store.getState().talk();
