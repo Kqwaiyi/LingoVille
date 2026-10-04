@@ -18,6 +18,16 @@ export const de: UiStrings = {
   },
   places: {
     home: 'Zuhause',
+    cafe: 'Café',
+    supermarket: 'Supermarkt',
+    'convenience-store': 'Spätkauf',
+    restaurant: 'Restaurant',
+    clinic: 'Klinik',
+    park: 'Park',
+    'tram-stop': 'Haltestelle',
+    bookshop: 'Buchhandlung',
+    bathhouse: 'Badehaus',
+    'town-office': 'Rathaus',
   },
   roles: {
     barista: {
@@ -155,6 +165,14 @@ export const de: UiStrings = {
     money: 'Geld',
     day: 'Tag {{day}} · {{weekday}}',
     saved: 'Gespeichert ✓',
+  },
+  placeLine: {
+    label: 'Ort',
+    hours: '{{opens}}–{{closes}}',
+    allDay: 'Rund um die Uhr geöffnet',
+    closedOn: 'Geschlossen: {{days}}',
+    openNow: 'Jetzt geöffnet',
+    closedNow: 'Jetzt geschlossen',
   },
   gateway: {
     checking: 'Gateway wird geprüft…',

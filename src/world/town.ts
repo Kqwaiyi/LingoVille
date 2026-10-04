@@ -64,12 +64,18 @@ export const SPOT_FOR_PROP: Record<PropId, 'door' | 'counter'> = {
 
 /**
  * Where the Character starts at each place. At home it stands facing the tap
- * (the First Morning); elsewhere just inside the door.
+ * (the First Morning); elsewhere just inside the door. Only the places built
+ * so far have one; the rest of the 11 arrive with the greybox town (ticket 13b).
  */
-export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
+export const SPAWN_POINTS: Partial<Record<PlaceId, Vec3>> = {
   home: [-10, 1, 0.5],
   cafe: [12, 1, 1.5],
 };
+
+/** Just inside the door of this place, or home's spawn point if it isn't built yet. */
+export function spawnAt(placeId: PlaceId): Vec3 {
+  return SPAWN_POINTS[placeId] ?? SPAWN_POINTS.home!;
+}
 
 /** Back from a save at home, the Character wakes up in bed. It drops onto the mattress. */
 export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
@@ -80,8 +86,8 @@ export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
  * saved place's entrance, or in bed if that's home.
  */
 export function spawnPoint(arrival: Arrival, placeId: PlaceId, search: string): Vec3 {
-  if (arrival === 'newGame') return SPAWN_POINTS[devSpawnPlace(search)];
-  return placeId === 'home' ? IN_BED : SPAWN_POINTS[placeId];
+  if (arrival === 'newGame') return spawnAt(devSpawnPlace(search));
+  return placeId === 'home' ? IN_BED : spawnAt(placeId);
 }
 
 /** Dev only: `?spawn=cafe` starts a new game at the café door, so a smoke test doesn't have to walk across town. */

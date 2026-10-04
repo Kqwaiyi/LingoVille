@@ -31,11 +31,18 @@ body,
   color: #445;
 }
 
-.dock {
+.dock-area {
   position: absolute;
   left: 50%;
   bottom: 14px;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dock {
   display: flex;
   align-items: center;
   gap: 18px;
@@ -44,6 +51,28 @@ body,
   color: var(--hud-ink);
   border-radius: 18px;
   user-select: none;
+}
+
+.place-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 999px;
+  font-size: 13px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.place-status {
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.place-status[data-open='false'] {
+  color: var(--hud-muted);
 }
 
 .ring {
@@ -123,7 +152,8 @@ body,
 .prompt {
   position: absolute;
   left: 50%;
-  bottom: 120px;
+  /* Clear of the dock and the place line above it. */
+  bottom: 160px;
   transform: translateX(-50%);
   padding: 6px 14px;
   background: var(--hud-bg);
@@ -223,7 +253,7 @@ body,
 }
 
 /* The dock shrinks and centres on the scene left of the column. */
-.game[data-talking] .dock {
+.game[data-talking] .dock-area {
   left: calc((100% - var(--chat-width)) / 2);
   transform: translateX(-50%) scale(0.85);
   transform-origin: bottom center;

@@ -6,8 +6,20 @@ import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingSt
 export const LANGUAGE_CODES = ['ja', 'zh', 'en', 'de'] as const;
 export type LanguageCode = (typeof LANGUAGE_CODES)[number];
 
-/** Places the Character can be at. The town grows to 11 places later. */
-export const PLACE_IDS = ['home', 'cafe'] as const;
+/** The town's 11 places. The Character is always at one of them. */
+export const PLACE_IDS = [
+  'home',
+  'cafe',
+  'supermarket',
+  'convenience-store',
+  'restaurant',
+  'clinic',
+  'park',
+  'tram-stop',
+  'bookshop',
+  'bathhouse',
+  'town-office',
+] as const;
 export type PlaceId = (typeof PLACE_IDS)[number];
 
 export const LIFE_SKILL_IDS = ['cooking', 'fitness', 'barista', 'cashier', 'server'] as const;

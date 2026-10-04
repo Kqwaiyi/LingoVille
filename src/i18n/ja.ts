@@ -18,6 +18,16 @@ export const ja: UiStrings = {
   },
   places: {
     home: '自宅',
+    cafe: 'カフェ',
+    supermarket: 'スーパー',
+    'convenience-store': 'コンビニ',
+    restaurant: 'レストラン',
+    clinic: '病院',
+    park: '公園',
+    'tram-stop': '電停',
+    bookshop: '本屋',
+    bathhouse: '銭湯',
+    'town-office': '役所',
   },
   roles: {
     barista: {
@@ -155,6 +165,14 @@ export const ja: UiStrings = {
     money: 'お金',
     day: '{{day}}日目 · {{weekday}}',
     saved: '保存しました ✓',
+  },
+  placeLine: {
+    label: '場所',
+    hours: '{{opens}}–{{closes}}',
+    allDay: '24時間営業',
+    closedOn: '定休日：{{days}}',
+    openNow: '営業中',
+    closedNow: '営業時間外',
   },
   gateway: {
     checking: 'ゲートウェイを確認中…',

@@ -31,6 +31,7 @@ export { INTERACTIONS } from './interactions.ts';
 export { CAFE_MENU, ITEM_IDS, ITEMS, type Item, type ItemId, type Restores } from './items.ts';
 export { NAMED_NPCS, type NamedNpc, type NamedNpcId } from './npcs.ts';
 export { PLACE_PHRASEBOOKS, placePhrasebook, placePhrasebookSchema, type PlacePhrase } from './phrasebooks.ts';
-export { formatTime, PLACE_HOURS, placeHours, type OpeningHours } from './places.ts';
+export { placeHours } from './openingHours.ts';
+export { formatTime, HOURS_IDS, PLACE_HOURS, SERVICE_HOURS, type HoursId } from './places.ts';
 export { SIGN_IDS, worldSign, type SignId, type SignLine } from './signs.ts';
 export { toGeminiSchema, toToolDeclaration, type FunctionDeclaration, type ToolSchema } from './toolDeclaration.ts';

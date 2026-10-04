@@ -1,4 +1,4 @@
-import { advanceClock } from './clock.ts';
+import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
 import { clampMeter } from './meters.ts';
 import type { GameState, PlaceId } from './state.ts';
 import { METER_MAX, WELL_BEING } from './tuning.ts';
@@ -31,9 +31,9 @@ export function tick(state: GameState, dtGameMinutes: number): GameState {
   };
 }
 
-/** The Character walks into a place. */
-export function enterPlace(state: GameState, placeId: PlaceId): GameState {
-  if (state.placeId === placeId) return state;
+/** The Character walks into a place, given its hours in this pack. A closed place can't be entered. */
+export function enterPlace(state: GameState, placeId: PlaceId, hours: OpeningHours): GameState {
+  if (state.placeId === placeId || !isOpen(hours, state.clock)) return state;
   return { ...state, placeId };
 }
 

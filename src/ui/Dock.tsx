@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { formatLocalMoney } from '../content/index.ts';
+import { formatLocalMoney, formatTime } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import { METER_MAX, SAVE, WELL_BEING } from '../sim/index.ts';
 import {
@@ -10,12 +10,16 @@ import {
   selectHunger,
   selectMood,
   selectMoneyInShifts,
+  selectPlaceHours,
+  selectPlaceId,
+  selectPlaceOpen,
   selectSavedCount,
   selectThirst,
   selectWeekday,
   useGame,
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
+import { usePlaceName } from './placeName.ts';
 
 function RingGauge({ label, icon, value, tone }: { label: string; icon: string; value: number; tone?: 'mood' }) {
   const percent = Math.round((value / METER_MAX) * 100);
@@ -66,7 +70,47 @@ function SavedNotice() {
   return <div className="dock-saved">{shownFor > 0 ? t('dock.saved') : ''}</div>;
 }
 
-/** The always-visible dock at the bottom centre: Well-being, Mood, the clock and money. */
+/** Just above the dock: where the Character is, its opening hours, and whether it's open now. Home has no hours to show. */
+function PlaceLine() {
+  const { t, i18n } = useTranslation();
+  const placeId = useGame(selectPlaceId);
+  const packId = useGame(selectCulturePackId);
+  const hours = useGame(selectPlaceHours);
+  const open = useGame(selectPlaceOpen);
+  const placeName = usePlaceName();
+
+  const parts = [placeName(placeId, packId)];
+  if (placeId !== 'home') {
+    if (hours === null) parts.push(t('placeLine.allDay'));
+    else {
+      parts.push(
+        t('placeLine.hours', {
+          opens: formatTime(hours.opensAt),
+          closes: formatTime(hours.closesAt),
+        }),
+      );
+      if (hours.closedOn.length > 0) {
+        const days = new Intl.ListFormat(i18n.language, {
+          type: 'conjunction',
+        }).format(hours.closedOn.map((day) => t(`weekdays.${day}`)));
+        parts.push(t('placeLine.closedOn', { days }));
+      }
+    }
+  }
+
+  return (
+    <div className="place-line" role="status" aria-label={t('placeLine.label')}>
+      <span>{parts.join(' · ')}</span>
+      {placeId !== 'home' && (
+        <span className="place-status" data-open={open}>
+          {t(open ? 'placeLine.openNow' : 'placeLine.closedNow')}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** The always-visible dock at the bottom centre: Well-being, Mood, the clock and money, with the place line above it. */
 export function Dock() {
   const { t } = useTranslation();
   const health = useGame(selectHealth);
@@ -78,22 +122,25 @@ export function Dock() {
   const weekday = useGame(selectWeekday);
 
   return (
-    <section className="dock" aria-label={t('dock.label')}>
-      <RingGauge label={t('dock.health')} icon="❤️" value={health} />
-      <RingGauge label={t('dock.hunger')} icon="🍙" value={hunger} />
-      <RingGauge label={t('dock.thirst')} icon="💧" value={thirst} />
-      {/* The face starts to follow Mood once Mood moves (ticket 15). */}
-      <RingGauge label={t('dock.mood')} icon="🙂" value={mood} tone="mood" />
-      <div className="dock-sep" aria-hidden />
-      <div className="dock-clock">
-        <time className="dock-time" aria-label={t('dock.time')}>
-          {formatClock(minute)}
-        </time>
-        <div className="dock-day">{t('dock.day', { day, weekday: t(`weekdays.${weekday}`) })}</div>
-        <SavedNotice />
-      </div>
-      <div className="dock-sep" aria-hidden />
-      <Money />
-    </section>
+    <div className="dock-area">
+      <PlaceLine />
+      <section className="dock" aria-label={t('dock.label')}>
+        <RingGauge label={t('dock.health')} icon="❤️" value={health} />
+        <RingGauge label={t('dock.hunger')} icon="🍙" value={hunger} />
+        <RingGauge label={t('dock.thirst')} icon="💧" value={thirst} />
+        {/* The face starts to follow Mood once Mood moves (ticket 15). */}
+        <RingGauge label={t('dock.mood')} icon="🙂" value={mood} tone="mood" />
+        <div className="dock-sep" aria-hidden />
+        <div className="dock-clock">
+          <time className="dock-time" aria-label={t('dock.time')}>
+            {formatClock(minute)}
+          </time>
+          <div className="dock-day">{t('dock.day', { day, weekday: t(`weekdays.${weekday}`) })}</div>
+          <SavedNotice />
+        </div>
+        <div className="dock-sep" aria-hidden />
+        <Money />
+      </section>
+    </div>
   );
 }

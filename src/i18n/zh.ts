@@ -18,6 +18,16 @@ export const zh: UiStrings = {
   },
   places: {
     home: '家',
+    cafe: '咖啡馆',
+    supermarket: '超市',
+    'convenience-store': '便利店',
+    restaurant: '餐厅',
+    clinic: '医院',
+    park: '公园',
+    'tram-stop': '电车站',
+    bookshop: '书店',
+    bathhouse: '澡堂',
+    'town-office': '办事处',
   },
   roles: {
     barista: {
@@ -155,6 +165,14 @@ export const zh: UiStrings = {
     money: '钱',
     day: '第 {{day}} 天 · {{weekday}}',
     saved: '已保存 ✓',
+  },
+  placeLine: {
+    label: '地点',
+    hours: '{{opens}}–{{closes}}',
+    allDay: '24小时营业',
+    closedOn: '休息日：{{days}}',
+    openNow: '营业中',
+    closedNow: '已打烊',
   },
   gateway: {
     checking: '正在检查网关…',

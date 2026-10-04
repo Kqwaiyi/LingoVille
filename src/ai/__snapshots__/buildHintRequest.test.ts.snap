@@ -56,7 +56,7 @@ They are a customer at Café Stern, talking to the barista, and they have asked 
 THE SITUATION
 The barista's goal: Take the customer's order.
 What the barista knows:
-- Café Stern is open 08:00–18:00.
+- Café Stern is open 08:00–18:00, closed on Sundays.
 - On the menu: Latte macchiato, 4,50 € (menu id "latte").
 - On the menu: Filterkaffee, 3,80 € (menu id "coffee").
 - On the menu: Schwarztee, 3 € (menu id "tea").

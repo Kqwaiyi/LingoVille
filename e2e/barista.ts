@@ -14,9 +14,13 @@ export const npcLine = (page: Page, text: string) => chat(page).getByRole('butto
 // What the scripted fake barista says in the ja pack (mock mode).
 export const GREETING = 'いらっしゃいませ！ご注文はお決まりですか？';
 
-/** Starts a new game at the café door (learning Japanese, or the language `target` names) and walks up to the counter until the barista can be talked to. */
+/**
+ * Starts a new game at the café door at 09:00 (learning Japanese, or the
+ * language `target` names) and walks up to the counter until the barista can
+ * be talked to. At 07:00, when the First Morning starts, the de café isn't open yet.
+ */
 export async function walkToTheBarista(page: Page, target?: Language) {
-  await startNewGame(page, { path: '/?spawn=cafe', target });
+  await startNewGame(page, { path: '/?spawn=cafe&at=9', target });
   await page.locator('canvas').click();
   await page.keyboard.down('KeyW');
   await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });

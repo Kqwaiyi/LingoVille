@@ -1,11 +1,29 @@
 import { Html } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
+import { useState } from 'react';
 import type { NamedNpcId } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { selectNpcSpeaking, useGame } from '../store/index.ts';
+import { selectIsOpen, selectNpcSpeaking, useGame } from '../store/index.ts';
+import { characterPosition } from './Character.tsx';
 import { Props } from './Props.tsx';
 import { Signs } from './Signs.tsx';
-import { BARISTA, BUILDINGS, CAFE_COUNTER, GROUND_HALF_SIZE, HOME_BED, HOME_TAP, STREET, WALL, type Building, type Vec3 } from './town.ts';
+import {
+  BARISTA,
+  BUILDINGS,
+  CAFE_COUNTER,
+  GROUND_HALF_SIZE,
+  HOME_BED,
+  HOME_TAP,
+  placeAt,
+  STREET,
+  WALL,
+  type Building,
+  type Vec3,
+} from './town.ts';
+
+/** How near the doorway the Character can be before a closing door would shut on them. */
+const DOORWAY_CLEARANCE = 1.5;
 
 /** A solid greybox box that the Character collides with. */
 function Block({ position, size, colour }: { position: Vec3; size: Vec3; colour: string }) {
@@ -48,6 +66,25 @@ function Npc({ npcId, position, colour }: { npcId: NamedNpcId; position: Vec3; c
   );
 }
 
+/**
+ * The door of a closed place: shut, so no one can walk in. It never shuts on
+ * the Character, though. Inside at closing time (or in the doorway), they can
+ * still walk out, and only then does the door close behind them.
+ */
+function ClosedDoor({ building, position }: { building: Building; position: Vec3 }) {
+  const open = useGame(selectIsOpen(building.placeId));
+  const [clear, setClear] = useState(false);
+
+  useFrame(() => {
+    const { x, z } = characterPosition;
+    const nowClear = placeAt(x, z) !== building.placeId && Math.hypot(x - position[0], z - position[2]) > DOORWAY_CLEARANCE;
+    if (nowClear !== clear) setClear(nowClear);
+  });
+
+  if (open || !clear) return null;
+  return <Block position={position} size={[WALL.doorWidth, WALL.height, WALL.thickness / 2]} colour="#6b5b4d" />;
+}
+
 /** Four walls with a doorway in the front (+z) wall, and a floor. No roof, so the camera can see in. */
 function BuildingShell({ building }: { building: Building }) {
   const [cx, cz] = building.centre;
@@ -67,6 +104,7 @@ function BuildingShell({ building }: { building: Building }) {
       <Block position={[cx + w / 2 - t / 2, y, cz]} size={[t, h, d]} colour={building.colour} />
       <Block position={[cx - w / 2 + frontSegment / 2, y, cz + d / 2 - t / 2]} size={[frontSegment, h, t]} colour={building.colour} />
       <Block position={[cx + w / 2 - frontSegment / 2, y, cz + d / 2 - t / 2]} size={[frontSegment, h, t]} colour={building.colour} />
+      <ClosedDoor building={building} position={[cx, y, cz + d / 2 - t / 2]} />
     </>
   );
 }

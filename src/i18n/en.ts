@@ -18,7 +18,17 @@ export const en = {
     sunday: 'Sunday',
   },
   places: {
-    home: 'home',
+    home: 'Home',
+    cafe: 'Café',
+    supermarket: 'Supermarket',
+    'convenience-store': 'Convenience store',
+    restaurant: 'Restaurant',
+    clinic: 'Clinic',
+    park: 'Park',
+    'tram-stop': 'Tram stop',
+    bookshop: 'Bookshop',
+    bathhouse: 'Bathhouse',
+    'town-office': 'Town office',
   },
   roles: {
     barista: {
@@ -74,7 +84,7 @@ export const en = {
     romajiNote: 'A romaji line under each Japanese line.',
   },
   slots: {
-    where: 'Day {{day}} at {{place}}',
+    where: 'Day {{day}} · {{place}}',
     lastPlayed: 'Last played {{when}}',
     unknownTime: 'at an unknown time',
     neverPlayed: 'Never played',
@@ -158,6 +168,14 @@ export const en = {
     money: 'Money',
     day: 'Day {{day}} · {{weekday}}',
     saved: 'Saved ✓',
+  },
+  placeLine: {
+    label: 'Place',
+    hours: '{{opens}}–{{closes}}',
+    allDay: 'Open 24 hours',
+    closedOn: 'Closed: {{days}}',
+    openNow: 'Open now',
+    closedNow: 'Closed now',
   },
   gateway: {
     checking: 'Checking gateway…',

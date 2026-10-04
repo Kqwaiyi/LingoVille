@@ -24,6 +24,7 @@ import {
   CULTURE_PACKS,
   INTERACTIONS,
   NAMED_NPCS,
+  placeHours,
   placePhrasebook,
   worldSign,
   type AppearancePresetId,
@@ -41,6 +42,7 @@ import {
   drinkWater,
   enterPlace,
   gameMinutesFor,
+  isOpen,
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
@@ -295,6 +297,8 @@ export type GameStoreDeps = {
   downloadFile: (file: SaveFile) => void;
   /** The RNG seed for a new game. */
   newRngSeed: () => number;
+  /** Dev only: the hour a new game starts at instead of the First Morning's, or null. */
+  devStartHour: () => number | null;
   /** Opens the mic for the mic check. */
   openMic: OpenMic;
 };
@@ -372,8 +376,16 @@ const BROWSER_DEPS: GameStoreDeps = {
   storage: browserStorage,
   downloadFile: downloadInBrowser,
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
+  devStartHour: devStartHourFromUrl,
   openMic: openBrowserMic,
 };
+
+/** Dev only: `?at=9` starts a new game at 09:00, so a smoke test can reach a place that opens after the First Morning. */
+function devStartHourFromUrl(): number | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const hour = Number(new URLSearchParams(window.location.search).get('at') ?? NaN);
+  return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
+}
 
 export type GameStore = {
   screen: Screen;
@@ -500,6 +512,12 @@ export type GameStore = {
 
 const isNpc = (interactable: Interactable | null): interactable is NamedNpcId =>
   interactable !== null && interactable in NAMED_NPCS;
+
+/** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
+const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
+
+/** Staff can be talked to only while their place is open. Closing time stops new conversations, never one under way. */
+const isAtWork = (npcId: NamedNpcId, game: GameState) => isPlaceOpen(NAMED_NPCS[npcId].placeId, game);
 
 /**
  * A game store. Given a game, it is already playing it in the first slot;
@@ -667,16 +685,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // The pre-selected language counts as chosen too, so it no longer follows the browser's.
       const nativeLanguage = get().nativeLanguage;
       updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
+      const game = createSave({
+        characterName: characterName.trim(),
+        targetLanguage: targetLanguage!,
+        culturePackId: targetLanguage!,
+        startingStep: startingStep!,
+        appearancePresetId,
+        skipFirstMorning,
+        rngSeed: deps.newRngSeed(),
+      });
+      const startHour = deps.devStartHour();
       play(
-        createSave({
-          characterName: characterName.trim(),
-          targetLanguage: targetLanguage!,
-          culturePackId: targetLanguage!,
-          startingStep: startingStep!,
-          appearancePresetId,
-          skipFirstMorning,
-          rngSeed: deps.newRngSeed(),
-        }),
+        startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } },
         setup.slotId,
         'newGame',
       );
@@ -1189,7 +1209,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       // The world calls these every frame, so they only notify on a change.
       enterPlace: (placeId) => {
-        const game = enterPlace(get().game, placeId);
+        const before = get().game;
+        const game = enterPlace(before, placeId, placeHours(placeId, before.identity.culturePackId));
         if (game === get().game) return;
         set({ game });
         // Through a door.
@@ -1224,7 +1245,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
       talk: () => {
         const { interactable, conversation, game } = get();
-        if (conversation || get().journal || !isNpc(interactable)) return;
+        if (conversation || get().journal || !isNpc(interactable) || !isAtWork(interactable, game)) return;
         const npc = NAMED_NPCS[interactable];
         const interaction = Object.values(INTERACTIONS).find((i) => i.npcId === npc.id)!;
         gameBeforeConversation = game;
@@ -1452,7 +1473,14 @@ export const selectWeekday = (s: GameStore) => weekdayOf(s.game.clock.day);
 /** Whole game minutes since midnight, so the clock re-renders once a game minute. */
 export const selectClockMinute = (s: GameStore) => Math.floor(s.game.clock.minuteOfDay);
 export const selectPlaceId = (s: GameStore) => s.game.placeId;
-export const selectInteractable = (s: GameStore) => s.interactable;
+/** What E would use here. Staff at a closed place don't count: there's no one to talk to. */
+export const selectInteractable = (s: GameStore) =>
+  isNpc(s.interactable) && !isAtWork(s.interactable, s.game) ? null : s.interactable;
+/** The current place's opening hours in this pack, for the place line above the dock. */
+export const selectPlaceHours = (s: GameStore) => placeHours(s.game.placeId, s.game.identity.culturePackId);
+/** Any place is open now: the world shuts the door of one that isn't. */
+export const selectIsOpen = (placeId: PlaceId) => (s: GameStore) => isPlaceOpen(placeId, s.game);
+export const selectPlaceOpen = (s: GameStore) => selectIsOpen(s.game.placeId)(s);
 export const selectConversation = (s: GameStore) => s.conversation;
 const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;

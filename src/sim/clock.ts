@@ -8,7 +8,24 @@ export type Weekday = (typeof WEEKDAYS)[number];
 
 /** Day 1 is a Monday. */
 export function weekdayOf(day: number): Weekday {
-  return WEEKDAYS[(day - 1) % WEEKDAYS.length]!;
+  const days = WEEKDAYS.length;
+  return WEEKDAYS[(((day - 1) % days) + days) % days]!;
+}
+
+/**
+ * When a place is open, in minutes since midnight. A `closesAt` past 24:00
+ * runs on into the next morning. On a `closedOn` weekday it doesn't open at
+ * all. Null means always open.
+ */
+export type OpeningHours = { opensAt: number; closesAt: number; closedOn: readonly Weekday[] } | null;
+
+/** The place is open at this moment: today's hours, or the tail of yesterday's that runs past midnight. */
+export function isOpen(hours: OpeningHours, clock: GameState['clock']): boolean {
+  if (hours === null) return true;
+  const { day, minuteOfDay } = clock;
+  const openOn = (d: number, minute: number) =>
+    !hours.closedOn.includes(weekdayOf(d)) && minute >= hours.opensAt && minute < hours.closesAt;
+  return openOn(day, minuteOfDay) || openOn(day - 1, minuteOfDay + CLOCK.minutesPerDay);
 }
 
 /**

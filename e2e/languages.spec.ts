@@ -100,6 +100,7 @@ test('German strings fit in the dock and the conversation column', async ({ page
   await expect(dock.getByText('Tag 1 · Montag')).toBeVisible();
   expect(await overflowing(dock, { vertical: true })).toEqual([]);
   expect(await overlappingRingLabels(dock)).toBe(false);
+  expect(await overflowing(page.getByRole('status', { name: 'Ort' }), { vertical: true })).toEqual([]);
 
   await page.locator('canvas').click();
   await page.keyboard.down('KeyW');

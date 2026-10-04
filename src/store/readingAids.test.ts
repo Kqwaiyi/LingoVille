@@ -65,7 +65,9 @@ let databases = 0;
 
 /** A café in the given language whose barista, annotations and Recaps the test speaks for. */
 function cafe(language: LanguageCode = 'ja', overrides: Partial<GameStoreDeps> = {}) {
-  const game: GameState = createSave({ ...DEV_SETUP, targetLanguage: language, culturePackId: language });
+  const save = createSave({ ...DEV_SETUP, targetLanguage: language, culturePackId: language });
+  // Mid-morning, when the café is open in every pack (the de café opens at 08:00).
+  const game: GameState = { ...save, clock: { ...save.clock, minuteOfDay: 10 * 60 } };
   const npc = {
     events: null as VoiceSessionEvents | null,
     speaks(text: string) {

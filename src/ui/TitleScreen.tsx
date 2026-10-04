@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CULTURE_PACKS, formatLocalMoney } from '../content/index.ts';
+import { formatLocalMoney } from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
 import {
   nameToDelete,
@@ -13,6 +13,7 @@ import {
 } from '../store/index.ts';
 import { formatTimeAgo } from './format.ts';
 import { PersistCallout } from './PersistCallout.tsx';
+import { usePlaceName } from './placeName.ts';
 
 type ReadyTitle = Extract<TitleView, { status: 'ready' }>;
 type MenuItem = 'continue' | 'load' | 'newGame' | 'import' | 'settings';
@@ -263,7 +264,7 @@ function useTimeAgo() {
 function SlotSummary({ card }: { card: ReadyCard }) {
   const { t } = useTranslation();
   const timeAgo = useTimeAgo();
-  const place = card.placeId === 'home' ? t('places.home') : CULTURE_PACKS[card.culturePackId].cafe.name;
+  const place = usePlaceName()(card.placeId, card.culturePackId);
   return (
     <div className="slot-summary">
       <strong>

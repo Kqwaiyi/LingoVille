@@ -46,7 +46,7 @@ test('Load a save shows a card per slot, and a save can be exported, deleted by 
   await newGameSavedThenReload(page);
   await openLoadASave(page);
   await expect(slotRow(page, 1)).toContainText('Sam · Japanese');
-  await expect(slotRow(page, 1)).toContainText('Day 1 at home');
+  await expect(slotRow(page, 1)).toContainText('Day 1 · Home');
   await expect(slotRow(page, 1)).toContainText('¥10,000');
   await expect(slotRow(page, 2)).toContainText('Empty · New game or Import');
 

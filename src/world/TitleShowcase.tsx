@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber';
 import { selectTitlePlaceId, useGame } from '../store/index.ts';
 import { CharacterModel, STANDING_HEIGHT } from './Character.tsx';
-import { SPAWN_POINTS } from './town.ts';
+import { spawnAt } from './town.ts';
 
 /** How the title screen frames the Character: from above the front wall, with a slow side-to-side drift. */
 const SHOWCASE = {
@@ -22,7 +22,7 @@ const SHOWCASE = {
  */
 export function TitleShowcase() {
   const placeId = useGame(selectTitlePlaceId);
-  const [x, , z] = SPAWN_POINTS[placeId];
+  const [x, , z] = spawnAt(placeId);
 
   useFrame(({ camera, clock }) => {
     const angle = Math.sin(clock.elapsedTime * SHOWCASE.driftSpeed) * SHOWCASE.swing;

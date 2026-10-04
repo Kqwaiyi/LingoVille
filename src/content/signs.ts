@@ -2,7 +2,8 @@ import type { LanguageCode } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { formatLocalMoney, menuPrice } from './currency.ts';
 import { CAFE_MENU } from './items.ts';
-import { formatTime, placeHours } from './places.ts';
+import { placeHours } from './openingHours.ts';
+import { formatTime } from './places.ts';
 
 // World text: the signs and menus the world paints as canvas textures, written
 // from the Culture Pack. Pointing at one shows each line's reading aid, and

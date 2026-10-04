@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { LANGUAGE_CODES, PLACE_IDS, type LanguageCode, type PlaceId } from '../sim/index.ts';
+import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours } from '../sim/index.ts';
 import { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
 import { ITEM_IDS, type ItemId } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
-import type { OpeningHours } from './places.ts';
+import { hours, HOURS_IDS, type HoursId } from './places.ts';
 
 // Each Culture Pack dresses the same town as Japan, China, the UK or Germany:
 // local names, prices, money, customs, signs, sounds and props. Everything the
@@ -48,8 +48,8 @@ export type CulturePack = {
   currency: Currency;
   /** Local customs the staff know, in English. */
   customs: string[];
-  /** Opening hours that differ from the town's defaults (`PLACE_HOURS`). */
-  hours: Partial<Record<PlaceId, OpeningHours>>;
+  /** Opening hours that differ from the town's defaults (`PLACE_HOURS`, `SERVICE_HOURS`). */
+  hours: Partial<Record<HoursId, OpeningHours>>;
   /** Ambient one-shot sound ids, played now and then around the town (ticket 32). */
   ambient: string[];
   goods: Record<ItemId, Good>;
@@ -71,8 +71,7 @@ export type CulturePack = {
   props: PropId[];
 };
 
-const HOUR = 60;
-const hours = (opensAt: number, closesAt: number) => ({ opensAt: opensAt * HOUR, closesAt: closesAt * HOUR });
+const DAY = CLOCK.minutesPerDay;
 
 /** The schema a Culture Pack must pass. Its glosses must cover exactly the three other Native Languages. */
 export function culturePackSchema(packId: LanguageCode) {
@@ -81,8 +80,14 @@ export function culturePackSchema(packId: LanguageCode) {
   const glosses = z.strictObject(Object.fromEntries(others.map((language) => [language, text])));
   const kebab = z.string().regex(/^[a-z]+(-[a-z]+)*$/);
   const openingHours = z
-    .object({ opensAt: z.int().min(0).max(24 * HOUR), closesAt: z.int().min(0).max(24 * HOUR) })
+    .object({
+      opensAt: z.int().min(0).max(DAY),
+      // Past 24:00 runs into the next morning, but it must close before opening time comes round again.
+      closesAt: z.int().min(0).max(2 * DAY),
+      closedOn: z.array(z.enum(WEEKDAYS)),
+    })
     .refine(({ opensAt, closesAt }) => opensAt < closesAt, 'A place must open before it closes.')
+    .refine(({ opensAt, closesAt }) => closesAt - opensAt < DAY, 'Open all day is null, not 24 hours.')
     .nullable();
   const priceSteps = z
     .array(z.object({ below: z.number().positive().optional(), step: z.number().positive() }))
@@ -102,7 +107,7 @@ export function culturePackSchema(packId: LanguageCode) {
       priceSteps,
     }),
     customs: z.array(text),
-    hours: z.partialRecord(z.enum(PLACE_IDS), openingHours),
+    hours: z.partialRecord(z.enum(HOURS_IDS), openingHours),
     ambient: z.array(kebab),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
@@ -244,7 +249,15 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'At the counter tipping is optional; people often round up.',
       'Cash is still common, and some cafés only take card above a few euros.',
     ],
-    hours: { cafe: hours(8, 18) },
+    // Almost everything shuts on Sunday. The bathhouse, the Fainting ward, the
+    // convenience store and the trams don't; the clinic and town office already do.
+    hours: {
+      cafe: hours(8, 18, ['sunday']),
+      supermarket: hours(9, 21, ['sunday']),
+      restaurant: hours(11, 22, ['monday', 'sunday']),
+      bookshop: hours(10, 20, ['sunday']),
+      landlord: hours(8, 20, ['sunday']),
+    },
     ambient: ['tram-bell', 'church-bells', 'bicycle-bell', 'shop-door-chime'],
     goods: {
       latte: { name: 'Latte macchiato', glosses: { ja: 'ラテ・マキアート', zh: '拿铁玛奇朵', en: 'Latte macchiato' } },
