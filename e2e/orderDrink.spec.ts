@@ -7,23 +7,23 @@ const money = (page: Page) => dock(page).getByLabel('Money');
 
 test('ordering a drink with the Typed Fallback: read-back, confirm, closing card and the money drop', async ({ page }) => {
   await talkToTheBarista(page);
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
 
   await typeLine(page, 'ホットラテ ください');
   await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
   // Nothing is served or charged before the Player confirms.
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
 
   await typeLine(page, 'はい');
   await expect(npcLine(page, 'ありがとうございます！こちら、どうぞ。またお越しくださいませ。')).toBeVisible();
 
   await expect(closingCard(page)).toBeVisible();
   await expect(closingCard(page).getByText('Hot latte · −¥450 · Mood ↑')).toBeVisible();
-  await expect(money(page)).toHaveText('¥9,750');
+  await expect(money(page)).toHaveText('¥9,550');
 
   await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
   await expect(column(page)).toBeHidden();
-  await expect(money(page)).toHaveText('¥9,750');
+  await expect(money(page)).toHaveText('¥9,550');
 });
 
 test('gibberish wears out the barista’s Patience, shown only on their face, until they end it with no charge', async ({ page }) => {
@@ -45,7 +45,7 @@ test('gibberish wears out the barista’s Patience, shown only on their face, un
   await expect(npcLine(page, '申し訳ございません…。またのお越しをお待ちしております。')).toBeVisible();
 
   await expect(closingCard(page).getByText('No charge · Mood ↓')).toBeVisible();
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
   // Patience is never shown as a number.
   await expect(column(page).getByText(/patience/i)).toHaveCount(0);
 

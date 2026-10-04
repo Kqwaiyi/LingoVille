@@ -2,6 +2,8 @@ import { Html } from '@react-three/drei';
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
 import type { NamedNpcId } from '../content/index.ts';
 import { selectNpcSpeaking, useGame } from '../store/index.ts';
+import { Props } from './Props.tsx';
+import { Signs } from './Signs.tsx';
 import { BARISTA, BUILDINGS, CAFE_COUNTER, GROUND_HALF_SIZE, HOME_BED, HOME_TAP, STREET, WALL, type Building, type Vec3 } from './town.ts';
 
 /** A solid greybox box that the Character collides with. */
@@ -90,6 +92,8 @@ export function Town() {
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={CAFE_COUNTER} size={[4, 1.1, 0.8]} colour="#8b6a4f" />
       <Npc npcId="barista" position={BARISTA} colour="#7fb3a3" />
+      <Signs />
+      <Props />
     </RigidBody>
   );
 }

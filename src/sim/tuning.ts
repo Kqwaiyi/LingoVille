@@ -45,6 +45,8 @@ export const MOVEMENT = {
   interactRangeMetres: 1.6,
   /** How close the Character must be to talk to an NPC. Walking further away ends the conversation. */
   talkRangeMetres: 2.5,
+  /** How close the Character must be for pointing at a sign or menu to show its reading aid. */
+  signReadRangeMetres: 6,
 } as const;
 
 // --- First Morning ----------------------------------------------------------
@@ -52,7 +54,8 @@ export const MOVEMENT = {
 export const FIRST_MORNING = {
   day: 1,
   minuteOfDay: CLOCK.wakeAt,
-  moneyInShifts: 1.7,
+  /** ¥10,000, 400元, €100 or £100: the same in every pack's anchor. */
+  moneyInShifts: 5 / 3,
   health: METER_MAX,
   hunger: 0.6 * METER_MAX,
   thirst: 0.4 * METER_MAX,
@@ -71,6 +74,8 @@ export const WELL_BEING = {
   lowWarningAt: 0.25 * METER_MAX,
   /** Thirst one café drink gives back. */
   cafeDrinkThirst: 0.4 * METER_MAX,
+  /** Hunger one café pastry gives back. */
+  cafeFoodHunger: 0.25 * METER_MAX,
 } as const;
 
 // --- Economy (prices as ratios of one Shift's base pay) ---------------------
@@ -85,6 +90,8 @@ export const ECONOMY = {
   jobLifeSkillPayRaisePerLevel: 0.06,
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
+  /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
+  pricePointTolerance: 0.1,
 } as const;
 
 export const PROFICIENCY_STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;

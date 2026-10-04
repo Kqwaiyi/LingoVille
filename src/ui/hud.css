@@ -140,6 +140,77 @@ body,
   font-family: inherit;
 }
 
+/* --- Signs ---------------------------------------------------------------- */
+
+/* Pointing at a sign or menu: its words with their reading aid, and Translate. */
+.sign-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: 168px;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.sign-tooltip ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sign-tooltip li + li {
+  margin-top: 4px;
+}
+
+.sign-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sign-tooltip rt {
+  font-size: 0.6em;
+  color: var(--hud-muted);
+}
+
+.sign-tooltip .romaji-line {
+  color: var(--hud-muted);
+}
+
+.sign-note {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--hud-muted);
+}
+
+.sign-gloss {
+  display: block;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.sign-tooltip button {
+  margin-top: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--hud-muted);
+  border-radius: 999px;
+  background: none;
+  color: var(--hud-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sign-tooltip button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* --- Conversation ---------------------------------------------------------- */
 
 .game {

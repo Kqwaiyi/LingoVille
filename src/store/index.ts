@@ -2,6 +2,7 @@
 export {
   createGameStore,
   DEV_SETUP,
+  devSetup,
   gameStore,
   selectArrival,
   selectChatLines,
@@ -35,6 +36,7 @@ export {
   selectRecap,
   selectSavedCount,
   selectScreen,
+  selectSignTooltip,
   selectTargetLanguage,
   selectThirst,
   selectTimeScale,
@@ -66,6 +68,8 @@ export {
   type ReadingAidsSettings,
   type RecapView,
   type Screen,
+  type SignTooltip,
+  type SignTooltipLine,
   type TitleView,
   type Toast,
 } from './gameStore.ts';

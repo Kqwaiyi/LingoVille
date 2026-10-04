@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CAFE_ITEMS, CULTURE_PACKS, INTERACTIONS } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, INTERACTIONS, menuPrice, type ItemId } from '../content/index.ts';
 import { applyInteractionOutcome, createSave, METER_MAX, MOOD, WELL_BEING, type GameState } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
 
 const { orderDrink } = INTERACTIONS;
 const LATTE = { items: [{ item: 'latte', quantity: 1 }] };
+/** What an item costs on the ja menu, in Shifts. */
+const price = (item: ItemId) => menuPrice(item, 'ja');
 
 function atTheCafe(character: Partial<GameState['character']> = {}): GameState {
   const state = createSave(TEST_SETUP);
@@ -17,13 +19,13 @@ describe('applyInteractionOutcome', () => {
 
     const { state: after, result } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: LATTE });
 
-    expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - CAFE_ITEMS.latte.priceInShifts);
+    expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - price('latte'));
     expect(after.character.thirst).toBe(state.character.thirst + WELL_BEING.cafeDrinkThirst);
     expect(after.character.mood).toBe(state.character.mood + MOOD.changes.goalInteractionSuccess);
     expect(result).toEqual({
       kind: 'success',
-      served: [{ name: CULTURE_PACKS.ja.cafe.menu.latte, gloss: CAFE_ITEMS.latte.gloss, quantity: 1 }],
-      paidInShifts: CAFE_ITEMS.latte.priceInShifts,
+      served: [{ itemId: 'latte', name: CULTURE_PACKS.ja.goods.latte.name, glosses: CULTURE_PACKS.ja.goods.latte.glosses, quantity: 1 }],
+      paidInShifts: price('latte'),
       moodChange: MOOD.changes.goalInteractionSuccess,
     });
   });
@@ -34,9 +36,31 @@ describe('applyInteractionOutcome', () => {
 
     const { state: after } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: order });
 
-    const cost = 2 * CAFE_ITEMS.latte.priceInShifts + CAFE_ITEMS.tea.priceInShifts;
+    const cost = 2 * price('latte') + price('tea');
     expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - cost);
     expect(after.character.thirst).toBe(Math.min(METER_MAX, 3 * WELL_BEING.cafeDrinkThirst));
+  });
+
+  it('charges the price on the pack’s menu, at its local price point', () => {
+    const cafe = atTheCafe();
+    const state: GameState = { ...cafe, identity: { ...cafe.identity, culturePackId: 'de' } };
+    const order = { items: [{ item: 'coffee', quantity: 1 }] };
+
+    const { state: after, result } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: order });
+
+    const paid = state.character.moneyInShifts - after.character.moneyInShifts;
+    expect(formatLocalMoney(paid, 'de')).toBe(formatLocalMoney(menuPrice('coffee', 'de'), 'de'));
+    expect(result).toMatchObject({ served: [{ name: CULTURE_PACKS.de.goods.coffee.name }] });
+  });
+
+  it('a café pastry fills Hunger rather than Thirst', () => {
+    const state = atTheCafe({ hunger: 10 });
+    const order = { items: [{ item: 'pastry', quantity: 1 }] };
+
+    const { state: after } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: order });
+
+    expect(after.character.hunger).toBe(10 + WELL_BEING.cafeFoodHunger);
+    expect(after.character.thirst).toBe(state.character.thirst);
   });
 
   it('never lifts a meter past full, and reports the Mood change that actually happened', () => {
@@ -56,7 +80,7 @@ describe('applyInteractionOutcome', () => {
   });
 
   it('refuses an order the Character cannot afford, changing nothing', () => {
-    const state = atTheCafe({ moneyInShifts: CAFE_ITEMS.latte.priceInShifts / 2 });
+    const state = atTheCafe({ moneyInShifts: price('latte') / 2 });
 
     const { state: after, result } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: LATTE });
 
@@ -65,7 +89,7 @@ describe('applyInteractionOutcome', () => {
   });
 
   it('serves an order that costs exactly what the Character has', () => {
-    const state = atTheCafe({ moneyInShifts: CAFE_ITEMS.latte.priceInShifts });
+    const state = atTheCafe({ moneyInShifts: price('latte') });
 
     const { state: after, result } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: LATTE });
 

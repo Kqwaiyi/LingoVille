@@ -90,23 +90,30 @@ function NpcFace({ role }: { role: string }) {
   );
 }
 
-function outcomeLine(card: ClosingCard, packId: LanguageCode) {
+function outcomeLine(card: ClosingCard, packId: LanguageCode, nativeLanguage: LanguageCode) {
   // A meter already at its limit doesn't move, so there's nothing to show.
   const mood = card.moodChange === 0 ? [] : [card.moodChange > 0 ? 'Mood ↑' : 'Mood ↓'];
   if (card.kind === 'failure') return ['No charge', ...mood];
-  const items = card.served.map(({ gloss, quantity }) => (quantity > 1 ? `${gloss} ×${quantity}` : gloss)).join(', ');
+  const items = card.served
+    .map(({ name, glosses, quantity }) => {
+      // A pack glosses its items in every Native Language but its own, where the local name already reads.
+      const gloss = glosses[nativeLanguage] ?? name;
+      return quantity > 1 ? `${gloss} ×${quantity}` : gloss;
+    })
+    .join(', ');
   return [items, `−${formatLocalMoney(card.paidInShifts, packId)}`, ...mood];
 }
 
 /** Replaces the input bar once the conversation is over: the outcome, its effects, and the way on to the Recap. */
 function ClosingCardPanel({ card, role }: { card: ClosingCard; role: string }) {
   const packId = useGame(selectCulturePackId);
+  const nativeLanguage = useGame(selectNativeLanguage);
   const skipRecap = useGame((s) => s.skipRecap);
   const seeRecap = useGame((s) => s.seeRecap);
   return (
     <section className="closing-card" aria-label="Conversation over" data-outcome={card.kind}>
       <h2>{card.kind === 'success' ? 'Done!' : `The ${role} couldn’t understand you`}</h2>
-      <p>{outcomeLine(card, packId).join(' · ')}</p>
+      <p>{outcomeLine(card, packId, nativeLanguage).join(' · ')}</p>
       <div className="closing-card-actions">
         <button type="button" onClick={skipRecap} autoFocus>
           Skip Recap

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
-import { CAFE_ITEMS, CULTURE_PACKS } from '../content/index.ts';
+import { CULTURE_PACKS, menuPrice } from '../content/index.ts';
 import { createSave, MOOD, PROFICIENCY_STEP_TABLE, WELL_BEING, type GameState } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -14,6 +14,8 @@ import {
 } from './index.ts';
 
 const LATTE = { items: [{ item: 'latte', quantity: 1 }] };
+const LATTE_GOOD = CULTURE_PACKS.ja.goods.latte;
+const LATTE_PRICE = menuPrice('latte', 'ja');
 
 /** A stand-in NPC the test speaks for, recording what the store sends it and how it answers tool calls. */
 function fakeVoice() {
@@ -75,7 +77,7 @@ describe('ordering a drink', () => {
     const { character } = store.getState().game;
 
     expect(fake.answers).toEqual([{ result: 'served' }]);
-    expect(character.moneyInShifts).toBeCloseTo(before.character.moneyInShifts - CAFE_ITEMS.latte.priceInShifts);
+    expect(character.moneyInShifts).toBeCloseTo(before.character.moneyInShifts - LATTE_PRICE);
     expect(character.thirst).toBe(before.character.thirst + WELL_BEING.cafeDrinkThirst);
     expect(character.mood).toBe(before.character.mood + MOOD.changes.goalInteractionSuccess);
   });
@@ -89,8 +91,8 @@ describe('ordering a drink', () => {
     expect(fake.closed).toBe(true);
     expect(selectClosingCard(store.getState())).toEqual({
       kind: 'success',
-      served: [{ name: CULTURE_PACKS.ja.cafe.menu.latte, gloss: CAFE_ITEMS.latte.gloss, quantity: 1 }],
-      paidInShifts: CAFE_ITEMS.latte.priceInShifts,
+      served: [{ itemId: 'latte', name: LATTE_GOOD.name, glosses: LATTE_GOOD.glosses, quantity: 1 }],
+      paidInShifts: LATTE_PRICE,
       moodChange: MOOD.changes.goalInteractionSuccess,
     });
     // The transcript stays in the column behind the card.
@@ -152,7 +154,7 @@ describe('ordering a drink', () => {
   });
 
   it("tells the NPC when the Character can't afford it, and the conversation goes on", () => {
-    const { store, fake } = orderingADrink({ moneyInShifts: CAFE_ITEMS.latte.priceInShifts / 2 });
+    const { store, fake } = orderingADrink({ moneyInShifts: LATTE_PRICE / 2 });
     const game = store.getState().game;
 
     fake.calls('serve_order', LATTE);

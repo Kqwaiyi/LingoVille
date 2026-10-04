@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { CAFE_ITEM_IDS, defineInteraction, INTERACTIONS } from './index.ts';
+import { CAFE_MENU, defineInteraction, INTERACTIONS } from './index.ts';
 
 function interactionWith(args: z.ZodObject) {
   return defineInteraction({
@@ -9,6 +9,7 @@ function interactionWith(args: z.ZodObject) {
     npcId: 'barista',
     goal: 'Test goal.',
     facts: ['menu'],
+    items: [],
     completion: { name: 'do_thing', description: 'Does the thing.', args },
     band: 'B',
     effect: { kind: 'none' },
@@ -67,6 +68,7 @@ describe('defineInteraction', () => {
     ['an unknown band', { band: 'X' }],
     ['no facts', { facts: [] }],
     ['a completion name the model cannot call', { completion: { name: 'Serve Order', description: 'x', args: z.object({}) } }],
+    ['an item no pack knows', { items: ['champagne'] }],
     ['completion arguments that are not a Zod object', { completion: { name: 'serve', description: 'x', args: { items: [] } } }],
   ])('rejects a definition with %s', (_, override) => {
     const valid = {
@@ -75,6 +77,7 @@ describe('defineInteraction', () => {
       npcId: 'barista',
       goal: 'Test goal.',
       facts: ['menu'],
+      items: [],
       completion: { name: 'do_thing', description: 'Does the thing.', args: z.object({}) },
       band: 'B',
       effect: { kind: 'none' },
@@ -90,7 +93,7 @@ describe('Goal Interaction #1: order a drink', () => {
   it('declares serve_order with an item from the café menu and a quantity', () => {
     expect(orderDrink.toolDeclaration.name).toBe('serve_order');
     const item = orderDrink.toolDeclaration.parameters.properties!.items!.items!.properties!.item!;
-    expect(item.enum).toEqual([...CAFE_ITEM_IDS]);
+    expect(item.enum).toEqual([...CAFE_MENU]);
   });
 
   it('accepts an order of menu items and rejects anything else', () => {

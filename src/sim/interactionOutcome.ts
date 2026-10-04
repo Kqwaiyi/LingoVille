@@ -72,7 +72,7 @@ export function applyInteractionOutcome(
         },
       };
       const succeeded = changeMood(paid, MOOD.changes.goalInteractionSuccess);
-      const served = completion.lines.map(({ name, gloss, quantity }) => ({ name, gloss, quantity }));
+      const served = completion.lines.map(({ itemId, name, glosses, quantity }) => ({ itemId, name, glosses, quantity }));
       return {
         state: succeeded.state,
         result: { kind: 'success', served, paidInShifts: costInShifts, moodChange: succeeded.moodChange },

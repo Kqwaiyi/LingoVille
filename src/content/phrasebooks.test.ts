@@ -13,8 +13,8 @@ describe('place phrasebooks', () => {
     }
   });
 
-  it('has the café phrasebook authored for the ja pack', () => {
-    expect(placePhrasebook('ja', 'cafe').length).toBeGreaterThan(0);
+  it.each(LANGUAGE_CODES)('has the café phrasebook authored for the %s pack', (packId) => {
+    expect(placePhrasebook(packId, 'cafe').length).toBeGreaterThan(0);
   });
 
   it('has nothing for a place with no phrasebook yet', () => {

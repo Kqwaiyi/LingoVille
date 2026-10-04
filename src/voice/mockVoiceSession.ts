@@ -1,5 +1,5 @@
 import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
-import { CAFE_ITEM_IDS, CAFE_ITEMS, CULTURE_PACKS, INTERACTIONS, toLocalMoney, type CafeItemId } from '../content/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, ITEMS, localPrice, type ItemId } from '../content/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
 import type { OpenVoiceSession } from './voiceSession.ts';
 
@@ -29,14 +29,14 @@ type Script = {
   outOfPatience: string;
   price: (amount: number) => string;
   /** The words it recognises. A line with none of them is gibberish to it. */
-  words: { items: Record<CafeItemId, string[]>; yes: string[]; no: string[]; known: string[] };
+  words: { items: Record<ItemId, string[]>; yes: string[]; no: string[]; known: string[] };
 };
 
 const SCRIPT: Record<LanguageCode, Script> = {
   ja: {
     greeting: 'いらっしゃいませ！ご注文はお決まりですか？',
     resume: '大変お待たせしました。ご注文をどうぞ。',
-    clarify: ['ご注文は何になさいますか？', 'ラテ、コーヒー、紅茶がございます。どれにしますか？'],
+    clarify: ['ご注文は何になさいますか？', 'ラテ、コーヒー、紅茶、メロンパンがございます。どれにしますか？'],
     readBack: (item, price) => `${item}ですね。${price}です。よろしいですか？`,
     served: 'ありがとうございます！こちら、どうぞ。またお越しくださいませ。',
     cannotAfford: '申し訳ございません、お支払いが足りないようです。ほかのものになさいますか？',
@@ -45,7 +45,12 @@ const SCRIPT: Record<LanguageCode, Script> = {
     outOfPatience: '申し訳ございません…。またのお越しをお待ちしております。',
     price: (amount) => `${amount}円`,
     words: {
-      items: { latte: ['ラテ', 'らて', 'latte'], coffee: ['コーヒー', 'こーひー', 'coffee'], tea: ['紅茶', 'こうちゃ', 'tea'] },
+      items: {
+        latte: ['ラテ', 'らて', 'latte'],
+        coffee: ['コーヒー', 'こーひー', 'coffee'],
+        tea: ['紅茶', 'こうちゃ', 'tea'],
+        pastry: ['メロンパン', 'めろんぱん'],
+      },
       yes: ['はい', 'ええ', 'うん', 'お願いします', 'おねがいします', 'yes', 'ok'],
       no: ['いいえ', 'いや', 'ちがいます', '違います', 'no'],
       known: ['ください', 'こんにちは', 'おはよう', 'すみません', 'ありがとう', 'メニュー', 'hello'],
@@ -54,7 +59,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
   zh: {
     greeting: '欢迎光临！您想喝点什么？',
     resume: '让您久等了。您想喝点什么？',
-    clarify: ['您想喝点什么？', '我们有拿铁、咖啡和红茶。您要哪个？'],
+    clarify: ['您想喝点什么？', '我们有拿铁、咖啡、红茶和蛋挞。您要哪个？'],
     readBack: (item, price) => `一杯${item}，${price}。对吗？`,
     served: '好的，这是您的饮料。欢迎下次光临！',
     cannotAfford: '不好意思，您的钱好像不够。要换别的吗？',
@@ -63,7 +68,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
     outOfPatience: '真不好意思……欢迎下次再来。',
     price: (amount) => `${amount}元`,
     words: {
-      items: { latte: ['拿铁', 'latte'], coffee: ['咖啡', 'coffee'], tea: ['红茶', '茶', 'tea'] },
+      items: { latte: ['拿铁', 'latte'], coffee: ['咖啡', 'coffee'], tea: ['红茶', '茶', 'tea'], pastry: ['蛋挞'] },
       yes: ['好', '对', '是', '可以', 'yes', 'ok'],
       no: ['不', 'no'],
       known: ['你好', '请', '谢谢', '菜单', '要', 'hello'],
@@ -72,7 +77,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
   en: {
     greeting: 'Hiya! What can I get you?',
     resume: 'Sorry about that! What can I get you?',
-    clarify: ['What would you like?', "We've got lattes, coffee and tea. Which one?"],
+    clarify: ['What would you like?', "We've got lattes, coffee, tea and scones. Which one?"],
     readBack: (item, price) => `One ${item.toLowerCase()}, that's ${price}. Is that right?`,
     served: 'Lovely, here you go. Have a nice day!',
     cannotAfford: "Sorry, it looks like that's not enough. Would you like something else?",
@@ -81,7 +86,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
     outOfPatience: "I'm so sorry, I can't quite help. Maybe another time!",
     price: (amount) => `£${amount.toFixed(2)}`,
     words: {
-      items: { latte: ['latte'], coffee: ['coffee', 'americano'], tea: ['tea', 'cuppa'] },
+      items: { latte: ['latte'], coffee: ['coffee', 'americano'], tea: ['tea', 'cuppa'], pastry: ['scone'] },
       yes: ['yes', 'yeah', 'yep', 'ok', 'okay', 'sure', 'right', 'correct'],
       no: ['no', 'nope', 'wrong'],
       known: ['hello', 'hi', 'hiya', 'please', 'thanks', 'thank you', 'menu', 'morning'],
@@ -90,7 +95,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
   de: {
     greeting: 'Hallo! Was darf’s sein?',
     resume: 'Entschuldigung! Was darf’s sein?',
-    clarify: ['Was möchten Sie trinken?', 'Wir haben Latte, Kaffee und Tee. Was darf’s sein?'],
+    clarify: ['Was möchten Sie trinken?', 'Wir haben Latte, Kaffee, Tee und Brezeln. Was darf’s sein?'],
     readBack: (item, price) => `Einmal ${item} für ${price}, richtig?`,
     served: 'Bitte schön! Einen schönen Tag noch!',
     cannotAfford: 'Oh, das reicht leider nicht. Möchten Sie etwas anderes?',
@@ -99,7 +104,7 @@ const SCRIPT: Record<LanguageCode, Script> = {
     outOfPatience: 'Tut mir leid… Vielleicht ein anderes Mal. Tschüss!',
     price: (amount) => `${amount.toFixed(2).replace('.', ',')} €`,
     words: {
-      items: { latte: ['latte', 'milchkaffee'], coffee: ['kaffee', 'coffee'], tea: ['tee', 'tea'] },
+      items: { latte: ['latte', 'milchkaffee'], coffee: ['kaffee', 'coffee'], tea: ['tee', 'tea'], pastry: ['brezel', 'breze'] },
       yes: ['ja', 'genau', 'gerne', 'okay', 'ok', 'richtig', 'stimmt'],
       no: ['nein', 'nee', 'falsch'],
       known: ['hallo', 'guten', 'bitte', 'danke', 'karte', 'moin', 'hello'],
@@ -133,7 +138,7 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events, options 
   const awaitingAnswer = new Map<string, (response: ToolResponse) => void>();
   let clarifications = 0;
   let calls = 0;
-  let readBack: CafeItemId | null = null;
+  let readBack: ItemId | null = null;
   let closed = false;
 
   const later = (act: () => void) => {
@@ -167,11 +172,11 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events, options 
     if (line === OUT_OF_PATIENCE_SCENE) return say(script.outOfPatience);
     if (line === MOCK_DROP_LINE) return drop();
 
-    const item = takesOrders ? CAFE_ITEM_IDS.find((id) => mentions(line, script.words.items[id])) : undefined;
+    const item = takesOrders ? INTERACTIONS.orderDrink.items.find((id) => mentions(line, script.words.items[id])) : undefined;
     if (item) {
       readBack = item;
-      const { amount } = toLocalMoney(CAFE_ITEMS[item].priceInShifts, packId);
-      return say(script.readBack(CULTURE_PACKS[packId].cafe.menu[item], script.price(amount)));
+      const { name } = CULTURE_PACKS[packId].goods[item];
+      return say(script.readBack(name, script.price(localPrice(ITEMS[item].priceInShifts, packId))));
     }
     if (readBack && mentions(line, script.words.no)) {
       readBack = null;

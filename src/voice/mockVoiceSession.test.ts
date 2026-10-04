@@ -48,7 +48,7 @@ async function atTheCounter(packId: LanguageCode = 'ja') {
   return { ...heard, session, say, answer };
 }
 
-const { menu } = CULTURE_PACKS.ja.cafe;
+const { goods } = CULTURE_PACKS.ja;
 
 describe('mock VoiceSession', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -100,7 +100,7 @@ describe('mock VoiceSession', () => {
 
     await say('ラテ ください');
 
-    expect(turns.at(-1)).toContain(menu.latte);
+    expect(turns.at(-1)).toContain(goods.latte.name);
     expect(turns.at(-1)).toContain('450');
     expect(toolCalls).toEqual([]);
 

@@ -47,7 +47,7 @@ test('Load a save shows a card per slot, and a save can be exported, deleted by 
   await openLoadASave(page);
   await expect(slotRow(page, 1)).toContainText('Sam · Japanese');
   await expect(slotRow(page, 1)).toContainText('Day 1 at home');
-  await expect(slotRow(page, 1)).toContainText('¥10,200');
+  await expect(slotRow(page, 1)).toContainText('¥10,000');
   await expect(slotRow(page, 2)).toContainText('Empty · New game or Import');
 
   const download = await exportSlotOne(page);
@@ -68,7 +68,7 @@ test('Load a save shows a card per slot, and a save can be exported, deleted by 
   await expect(page.getByText('Imported into slot 1.')).toBeVisible();
   await titleMenu(page).getByRole('button', { name: 'Continue' }).click();
   await expect(titleMenu(page)).toBeHidden();
-  await expect(dock(page).getByLabel('Money')).toHaveText('¥10,200');
+  await expect(dock(page).getByLabel('Money')).toHaveText('¥10,000');
 });
 
 test('a bad file is refused with a plain message', async ({ page }) => {

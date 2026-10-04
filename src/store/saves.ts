@@ -1,6 +1,6 @@
 import { createStore, delMany, entries, get, promisifyRequest, set, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
-import { CAFE_ITEM_IDS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import { ITEM_IDS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 import {
   DEBT_KINDS,
   ILLNESS_IDS,
@@ -72,7 +72,7 @@ const GameStateSchema = z.object({
     today: z.object({ day, homeMeals: z.int().min(0), gymSessions: z.int().min(0) }),
   }),
   possessions: z.object({
-    inventory: z.array(z.object({ itemId: z.enum(CAFE_ITEM_IDS), quantity: z.int().min(1), expiresOnDay: day.nullable() })),
+    inventory: z.array(z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1), expiresOnDay: day.nullable() })),
     gymMembershipUntilDay: day.nullable(),
     addressRegistered: z.boolean(),
     jobsHired: z.array(z.enum(JOB_IDS)),

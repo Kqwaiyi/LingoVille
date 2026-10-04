@@ -1,4 +1,4 @@
-import type { CafeItemId, NamedNpcId } from '../content/index.ts';
+import type { ItemId, NamedNpcId } from '../content/index.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep } from './tuning.ts';
 
@@ -21,7 +21,7 @@ export const ILLNESS_IDS = ['cold', 'flu', 'food-poisoning', 'hay-fever'] as con
 export type IllnessId = (typeof ILLNESS_IDS)[number];
 
 /** Something the Character owns. Groceries go off on `expiresOnDay`; goods that keep have null. */
-export type InventoryItem = { itemId: CafeItemId; quantity: number; expiresOnDay: number | null };
+export type InventoryItem = { itemId: ItemId; quantity: number; expiresOnDay: number | null };
 
 /** A word or phrase the Player kept from a Recap, with its gloss in the Native Language it was saved in. */
 export type PhrasebookEntry = { text: string; reading: string; gloss: string; glossLanguage: LanguageCode; dayAdded: number };

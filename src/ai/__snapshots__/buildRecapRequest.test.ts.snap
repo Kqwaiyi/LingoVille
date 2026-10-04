@@ -137,7 +137,7 @@ exports[`buildRecapRequest > builds one combined Recap for a whole Shift 1`] = `
       "parts": [
         {
           "text": "CUSTOMER 1
-With the barista at ほしコーヒー. The barista's goal: Take the customer's drink order. Outcome: succeeded.
+With the barista at ほしコーヒー. The barista's goal: Take the customer's order. Outcome: succeeded.
 1. NPC: 欢迎光临！您要点什么？
 2. PLAYER (heard as, may be misheard): 我要一百拿铁
 3. NPC: 一杯热拿铁，对吗？二十八块。
@@ -146,7 +146,7 @@ With the barista at ほしコーヒー. The barista's goal: Take the customer's 
 Help used: none.
 
 CUSTOMER 2
-With the barista at ほしコーヒー. The barista's goal: Take the customer's drink order. Outcome: failed.
+With the barista at ほしコーヒー. The barista's goal: Take the customer's order. Outcome: failed.
 1. NPC: 欢迎光临！您要点什么？
 2. PLAYER (heard as, may be misheard): 我要一百拿铁
 Help used: none.",
@@ -276,7 +276,7 @@ exports[`buildRecapRequest > builds the Recap for a Goal Interaction 1`] = `
       "parts": [
         {
           "text": "THE CONVERSATION
-With the barista at 星星咖啡. The barista's goal: Take the customer's drink order. Outcome: succeeded.
+With the barista at 星星咖啡. The barista's goal: Take the customer's order. Outcome: succeeded.
 1. NPC: 欢迎光临！您要点什么？
 2. PLAYER (heard as, may be misheard): 我要一百拿铁
 3. NPC: 一杯热拿铁，对吗？二十八块。

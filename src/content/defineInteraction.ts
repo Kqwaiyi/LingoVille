@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { LanguageCode, PlaceId } from '../sim/index.ts';
-import { CAFE_ITEMS, type CafeItemId, type Restores } from './cafe.ts';
-import { CULTURE_PACKS } from './culturePacks.ts';
+import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
+import { menuPrice } from './currency.ts';
+import { ITEM_IDS, ITEMS, type ItemId, type Restores } from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
 import { PLACE_HOURS } from './places.ts';
 import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.ts';
@@ -10,11 +11,11 @@ import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.t
 export type Band = 'B' | 'I' | 'A';
 
 /** Which Culture Pack facts the NPC is told, so it can answer side questions. */
-export const FACT_SOURCES = ['openingHours', 'menu', 'placeFacts'] as const;
+export const FACT_SOURCES = ['openingHours', 'menu', 'placeFacts', 'customs'] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 /** The arguments a `serveOrder` effect reads from its completion function. */
-type ServeOrderArgs = { items: { item: CafeItemId; quantity: number }[] };
+type ServeOrderArgs = { items: { item: ItemId; quantity: number }[] };
 
 /**
  * The effect on success. `serveOrder` serves the confirmed items from the menu
@@ -31,13 +32,16 @@ export type InteractionDefinition<Args extends z.ZodObject> = {
   /** The one goal, in plain English, as the NPC is told it. */
   goal: string;
   facts: FactSource[];
+  /** The items the NPC can sell (its menu), by id. Every Culture Pack must sell them all. */
+  items: readonly ItemId[];
   /** The function the NPC calls once the goal is done and confirmed. */
   completion: { name: string; description: string; args: Args };
   band: Band;
   effect: EffectFor<z.infer<Args>>;
 };
 
-export type ServedItem = { name: string; gloss: string; quantity: number };
+/** An item as served: its local name, and its glosses in the other Native Languages. */
+export type ServedItem = { itemId: ItemId; name: string; glosses: Glosses; quantity: number };
 
 /** One line of a confirmed order, with what each one costs and gives back. The sim adds them up. */
 export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores };
@@ -63,6 +67,7 @@ const definitionSchema = z.object({
   npcId: z.custom<NamedNpcId>((value) => typeof value === 'string' && value in NAMED_NPCS, 'unknown NPC'),
   goal: z.string().min(1),
   facts: z.array(z.enum(FACT_SOURCES)).min(1),
+  items: z.array(z.enum(ITEM_IDS)),
   completion: z.object({
     // Live function names: snake_case.
     name: z.string().regex(/^[a-z]+(_[a-z]+)*$/),
@@ -74,10 +79,10 @@ const definitionSchema = z.object({
 });
 
 function serveOrder({ items }: ServeOrderArgs, packId: LanguageCode): OrderLine[] {
-  const menu = CULTURE_PACKS[packId].cafe.menu;
+  const { goods } = CULTURE_PACKS[packId];
   return items.map(({ item, quantity }) => {
-    const { gloss, priceInShifts, restores } = CAFE_ITEMS[item];
-    return { name: menu[item], gloss, quantity, priceInShifts, restores };
+    const { name, glosses } = goods[item];
+    return { itemId: item, name, glosses, quantity, priceInShifts: menuPrice(item, packId), restores: ITEMS[item].restores };
   });
 }
 

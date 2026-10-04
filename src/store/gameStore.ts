@@ -24,9 +24,11 @@ import {
   INTERACTIONS,
   NAMED_NPCS,
   placePhrasebook,
+  worldSign,
   type Interaction,
   type NamedNpcId,
   type PlacePhrase,
+  type SignId,
 } from '../content/index.ts';
 import {
   addToPhrasebook,
@@ -37,6 +39,7 @@ import {
   enterPlace,
   gameMinutesFor,
   isOutOfPatience,
+  LANGUAGE_CODES,
   isUnreadableTranscript,
   losePatience,
   newPlayerTurn,
@@ -91,6 +94,17 @@ export const DEV_SETUP: NewGameSetup = {
   appearancePresetId: 'preset-1',
   rngSeed: 20261003,
 };
+
+/**
+ * The dev setup, or in dev, the one `?pack=` asks for: `?pack=de` starts a new
+ * game in the German pack, learning German. New game setup replaces it (ticket 12).
+ */
+export function devSetup(search: string): NewGameSetup {
+  const asked = new URLSearchParams(search).get('pack');
+  const pack = LANGUAGE_CODES.find((code) => code === asked);
+  if (!import.meta.env.DEV || !pack) return DEV_SETUP;
+  return { ...DEV_SETUP, culturePackId: pack, targetLanguage: pack };
+}
 
 /** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
@@ -171,6 +185,18 @@ export type LineReading = { segments: Segment[]; corrected: boolean };
 /** The reading aids device settings. Hiding reading aids hides romaji too. */
 export type ReadingAidsSettings = { show: boolean; romaji: boolean };
 
+/** One line of a sign the Player is pointing at, with its library reading and, once translated, its gloss. */
+export type SignTooltipLine = { text: string; note: string | null; segments: Segment[] | null; gloss: string | null };
+
+/** The tooltip over a sign or menu the Player is pointing at. */
+export type SignTooltip = {
+  signId: SignId;
+  translated: boolean;
+  /** Every line is glossed in the Native Language. A sign in the Player's own language has nothing to translate. */
+  canTranslate: boolean;
+  lines: SignTooltipLine[];
+};
+
 /** A word from a Recap, kept with "+ Phrasebook". */
 export type NewWord = Recap['newWords'][number];
 
@@ -242,6 +268,8 @@ export type GameStoreDeps = {
   storage: StoragePersistence;
   /** Hands the Player a file to keep. */
   downloadFile: (file: SaveFile) => void;
+  /** What New game builds the save from, until New game setup asks the Player (ticket 12). */
+  newGameSetup: () => NewGameSetup;
 };
 
 /** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
@@ -316,6 +344,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   hearItSaid,
   storage: browserStorage,
   downloadFile: downloadInBrowser,
+  newGameSetup: () => devSetup(typeof window === 'undefined' ? '' : window.location.search),
 };
 
 export type GameStore = {
@@ -344,6 +373,8 @@ export type GameStore = {
   voiceUnavailable: boolean;
   /** The full-screen Journal, while it is open. */
   journal: JournalView | null;
+  /** The sign the Player is pointing at, and whether the pointer is on its tooltip, which keeps it open. */
+  sign: { tooltip: SignTooltip; held: boolean } | null;
   /** The browser refused to keep saves safe from clearing, and the Player hasn't dismissed the callout yet. */
   persistCallout: boolean;
   /** Looks for saves and reads this browser's device settings, for the title screen. */
@@ -371,6 +402,14 @@ export type GameStore = {
   setTabHidden: (hidden: boolean) => void;
   enterPlace: (placeId: PlaceId) => void;
   setInteractable: (interactable: Interactable | null) => void;
+  /** The pointer is on a sign within range: shows its tooltip. */
+  pointAtSign: (signId: SignId) => void;
+  /** The pointer has left a sign, or (`outOfRange`) the Character has walked out of range of it, which closes it even while held. */
+  unpointSign: (signId: SignId, outOfRange?: boolean) => void;
+  /** The pointer is on the sign's tooltip, which keeps it open, or has left it, which closes it. */
+  holdSignTooltip: (held: boolean) => void;
+  /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
+  translateSign: () => void;
   drinkWater: () => void;
   /** E near an NPC: opens a conversation, and the NPC speaks first. */
   talk: () => void;
@@ -432,6 +471,26 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   const lineReadings = new Map<number, { readings: Conversation['readings']; annotating: Promise<unknown>[] }>();
 
   return createStore<GameStore>()((set, get) => {
+    /** A sign's tooltip in this game: each line with its library reading, and its gloss once translated. */
+    const signTooltip = (signId: SignId, translated: boolean): SignTooltip => {
+      const { game, nativeLanguage } = get();
+      const packId = game.identity.culturePackId;
+      const lines = worldSign(signId, packId);
+      const canTranslate = lines.every((line) => line.glosses[nativeLanguage] !== undefined);
+      const showGlosses = translated && canTranslate;
+      return {
+        signId,
+        translated: showGlosses,
+        canTranslate,
+        lines: lines.map(({ text, note, glosses }) => ({
+          text,
+          note,
+          segments: hasReadingAids(packId) ? deps.readings.read(packId, text) : null,
+          gloss: showGlosses ? glosses[nativeLanguage]! : null,
+        })),
+      };
+    };
+
     /**
      * Saves the game into its slot. A conversation is never saved in progress:
      * until its outcome is decided, the save keeps the game from before it.
@@ -874,6 +933,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       readingAids: { show: DEFAULT_DEVICE_SETTINGS.readingAids, romaji: DEFAULT_DEVICE_SETTINGS.showRomaji },
       journal: null,
       persistCallout: false,
+      sign: null,
       openTitle: () => {
         set({ title: { status: 'checking' } });
         // The settings come first, so the title shows in the Player's language.
@@ -896,7 +956,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       newGame: () => {
         const freeSlotId = readyTitle()?.freeSlotId;
         if (!freeSlotId) return;
-        play(createSave(DEV_SETUP), freeSlotId, 'newGame');
+        play(createSave(deps.newGameSetup()), freeSlotId, 'newGame');
         save();
       },
       exportSave: (slotId) => void download(() => exportSave(stores, slotId)),
@@ -968,6 +1028,24 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ interactable });
       },
       drinkWater: () => set({ game: drinkWater(get().game) }),
+
+      pointAtSign: (signId) => {
+        const { sign } = get();
+        if (sign?.tooltip.signId === signId) return;
+        set({ sign: { tooltip: signTooltip(signId, false), held: false } });
+      },
+      unpointSign: (signId, outOfRange = false) => {
+        const { sign } = get();
+        if (sign?.tooltip.signId === signId && (outOfRange || !sign.held)) set({ sign: null });
+      },
+      holdSignTooltip: (held) => {
+        const { sign } = get();
+        if (sign) set({ sign: held ? { ...sign, held } : null });
+      },
+      translateSign: () => {
+        const { sign } = get();
+        if (sign?.tooltip.canTranslate) set({ sign: { ...sign, tooltip: signTooltip(sign.tooltip.signId, true) } });
+      },
 
       talk: () => {
         const { interactable, conversation, game } = get();
@@ -1202,6 +1280,8 @@ export const selectTranslation =
   (s: GameStore): TranslationView | null =>
     s.conversation?.translated.includes(line) ? (s.conversation.annotations[line] ?? TRANSLATING) : null;
 export const selectReadingAids = (s: GameStore) => s.readingAids;
+
+export const selectSignTooltip = (s: GameStore) => s.sign?.tooltip ?? null;
 /** An NPC line's reading aid, unless reading aids are hidden. */
 export const selectLineReading =
   (line: number) =>

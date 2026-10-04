@@ -1,3 +1,4 @@
+import type { PropId, SignId } from '../content/index.ts';
 import type { PlaceId } from '../sim/index.ts';
 import type { Arrival } from '../store/index.ts';
 
@@ -32,6 +33,34 @@ export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
 export const CAFE_COUNTER: Vec3 = [12, 0.55, -3];
 /** The barista stands behind the counter, facing the door. */
 export const BARISTA: Vec3 = [12, 1, -4.1];
+
+/** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */
+export const SIGNS: Record<SignId, { position: Vec3; size: readonly [width: number, height: number] }> = {
+  // Over the café door, on the outside of the front wall.
+  'cafe-name': { position: [12, 2.75, 3.02], size: [3.4, 0.7] },
+  // Beside the door, at eye height.
+  'cafe-hours': { position: [14.1, 1.5, 3.02], size: [1, 0.7] },
+  // On the back wall behind the counter, to the barista's left.
+  'cafe-menu': { position: [14.3, 1.65, -4.68], size: [1.7, 1.5] },
+};
+
+/** Where a pack's props stand: hung at the café door, or set out on the counter (one spot per counter prop). */
+export const PROP_SPOTS = {
+  door: [12, 2.1, 3.1] as Vec3,
+  counter: [[10.5, 1.1, -3] as Vec3, [13.5, 1.1, -3] as Vec3],
+} as const;
+
+/** Which spot each prop takes. */
+export const SPOT_FOR_PROP: Record<PropId, 'door' | 'counter'> = {
+  noren: 'door',
+  'red-lantern': 'door',
+  bunting: 'door',
+  'lucky-cat': 'counter',
+  'tea-set': 'counter',
+  'cake-stand': 'counter',
+  'pretzel-basket': 'counter',
+  teapot: 'counter',
+};
 
 /**
  * Where the Character starts at each place. At home it stands facing the tap

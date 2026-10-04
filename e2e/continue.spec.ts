@@ -33,11 +33,11 @@ test('order a drink, reload, Continue: the money and the place are as they were'
   await typeLine(page, 'はい');
   await expect(closingCard(page)).toBeVisible();
   await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
-  await expect(money(page)).toHaveText('¥9,750');
+  await expect(money(page)).toHaveText('¥9,550');
 
   await reloadAndContinue(page);
 
-  await expect(money(page)).toHaveText('¥9,750');
+  await expect(money(page)).toHaveText('¥9,550');
   // Back at the café's entrance: a few steps forward reach the barista.
   await page.locator('canvas').click();
   await page.keyboard.down('KeyW');
@@ -53,5 +53,5 @@ test('a reload mid-conversation comes back as if the conversation never happened
   await reloadAndContinue(page);
 
   await expect(column(page)).toBeHidden();
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
 });

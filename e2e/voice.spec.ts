@@ -49,7 +49,7 @@ test('a dropped connection is retried, and the conversation carries on where it 
 
 test('a connection that drops and cannot come back is a network abandonment: a toast, and nothing changes', async ({ page }) => {
   await talkToTheBarista(page);
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
   const moodBefore = await mood(page).getAttribute('aria-valuenow');
   await tokensFail(page);
 
@@ -57,7 +57,7 @@ test('a connection that drops and cannot come back is a network abandonment: a t
 
   await expect(page.getByRole('status').filter({ hasText: 'The barista had to step away' })).toBeVisible();
   await expect(column(page)).toBeHidden();
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
   await expect(mood(page)).toHaveAttribute('aria-valuenow', moodBefore!);
   await expect(page.getByRole('region', { name: 'Conversation over' })).toBeHidden();
   // The Character is still at the counter and can try again.
@@ -73,7 +73,7 @@ test('with no token to be had, the voice service unavailable screen shows instea
   const screen = page.getByRole('alertdialog', { name: 'Voice service unavailable: check the local server' });
   await expect(screen).toBeVisible();
   await expect(column(page)).toBeHidden();
-  await expect(money(page)).toHaveText('¥10,200');
+  await expect(money(page)).toHaveText('¥10,000');
 
   await screen.getByRole('button', { name: 'Back to the game' }).click();
   await expect(screen).toBeHidden();

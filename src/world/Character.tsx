@@ -21,6 +21,9 @@ const GRAVITY = 20;
 type CharacterController = ReturnType<RapierContext['world']['createCharacterController']>;
 const CAMERA = { distance: 7, lookHeight: 1.2, minPitch: 0.15, maxPitch: 1.2, dragSensitivity: 0.005, follow: 10 } as const;
 
+/** Where the Character is, updated every frame, for things in the world that need to know how close it is. */
+export const characterPosition = new Vector3();
+
 function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
   return Math.hypot(x - tx, z - tz);
 }
@@ -73,7 +76,11 @@ export function Character() {
   const arrival = useGame(selectArrival);
   const startPlaceId = useGame(selectPlaceId);
   // Where the Character appeared. Fixed at mount: after that, the Character walks.
-  const [spawn] = useState(() => spawnPoint(arrival, startPlaceId, window.location.search));
+  const [spawn] = useState(() => {
+    const point = spawnPoint(arrival, startPlaceId, window.location.search);
+    characterPosition.set(...point);
+    return point;
+  });
   const [, getKeys] = useKeyboardControls<Control>();
   const { world } = useRapier();
   const enterPlace = useGame((s) => s.enterPlace);
@@ -122,6 +129,7 @@ export function Character() {
     const at = body.current.translation();
     const next = { x: at.x + step.x, y: at.y + step.y, z: at.z + step.z };
     body.current.setNextKinematicTranslation(next);
+    characterPosition.set(next.x, next.y, next.z);
     if (walking && model.current) model.current.rotation.y = Math.atan2(move.x, move.z);
 
     const target = scratch.target.set(next.x, next.y + CAMERA.lookHeight - CAPSULE.halfHeight, next.z);

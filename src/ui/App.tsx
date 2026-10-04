@@ -7,6 +7,7 @@ import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
 import { PersistCallout } from './PersistCallout.tsx';
+import { SignTooltip } from './SignTooltip.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
@@ -46,6 +47,7 @@ function Hud() {
     <>
       <GatewayStatus />
       <InteractionPrompt />
+      <SignTooltip />
       <Dock />
       <ConversationColumn />
       <Toast />
