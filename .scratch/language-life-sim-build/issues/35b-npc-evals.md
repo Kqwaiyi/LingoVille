@@ -2,7 +2,7 @@
 
 **What to build:** The eval harness also plays scripted conversations against real NPC sessions and checks them against the NPC hard bars and rate bars. A judge model rates corrections and step-appropriate speech.
 
-**Blocked by:** 35a — Eval harness with annotate and Recap cases, 14b — NPCs adapt to the Player's step
+**Blocked by:** 35a — Eval harness with annotate and Recap cases, 14 — Language Proficiency from Recap evidence, and NPCs adapt to the step
 
 **Spec:** [spec.md](../spec.md): AI quality evaluation
 

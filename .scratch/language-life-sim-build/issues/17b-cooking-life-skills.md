@@ -2,7 +2,7 @@
 
 **What to build:** At home the Player cooks groceries into a meal. The Cooking skill (0–5 stars) makes home meals more filling and more pleasant, and lowers the risk of food poisoning. A skills page shows all five Life Skills as stars.
 
-**Blocked by:** 17a — Pay for groceries, inventory and expiry, 15b — Mood sources and the Mood modifier
+**Blocked by:** 17a — Supermarket and convenience store: groceries, inventory, finding an item and counter food, 15 — Sleep, Mood sources and the Mood modifier
 
 **Spec:** [spec.md](../spec.md): Life Skills; Economy
 

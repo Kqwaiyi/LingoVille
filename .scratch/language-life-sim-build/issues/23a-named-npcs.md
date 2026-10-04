@@ -2,7 +2,7 @@
 
 **What to build:** The town has about 15 Named NPCs: counter staff, 3–4 park regulars and the landlord. Each has a fixed persona localised for every pack, and their name shows in the conversation header. The save keeps one NPC Memory record per Named NPC.
 
-**Blocked by:** 13b — Greybox town of 11 places
+**Blocked by:** 13b — Greybox town of 11 places and tram travel
 
 **Spec:** [spec.md](../spec.md): Named NPCs, Familiarity and NPC Memory
 

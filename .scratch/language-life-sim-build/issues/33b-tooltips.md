@@ -1,8 +1,8 @@
-# 33c — One-time tooltips
+# 33b — One-time tooltips
 
 **What to build:** One-time tooltips explain new systems the first time they come up, and never repeat on that browser. They can all be turned off.
 
-**Blocked by:** 33a — Settings screen, 16a — Fainting and hospital debt, 19b — A Shift of single-drink customers
+**Blocked by:** 33a — Settings, pause menu and credits, 16 — Fainting, hospital debt and NPC-initiated conversations, 19b — A Shift of single-drink customers
 
 **Spec:** [spec.md](../spec.md): Onboarding (tooltips); UI and HUD
 

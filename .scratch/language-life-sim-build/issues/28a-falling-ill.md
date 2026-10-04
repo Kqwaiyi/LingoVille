@@ -2,7 +2,7 @@
 
 **What to build:** Every week or two, the Character may fall ill with a cold, flu, food poisoning or hay fever, each with its own symptoms. An Illness drains Health slowly and lowers Mood, and it leads to Fainting if left untreated.
 
-**Blocked by:** 16a — Fainting and hospital debt, 17b — Cooking and Life Skills
+**Blocked by:** 16 — Fainting, hospital debt and NPC-initiated conversations, 17b — Cooking and Life Skills
 
 **Spec:** [spec.md](../spec.md): Illness
 

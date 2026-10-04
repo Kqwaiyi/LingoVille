@@ -2,7 +2,7 @@
 
 **What to build:** After setup, the Player learns the game by living the first morning in the real town: drink water, walk to the café and order breakfast. A banner at the top centre, with an arrow, a distance and a world marker, shows where to go next. Any equivalent action completes a step. The First Morning can be skipped.
 
-**Blocked by:** 12c — Mic check and the mic-denied path, 17a — Pay for groceries, inventory and expiry, 33b — Pause menu and credits screen
+**Blocked by:** 12c — Mic check and the mic-denied path, 17a — Supermarket and convenience store: groceries, inventory, finding an item and counter food, 33a — Settings, pause menu and credits
 
 **Spec:** [spec.md](../spec.md): Onboarding (First Morning); UI and HUD
 

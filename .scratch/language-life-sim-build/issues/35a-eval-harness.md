@@ -2,7 +2,7 @@
 
 **What to build:** The dev runs `npm run eval` to check real model quality. The harness shows an estimated cost and asks before running. It checks annotate and Recap cases against hard bars and a human-owned baseline, and writes a timestamped report.
 
-**Blocked by:** 14a — Proficiency moves from Recap evidence
+**Blocked by:** 14 — Language Proficiency from Recap evidence, and NPCs adapt to the step
 
 **Spec:** [spec.md](../spec.md): AI quality evaluation
 

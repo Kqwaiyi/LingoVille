@@ -2,7 +2,7 @@
 
 **What to build:** In any conversation with a Named NPC, the Player can give a gift from the inventory. One gift per NPC per week counts, and the NPC's favourite counts most. The Player finds out the favourite by asking.
 
-**Blocked by:** 23c — Familiarity, names and memory in the prompt, 24b — Wrapped gifts and recommendations by taste
+**Blocked by:** 23b — Small Talk and Familiarity, 24 — Bookshop and Comfort Purchases
 
 **Spec:** [spec.md](../spec.md): Named NPCs, Familiarity and NPC Memory
 
