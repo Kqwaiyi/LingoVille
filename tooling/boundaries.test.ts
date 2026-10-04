@@ -12,7 +12,9 @@ async function boundaryErrors(filePath: string, code: string) {
   );
 }
 
-describe('import boundaries', () => {
+// The first lint starts the TypeScript resolver cold, which takes longer than
+// Vitest's default 5 s while the rest of the suite runs alongside it.
+describe('import boundaries', { timeout: 30_000 }, () => {
   it.each(['src/sim/violation.ts', 'src/content/violation.ts', 'src/ai/violation.ts'])(
     '%s may not import ui, world or voice',
     async (filePath) => {
