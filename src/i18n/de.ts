@@ -34,6 +34,59 @@ export const de: UiStrings = {
       name: 'Barista',
       subject: 'Der Barista',
     },
+    landlord: {
+      name: 'Vermieter',
+      subject: 'Der Vermieter',
+    },
+    cashier: {
+      name: 'Kassierer',
+      subject: 'Der Kassierer',
+    },
+    clerk: {
+      name: 'Angestellter',
+      subject: 'Der Angestellte',
+    },
+    server: {
+      name: 'Kellner',
+      subject: 'Der Kellner',
+    },
+    receptionist: {
+      name: 'Empfang',
+      subject: 'Die Empfangskraft',
+    },
+    doctor: {
+      name: 'Arzt',
+      subject: 'Der Arzt',
+    },
+    nurse: {
+      name: 'Pflegekraft',
+      subject: 'Die Pflegekraft',
+    },
+    pharmacist: {
+      name: 'Apotheker',
+      subject: 'Der Apotheker',
+    },
+    regular: {
+      name: 'Stammgast im Park',
+      subject: 'Der Stammgast',
+    },
+    'passer-by': {
+      name: 'Passant',
+      subject: 'Der Passant',
+    },
+    shopkeeper: {
+      name: 'Ladeninhaber',
+      subject: 'Der Ladeninhaber',
+    },
+    attendant: {
+      name: 'Aufsicht',
+      subject: 'Die Aufsicht',
+    },
+  },
+  tramStops: {
+    'west-stop': 'Altstadt',
+    'central-stop': 'Stadtmitte',
+    'east-stop': 'Marktstraße',
   },
   title: {
     menuLabel: 'Titelmenü',
@@ -183,6 +236,13 @@ export const de: UiStrings = {
   prompt: {
     drink: '<kbd>E</kbd> drücken, um Leitungswasser zu trinken',
     talk: '<kbd>E</kbd> drücken, um zu sprechen — {{role}}',
+    tram: '<kbd>E</kbd> drücken, um die Straßenbahn zu nehmen',
+    noTram: 'Keine Straßenbahn fährt · Straßenbahnen fahren {{opens}}–{{closes}}',
+  },
+  tram: {
+    heading: 'Mit der Straßenbahn nach …',
+    trip: '{{minutes}} Min. · Kostenlos',
+    cancel: 'Hierbleiben',
   },
   faces: {
     relaxed: '{{who}} wirkt entspannt',
@@ -279,6 +339,7 @@ export const de: UiStrings = {
     recapSaved: 'Rückblick in deinem Tagebuch gespeichert',
     loadedBackup: 'Spielstand von heute Morgen geladen',
     npcSteppedAway: '{{who}} musste kurz weg. Nichts ist verloren.',
+    nothingToSay: '{{who}} lächelt und nickt. Hier gibt es noch nichts zu besprechen.',
   },
   voiceUnavailable: {
     title: 'Sprachdienst nicht verfügbar: Prüfe den lokalen Server',

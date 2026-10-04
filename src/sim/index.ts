@@ -35,5 +35,6 @@ export {
   type PhrasebookEntry,
   type PlaceId,
 } from './state.ts';
+export { rideTram, tramTripMinutes } from './tram.ts';
 export * from './tuning.ts';
 export { drinkWater, enterPlace, tick } from './wellBeing.ts';

@@ -34,6 +34,59 @@ export const zh: UiStrings = {
       name: '咖啡师',
       subject: '咖啡师',
     },
+    landlord: {
+      name: '房东',
+      subject: '房东',
+    },
+    cashier: {
+      name: '收银员',
+      subject: '收银员',
+    },
+    clerk: {
+      name: '店员',
+      subject: '店员',
+    },
+    server: {
+      name: '服务员',
+      subject: '服务员',
+    },
+    receptionist: {
+      name: '前台',
+      subject: '前台',
+    },
+    doctor: {
+      name: '医生',
+      subject: '医生',
+    },
+    nurse: {
+      name: '护士',
+      subject: '护士',
+    },
+    pharmacist: {
+      name: '药剂师',
+      subject: '药剂师',
+    },
+    regular: {
+      name: '公园常客',
+      subject: '常客',
+    },
+    'passer-by': {
+      name: '路人',
+      subject: '路人',
+    },
+    shopkeeper: {
+      name: '店主',
+      subject: '店主',
+    },
+    attendant: {
+      name: '服务员',
+      subject: '服务员',
+    },
+  },
+  tramStops: {
+    'west-stop': '老城',
+    'central-stop': '市中心',
+    'east-stop': '市场街',
   },
   title: {
     menuLabel: '标题菜单',
@@ -183,6 +236,13 @@ export const zh: UiStrings = {
   prompt: {
     drink: '按 <kbd>E</kbd> 喝自来水',
     talk: '按 <kbd>E</kbd> 交谈 — {{role}}',
+    tram: '按 <kbd>E</kbd> 乘坐电车',
+    noTram: '电车已停运 · 运营时间 {{opens}}–{{closes}}',
+  },
+  tram: {
+    heading: '乘电车去…',
+    trip: '{{minutes}} 分钟 · 免费',
+    cancel: '留在这里',
   },
   faces: {
     relaxed: '{{who}}看起来很放松',
@@ -279,6 +339,7 @@ export const zh: UiStrings = {
     recapSaved: '回顾已保存到你的日记',
     loadedBackup: '已读取今天早上的存档',
     npcSteppedAway: '{{who}}临时走开了。什么都没有丢失。',
+    nothingToSay: '{{who}}微笑着点点头。这里暂时还没什么可聊的。',
   },
   voiceUnavailable: {
     title: '语音服务不可用：请检查本地服务器',

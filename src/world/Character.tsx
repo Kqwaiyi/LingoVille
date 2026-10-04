@@ -10,10 +10,19 @@ import {
 } from '@react-three/rapier';
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Vector3, type Group } from 'three';
+import { TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
-import { selectArrival, selectPlaceId, selectWorldKeysOff, useGame, type Interactable } from '../store/index.ts';
+import {
+  selectArrival,
+  selectPlaceId,
+  selectTramArrival,
+  selectTramRunning,
+  selectWorldKeysOff,
+  useGame,
+  type Interactable,
+} from '../store/index.ts';
 import type { Control } from './controls.ts';
-import { BARISTA, HOME_TAP, placeAt, spawnPoint, type Vec3 } from './town.ts';
+import { HOME_TAP, isWaitingForTram, NPC_SPOTS, placeAt, spawnPoint, tramStopAt, tramStopSpawn, type Vec3 } from './town.ts';
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
@@ -28,12 +37,22 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
   return Math.hypot(x - tx, z - tz);
 }
 
-/** What the Character standing here could use with E. Only from inside, so nothing is reachable through a wall. */
-function interactableAt(x: number, z: number): Interactable | null {
+/**
+ * What the Character standing here could use with E: the tap, the nearest
+ * person in talking range, or else the tram stop whose platform this is.
+ * Only from inside the same place, so no one is reachable through a wall.
+ */
+function interactableAt(x: number, z: number, tramRunning: boolean): Interactable | null {
   const placeId = placeAt(x, z);
   if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
-  if (placeId === 'cafe' && distanceTo(x, z, BARISTA) <= MOVEMENT.talkRangeMetres) return 'barista';
-  return null;
+  let nearest: Interactable | null = null;
+  let nearestDistance: number = MOVEMENT.talkRangeMetres;
+  for (const npcId of TOWN_NPC_IDS) {
+    if (TOWN_NPCS[npcId].placeId !== placeId || (!tramRunning && isWaitingForTram(npcId))) continue;
+    const distance = distanceTo(x, z, NPC_SPOTS[npcId]);
+    if (distance <= nearestDistance) [nearest, nearestDistance] = [npcId, distance];
+  }
+  return nearest ?? tramStopAt(x, z);
 }
 
 /** Orbit angles for the follow camera, changed by dragging with the mouse. */
@@ -87,6 +106,20 @@ export function Character() {
   const setInteractable = useGame((s) => s.setInteractable);
   // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
   const keysOff = useGame(selectWorldKeysOff);
+  const tramArrival = useGame(selectTramArrival);
+  const tramRunning = useGame(selectTramRunning);
+  // The camera jumps with the Character after a tram ride, instead of sweeping across town.
+  const snapCamera = useRef(false);
+
+  // Off the tram: the Character stands on the platform of the stop it rode to.
+  useEffect(() => {
+    if (!tramArrival || !body.current) return;
+    const [x, y, z] = tramStopSpawn(tramArrival.stopId);
+    body.current.setTranslation({ x, y, z }, true);
+    characterPosition.set(x, y, z);
+    fallSpeed.current = 0;
+    snapCamera.current = true;
+  }, [tramArrival]);
 
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.
@@ -138,12 +171,13 @@ export function Character() {
       target.y + Math.sin(pitch) * CAMERA.distance,
       target.z + Math.cos(yaw) * Math.cos(pitch) * CAMERA.distance,
     );
-    camera.position.lerp(wanted, Math.min(1, CAMERA.follow * dt));
+    camera.position.lerp(wanted, snapCamera.current ? 1 : Math.min(1, CAMERA.follow * dt));
+    snapCamera.current = false;
     camera.lookAt(target);
 
     const placeId = placeAt(next.x, next.z);
     if (placeId) enterPlace(placeId);
-    setInteractable(interactableAt(next.x, next.z));
+    setInteractable(interactableAt(next.x, next.z, tramRunning));
   });
 
   return (

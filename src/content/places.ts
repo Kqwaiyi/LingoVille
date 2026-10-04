@@ -31,6 +31,9 @@ export const PLACE_HOURS: Record<PlaceId, OpeningHours> = {
   'town-office': hours(9, 17, ['saturday', 'sunday']),
 };
 
+/** Places with no door, so their hours never keep anyone out. At a tram stop, the hours are the trams'. */
+export const OPEN_AIR_PLACES: readonly PlaceId[] = ['park', 'tram-stop'];
+
 export const SERVICE_HOURS: Record<ServiceId, OpeningHours> = {
   landlord: hours(8, 20),
   'fainting-ward': null,

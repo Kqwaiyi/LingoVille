@@ -170,6 +170,71 @@ body,
   font-family: inherit;
 }
 
+/* --- Tram ------------------------------------------------------------------ */
+
+/* At a tram stop: the other stops on the line, each with its trip time. */
+.tram-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 160px;
+  transform: translateX(-50%);
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+}
+
+.tram-panel h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.tram-from {
+  margin: 2px 0 10px;
+  color: var(--hud-muted);
+  font-size: 13px;
+}
+
+.tram-panel ul {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.tram-panel button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hud-track);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tram-panel li + li {
+  margin-top: 6px;
+}
+
+.tram-panel button:hover,
+.tram-panel button:focus-visible {
+  background: var(--hud-track);
+}
+
+.tram-trip {
+  color: var(--hud-muted);
+}
+
+.tram-panel .tram-cancel {
+  justify-content: center;
+  border-color: transparent;
+  color: var(--hud-muted);
+}
+
 /* --- Signs ---------------------------------------------------------------- */
 
 /* Pointing at a sign or menu: its words with their reading aid, and Translate. */

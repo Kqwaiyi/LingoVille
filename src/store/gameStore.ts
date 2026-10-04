@@ -24,6 +24,7 @@ import {
   CULTURE_PACKS,
   INTERACTIONS,
   NAMED_NPCS,
+  OPEN_AIR_PLACES,
   placeHours,
   placePhrasebook,
   worldSign,
@@ -32,6 +33,11 @@ import {
   type NamedNpcId,
   type PlacePhrase,
   type SignId,
+  stopsBetween,
+  TOWN_NPCS,
+  TRAM_LINE,
+  type TownNpcId,
+  type TramStopId,
 } from '../content/index.ts';
 import {
   addToPhrasebook,
@@ -50,9 +56,11 @@ import {
   losePatience,
   newPlayerTurn,
   npcExpression,
+  rideTram,
   SAVE,
   startPatience,
   tick,
+  tramTripMinutes,
   weekdayOf,
   type GameState,
   type LanguageCode,
@@ -185,14 +193,25 @@ export type TitleView =
 /** How the Character arrived in the world: the First Morning, or back from a save. The world picks the spawn point from it. */
 export type Arrival = 'newGame' | 'continued';
 
-/** Something in the world the Character is close enough to use with E: the tap, or an NPC to talk to. */
-export type Interactable = 'tap' | NamedNpcId;
+/** Something in the world the Character is close enough to use with E: the tap, an NPC to talk to, or a tram stop. */
+export type Interactable = 'tap' | TownNpcId | TramStopId;
+
+/** Where the tram can take the Character from a stop, and how long each trip takes. */
+export type TramDestination = { stopId: TramStopId; minutes: number };
+
+/** The tram has just set the Character down at this stop. Each trip is a new object, so the world moves the Character once per ride. */
+export type TramArrival = { stopId: TramStopId };
 
 /** A line of the conversation. A typed player line is marked, so the Recap knows it wasn't misheard. */
 export type ChatLine = TranscriptLine & { typed?: true };
 
 /** A short notice over the game that clears itself. */
-export type Toast = { kind: 'npcSteppedAway'; npcId: NamedNpcId } | { kind: 'recapSaved' } | { kind: 'loadedBackup' };
+export type Toast =
+  | { kind: 'npcSteppedAway'; npcId: NamedNpcId }
+  | { kind: 'recapSaved' }
+  | { kind: 'loadedBackup' }
+  /** Staff standing in for a conversation that a later ticket brings. */
+  | { kind: 'nothingToSay'; npcId: TownNpcId };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -409,6 +428,9 @@ export type GameStore = {
   micCheckPassed: boolean;
   tabHidden: boolean;
   interactable: Interactable | null;
+  /** The Player is choosing where to take the tram. */
+  tramChoosing: boolean;
+  tramArrival: TramArrival | null;
   conversation: Conversation | null;
   /** The typed field has focus, so keys type into it instead of moving or acting. */
   typing: boolean;
@@ -465,6 +487,11 @@ export type GameStore = {
   setTabHidden: (hidden: boolean) => void;
   enterPlace: (placeId: PlaceId) => void;
   setInteractable: (interactable: Interactable | null) => void;
+  /** E at a tram stop while the trams run: choose a stop to ride to. */
+  openTram: () => void;
+  closeTram: () => void;
+  /** Rides the tram from this stop to `stopId`: free, but time passes. */
+  rideTram: (stopId: TramStopId) => void;
   /** The pointer is on a sign within range: shows its tooltip. */
   pointAtSign: (signId: SignId) => void;
   /** The pointer has left a sign, or (`outOfRange`) the Character has walked out of range of it, which closes it even while held. */
@@ -510,14 +537,21 @@ export type GameStore = {
   dismissVoiceUnavailable: () => void;
 };
 
-const isNpc = (interactable: Interactable | null): interactable is NamedNpcId =>
-  interactable !== null && interactable in NAMED_NPCS;
+const isTownNpc = (interactable: Interactable | null): interactable is TownNpcId =>
+  interactable !== null && interactable in TOWN_NPCS;
+
+const isTramStop = (interactable: Interactable | null): interactable is TramStopId =>
+  (TRAM_LINE as readonly (Interactable | null)[]).includes(interactable);
 
 /** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
 const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
 
 /** Staff can be talked to only while their place is open. Closing time stops new conversations, never one under way. */
-const isAtWork = (npcId: NamedNpcId, game: GameState) => isPlaceOpen(NAMED_NPCS[npcId].placeId, game);
+const isAtWork = (npcId: TownNpcId, game: GameState) =>
+  isOpen(placeHours(TOWN_NPCS[npcId].hoursId, game.identity.culturePackId), game.clock);
+
+/** The trams run now: the tram stop's hours are theirs. */
+const tramsRunning = (game: GameState) => isPlaceOpen('tram-stop', game);
 
 /**
  * A game store. Given a game, it is already playing it in the first slot;
@@ -1075,6 +1109,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       game: initial ?? createSave(DEV_SETUP),
       tabHidden: false,
       interactable: null,
+      tramChoosing: false,
+      tramArrival: null,
       conversation: null,
       typing: false,
       micLevel: 0,
@@ -1210,7 +1246,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // The world calls these every frame, so they only notify on a change.
       enterPlace: (placeId) => {
         const before = get().game;
-        const game = enterPlace(before, placeId, placeHours(placeId, before.identity.culturePackId));
+        // Out in the open, there's no door to keep anyone out.
+        const hours = OPEN_AIR_PLACES.includes(placeId) ? null : placeHours(placeId, before.identity.culturePackId);
+        const game = enterPlace(before, placeId, hours);
         if (game === get().game) return;
         set({ game });
         // Through a door.
@@ -1221,7 +1259,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const { conversation } = get();
         // Walking away is like Leave: no cost before the outcome, the closing card after it.
         if (conversation && !conversation.closed && interactable !== conversation.npcId) get().leaveConversation();
-        set({ interactable });
+        set({ interactable, tramChoosing: false });
+      },
+      openTram: () => {
+        const { interactable, conversation, game } = get();
+        if (conversation || !isTramStop(interactable) || !tramsRunning(game)) return;
+        set({ tramChoosing: true });
+      },
+      closeTram: () => set({ tramChoosing: false }),
+      rideTram: (stopId) => {
+        const { interactable, conversation, game, tramChoosing } = get();
+        if (!tramChoosing || conversation || !isTramStop(interactable)) return;
+        const after = rideTram(game, stopsBetween(interactable, stopId), placeHours('tram-stop', game.identity.culturePackId));
+        if (after === game) return;
+        set({ game: after, tramChoosing: false, interactable: null, tramArrival: { stopId } });
       },
       drinkWater: () => set({ game: drinkWater(get().game) }),
 
@@ -1245,8 +1296,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
       talk: () => {
         const { interactable, conversation, game } = get();
-        if (conversation || get().journal || !isNpc(interactable) || !isAtWork(interactable, game)) return;
-        const npc = NAMED_NPCS[interactable];
+        if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
+        if (!(interactable in NAMED_NPCS)) return set({ toast: { kind: 'nothingToSay', npcId: interactable } });
+        const npc = NAMED_NPCS[interactable as NamedNpcId];
         const interaction = Object.values(INTERACTIONS).find((i) => i.npcId === npc.id)!;
         gameBeforeConversation = game;
         const id = ++conversations;
@@ -1475,7 +1527,23 @@ export const selectClockMinute = (s: GameStore) => Math.floor(s.game.clock.minut
 export const selectPlaceId = (s: GameStore) => s.game.placeId;
 /** What E would use here. Staff at a closed place don't count: there's no one to talk to. */
 export const selectInteractable = (s: GameStore) =>
-  isNpc(s.interactable) && !isAtWork(s.interactable, s.game) ? null : s.interactable;
+  isTownNpc(s.interactable) && !isAtWork(s.interactable, s.game) ? null : s.interactable;
+/** The tram stop the Character is standing at, or null. */
+export const selectTramStop = (s: GameStore) => (isTramStop(s.interactable) ? s.interactable : null);
+/** A tram runs now. Outside the trams' hours, the stop says none is running. */
+export const selectTramRunning = (s: GameStore) => tramsRunning(s.game);
+/** The trams' hours in this pack: the tram stop's. */
+export const selectTramHours = (s: GameStore) => placeHours('tram-stop', s.game.identity.culturePackId);
+export const selectTramChoosing = (s: GameStore) => s.tramChoosing;
+export const selectTramArrival = (s: GameStore) => s.tramArrival;
+const TRAM_DESTINATIONS = new Map(
+  TRAM_LINE.map((from) => [
+    from,
+    TRAM_LINE.filter((to) => to !== from).map((stopId) => ({ stopId, minutes: tramTripMinutes(stopsBetween(from, stopId)) })),
+  ]),
+);
+/** The other stops on the line from this one, and each trip's time. */
+export const selectTramDestinations = (from: TramStopId): readonly TramDestination[] => TRAM_DESTINATIONS.get(from)!;
 /** The current place's opening hours in this pack, for the place line above the dock. */
 export const selectPlaceHours = (s: GameStore) => placeHours(s.game.placeId, s.game.identity.culturePackId);
 /** Any place is open now: the world shuts the door of one that isn't. */
@@ -1485,8 +1553,8 @@ export const selectConversation = (s: GameStore) => s.conversation;
 const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;
 export const selectTyping = (s: GameStore) => s.typing;
-/** Keys belong to the UI, not the world: the typed field has focus, or the Journal is open. */
-export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null;
+/** Keys belong to the UI, not the world: the typed field has focus, the Journal is open, or the Player is choosing a tram stop. */
+export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null || s.tramChoosing;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;

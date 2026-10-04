@@ -49,6 +49,12 @@ export const MOVEMENT = {
   signReadRangeMetres: 6,
 } as const;
 
+/** Trams are fast travel: free, and the only cost is time. */
+export const TRAM = {
+  /** Game minutes from one stop to the next along the line. */
+  minutesPerStop: 8,
+} as const;
+
 // --- First Morning ----------------------------------------------------------
 
 export const FIRST_MORNING = {

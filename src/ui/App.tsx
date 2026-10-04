@@ -11,6 +11,7 @@ import { PersistCallout } from './PersistCallout.tsx';
 import { SetupScreen } from './SetupScreen.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
+import { TramPanel } from './TramPanel.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
 
@@ -52,6 +53,7 @@ function Hud() {
     <>
       <GatewayStatus />
       <InteractionPrompt />
+      <TramPanel />
       <SignTooltip />
       <Dock />
       <ConversationColumn />

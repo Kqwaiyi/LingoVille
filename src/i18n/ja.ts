@@ -34,6 +34,59 @@ export const ja: UiStrings = {
       name: 'バリスタ',
       subject: 'バリスタ',
     },
+    landlord: {
+      name: '大家さん',
+      subject: '大家さん',
+    },
+    cashier: {
+      name: 'レジ係',
+      subject: 'レジ係',
+    },
+    clerk: {
+      name: '店員',
+      subject: '店員',
+    },
+    server: {
+      name: '店員',
+      subject: '店員',
+    },
+    receptionist: {
+      name: '受付',
+      subject: '受付の人',
+    },
+    doctor: {
+      name: '医者',
+      subject: '医者',
+    },
+    nurse: {
+      name: '看護師',
+      subject: '看護師',
+    },
+    pharmacist: {
+      name: '薬剤師',
+      subject: '薬剤師',
+    },
+    regular: {
+      name: '公園の常連',
+      subject: '常連さん',
+    },
+    'passer-by': {
+      name: '通行人',
+      subject: '通行人',
+    },
+    shopkeeper: {
+      name: '店主',
+      subject: '店主',
+    },
+    attendant: {
+      name: '係員',
+      subject: '係員',
+    },
+  },
+  tramStops: {
+    'west-stop': '旧市街',
+    'central-stop': '中央',
+    'east-stop': '市場通り',
   },
   title: {
     menuLabel: 'タイトルメニュー',
@@ -183,6 +236,13 @@ export const ja: UiStrings = {
   prompt: {
     drink: '<kbd>E</kbd> で水道水を飲む',
     talk: '<kbd>E</kbd> で話しかける — {{role}}',
+    tram: '<kbd>E</kbd> で路面電車に乗る',
+    noTram: '路面電車は運行していません · 運行時間 {{opens}}–{{closes}}',
+  },
+  tram: {
+    heading: '路面電車で行き先を選ぶ',
+    trip: '{{minutes}}分 · 無料',
+    cancel: 'ここに残る',
   },
   faces: {
     relaxed: '{{who}}は落ち着いている',
@@ -279,6 +339,7 @@ export const ja: UiStrings = {
     recapSaved: '振り返りを日記に保存しました',
     loadedBackup: '今朝のセーブを読み込みました',
     npcSteppedAway: '{{who}}は席を外しました。何も失われていません。',
+    nothingToSay: '{{who}}はにっこり会釈しました。ここではまだ話すことがありません。',
   },
   voiceUnavailable: {
     title: '音声サービスを利用できません: ローカルサーバーを確認してください',

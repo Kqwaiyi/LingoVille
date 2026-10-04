@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { TOWN_NPCS } from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
 import { selectToast, selectVoiceUnavailable, useGame } from '../store/index.ts';
 
@@ -22,6 +23,7 @@ export function Toast() {
       {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'loadedBackup' && t('toast.loadedBackup')}
       {toast.kind === 'npcSteppedAway' && t('toast.npcSteppedAway', { who: t(`roles.${toast.npcId}.subject`) })}
+      {toast.kind === 'nothingToSay' && t('toast.nothingToSay', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
     </div>
   );
 }

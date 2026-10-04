@@ -37,6 +37,59 @@ export const en = {
       /** Starting a sentence. */
       subject: 'The barista',
     },
+    landlord: {
+      name: 'Landlord',
+      subject: 'The landlord',
+    },
+    cashier: {
+      name: 'Cashier',
+      subject: 'The cashier',
+    },
+    clerk: {
+      name: 'Clerk',
+      subject: 'The clerk',
+    },
+    server: {
+      name: 'Server',
+      subject: 'The server',
+    },
+    receptionist: {
+      name: 'Receptionist',
+      subject: 'The receptionist',
+    },
+    doctor: {
+      name: 'Doctor',
+      subject: 'The doctor',
+    },
+    nurse: {
+      name: 'Nurse',
+      subject: 'The nurse',
+    },
+    pharmacist: {
+      name: 'Pharmacist',
+      subject: 'The pharmacist',
+    },
+    regular: {
+      name: 'Park regular',
+      subject: 'The regular',
+    },
+    'passer-by': {
+      name: 'Passer-by',
+      subject: 'The passer-by',
+    },
+    shopkeeper: {
+      name: 'Shopkeeper',
+      subject: 'The shopkeeper',
+    },
+    attendant: {
+      name: 'Attendant',
+      subject: 'The attendant',
+    },
+  },
+  tramStops: {
+    'west-stop': 'Old Town',
+    'central-stop': 'Town Centre',
+    'east-stop': 'Market Street',
   },
   title: {
     menuLabel: 'Title menu',
@@ -186,6 +239,13 @@ export const en = {
   prompt: {
     drink: 'Press <kbd>E</kbd> to drink tap water',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
+    tram: 'Press <kbd>E</kbd> to take the tram',
+    noTram: 'No tram is running · Trams run {{opens}}–{{closes}}',
+  },
+  tram: {
+    heading: 'Take the tram to…',
+    trip: '{{minutes}} min · Free',
+    cancel: 'Stay here',
   },
   faces: {
     relaxed: '{{who}} looks relaxed',
@@ -284,6 +344,7 @@ export const en = {
     recapSaved: 'Recap saved to your Journal',
     loadedBackup: 'Loaded this morning’s save',
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
+    nothingToSay: '{{who}} smiles and nods. There’s nothing to talk about here yet.',
   },
   voiceUnavailable: {
     title: 'Voice service unavailable: check the local server',
