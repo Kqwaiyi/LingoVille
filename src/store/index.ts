@@ -110,6 +110,7 @@ export {
   browserDeviceSettings,
   createDeviceSettings,
   DEFAULT_DEVICE_SETTINGS,
+  pickNativeLanguage,
   type DeviceSettings,
   type DeviceSettingsStore,
 } from './deviceSettings.ts';

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CULTURE_PACKS, formatLocalMoney, NAMED_NPCS } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, type NamedNpcId } from '../content/index.ts';
+import { useTranslation } from '../i18n/index.ts';
 import type { LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
   selectChatLines,
@@ -28,10 +29,9 @@ import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
 
-// English until the i18n module lands (ticket 12).
-
 /** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
 function NpcLineHelp({ index, text }: { index: number; text: string }) {
+  const { t } = useTranslation();
   const translation = useGame(selectTranslation(index));
   const nativeLanguage = useGame(selectNativeLanguage);
   const translateLine = useGame((s) => s.translateLine);
@@ -43,15 +43,15 @@ function NpcLineHelp({ index, text }: { index: number; text: string }) {
           {translation.text}
         </p>
       )}
-      {translation?.status === 'loading' && <p className="bubble-translation">Translating…</p>}
+      {translation?.status === 'loading' && <p className="bubble-translation">{t('chat.translating')}</p>}
       <div className="bubble-actions">
         {translation?.status !== 'ready' && translation?.status !== 'loading' && (
           <button type="button" onClick={() => translateLine(index)}>
-            {translation?.status === 'failed' ? 'Couldn’t translate. Try again' : 'Translate'}
+            {translation?.status === 'failed' ? t('chat.translateFailed') : t('chat.translate')}
           </button>
         )}
-        <button type="button" aria-label={`Replay “${text}”`} onClick={() => hearItSaid(text)}>
-          🔊 Replay
+        <button type="button" aria-label={t('chat.replayLabel', { text })} onClick={() => hearItSaid(text)}>
+          {t('chat.replay')}
         </button>
       </div>
     </>
@@ -59,6 +59,7 @@ function NpcLineHelp({ index, text }: { index: number; text: string }) {
 }
 
 function Bubble({ line, index, finished }: { line: ChatLine; index: number; finished: boolean }) {
+  const { t } = useTranslation();
   const language = useGame(selectTargetLanguage);
   const reading = useGame(selectLineReading(index));
   if (line.speaker === 'npc') {
@@ -71,7 +72,7 @@ function Bubble({ line, index, finished }: { line: ChatLine; index: number; fini
   }
   return (
     <div className="bubble bubble-player">
-      <small>Heard as</small>
+      <small>{t('chat.heardAs')}</small>
       {line.text}
     </div>
   );
@@ -80,46 +81,58 @@ function Bubble({ line, index, finished }: { line: ChatLine; index: number; fini
 // A placeholder face until real NPC faces arrive (ticket 30). It's the only way Patience shows.
 const FACE: Record<NpcExpression, string> = { relaxed: '🙂', puzzled: '😕', strained: '😟' };
 
-function NpcFace({ role }: { role: string }) {
+function NpcFace({ npcId }: { npcId: NamedNpcId }) {
+  const { t } = useTranslation();
   const expression = useGame(selectNpcExpression);
   if (!expression) return null;
   return (
-    <span className="npc-face" role="img" aria-label={`The ${role} looks ${expression}`} data-expression={expression}>
+    <span
+      className="npc-face"
+      role="img"
+      aria-label={t(`faces.${expression}`, { who: t(`roles.${npcId}.subject`) })}
+      data-expression={expression}
+    >
       {FACE[expression]}
     </span>
   );
 }
 
-function outcomeLine(card: ClosingCard, packId: LanguageCode, nativeLanguage: LanguageCode) {
-  // A meter already at its limit doesn't move, so there's nothing to show.
-  const mood = card.moodChange === 0 ? [] : [card.moodChange > 0 ? 'Mood ↑' : 'Mood ↓'];
-  if (card.kind === 'failure') return ['No charge', ...mood];
-  const items = card.served
+/** What was served, in the Native Language. */
+function servedLine(card: Extract<ClosingCard, { kind: 'success' }>, nativeLanguage: LanguageCode) {
+  return card.served
     .map(({ name, glosses, quantity }) => {
       // A pack glosses its items in every Native Language but its own, where the local name already reads.
       const gloss = glosses[nativeLanguage] ?? name;
       return quantity > 1 ? `${gloss} ×${quantity}` : gloss;
     })
     .join(', ');
-  return [items, `−${formatLocalMoney(card.paidInShifts, packId)}`, ...mood];
 }
 
 /** Replaces the input bar once the conversation is over: the outcome, its effects, and the way on to the Recap. */
-function ClosingCardPanel({ card, role }: { card: ClosingCard; role: string }) {
+function ClosingCardPanel({ card, npcId }: { card: ClosingCard; npcId: NamedNpcId }) {
+  const { t } = useTranslation();
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
   const skipRecap = useGame((s) => s.skipRecap);
   const seeRecap = useGame((s) => s.seeRecap);
+
+  // A meter already at its limit doesn't move, so there's nothing to show.
+  const mood = card.moodChange === 0 ? [] : [card.moodChange > 0 ? t('closing.moodUp') : t('closing.moodDown')];
+  const outcome =
+    card.kind === 'failure'
+      ? [t('closing.noCharge'), ...mood]
+      : [servedLine(card, nativeLanguage), `−${formatLocalMoney(card.paidInShifts, packId)}`, ...mood];
+
   return (
-    <section className="closing-card" aria-label="Conversation over" data-outcome={card.kind}>
-      <h2>{card.kind === 'success' ? 'Done!' : `The ${role} couldn’t understand you`}</h2>
-      <p>{outcomeLine(card, packId, nativeLanguage).join(' · ')}</p>
+    <section className="closing-card" aria-label={t('closing.label')} data-outcome={card.kind}>
+      <h2>{card.kind === 'success' ? t('closing.success') : t('closing.notUnderstood', { who: t(`roles.${npcId}.subject`) })}</h2>
+      <p>{outcome.join(' · ')}</p>
       <div className="closing-card-actions">
         <button type="button" onClick={skipRecap} autoFocus>
-          Skip Recap
+          {t('closing.skipRecap')}
         </button>
         <button type="button" className="primary" onClick={seeRecap}>
-          See Recap
+          {t('closing.seeRecap')}
         </button>
       </div>
     </section>
@@ -128,25 +141,26 @@ function ClosingCardPanel({ card, role }: { card: ClosingCard; role: string }) {
 
 /** The Recap in the column, as a lined Journal page, with a loading state while it is written. */
 function RecapPanel({ recap }: { recap: RecapView }) {
+  const { t } = useTranslation();
   const closeRecap = useGame((s) => s.closeRecap);
   return (
-    <section className="recap" aria-label="Recap" aria-busy={recap.status === 'writing'}>
+    <section className="recap" aria-label={t('recap.label')} aria-busy={recap.status === 'writing'}>
       <div className="recap-body">
         {recap.status === 'writing' && (
           <p className="recap-writing" role="status">
-            Writing your Recap…
+            {t('recap.writing')}
           </p>
         )}
         {recap.status === 'failed' && (
           <p className="recap-writing" role="status">
-            The Recap couldn’t be written this time. The conversation is saved to your Journal.
+            {t('recap.failed')}
           </p>
         )}
         {recap.status === 'ready' && <JournalPageView page={recap.entry} />}
       </div>
       <div className="closing-card-actions recap-actions">
         <button type="button" className="primary" onClick={closeRecap} autoFocus>
-          Done
+          {t('recap.done')}
         </button>
       </div>
     </section>
@@ -155,6 +169,7 @@ function RecapPanel({ recap }: { recap: RecapView }) {
 
 /** The always-present typed field: T focuses it, Enter sends, and Space types a space. */
 function TypedField() {
+  const { t } = useTranslation();
   const [text, setText] = useState('');
   const field = useRef<HTMLInputElement>(null);
   const typing = useGame(selectTyping);
@@ -185,8 +200,8 @@ function TypedField() {
     <input
       ref={field}
       type="text"
-      aria-label="Typed reply"
-      placeholder="Type a reply (T), Enter to send"
+      aria-label={t('chat.typedLabel')}
+      placeholder={t('chat.typedPlaceholder')}
       autoComplete="off"
       value={text}
       onChange={(e) => setText(e.target.value)}
@@ -202,6 +217,7 @@ function TypedField() {
  * button. Red with a live dot while listening.
  */
 function MicButton() {
+  const { t } = useTranslation();
   const listening = useGame(selectListening);
   const level = useGame(selectMicLevel);
   const typing = useGame(selectTyping);
@@ -243,7 +259,7 @@ function MicButton() {
     <button
       type="button"
       className="mic"
-      aria-label="Hold to talk (Space)"
+      aria-label={t('chat.mic')}
       aria-pressed={listening}
       data-listening={listening || undefined}
       style={{ '--level': level } as CSSProperties}
@@ -271,6 +287,7 @@ function InputBar() {
 
 /** The conversation column on the right: header, chat bubbles and the input bar. */
 export function ConversationColumn() {
+  const { t } = useTranslation();
   const conversation = useGame(selectConversation);
   const lines = useGame(selectChatLines);
   const minute = useGame(selectClockMinute);
@@ -309,24 +326,23 @@ export function ConversationColumn() {
   }, [lines, helpOpen]);
 
   if (!conversation) return null;
-  const npc = NAMED_NPCS[conversation.npcId];
-  const role = npc.role.charAt(0).toUpperCase() + npc.role.slice(1);
+  const { npcId } = conversation;
 
   return (
-    <aside className="chat-column" aria-label="Conversation">
+    <aside className="chat-column" aria-label={t('chat.label')}>
       <header className="chat-header">
         <div className="chat-who">
-          <NpcFace role={npc.role} />
-          <span>{role}</span>
+          <NpcFace npcId={npcId} />
+          <span>{t(`roles.${npcId}.name`)}</span>
         </div>
         <div className="chat-meta">
           {/* The café is the only staffed place until the whole town lands (ticket 13). */}
           {CULTURE_PACKS[packId].cafe.name} · {formatClock(minute)}
         </div>
         <div className="chat-tabs">
-          <div role="tablist" aria-label="Conversation tabs">
+          <div role="tablist" aria-label={t('chat.tabs')}>
             <button type="button" role="tab" aria-selected={!helpOpen} onClick={() => helpOpen && toggleHelp()}>
-              Chat
+              {t('chat.chatTab')}
             </button>
             <button
               type="button"
@@ -335,11 +351,11 @@ export function ConversationColumn() {
               disabled={conversation.closed}
               onClick={() => !helpOpen && toggleHelp()}
             >
-              Help <kbd>H</kbd>
+              {t('chat.helpTab')} <kbd>H</kbd>
             </button>
           </div>
           <button type="button" className="chat-leave" onClick={leaveConversation}>
-            Leave <kbd>Esc</kbd>
+            {t('chat.leave')} <kbd>Esc</kbd>
           </button>
         </div>
       </header>
@@ -350,18 +366,18 @@ export function ConversationColumn() {
           {helpOpen ? (
             <HelpPanel />
           ) : (
-            <div className="chat-log" role="log" aria-label="Chat" ref={log}>
+            <div className="chat-log" role="log" aria-label={t('chat.log')} ref={log}>
               {lines.map((line, i) => (
                 <Bubble key={i} line={line} index={i} finished={i !== conversation.npcLine} />
               ))}
               {reconnecting && (
                 <p className="chat-notice" role="status">
-                  Reconnecting…
+                  {t('chat.reconnecting')}
                 </p>
               )}
             </div>
           )}
-          {closingCard ? <ClosingCardPanel card={closingCard} role={npc.role} /> : <InputBar />}
+          {closingCard ? <ClosingCardPanel card={closingCard} npcId={npcId} /> : <InputBar />}
         </>
       )}
     </aside>

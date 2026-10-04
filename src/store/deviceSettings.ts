@@ -1,6 +1,6 @@
 import { createStore, get, set, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
-import { LANGUAGE_CODES } from '../sim/index.ts';
+import { LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
 
 // Device settings: one record per browser, outside saves, so they follow the
 // Player from one save to the next. They are conveniences, not progress: a
@@ -37,23 +37,40 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
 
 const KEY = 'device';
 
+/** The first of the browser's languages that is a Native Language, by base tag (`de-AT` is `de`), or else English. */
+export function pickNativeLanguage(browserLanguages: readonly string[]): LanguageCode {
+  for (const tag of browserLanguages) {
+    const base = tag.split('-')[0]!.toLowerCase();
+    const code = LANGUAGE_CODES.find((language) => language === base);
+    if (code) return code;
+  }
+  return 'en';
+}
+
+const navigatorLanguages = () => (typeof navigator === 'undefined' ? [] : (navigator.languages ?? []));
+
 export type DeviceSettingsStore = {
   load(): Promise<DeviceSettings>;
   save(settings: DeviceSettings): Promise<void>;
 };
 
-export function createDeviceSettings(openStore: () => UseStore): DeviceSettingsStore {
+/** Until the Player chooses, the Native Language is the one the browser's languages suggest. */
+export function createDeviceSettings(
+  openStore: () => UseStore,
+  { browserLanguages = navigatorLanguages }: { browserLanguages?: () => readonly string[] } = {},
+): DeviceSettingsStore {
   let store: UseStore | null = null;
   const db = () => (store ??= openStore());
+  const defaults = (): DeviceSettings => ({ ...DEFAULT_DEVICE_SETTINGS, nativeLanguage: pickNativeLanguage(browserLanguages()) });
 
   return {
     load: async () => {
       const raw = await get<unknown>(KEY, db());
-      if (raw === undefined) return DEFAULT_DEVICE_SETTINGS;
+      if (raw === undefined) return defaults();
       const parsed = DeviceSettingsSchema.safeParse(raw);
       if (parsed.success) return parsed.data;
       console.warn('[settings] unreadable, using the defaults:', z.prettifyError(parsed.error));
-      return DEFAULT_DEVICE_SETTINGS;
+      return defaults();
     },
     save: (settings) => set(KEY, DeviceSettingsSchema.parse(settings), db()),
   };

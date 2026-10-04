@@ -1,6 +1,7 @@
 import { Html } from '@react-three/drei';
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
 import type { NamedNpcId } from '../content/index.ts';
+import { useTranslation } from '../i18n/index.ts';
 import { selectNpcSpeaking, useGame } from '../store/index.ts';
 import { Props } from './Props.tsx';
 import { Signs } from './Signs.tsx';
@@ -19,16 +20,15 @@ function Block({ position, size, colour }: { position: Vec3; size: Vec3; colour:
   );
 }
 
-// English until the i18n module lands (ticket 12).
-
 /** A small "speaking…" over the NPC while a line of theirs is coming in. The words themselves are in the chat column. */
 function SpeakingIndicator({ npcId }: { npcId: NamedNpcId }) {
+  const { t } = useTranslation();
   const speaking = useGame(selectNpcSpeaking) === npcId;
   if (!speaking) return null;
   return (
     <Html position={[0, 1.2, 0]} center zIndexRange={[10, 0]}>
       <span className="npc-speaking" role="status">
-        speaking…
+        {t('chat.speaking')}
       </span>
     </Html>
   );

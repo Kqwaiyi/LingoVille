@@ -13,6 +13,7 @@ import {
   SAVE_SCHEMA_VERSION,
   selectArrival,
   selectMoneyInShifts,
+  selectNativeLanguage,
   selectPersistCallout,
   selectPlaceId,
   selectSavedCount,
@@ -62,7 +63,11 @@ let databases = 0;
  * same one. It grants persistent storage unless told otherwise, and keeps
  * what it was asked to download.
  */
-function freshBrowser({ persistGranted = true, clock = () => new Date('2026-10-03T09:00:00Z') } = {}): Browser {
+function freshBrowser({
+  persistGranted = true,
+  clock = () => new Date('2026-10-03T09:00:00Z'),
+  languages = ['en-US'] as readonly string[],
+} = {}): Browser {
   const n = ++databases;
   const rawSaves = createStore(`title-saves-${n}`, 'saves');
   const persist = { granted: persistGranted, asked: 0 };
@@ -73,7 +78,7 @@ function freshBrowser({ persistGranted = true, clock = () => new Date('2026-10-0
     persist,
     saves: createSaves(() => rawSaves, { now: clock }),
     journal: createJournal(() => createStore(`title-journal-${n}`, 'entries')),
-    deviceSettings: createDeviceSettings(() => createStore(`title-device-${n}`, 'settings')),
+    deviceSettings: createDeviceSettings(() => createStore(`title-device-${n}`, 'settings'), { browserLanguages: () => languages }),
     storage: {
       persisted: async () => persist.granted && persist.asked > 0,
       persist: async () => {
@@ -165,12 +170,14 @@ describe('the title screen', () => {
     expect(title).toMatchObject({ continueSlotId: 'slot-2', freeSlotId: 'slot-1' });
   });
 
-  it('New game starts the First Morning in a free slot and saves it at once', async () => {
+  it('New game opens setup, and finishing it starts the First Morning in a free slot and saves it at once', async () => {
     const browser = freshBrowser();
     const store = createGameStore(null, browser);
     await openTitle(store);
 
     store.getState().newGame();
+    expect(selectScreen(store.getState())).toBe('setup');
+    store.getState().finishSetup();
     await saved(store, 1);
 
     expect(selectScreen(store.getState())).toBe('playing');
@@ -195,6 +202,7 @@ describe('the title screen', () => {
     const before = createGameStore(null, browser);
     await openTitle(before);
     before.getState().newGame();
+    before.getState().finishSetup();
     before.getState().enterPlace('cafe');
     before.getState().advance(CLOCK.maxRealDeltaMs);
     before.setState({ game: { ...before.getState().game, character: { ...before.getState().game.character, moneyInShifts: 1.2 } } });
@@ -235,6 +243,7 @@ describe('the title screen', () => {
     const before = createGameStore(null, { ...browser, openVoiceSession });
     await openTitle(before);
     before.getState().newGame();
+    before.getState().finishSetup();
     before.getState().enterPlace('cafe');
     const atTheCounter = before.getState().game;
     before.getState().setInteractable('barista');
@@ -260,6 +269,84 @@ describe('the title screen', () => {
     await openTitle(store);
 
     expect(store.getState().nativeLanguage).toBe('de');
+  });
+});
+
+describe('the Native Language screen', () => {
+  it('pre-selects the first of the browser’s languages that is a Native Language', async () => {
+    const store = createGameStore(null, freshBrowser({ languages: ['fr-CA', 'de-DE', 'ja'] }));
+    await openTitle(store);
+
+    store.getState().newGame();
+
+    expect(selectScreen(store.getState())).toBe('setup');
+    expect(selectNativeLanguage(store.getState())).toBe('de');
+  });
+
+  it('pre-selects English when none of the browser’s languages is one', async () => {
+    const store = createGameStore(null, freshBrowser({ languages: ['fr-FR', 'es'] }));
+    await openTitle(store);
+
+    store.getState().newGame();
+
+    expect(selectNativeLanguage(store.getState())).toBe('en');
+  });
+
+  it('switches the Native Language as soon as one is chosen, and keeps the choice in this browser’s device settings', async () => {
+    const browser = freshBrowser();
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+    store.getState().newGame();
+
+    for (const language of ['ja', 'zh', 'de'] as const) store.getState().setNativeLanguage(language);
+
+    expect(selectNativeLanguage(store.getState())).toBe('de');
+    await vi.waitFor(async () => expect((await browser.deviceSettings.load()).nativeLanguage).toBe('de'));
+    const after = createGameStore(null, browser);
+    await openTitle(after);
+    expect(selectNativeLanguage(after.getState())).toBe('de');
+  });
+
+  it('changing the Native Language keeps the other device settings', async () => {
+    const browser = freshBrowser();
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+
+    store.getState().setReadingAids({ romaji: true });
+    store.getState().setNativeLanguage('zh');
+
+    await vi.waitFor(async () => expect(await browser.deviceSettings.load()).toMatchObject({ nativeLanguage: 'zh', showRomaji: true }));
+  });
+
+  it('keeps the pre-selected language once setup is finished, even if the browser’s languages change later', async () => {
+    const languages = ['de-DE'];
+    const browser = freshBrowser({ languages });
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+    store.getState().newGame();
+
+    store.getState().finishSetup();
+    await saved(store, 1);
+    languages.splice(0, 1, 'ja-JP');
+
+    const after = createGameStore(null, browser);
+    await openTitle(after);
+    expect(selectNativeLanguage(after.getState())).toBe('de');
+  });
+
+  it('Back returns to the title screen, in the language just chosen, without starting a game', async () => {
+    const browser = freshBrowser();
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+    store.getState().newGame();
+    store.getState().setNativeLanguage('ja');
+
+    store.getState().leaveSetup();
+
+    expect(selectScreen(store.getState())).toBe('title');
+    expect(await openTitle(store)).toMatchObject({ continueSlotId: null, freeSlotId: 'slot-1' });
+    expect(selectNativeLanguage(store.getState())).toBe('ja');
+    expect(await browser.saves.load('slot-1')).toBeNull();
   });
 });
 
@@ -365,6 +452,7 @@ describe('persistent storage', () => {
     await openTitle(store);
 
     store.getState().newGame();
+    store.getState().finishSetup();
     store.getState().saveNow();
     await saved(store, 2);
 
@@ -379,6 +467,7 @@ describe('persistent storage', () => {
     expect(selectPersistCallout(first.getState())).toBe(false);
 
     first.getState().newGame();
+    first.getState().finishSetup();
     await vi.waitFor(() => expect(selectPersistCallout(first.getState())).toBe(true));
 
     // Back on the title screen after a reload, it still shows.

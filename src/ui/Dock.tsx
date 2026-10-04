@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { formatLocalMoney } from '../content/index.ts';
-import { METER_MAX, SAVE, WELL_BEING, type Weekday } from '../sim/index.ts';
+import { useTranslation } from '../i18n/index.ts';
+import { METER_MAX, SAVE, WELL_BEING } from '../sim/index.ts';
 import {
   selectClockMinute,
   selectCulturePackId,
@@ -15,17 +16,6 @@ import {
   useGame,
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
-
-// Strings are English until the i18n module lands (ticket 12).
-const WEEKDAY_LABEL: Record<Weekday, string> = {
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
-  saturday: 'Saturday',
-  sunday: 'Sunday',
-};
 
 function RingGauge({ label, icon, value, tone }: { label: string; icon: string; value: number; tone?: 'mood' }) {
   const percent = Math.round((value / METER_MAX) * 100);
@@ -50,18 +40,19 @@ function RingGauge({ label, icon, value, tone }: { label: string; icon: string; 
 }
 
 function Money() {
+  const { t } = useTranslation();
   const shifts = useGame(selectMoneyInShifts);
   const packId = useGame(selectCulturePackId);
   return (
-    <div className="dock-money" aria-label="Money">
+    <div className="dock-money" aria-label={t('dock.money')}>
       {formatLocalMoney(shifts, packId)}
     </div>
   );
 }
 
-// English until the i18n module lands (ticket 12), like the rest of the dock.
 /** "Saved ✓" under the clock for a moment after each save. Silent: it makes no sound. */
 function SavedNotice() {
+  const { t } = useTranslation();
   const savedCount = useGame(selectSavedCount);
   const [shownFor, setShownFor] = useState(0);
 
@@ -72,11 +63,12 @@ function SavedNotice() {
     return () => clearTimeout(timer);
   }, [savedCount]);
 
-  return <div className="dock-saved">{shownFor > 0 ? 'Saved ✓' : ''}</div>;
+  return <div className="dock-saved">{shownFor > 0 ? t('dock.saved') : ''}</div>;
 }
 
 /** The always-visible dock at the bottom centre: Well-being, Mood, the clock and money. */
 export function Dock() {
+  const { t } = useTranslation();
   const health = useGame(selectHealth);
   const hunger = useGame(selectHunger);
   const thirst = useGame(selectThirst);
@@ -86,20 +78,18 @@ export function Dock() {
   const weekday = useGame(selectWeekday);
 
   return (
-    <section className="dock" aria-label="Dock">
-      <RingGauge label="Health" icon="❤️" value={health} />
-      <RingGauge label="Hunger" icon="🍙" value={hunger} />
-      <RingGauge label="Thirst" icon="💧" value={thirst} />
+    <section className="dock" aria-label={t('dock.label')}>
+      <RingGauge label={t('dock.health')} icon="❤️" value={health} />
+      <RingGauge label={t('dock.hunger')} icon="🍙" value={hunger} />
+      <RingGauge label={t('dock.thirst')} icon="💧" value={thirst} />
       {/* The face starts to follow Mood once Mood moves (ticket 15). */}
-      <RingGauge label="Mood" icon="🙂" value={mood} tone="mood" />
+      <RingGauge label={t('dock.mood')} icon="🙂" value={mood} tone="mood" />
       <div className="dock-sep" aria-hidden />
       <div className="dock-clock">
-        <time className="dock-time" aria-label="Time">
+        <time className="dock-time" aria-label={t('dock.time')}>
           {formatClock(minute)}
         </time>
-        <div className="dock-day">
-          Day {day} · {WEEKDAY_LABEL[weekday]}
-        </div>
+        <div className="dock-day">{t('dock.day', { day, weekday: t(`weekdays.${weekday}`) })}</div>
         <SavedNotice />
       </div>
       <div className="dock-sep" aria-hidden />

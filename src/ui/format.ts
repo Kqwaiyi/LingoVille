@@ -1,5 +1,3 @@
-// English until the i18n module lands (ticket 12).
-const RELATIVE = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['year', 365 * 24 * 60 * 60_000],
   ['month', 30 * 24 * 60 * 60_000],
@@ -9,12 +7,12 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ['minute', 60_000],
 ];
 
-/** "5 minutes ago", "yesterday": how long ago a real time was. */
-export function formatTimeAgo(iso: string, now = Date.now()) {
+/** "5 minutes ago", "yesterday": how long ago a real time was, in this language. Null if the time can't be read. */
+export function formatTimeAgo(iso: string, language: string, now = Date.now()) {
   const ago = now - Date.parse(iso);
-  if (Number.isNaN(ago)) return 'at an unknown time';
+  if (Number.isNaN(ago)) return null;
   const [unit, ms] = UNITS.find(([, size]) => ago >= size) ?? ['minute', 60_000];
-  return RELATIVE.format(-Math.floor(ago / ms), unit);
+  return new Intl.RelativeTimeFormat(language, { numeric: 'auto' }).format(-Math.floor(ago / ms), unit);
 }
 
 /** "07:05" from minutes since midnight. */

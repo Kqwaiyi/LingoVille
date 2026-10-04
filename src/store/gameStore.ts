@@ -70,7 +70,7 @@ import {
   type TranscriptLine,
   type VoiceSession,
 } from '../voice/index.ts';
-import { browserDeviceSettings, DEFAULT_DEVICE_SETTINGS, type DeviceSettingsStore } from './deviceSettings.ts';
+import { browserDeviceSettings, DEFAULT_DEVICE_SETTINGS, type DeviceSettings, type DeviceSettingsStore } from './deviceSettings.ts';
 import { browserLibraryReadings, type LibraryReadings } from './libraryReadings.ts';
 import { browserJournal, journalPage, type Journal, type JournalEntry, type JournalPage, type NewJournalEntry } from './journal.ts';
 import {
@@ -85,7 +85,7 @@ import {
 } from './saveFiles.ts';
 import { browserSaves, SLOT_IDS, type LoadedSave, type Saves, type Slot, type SlotId } from './saves.ts';
 
-/** The fixed setup every new game uses until New game setup lands (ticket 12). */
+/** The fixed setup every new game uses until the rest of New game setup lands (ticket 12b). */
 export const DEV_SETUP: NewGameSetup = {
   characterName: 'Sam',
   targetLanguage: 'ja',
@@ -97,7 +97,7 @@ export const DEV_SETUP: NewGameSetup = {
 
 /**
  * The dev setup, or in dev, the one `?pack=` asks for: `?pack=de` starts a new
- * game in the German pack, learning German. New game setup replaces it (ticket 12).
+ * game in the German pack, learning German. The rest of New game setup replaces it (ticket 12b).
  */
 export function devSetup(search: string): NewGameSetup {
   const asked = new URLSearchParams(search).get('pack');
@@ -109,8 +109,11 @@ export function devSetup(search: string): NewGameSetup {
 /** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
-/** Which screen shows: the title, or the game itself. */
-export type Screen = 'title' | 'playing';
+/** Which screen shows: the title, New game setup, or the game itself. */
+export type Screen = 'title' | 'setup' | 'playing';
+
+/** New game setup, while it shows: the slot the new game goes into. Its screens so far: the Native Language. */
+type Setup = { slotId: SlotId };
 
 /** A slot on the title screen: empty, a save to play, or a save that can't be loaded at all. */
 export type SlotCard =
@@ -268,7 +271,7 @@ export type GameStoreDeps = {
   storage: StoragePersistence;
   /** Hands the Player a file to keep. */
   downloadFile: (file: SaveFile) => void;
-  /** What New game builds the save from, until New game setup asks the Player (ticket 12). */
+  /** What New game builds the save from, until the rest of New game setup asks the Player (ticket 12b). */
   newGameSetup: () => NewGameSetup;
 };
 
@@ -351,6 +354,8 @@ export type GameStore = {
   screen: Screen;
   /** The title screen, while it shows. */
   title: TitleView | null;
+  /** New game setup, while it shows. */
+  setup: Setup | null;
   arrival: Arrival;
   /** The slot the game is saved into. */
   slotId: string;
@@ -383,8 +388,14 @@ export type GameStore = {
   continueGame: () => void;
   /** Load a save: plays the save in this slot. */
   playSlot: (slotId: SlotId) => void;
-  /** New game: the First Morning in the first empty slot, from the fixed dev setup until New game setup lands (ticket 12). */
+  /** New game: opens setup for the first empty slot, on the Native Language screen. */
   newGame: () => void;
+  /** Chooses the Native Language: the UI switches at once, and this browser's device settings keep it. */
+  setNativeLanguage: (nativeLanguage: LanguageCode) => void;
+  /** Finishes setup: the First Morning in its slot, from the fixed dev setup until the other setup screens land (ticket 12b). */
+  finishSetup: () => void;
+  /** Back from setup to the title screen. */
+  leaveSetup: () => void;
   /** Downloads the slot as one file: its save, its Journal and its backups' metadata. */
   exportSave: (slotId: SlotId) => void;
   /** Downloads everything stored for a slot, as found, for a save that can't be loaded. */
@@ -551,6 +562,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (askedToPersist) return;
       askedToPersist = true;
       void checkPersisted(true);
+    };
+
+    // Device settings change one at a time, each from the one before, so a quick run of changes never loses one.
+    let settingsWrites: Promise<unknown> = Promise.resolve();
+    const updateDeviceSettings = (change: (settings: DeviceSettings) => DeviceSettings | null) => {
+      settingsWrites = settingsWrites
+        .then(() => deps.deviceSettings.load())
+        .then((settings) => {
+          const changed = change(settings);
+          return changed && deps.deviceSettings.save(changed);
+        })
+        .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
     };
 
     const readyTitle = () => {
@@ -917,6 +940,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     return {
       screen: initial ? 'playing' : 'title',
       title: initial ? null : { status: 'checking' },
+      setup: null,
       arrival: 'newGame',
       slotId: SLOT_IDS[0],
       savedCount: 0,
@@ -937,8 +961,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       openTitle: () => {
         set({ title: { status: 'checking' } });
         // The settings come first, so the title shows in the Player's language.
-        deps.deviceSettings
-          .load()
+        settingsWrites
+          .then(() => deps.deviceSettings.load())
           .then(
             ({ nativeLanguage, readingAids, showRomaji }) => set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji } }),
             (error: unknown) => console.warn('[settings] could not be read:', error),
@@ -956,8 +980,26 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       newGame: () => {
         const freeSlotId = readyTitle()?.freeSlotId;
         if (!freeSlotId) return;
-        play(createSave(deps.newGameSetup()), freeSlotId, 'newGame');
+        // The Native Language from the device settings: the one the browser suggests, until the Player chooses.
+        set({ screen: 'setup', title: null, setup: { slotId: freeSlotId } });
+      },
+      setNativeLanguage: (nativeLanguage) => {
+        set({ nativeLanguage });
+        updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
+      },
+      finishSetup: () => {
+        const setup = get().setup;
+        if (get().screen !== 'setup' || !setup) return;
+        set({ setup: null });
+        // The pre-selected language counts as chosen too, so it no longer follows the browser's.
+        const { nativeLanguage } = get();
+        updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
+        play(createSave(deps.newGameSetup()), setup.slotId, 'newGame');
         save();
+      },
+      leaveSetup: () => {
+        if (get().screen !== 'setup') return;
+        set({ screen: 'title', setup: null, title: { status: 'checking' } });
       },
       exportSave: (slotId) => void download(() => exportSave(stores, slotId)),
       exportRawSave: (slotId) => void download(() => exportRawSave(stores, slotId)),
@@ -990,14 +1032,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       dismissPersistCallout: () => {
         set({ persistCallout: false });
-        deps.deviceSettings
-          .load()
-          .then((settings) =>
-            settings.tooltipsSeen.includes(PERSIST_REFUSED)
-              ? undefined
-              : deps.deviceSettings.save({ ...settings, tooltipsSeen: [...settings.tooltipsSeen, PERSIST_REFUSED] }),
-          )
-          .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+        updateDeviceSettings((settings) =>
+          settings.tooltipsSeen.includes(PERSIST_REFUSED) ? null : { ...settings, tooltipsSeen: [...settings.tooltipsSeen, PERSIST_REFUSED] },
+        );
       },
       saveNow: save,
       advance: (realDeltaMs) => {
@@ -1177,10 +1214,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       setReadingAids: (change) => {
         const readingAids = { ...get().readingAids, ...change };
         set({ readingAids });
-        deps.deviceSettings
-          .load()
-          .then((settings) => deps.deviceSettings.save({ ...settings, readingAids: readingAids.show, showRomaji: readingAids.romaji }))
-          .catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+        updateDeviceSettings((settings) => ({ ...settings, readingAids: readingAids.show, showRomaji: readingAids.romaji }));
       },
       addToPhrasebook: (word, glossLanguage) => {
         const game = addToPhrasebook(get().game, { text: word.base, reading: word.reading, gloss: word.gloss, glossLanguage });

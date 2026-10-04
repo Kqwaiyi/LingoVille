@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { CULTURE_PACKS, formatLocalMoney } from '../content/index.ts';
-import type { LanguageCode, PlaceId } from '../sim/index.ts';
+import { Trans, useTranslation } from '../i18n/index.ts';
 import {
   nameToDelete,
   selectReadingAids,
   selectTitle,
   useGame,
-  type ImportProblem,
   type SlotCard,
   type SlotId,
   type TitleNotice,
@@ -15,48 +14,27 @@ import {
 import { formatTimeAgo } from './format.ts';
 import { PersistCallout } from './PersistCallout.tsx';
 
-// English until the i18n module lands (ticket 12).
-
 type ReadyTitle = Extract<TitleView, { status: 'ready' }>;
 type MenuItem = 'continue' | 'load' | 'newGame' | 'import' | 'settings';
 type ReadyCard = Extract<SlotCard, { status: 'ready' }>;
 type SavedCard = Exclude<SlotCard, { status: 'empty' }>;
 
-const MENU_LABEL: Record<MenuItem, string> = {
-  continue: 'Continue',
-  load: 'Load a save',
-  newGame: 'New game',
-  import: 'Import a save',
-  settings: 'Settings',
-};
-
-const PLACE_NAME: Record<PlaceId, (pack: LanguageCode) => string> = {
-  home: () => 'home',
-  cafe: (pack) => CULTURE_PACKS[pack].cafe.name,
-};
-
-const IMPORT_REFUSED: Record<ImportProblem, string> = {
-  notASaveFile: 'That file isn’t an Insomniacs save.',
-  newerVersion: 'That save was made by a newer version of the game, so this one can’t read it.',
-  damaged: 'That save file is damaged, so it can’t be imported.',
-  slotNotEmpty: 'A save can only be imported into an empty slot. Delete a save first.',
-};
-
 const slotNumber = (slotId: SlotId) => slotId.replace('slot-', '');
 
 /** The device settings there are so far, kept for this browser. Volume and speaking come with ticket 33. */
 function SettingsPanel() {
+  const { t } = useTranslation();
   const readingAids = useGame(selectReadingAids);
   const setReadingAids = useGame((s) => s.setReadingAids);
   return (
     <>
-      <h2>Settings</h2>
-      <p>Kept for this browser, whichever save you play.</p>
+      <h2>{t('settings.heading')}</h2>
+      <p>{t('settings.kept')}</p>
       <label className="title-toggle">
         <input type="checkbox" checked={readingAids.show} onChange={(e) => setReadingAids({ show: e.target.checked })} />
         <span>
-          Reading aids
-          <small>Pinyin over Chinese, furigana over Japanese.</small>
+          {t('settings.readingAids')}
+          <small>{t('settings.readingAidsNote')}</small>
         </span>
       </label>
       <label className="title-toggle">
@@ -67,26 +45,23 @@ function SettingsPanel() {
           onChange={(e) => setReadingAids({ romaji: e.target.checked })}
         />
         <span>
-          Show romaji
-          <small>A romaji line under each Japanese line.</small>
+          {t('settings.romaji')}
+          <small>{t('settings.romajiNote')}</small>
         </span>
       </label>
     </>
   );
 }
 
-function noticeText(notice: TitleNotice) {
+function NoticeText({ notice }: { notice: TitleNotice }) {
+  const { t } = useTranslation();
   switch (notice.kind) {
     case 'imported':
-      return `Imported into slot ${slotNumber(notice.slotId)}.`;
+      return t('title.notice.imported', { slot: slotNumber(notice.slotId) });
     case 'importRefused':
-      return IMPORT_REFUSED[notice.problem];
-    case 'exportFailed':
-      return 'The save couldn’t be exported.';
-    case 'deleteFailed':
-      return 'The save couldn’t be deleted.';
-    case 'importFailed':
-      return 'The save couldn’t be imported.';
+      return t(`title.importRefused.${notice.problem}`);
+    default:
+      return t(`title.notice.${notice.kind}`);
   }
 }
 
@@ -96,6 +71,7 @@ function noticeText(notice: TitleNotice) {
  * and Esc goes back.
  */
 export function TitleScreen() {
+  const { t } = useTranslation();
   const title = useGame(selectTitle);
   const openTitle = useGame((s) => s.openTitle);
 
@@ -106,18 +82,17 @@ export function TitleScreen() {
       {title?.status === 'ready' ? (
         <TitleMenu title={title} />
       ) : (
-        <nav className="title-menu" aria-label="Title menu" aria-busy={title?.status !== 'failed' || undefined}>
+        <nav className="title-menu" aria-label={t('title.menuLabel')} aria-busy={title?.status !== 'failed' || undefined}>
           <h1>Insomniacs</h1>
           {title?.status === 'failed' && (
             <p className="title-note" role="alert">
-              Your saves couldn’t be read. {title.message}
+              {t('title.readFailed', { message: title.message })}
             </p>
           )}
         </nav>
       )}
       <p className="title-keys" aria-hidden>
-        <kbd>↑</kbd>
-        <kbd>↓</kbd> Select · <kbd>Enter</kbd> Confirm · <kbd>Esc</kbd> Back
+        <Trans i18nKey="title.keys" components={{ kbd: <kbd /> }} />
       </p>
       <PersistCallout />
     </div>
@@ -125,6 +100,7 @@ export function TitleScreen() {
 }
 
 function TitleMenu({ title }: { title: ReadyTitle }) {
+  const { t } = useTranslation();
   const continueGame = useGame((s) => s.continueGame);
   const newGame = useGame((s) => s.newGame);
   const importSave = useGame((s) => s.importSave);
@@ -187,7 +163,7 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
 
   return (
     <>
-      <nav className="title-menu" aria-label="Title menu">
+      <nav className="title-menu" aria-label={t('title.menuLabel')}>
         <h1>Insomniacs</h1>
         <ul>
           {items.map((item) => {
@@ -204,32 +180,32 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
                   onMouseEnter={() => setHighlighted(item)}
                   onClick={() => confirm(item)}
                 >
-                  {MENU_LABEL[item]}
+                  {t(`title.menu.${item}`)}
                 </button>
-                {greyedOut && <p className="title-note">Delete a save to start a new one</p>}
+                {greyedOut && <p className="title-note">{t('title.full')}</p>}
               </li>
             );
           })}
         </ul>
       </nav>
 
-      <section className="title-panel" ref={panel} aria-label={MENU_LABEL[current]}>
+      <section className="title-panel" ref={panel} aria-label={t(`title.menu.${current}`)}>
         {title.notice && (
           <p className="title-notice" role={title.notice.kind === 'imported' ? 'status' : 'alert'}>
-            {noticeText(title.notice)}
-            <button type="button" className="title-notice-close" aria-label="Dismiss" onClick={dismissTitleNotice}>
+            <NoticeText notice={title.notice} />
+            <button type="button" className="title-notice-close" aria-label={t('title.dismiss')} onClick={dismissTitleNotice}>
               ×
             </button>
           </p>
         )}
         {current === 'continue' && continueCard && continueCard.status !== 'empty' && (
           <>
-            <h2>Continue</h2>
+            <h2>{t('title.menu.continue')}</h2>
             {continueCard.status === 'ready' ? (
               <>
                 <SlotSummary card={continueCard} />
                 <button type="button" className="primary" onClick={continueGame}>
-                  Continue
+                  {t('title.menu.continue')}
                 </button>
               </>
             ) : (
@@ -240,22 +216,22 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
         {current === 'load' && <SlotList slots={title.slots} onDelete={setDeleting} />}
         {current === 'newGame' && (
           <>
-            <h2>Start a new life</h2>
-            <p>Move into town on your first morning, with a little money and a lot to learn.</p>
+            <h2>{t('title.newGame.heading')}</h2>
+            <p>{t('title.newGame.body')}</p>
             <button type="button" className="primary" disabled={full} onClick={newGame}>
-              Start
+              {t('title.newGame.start')}
             </button>
-            {full && <p className="title-note">Delete a save to start a new one</p>}
+            {full && <p className="title-note">{t('title.full')}</p>}
           </>
         )}
         {current === 'import' && (
           <>
-            <h2>Import a save</h2>
-            <p>Bring back a life from an exported file, with its Journal. It goes into an empty slot.</p>
+            <h2>{t('title.menu.import')}</h2>
+            <p>{t('title.import.body')}</p>
             <button type="button" className="primary" disabled={full} onClick={() => fileInput.current?.click()}>
-              Choose a file
+              {t('title.import.choose')}
             </button>
-            {full && <p className="title-note">Delete a save to import one</p>}
+            {full && <p className="title-note">{t('title.fullImport')}</p>}
           </>
         )}
         {current === 'settings' && <SettingsPanel />}
@@ -265,7 +241,7 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
         ref={fileInput}
         type="file"
         accept="application/json,.json"
-        aria-label="Save file to import"
+        aria-label={t('title.import.fileLabel')}
         hidden
         onChange={async (e) => {
           const file = e.target.files?.[0];
@@ -278,36 +254,47 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
   );
 }
 
+/** "5 minutes ago", in the Native Language. */
+function useTimeAgo() {
+  const { t, i18n } = useTranslation();
+  return (iso: string) => formatTimeAgo(iso, i18n.language) ?? t('slots.unknownTime');
+}
+
 function SlotSummary({ card }: { card: ReadyCard }) {
+  const { t } = useTranslation();
+  const timeAgo = useTimeAgo();
+  const place = card.placeId === 'home' ? t('places.home') : CULTURE_PACKS[card.culturePackId].cafe.name;
   return (
     <div className="slot-summary">
       <strong>
-        {card.characterName} · {CULTURE_PACKS[card.targetLanguage].languageName}
+        {card.characterName} · {t(`languages.${card.targetLanguage}`)}
       </strong>
       <span>
-        Day {card.day} at {PLACE_NAME[card.placeId](card.culturePackId)} · {formatLocalMoney(card.moneyInShifts, card.culturePackId)}
+        {t('slots.where', { day: card.day, place })} · {formatLocalMoney(card.moneyInShifts, card.culturePackId)}
       </span>
-      <span className="slot-when">Last played {formatTimeAgo(card.lastPlayedAt)}</span>
-      {card.fromBackup && <span className="slot-backup">Loads this morning’s save</span>}
+      <span className="slot-when">{t('slots.lastPlayed', { when: timeAgo(card.lastPlayedAt) })}</span>
+      {card.fromBackup && <span className="slot-backup">{t('slots.fromBackup')}</span>}
     </div>
   );
 }
 
 function DamagedSlot({ card, onDelete }: { card: Extract<SlotCard, { status: 'damaged' }>; onDelete: () => void }) {
+  const { t } = useTranslation();
+  const timeAgo = useTimeAgo();
   const exportRawSave = useGame((s) => s.exportRawSave);
   return (
     <div className="slot-damaged">
-      <strong>⚠ This save couldn’t be loaded</strong>
+      <strong>{t('slots.damaged')}</strong>
       <span className="slot-when">
         {card.characterName && `${card.characterName} · `}
-        {card.lastPlayedAt ? `Last played ${formatTimeAgo(card.lastPlayedAt)}` : 'Never played'}
+        {card.lastPlayedAt ? t('slots.lastPlayed', { when: timeAgo(card.lastPlayedAt) }) : t('slots.neverPlayed')}
       </span>
       <div className="slot-actions">
         <button type="button" onClick={() => exportRawSave(card.slotId)}>
-          Export raw
+          {t('slots.exportRaw')}
         </button>
         <button type="button" className="danger" onClick={onDelete}>
-          Delete
+          {t('slots.delete')}
         </button>
       </div>
     </div>
@@ -316,29 +303,30 @@ function DamagedSlot({ card, onDelete }: { card: Extract<SlotCard, { status: 'da
 
 /** Load a save: the 4 slots as rows. */
 function SlotList({ slots, onDelete }: { slots: SlotCard[]; onDelete: (card: SavedCard) => void }) {
+  const { t } = useTranslation();
   const playSlot = useGame((s) => s.playSlot);
   const exportSave = useGame((s) => s.exportSave);
   const [moreFor, setMoreFor] = useState<SlotId | null>(null);
 
   return (
     <>
-      <h2>Load a save</h2>
+      <h2>{t('title.menu.load')}</h2>
       <ul className="slot-list">
         {slots.map((card) => (
           <li key={card.slotId} className="slot-row" data-status={card.status}>
             <span className="slot-number">{slotNumber(card.slotId)}</span>
-            {card.status === 'empty' && <span className="slot-empty">Empty · New game or Import</span>}
+            {card.status === 'empty' && <span className="slot-empty">{t('slots.empty')}</span>}
             {card.status === 'damaged' && <DamagedSlot card={card} onDelete={() => onDelete(card)} />}
             {card.status === 'ready' && (
               <>
                 <SlotSummary card={card} />
                 <div className="slot-actions">
                   <button type="button" onClick={() => playSlot(card.slotId)}>
-                    Play
+                    {t('slots.play')}
                   </button>
                   <button
                     type="button"
-                    aria-label={`More for slot ${slotNumber(card.slotId)}`}
+                    aria-label={t('slots.more', { slot: slotNumber(card.slotId) })}
                     aria-expanded={moreFor === card.slotId}
                     onClick={() => setMoreFor(moreFor === card.slotId ? null : card.slotId)}
                   >
@@ -351,7 +339,7 @@ function SlotList({ slots, onDelete }: { slots: SlotCard[]; onDelete: (card: Sav
                           exportSave(card.slotId);
                         }}
                       >
-                        Export
+                        {t('slots.export')}
                       </button>
                       <button type="button" role="menuitem" className="danger"
                         onClick={() => {
@@ -359,7 +347,7 @@ function SlotList({ slots, onDelete }: { slots: SlotCard[]; onDelete: (card: Sav
                           onDelete(card);
                         }}
                       >
-                        Delete
+                        {t('slots.delete')}
                       </button>
                     </div>
                   )}
@@ -375,6 +363,7 @@ function SlotList({ slots, onDelete }: { slots: SlotCard[]; onDelete: (card: Sav
 
 /** Delete asks for the Character's name typed, so a save can't be deleted by accident. */
 function DeleteDialog({ card, onClose }: { card: SavedCard; onClose: () => void }) {
+  const { t } = useTranslation();
   const deleteSave = useGame((s) => s.deleteSave);
   const [typed, setTyped] = useState('');
   const name = nameToDelete(card);
@@ -395,18 +384,22 @@ function DeleteDialog({ card, onClose }: { card: SavedCard; onClose: () => void 
   return (
     <div className="screen-backdrop">
       <form className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-title" onSubmit={submit} onKeyDown={onKeyDown}>
-        <h2 id="delete-title">Delete {card.characterName ? `${card.characterName}’s save` : 'this save'}?</h2>
-        <p>This removes the save, its backups and its Journal. It can’t be undone.</p>
+        <h2 id="delete-title">
+          {card.characterName ? t('deleteDialog.titleNamed', { name: card.characterName }) : t('deleteDialog.titleUnnamed')}
+        </h2>
+        <p>{t('deleteDialog.body')}</p>
         <label>
-          Type <strong>{name}</strong> to confirm
+          <span>
+            <Trans i18nKey="deleteDialog.typeToConfirm" values={{ name }} components={{ name: <strong /> }} />
+          </span>
           <input value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus autoComplete="off" spellCheck={false} />
         </label>
         <div className="delete-dialog-actions">
           <button type="button" onClick={onClose}>
-            Cancel
+            {t('deleteDialog.cancel')}
           </button>
           <button type="submit" className="danger" disabled={!matches}>
-            Delete
+            {t('deleteDialog.delete')}
           </button>
         </div>
       </form>

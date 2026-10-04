@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { NAMED_NPCS } from '../content/index.ts';
+import { Trans, useTranslation } from '../i18n/index.ts';
 import { selectConversation, selectInteractable, selectWorldKeysOff, useGame } from '../store/index.ts';
 
 /** "Press E to …" while the Character is close enough to use something, and E to use it. */
 export function InteractionPrompt() {
+  const { t } = useTranslation();
   const interactable = useGame(selectInteractable);
   const talking = useGame(selectConversation) !== null;
   const keysOff = useGame(selectWorldKeysOff);
@@ -23,10 +24,13 @@ export function InteractionPrompt() {
   }, [active, interactable, drinkWater, talk]);
 
   if (!active) return null;
-  // English until the i18n module lands (ticket 12).
   return (
     <div className="prompt">
-      Press <kbd>E</kbd> {interactable === 'tap' ? 'to drink tap water' : `to talk — ${NAMED_NPCS[interactable].role}`}
+      {interactable === 'tap' ? (
+        <Trans i18nKey="prompt.drink" components={{ kbd: <kbd /> }} />
+      ) : (
+        <Trans i18nKey="prompt.talk" values={{ role: t(`roles.${interactable}.name`) }} components={{ kbd: <kbd /> }} />
+      )}
     </div>
   );
 }

@@ -138,6 +138,7 @@ describe('devSetup', () => {
     store.getState().openTitle();
     await vi.waitFor(() => expect(selectTitle(store.getState())?.status).toBe('ready'));
     store.getState().newGame();
+    store.getState().finishSetup();
 
     expect(store.getState().game.identity).toMatchObject({ culturePackId: 'de', targetLanguage: 'de' });
   });

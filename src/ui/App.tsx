@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
-import { selectConversation, selectScreen, useGame } from '../store/index.ts';
+import { useShowNativeLanguage } from '../i18n/index.ts';
+import { selectConversation, selectNativeLanguage, selectScreen, useGame } from '../store/index.ts';
 import { Scene } from '../world/index.ts';
 import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
+import { NativeLanguageScreen } from './NativeLanguageScreen.tsx';
 import { PersistCallout } from './PersistCallout.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
@@ -28,16 +30,19 @@ function usePauseAndSaveWhenHidden() {
   }, [setTabHidden, saveNow]);
 }
 
-/** The live town is always there: behind the title screen first, then under the HUD. */
+/** The live town is always there: behind the title screen and setup first, then under the HUD. */
 export function App() {
   usePauseAndSaveWhenHidden();
+  useShowNativeLanguage(useGame(selectNativeLanguage));
   const screen = useGame(selectScreen);
   const talking = useGame(selectConversation) !== null;
 
   return (
     <main className="game" data-talking={talking || undefined}>
       <Scene />
-      {screen === 'title' ? <TitleScreen /> : <Hud />}
+      {screen === 'title' && <TitleScreen />}
+      {screen === 'setup' && <NativeLanguageScreen />}
+      {screen === 'playing' && <Hud />}
     </main>
   );
 }

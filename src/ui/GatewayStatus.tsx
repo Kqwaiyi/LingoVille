@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from '../i18n/index.ts';
 
-// Dev scaffold from the skeleton ticket. Its strings move to i18n once that module lands.
+// Dev scaffold from the skeleton ticket.
 type Status = { kind: 'checking' } | { kind: 'reachable'; mock: boolean } | { kind: 'unreachable' };
 
 export function GatewayStatus() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<Status>({ kind: 'checking' });
 
   useEffect(() => {
@@ -24,9 +26,9 @@ export function GatewayStatus() {
 
   return (
     <p role="status" className="dev-status">
-      {status.kind === 'checking' && 'Checking gateway…'}
-      {status.kind === 'reachable' && `Gateway reachable${status.mock ? ' (mock mode)' : ''}`}
-      {status.kind === 'unreachable' && 'Gateway unreachable'}
+      {status.kind === 'checking' && t('gateway.checking')}
+      {status.kind === 'reachable' && t(status.mock ? 'gateway.reachableMock' : 'gateway.reachable')}
+      {status.kind === 'unreachable' && t('gateway.unreachable')}
     </p>
   );
 }

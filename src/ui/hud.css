@@ -1276,6 +1276,78 @@ ruby {
   gap: 8px;
 }
 
+/* --- Setup ----------------------------------------------------------------- */
+
+.setup-screen {
+  grid-template-columns: minmax(0, 480px) 1fr;
+}
+
+.setup-panel {
+  align-items: stretch;
+}
+
+.language-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.language-choice {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.language-choice:has(input:checked) {
+  border-color: var(--ok);
+  background: rgba(111, 207, 142, 0.14);
+}
+
+.language-choice:has(input:focus-visible) {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.language-choice input {
+  align-self: center;
+  margin: 0;
+  accent-color: var(--ok);
+}
+
+.language-choice span {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.language-choice small {
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.setup-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .title-screen {
     grid-template-columns: 1fr;

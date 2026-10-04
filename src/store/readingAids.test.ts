@@ -284,6 +284,7 @@ describe('preloading the library', () => {
     await vi.waitFor(() => expect(store.getState().title?.status).toBe('ready'));
 
     store.getState().newGame();
+    store.getState().finishSetup();
 
     expect(library.preloaded).toEqual([DEV_SETUP.targetLanguage]);
   });
@@ -306,6 +307,7 @@ describe('preloading the library', () => {
     store.getState().openTitle();
     await vi.waitFor(() => expect(store.getState().title?.status).toBe('ready'));
     store.getState().newGame();
+    store.getState().finishSetup();
     store.getState().enterPlace('cafe');
     store.getState().setInteractable('barista');
     store.getState().talk();

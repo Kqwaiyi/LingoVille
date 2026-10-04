@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
-import { selectConversation, selectCulturePackId, selectJournal, selectPhrasebook, selectTyping, useGame } from '../store/index.ts';
-import { HearItSaid, JournalPageView, journalPageTitle, journalPageWhen, Reading } from './JournalPage.tsx';
-
-// English until the i18n module lands (ticket 12).
+import { useTranslation } from '../i18n/index.ts';
+import {
+  selectConversation,
+  selectCulturePackId,
+  selectJournal,
+  selectPhrasebook,
+  selectTyping,
+  useGame,
+  type JournalPage,
+} from '../store/index.ts';
+import { HearItSaid, JournalPageView, Reading, usePageHeading } from './JournalPage.tsx';
 
 /** J opens the Journal outside conversations; Esc closes it. */
 function useJournalKeys() {
@@ -26,12 +33,13 @@ function useJournalKeys() {
 
 /** The personal phrasebook: every word kept with + Phrasebook, newest first. */
 function PhrasebookView() {
+  const { t } = useTranslation();
   const phrasebook = useGame(selectPhrasebook);
   const packId = useGame(selectCulturePackId);
   return (
-    <section className="journal-phrasebook" aria-label="My phrasebook">
+    <section className="journal-phrasebook" aria-label={t('help.myPhrasebook')}>
       {phrasebook.length === 0 ? (
-        <p className="journal-empty">No words yet. Press + Phrasebook on a Recap’s new words to keep them here.</p>
+        <p className="journal-empty">{t('journal.phrasebookEmpty')}</p>
       ) : (
         <ul>
           {[...phrasebook].reverse().map((entry) => (
@@ -43,7 +51,7 @@ function PhrasebookView() {
               <span className="journal-gloss" lang={entry.glossLanguage}>
                 {entry.gloss}
               </span>
-              <span className="journal-added">Day {entry.dayAdded}</span>
+              <span className="journal-added">{t('journal.dayAdded', { day: entry.dayAdded })}</span>
             </li>
           ))}
         </ul>
@@ -52,8 +60,20 @@ function PhrasebookView() {
   );
 }
 
+/** An entry in the list, by who and where, and when. */
+function EntryButton({ page, selected, onSelect }: { page: JournalPage; selected: boolean; onSelect: () => void }) {
+  const { title, when } = usePageHeading(page);
+  return (
+    <button type="button" aria-current={selected || undefined} onClick={onSelect}>
+      <strong>{title}</strong>
+      <span>{when}</span>
+    </button>
+  );
+}
+
 /** The full-screen Journal: every entry on the left, newest first, and the selected one on the right; or the phrasebook. */
 export function Journal() {
+  const { t } = useTranslation();
   useJournalKeys();
   const journal = useGame(selectJournal);
   const closeJournal = useGame((s) => s.closeJournal);
@@ -67,40 +87,31 @@ export function Journal() {
   return (
     <section className="journal" role="dialog" aria-modal="true" aria-labelledby="journal-title">
       <header className="journal-header">
-        <h2 id="journal-title">Journal</h2>
-        <div className="journal-views" role="tablist" aria-label="Journal views">
+        <h2 id="journal-title">{t('journal.title')}</h2>
+        <div className="journal-views" role="tablist" aria-label={t('journal.views')}>
           <button type="button" role="tab" aria-selected={view === 'entries'} onClick={() => setView('entries')}>
-            Entries
+            {t('journal.entries')}
           </button>
           <button type="button" role="tab" aria-selected={view === 'phrasebook'} onClick={() => setView('phrasebook')}>
-            Phrasebook
+            {t('journal.phrasebook')}
           </button>
         </div>
         <button type="button" className="journal-close" onClick={closeJournal}>
-          Close <kbd>Esc</kbd>
+          {t('journal.close')} <kbd>Esc</kbd>
         </button>
       </header>
       {view === 'phrasebook' ? (
         <PhrasebookView />
       ) : (
         <div className="journal-panes">
-          <nav className="journal-list" aria-label="Journal entries">
-            {journal.entries === null && <p className="journal-empty">Opening your Journal…</p>}
-            {journal.failed && <p className="journal-empty">Your Journal couldn’t be read.</p>}
-            {journal.entries?.length === 0 && !journal.failed && (
-              <p className="journal-empty">No entries yet. Talk to someone in town, and your Recap will be kept here.</p>
-            )}
+          <nav className="journal-list" aria-label={t('journal.entriesLabel')}>
+            {journal.entries === null && <p className="journal-empty">{t('journal.opening')}</p>}
+            {journal.failed && <p className="journal-empty">{t('journal.failed')}</p>}
+            {journal.entries?.length === 0 && !journal.failed && <p className="journal-empty">{t('journal.empty')}</p>}
             <ul>
               {entries.map((entry) => (
                 <li key={entry.id}>
-                  <button
-                    type="button"
-                    aria-current={entry === selected || undefined}
-                    onClick={() => setSelectedId(entry.id)}
-                  >
-                    <strong>{journalPageTitle(entry)}</strong>
-                    <span>{journalPageWhen(entry)}</span>
-                  </button>
+                  <EntryButton page={entry} selected={entry === selected} onSelect={() => setSelectedId(entry.id)} />
                 </li>
               ))}
             </ul>

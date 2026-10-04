@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/index.ts';
 import { selectConversation, selectCulturePackId, selectNativeLanguage, selectSignTooltip, useGame } from '../store/index.ts';
 import { ReadingLine } from './Ruby.tsx';
 
@@ -7,6 +8,7 @@ import { ReadingLine } from './Ruby.tsx';
  * it to reach Translate without it closing.
  */
 export function SignTooltip() {
+  const { t } = useTranslation();
   const tooltip = useGame(selectSignTooltip);
   const talking = useGame(selectConversation) !== null;
   // Signs are written in the Culture Pack's language.
@@ -16,9 +18,8 @@ export function SignTooltip() {
   const translate = useGame((s) => s.translateSign);
   if (!tooltip || talking) return null;
 
-  // English until the i18n module lands (ticket 12).
   return (
-    <aside className="sign-tooltip" aria-label="Sign" onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)}>
+    <aside className="sign-tooltip" aria-label={t('sign.label')} onPointerEnter={() => hold(true)} onPointerLeave={() => hold(false)}>
       <ul>
         {tooltip.lines.map((line, i) => (
           <li key={i}>
@@ -36,7 +37,7 @@ export function SignTooltip() {
       </ul>
       {tooltip.canTranslate && !tooltip.translated && (
         <button type="button" onClick={translate}>
-          Translate
+          {t('sign.translate')}
         </button>
       )}
     </aside>
