@@ -14,6 +14,7 @@ import {
   FURNITURE,
   GROUND_HALF_SIZE,
   HOME_BED,
+  HOME_STOVE,
   WARD_BED,
   HOME_TAP,
   isWaitingForTram,
@@ -248,6 +249,7 @@ export function Town() {
       ))}
 
       <Block position={HOME_TAP} size={[1.2, 1, 0.6]} colour="#8fa3b8" />
+      <Block position={HOME_STOVE} size={[1.2, 1, 0.6]} colour="#5b6170" />
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={WARD_BED} size={[1.4, 0.5, 2.2]} colour="#f4f6f7" />
       {TOWN_NPC_IDS.filter((npcId) => tramRunning || !isWaitingForTram(npcId)).map((npcId) => (

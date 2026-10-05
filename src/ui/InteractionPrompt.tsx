@@ -30,6 +30,7 @@ export function InteractionPrompt() {
   const talking = useGame(selectConversation) !== null;
   const keysOff = useGame(selectWorldKeysOff);
   const drinkWater = useGame((s) => s.drinkWater);
+  const cook = useGame((s) => s.cook);
   const sleep = useGame((s) => s.sleep);
   const talk = useGame((s) => s.talk);
   const openTram = useGame((s) => s.openTram);
@@ -43,6 +44,7 @@ export function InteractionPrompt() {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyE' || e.repeat) return;
       if (interactable === 'tap') drinkWater();
+      else if (interactable === 'stove') cook();
       else if (interactable === 'bed') sleep();
       else if (tramStop) openTram();
       else if (shelf) takeFromShelf();
@@ -50,7 +52,7 @@ export function InteractionPrompt() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, shelf, drinkWater, sleep, openTram, takeFromShelf, talk]);
+  }, [usable, interactable, tramStop, shelf, drinkWater, cook, sleep, openTram, takeFromShelf, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -65,6 +67,8 @@ export function InteractionPrompt() {
     <div className="prompt">
       {interactable === 'tap' ? (
         <Trans i18nKey="prompt.drink" components={{ kbd: <kbd /> }} />
+      ) : interactable === 'stove' ? (
+        <Trans i18nKey="prompt.cook" components={{ kbd: <kbd /> }} />
       ) : interactable === 'bed' ? (
         <Trans i18nKey="prompt.sleep" components={{ kbd: <kbd /> }} />
       ) : tramStop ? (

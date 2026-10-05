@@ -23,6 +23,7 @@ export function Toast() {
     <div className="toast" role="status">
       {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'loadedBackup' && t('toast.loadedBackup')}
+      {toast.kind === 'nothingToCook' && t('toast.nothingToCook')}
       {toast.kind === 'tooEarlyForBed' && t('toast.tooEarlyForBed', { time: formatTime(CLOCK.bedUsableFrom) })}
       {toast.kind === 'npcSteppedAway' && t('toast.npcSteppedAway', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
       {toast.kind === 'nothingToSay' && t('toast.nothingToSay', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}

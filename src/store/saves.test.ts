@@ -67,11 +67,19 @@ const later = (game: GameState): GameState => ({ ...game, clock: { ...game.clock
 /** The same game, just after midnight. */
 const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.clock.day + 1, minuteOfDay: 0 } });
 
+/** The game before cooking recorded a food poisoning chance: version 5. */
+function beforeCooking() {
+  const game = lived();
+  const character: Partial<GameState['character']> = { ...game.character };
+  delete character.foodPoisoningChance;
+  return { ...game, character };
+}
+
 /** The game before the Character could faint: version 4. */
 function beforeFainting() {
-  const game: Partial<GameState> = lived();
+  const game: Partial<ReturnType<typeof beforeCooking>> = beforeCooking();
   delete game.wokeInWardOnDay;
-  return game as Omit<GameState, 'wokeInWardOnDay'>;
+  return game as Omit<ReturnType<typeof beforeCooking>, 'wokeInWardOnDay'>;
 }
 
 /** The game before conversations moved Language Proficiency: version 3. */
@@ -199,6 +207,16 @@ describe('saves', () => {
     const game = (await saves.load('slot-1'))?.save.game;
 
     expect(game?.wokeInWardOnDay).toBeNull();
+    expect(game).toEqual(lived());
+  });
+
+  it('upgrades a save from before cooking as a Character with no food poisoning chance', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 5, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeCooking() }, raw);
+
+    const game = (await saves.load('slot-1'))?.save.game;
+
+    expect(game?.character.foodPoisoningChance).toBe(0);
     expect(game).toEqual(lived());
   });
 

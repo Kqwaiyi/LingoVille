@@ -243,6 +243,7 @@ export const en = {
   },
   prompt: {
     drink: 'Press <kbd>E</kbd> to drink tap water',
+    cook: 'Press <kbd>E</kbd> to cook a meal',
     sleep: 'Press <kbd>E</kbd> to go to bed',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
     tram: 'Press <kbd>E</kbd> to take the tram',
@@ -260,6 +261,19 @@ export const en = {
     total: 'Total {{amount}}',
     payAtTill: 'Pay at the till',
     putBack: 'Put one {{item}} back',
+  },
+  skills: {
+    open: 'Skills',
+    label: 'Skills',
+    close: 'Close',
+    level: 'Level {{level}} of {{max}}',
+    names: {
+      cooking: 'Cooking',
+      fitness: 'Fitness',
+      barista: 'Barista',
+      cashier: 'Cashier',
+      server: 'Server',
+    },
   },
   inventory: {
     open: 'Inventory ({{count}})',
@@ -367,6 +381,7 @@ export const en = {
     recapSaved: 'Recap saved to your Journal',
     loadedBackup: 'Loaded this morning’s save',
     tooEarlyForBed: 'It’s too early for bed. You can sleep from {{time}}.',
+    nothingToCook: 'Nothing to cook. Groceries from the supermarket can be cooked here.',
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
     nothingToSay: '{{who}} smiles and nods. There’s nothing to talk about here yet.',
   },

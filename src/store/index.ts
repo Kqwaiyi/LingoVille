@@ -22,6 +22,7 @@ export {
   selectHunger,
   selectInteractable,
   selectInventory,
+  selectLifeSkillLevels,
   selectIsOpen,
   selectJournal,
   selectLineReading,

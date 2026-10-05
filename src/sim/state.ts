@@ -89,6 +89,11 @@ export type GameState = {
     /** Money is held in Shifts of base pay; the Culture Pack converts it to local currency. */
     moneyInShifts: number;
     illness: { illnessId: IllnessId; onsetDay: number } | null;
+    /**
+     * The chance that what the Character has eaten gives them food poisoning, built up by cooking
+     * gone-off groceries. Recorded here for Illness, which rolls it and starts it again from 0.
+     */
+    foodPoisoningChance: number;
   };
   /** Rent falls due at the end of `dueDay`; `owedInShifts` is what is due then. */
   rent: { dueDay: number; owedInShifts: number };
@@ -146,6 +151,7 @@ export function createSave(setup: NewGameSetup): GameState {
       mood: MOOD.neutral,
       moneyInShifts: FIRST_MORNING.moneyInShifts,
       illness: null,
+      foodPoisoningChance: 0,
     },
     rent: { dueDay: FIRST_MORNING.rentDueDay, owedInShifts: 0 },
     debts: [],

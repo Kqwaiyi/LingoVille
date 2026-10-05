@@ -18,7 +18,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 5;
+export const SAVE_SCHEMA_VERSION = 6;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -57,6 +57,7 @@ const GameStateSchema = z.object({
     mood: meter,
     moneyInShifts: z.number(),
     illness: z.object({ illnessId: z.enum(ILLNESS_IDS), onsetDay: day }).nullable(),
+    foodPoisoningChance: z.number().min(0).max(1),
   }),
   rent: z.object({ dueDay: day, owedInShifts: z.number().min(0) }),
   debts: z.array(z.object({ kind: z.enum(DEBT_KINDS), amountInShifts: z.number().min(0) })),
@@ -126,6 +127,12 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
   }),
   // 4 → 5: Health running out faints the Character. No one has fainted yet.
   (save) => ({ ...save, schemaVersion: 5, game: { ...save.game, wokeInWardOnDay: null } }),
+  // 5 → 6: cooking gone-off food records a food poisoning chance. Nothing has been cooked yet.
+  (save) => ({
+    ...save,
+    schemaVersion: 6,
+    game: { ...save.game, character: { ...(save.game.character as object), foodPoisoningChance: 0 } },
+  }),
 ];
 
 /** A loose look at a stored field, for bytes that may not be a readable save. */

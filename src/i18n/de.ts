@@ -240,6 +240,7 @@ export const de: UiStrings = {
   },
   prompt: {
     drink: '<kbd>E</kbd> drücken, um Leitungswasser zu trinken',
+    cook: '<kbd>E</kbd> drücken, um eine Mahlzeit zu kochen',
     sleep: '<kbd>E</kbd> drücken, um ins Bett zu gehen',
     talk: '<kbd>E</kbd> drücken, um zu sprechen — {{role}}',
     tram: '<kbd>E</kbd> drücken, um die Straßenbahn zu nehmen',
@@ -257,6 +258,19 @@ export const de: UiStrings = {
     total: 'Summe {{amount}}',
     payAtTill: 'An der Kasse bezahlen',
     putBack: 'Ein {{item}} zurücklegen',
+  },
+  skills: {
+    open: 'Fähigkeiten',
+    label: 'Fähigkeiten',
+    close: 'Schließen',
+    level: 'Stufe {{level}} von {{max}}',
+    names: {
+      cooking: 'Kochen',
+      fitness: 'Fitness',
+      barista: 'Barista',
+      cashier: 'Kasse',
+      server: 'Service',
+    },
   },
   inventory: {
     open: 'Inventar ({{count}})',
@@ -362,6 +376,7 @@ export const de: UiStrings = {
     recapSaved: 'Rückblick in deinem Tagebuch gespeichert',
     loadedBackup: 'Spielstand von heute Morgen geladen',
     tooEarlyForBed: 'Es ist noch zu früh fürs Bett. Schlafen geht ab {{time}}.',
+    nothingToCook: 'Nichts zum Kochen da. Lebensmittel aus dem Supermarkt kann man hier kochen.',
     npcSteppedAway: '{{who}} musste kurz weg. Nichts ist verloren.',
     nothingToSay: '{{who}} lächelt und nickt. Hier gibt es noch nichts zu besprechen.',
   },

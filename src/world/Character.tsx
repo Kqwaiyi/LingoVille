@@ -25,6 +25,7 @@ import {
 import type { Control } from './controls.ts';
 import {
   HOME_BED,
+  HOME_STOVE,
   HOME_TAP,
   IN_WARD_BED,
   isWaitingForTram,
@@ -51,13 +52,14 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: the tap or the bed, the nearest
+ * What the Character standing here could use with E: the tap, the stove or the bed, the nearest
  * person in talking range, the nearest supermarket shelf, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
 function interactableAt(x: number, z: number, tramRunning: boolean): Interactable | null {
   const placeId = placeAt(x, z);
   if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
+  if (placeId === 'home' && distanceTo(x, z, HOME_STOVE) <= MOVEMENT.interactRangeMetres) return 'stove';
   if (placeId === 'home' && distanceTo(x, z, HOME_BED) <= MOVEMENT.interactRangeMetres) return 'bed';
   let nearest: Interactable | null = null;
   let nearestDistance: number = MOVEMENT.talkRangeMetres;

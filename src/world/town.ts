@@ -128,6 +128,8 @@ export const TREES: readonly Vec2[] = [
 /** The tap at home, against the back wall straight ahead of the spawn point. */
 export const HOME_TAP: Vec3 = [-10, 0.5, -2.85];
 export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
+/** The stove at home, along the back wall to the right of the tap. */
+export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
 
 /** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */
 export const SIGNS: Record<SignId, { position: Vec3; size: readonly [width: number, height: number] }> = {

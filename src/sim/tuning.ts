@@ -208,6 +208,10 @@ export const LIFE_SKILLS = {
   xpToReachLevel: [0, 40, 100, 180, 280, 400],
   xpPerHomeMeal: 6,
   homeMealsCountingPerDay: 3,
+  /** Hunger one home-cooked meal gives back, linear in Cooking level: under a bento at 0, over one at max. */
+  homeMealHunger: { atZero: 0.35 * METER_MAX, atMax: 0.6 * METER_MAX },
+  /** How much of the gone-off food poisoning chance max Cooking takes away, scaled linearly by level. */
+  cookingFoodPoisoningReductionAtMax: 0.8,
   xpPerGymSession: 15,
   gymSessionsPerDay: 1,
   xpPerShiftCustomer: 3,
@@ -241,7 +245,7 @@ export const ILLNESS = {
   /** Multiplier on the chance when average Well-being is at 0. */
   lowWellBeingMultiplierAtZero: 2,
   healthFullToEmptyGameMinutes: 48 * MINUTES_PER_HOUR,
-  /** Extra food poisoning chance from eating expired groceries. */
+  /** Food poisoning chance from cooking one gone-off grocery at Cooking 0. Fresh groceries carry none. */
   expiredFoodPoisoningChance: 0.25,
 } as const;
 

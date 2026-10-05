@@ -240,6 +240,7 @@ export const zh: UiStrings = {
   },
   prompt: {
     drink: '按 <kbd>E</kbd> 喝自来水',
+    cook: '按 <kbd>E</kbd> 做饭',
     sleep: '按 <kbd>E</kbd> 上床睡觉',
     talk: '按 <kbd>E</kbd> 交谈 — {{role}}',
     tram: '按 <kbd>E</kbd> 乘坐电车',
@@ -257,6 +258,19 @@ export const zh: UiStrings = {
     total: '合计 {{amount}}',
     payAtTill: '到收银台结账',
     putBack: '放回一个{{item}}',
+  },
+  skills: {
+    open: '技能',
+    label: '技能',
+    close: '关闭',
+    level: '等级 {{level}}／{{max}}',
+    names: {
+      cooking: '烹饪',
+      fitness: '健身',
+      barista: '咖啡师',
+      cashier: '收银',
+      server: '服务员',
+    },
   },
   inventory: {
     open: '物品（{{count}}）',
@@ -362,6 +376,7 @@ export const zh: UiStrings = {
     recapSaved: '回顾已保存到你的日记',
     loadedBackup: '已读取今天早上的存档',
     tooEarlyForBed: '现在睡觉还太早。{{time}}以后才能睡。',
+    nothingToCook: '没有可以做的食材。超市买的食材可以在这里做饭。',
     npcSteppedAway: '{{who}}临时走开了。什么都没有丢失。',
     nothingToSay: '{{who}}微笑着点点头。这里暂时还没什么可聊的。',
   },

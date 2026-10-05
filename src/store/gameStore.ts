@@ -53,6 +53,7 @@ import {
   bedUsable,
   CHARACTER_NAME,
   CLOCK,
+  cook,
   createSave,
   drinkWater,
   ECONOMY,
@@ -64,6 +65,7 @@ import {
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
+  lifeSkillLevels,
   MIC_CHECK,
   losePatience,
   moodFace,
@@ -82,6 +84,7 @@ import {
   type ConversationEvidence,
   type GameState,
   type InventoryItem,
+  type LifeSkillId,
   type LanguageCode,
   type NewGameSetup,
   type NpcExpression,
@@ -216,7 +219,7 @@ export type TitleView =
 export type Arrival = 'newGame' | 'continued';
 
 /** Something in the world the Character is close enough to use with E: the tap, an NPC to talk to, or a tram stop. */
-export type Interactable = 'tap' | 'bed' | TownNpcId | TramStopId | GroceryId;
+export type Interactable = 'tap' | 'stove' | 'bed' | TownNpcId | TramStopId | GroceryId;
 
 /** One thing in the inventory, and whether it has gone off yet. */
 export type InventoryLine = InventoryItem & { goneOff: boolean };
@@ -237,6 +240,8 @@ export type Toast =
   | { kind: 'loadedBackup' }
   /** The bed is used before 20:00. */
   | { kind: 'tooEarlyForBed' }
+  /** The stove is used with no groceries in the inventory. */
+  | { kind: 'nothingToCook' }
   /** Staff standing in for a conversation that a later ticket brings. */
   | { kind: 'nothingToSay'; npcId: TownNpcId };
 
@@ -554,6 +559,8 @@ export type GameStore = {
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
   drinkWater: () => void;
+  /** E at the stove: cooks a grocery into a meal, or says there's nothing to cook. */
+  cook: () => void;
   /** E at a supermarket shelf: one of its grocery into the basket. */
   takeFromShelf: () => void;
   /** Puts one of an item in the basket back on its shelf. */
@@ -1470,6 +1477,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         noticeApproach(game, after);
       },
       drinkWater: () => set({ game: drinkWater(get().game) }),
+      cook: () => {
+        const { game } = get();
+        const after = cook(game);
+        if (after === game) return set({ toast: { kind: 'nothingToCook' } });
+        set({ game: after });
+      },
       takeFromShelf: () => {
         const { interactable, conversation, basket, shelfMarker, game } = get();
         if (conversation || !isShelf(interactable) || !isPlaceOpen('supermarket', game)) return;
@@ -1745,6 +1758,16 @@ export const selectInventory = (s: GameStore): readonly InventoryLine[] => {
   const lines = inventory.map((item) => ({ ...item, goneOff: isGoneOff(item, day) }));
   inventoryLines.set(inventory, { day, lines });
   return lines;
+};
+const skillLevels = new WeakMap<GameState['progression']['lifeSkillXp'], Record<LifeSkillId, number>>();
+/** Each Life Skill's level, 0–5 stars. The same object until the XP changes. */
+export const selectLifeSkillLevels = (s: GameStore): Record<LifeSkillId, number> => {
+  const { lifeSkillXp } = s.game.progression;
+  const kept = skillLevels.get(lifeSkillXp);
+  if (kept) return kept;
+  const levels = lifeSkillLevels(s.game);
+  skillLevels.set(lifeSkillXp, levels);
+  return levels;
 };
 /** The tram stop the Character is standing at, or null. */
 export const selectTramStop = (s: GameStore) => (isTramStop(s.interactable) ? s.interactable : null);

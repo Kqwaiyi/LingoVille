@@ -240,6 +240,7 @@ export const ja: UiStrings = {
   },
   prompt: {
     drink: '<kbd>E</kbd> で水道水を飲む',
+    cook: '<kbd>E</kbd> で料理する',
     sleep: '<kbd>E</kbd> で寝る',
     talk: '<kbd>E</kbd> で話しかける — {{role}}',
     tram: '<kbd>E</kbd> で路面電車に乗る',
@@ -257,6 +258,19 @@ export const ja: UiStrings = {
     total: '合計 {{amount}}',
     payAtTill: 'レジで会計',
     putBack: '{{item}}を1つ戻す',
+  },
+  skills: {
+    open: 'スキル',
+    label: 'スキル',
+    close: '閉じる',
+    level: 'レベル {{level}}／{{max}}',
+    names: {
+      cooking: '料理',
+      fitness: 'フィットネス',
+      barista: 'バリスタ',
+      cashier: 'レジ',
+      server: 'ホール',
+    },
   },
   inventory: {
     open: '持ち物（{{count}}）',
@@ -362,6 +376,7 @@ export const ja: UiStrings = {
     recapSaved: '振り返りを日記に保存しました',
     loadedBackup: '今朝のセーブを読み込みました',
     tooEarlyForBed: '寝るにはまだ早いです。{{time}}から寝られます。',
+    nothingToCook: '料理する食材がありません。スーパーで買った食材をここで料理できます。',
     npcSteppedAway: '{{who}}は席を外しました。何も失われていません。',
     nothingToSay: '{{who}}はにっこり会釈しました。ここではまだ話すことがありません。',
   },
