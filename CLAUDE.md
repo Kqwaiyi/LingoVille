@@ -24,3 +24,4 @@ Modules live in `src/` (`sim`, `content`, `ai`, `voice`, `world`, `ui`, `i18n`, 
 
 - `npm run dev`: Vite plus the gateway. Copy `.env.example` to `.env`, or set `GEMINI_MOCK=1`.
 - `npm run typecheck`, `npm run lint`, `npm test` (Vitest), `npm run test:e2e` (Playwright, mock mode).
+- **Never run `npm run eval` (or `--quick`) unless the user explicitly asks for it in the chat.** It calls real Gemini and costs money. When a change needs an eval, say so and let the user run it or ask you to.

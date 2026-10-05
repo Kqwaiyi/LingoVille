@@ -10,6 +10,6 @@ The `npm run eval` harness checks real model quality against hard bars and rate 
 - Reports go to the gitignored `evals/reports/<timestamp>.json`.
 - The dev's voice recordings are gitignored; only `recordings/manifest.json` is committed.
 
-**Testing**: `npm run eval` (or `npm run eval -- --quick`) calls real Gemini, so run it only when asked, or before merging changes to `ai` or `server/config.ts`. The harness's own logic is tested in Vitest with a fake `fetch`, and the cases are checked too (gold readings must pass the annotate checks). Those tests never call Gemini.
+**Testing**: `npm run eval` (or `npm run eval -- --quick`) calls real Gemini and costs money, so an agent runs it only when the user explicitly asks in the chat. Changes to `ai` or `server/config.ts` need a passing run before merging: say so, and let the user run it or ask you to. The harness's own logic is tested in Vitest with a fake `fetch`, and the cases are checked too (gold readings must pass the annotate checks). Those tests never call Gemini.
 
 `npx vitest run evals`
