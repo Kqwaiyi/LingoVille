@@ -247,6 +247,7 @@ export const zh: UiStrings = {
     noTram: '电车已停运 · 运营时间 {{opens}}–{{closes}}',
     take: '按 <kbd>E</kbd> 拿取{{item}} · {{price}}',
     pay: '按 <kbd>E</kbd> 结账 — {{role}}',
+    ask: '按 <kbd>F</kbd> 问东西在哪里',
   },
   tram: {
     heading: '乘电车去…',

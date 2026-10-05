@@ -1,6 +1,7 @@
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import {
+  basketChangedScene,
   buildNpcSession,
   checkReadings,
   hasReadingAids,
@@ -25,6 +26,7 @@ import {
   CULTURE_PACKS,
   GROCERIES_SOLD,
   interactionStartedWithE,
+  interactionStartedWithF,
   localPlaceName,
   NAMED_NPCS,
   OPEN_AIR_PLACES,
@@ -123,6 +125,9 @@ import {
   type SlotStores,
 } from './saveFiles.ts';
 import { browserSaves, SLOT_IDS, type LoadedSave, type Saves, type Slot, type SlotId } from './saves.ts';
+
+/** Builds the NPC's session for a conversation, given the shopping on the counter at the time. */
+type SessionFor = (onCounter: Basket) => NpcSession;
 
 /** A fixed setup: the First Morning that stands in behind the title screen, and the one store tests play. */
 export const DEV_SETUP: NewGameSetup = {
@@ -569,8 +574,8 @@ export type GameStore = {
   wakeInWard: () => void;
   /** Goes to bed at home: from 20:00, it wakes the next morning and saves; earlier, it says it's too early. */
   sleep: () => void;
-  /** E near an NPC: opens a conversation, and the NPC speaks first. */
-  talk: () => void;
+  /** E near an NPC (or F, for their second conversation if they have one): opens a conversation, and the NPC speaks first. */
+  talk: (key?: 'E' | 'F') => void;
   sendTypedLine: (text: string) => void;
   /** Space or the mic button pressed: interrupts the NPC and listens. */
   startTalking: () => void;
@@ -1139,10 +1144,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     /**
-     * Opens a session for the conversation. Every event from a session that has
-     * since been closed or replaced is ignored.
+     * Opens a session for the conversation, built for the shopping on the counter now.
+     * Every event from a session that has since been closed or replaced is ignored.
      */
-    const openSession = (npcSession: NpcSession, resumeFrom?: ChatLine[]) => {
+    const openSession = (sessionFor: SessionFor, resumeFrom?: ChatLine[]) => {
+      const npcSession = sessionFor(get().conversation!.basket);
       const live =
         <A extends unknown[]>(handle: (conversation: Conversation, ...args: A) => void) =>
         (...args: A) => {
@@ -1176,14 +1182,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             if (current.listening) set({ micLevel: level });
           }),
           onUsage: live((current, turn: TokenUsage) => set({ conversation: { ...current, usage: addUsage(current.usage, turn) } })),
-          onDisconnect: live((current) => connectionFailed(current, npcSession)),
+          onDisconnect: live((current) => connectionFailed(current, sessionFor)),
         },
         { resumeFrom, typedOnly: get().inputMode === 'typed' },
       );
       voice = session;
       session.connect().then(
         live(() => updateConversation({ reconnecting: false })),
-        live((current, error: unknown) => connectionFailed(current, npcSession, error)),
+        live((current, error: unknown) => connectionFailed(current, sessionFor, error)),
       );
     };
 
@@ -1193,7 +1199,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * fresh session that carries on from the conversation so far, and a second
      * failure is a network abandonment: nothing is lost, and there's no Recap.
      */
-    const connectionFailed = (conversation: Conversation, npcSession: NpcSession, error?: unknown) => {
+    const connectionFailed = (conversation: Conversation, sessionFor: SessionFor, error?: unknown) => {
       closeSession();
       if (conversation.outcome) return showClosingCard();
       if (!conversation.retried && error instanceof VoiceServiceUnavailableError) return dropConversation({ voiceUnavailable: true });
@@ -1202,7 +1208,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         micLevel: 0,
         conversation: { ...conversation, retried: true, reconnecting: true, listening: false, npcLine: null, heardLine: null },
       });
-      openSession(npcSession, conversation.lines);
+      openSession(sessionFor, conversation.lines);
     };
 
     /**
@@ -1218,6 +1224,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       set({
         fainting: { billInShifts, paid: after.character.moneyInShifts < before.character.moneyInShifts },
         wardArrival: { wokeInWardOnDay: after.wokeInWardOnDay! },
+        // Fainting moves the Character to the ward without going through a door, so the shopping goes back here.
+        basket: [],
+        shelfMarker: null,
       });
       save({ startsDay: true });
       noticeApproach(before, after);
@@ -1232,11 +1241,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       gameBeforeConversation = game;
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
-      const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
-        clock: game.clock,
-        ...(approach && { approach }),
-        ...(basket.length > 0 && { basket }),
-      });
+      const sessionFor: SessionFor = (onCounter) =>
+        buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
+          clock: game.clock,
+          ...(approach && { approach }),
+          ...(onCounter.length > 0 && { basket: onCounter }),
+        });
 
       set({
         voiceUnavailable: false,
@@ -1265,7 +1275,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           helpLog: [],
         },
       });
-      openSession(npcSession);
+      openSession(sessionFor);
     };
 
     /** An NPC who is due comes up to the Character, unless the Player is busy: then they wait until the Player is free. */
@@ -1489,8 +1499,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ basket: addToBasket(basket, interactable), ...(shelfMarker === interactable && { shelfMarker: null }) });
       },
       putBack: (itemId) => {
-        if (get().conversation) return;
-        set({ basket: putBackFromBasket(get().basket, itemId) });
+        const state = get();
+        const { basket, conversation, game } = state;
+        if (!selectCanPutBack(state) || !basket.some((line) => line.itemId === itemId)) return;
+        const after = putBackFromBasket(basket, itemId);
+        set({ basket: after });
+        if (!conversation) return;
+        // The cashier rings up what is on the counter now, in a new turn of their own.
+        updateConversation({ basket: after, npcLine: null, heardLine: null });
+        voice?.sendText(basketChangedScene(after, game.identity.culturePackId));
       },
       wakeInWard: () => {
         if (!get().fainting) return;
@@ -1526,12 +1543,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (sign?.tooltip.canTranslate) set({ sign: { ...sign, tooltip: signTooltip(sign.tooltip.signId, true) } });
       },
 
-      talk: () => {
+      talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
-        const shopping = get().basket.length > 0;
-        const interaction = interactable in NAMED_NPCS ? interactionStartedWithE(interactable as NamedNpcId, { shopping }) : null;
-        if (!interaction) return set({ toast: { kind: 'nothingToSay', npcId: interactable } });
+        const interaction = key === 'E' ? selectTalkWithE(get()) : selectTalkWithF(get());
+        // F is only a second choice: with none, it does nothing.
+        if (!interaction) return key === 'E' ? set({ toast: { kind: 'nothingToSay', npcId: interactable } }) : undefined;
         startConversation(interaction, null);
       },
       sendTypedLine: (text) => {
@@ -1743,8 +1760,32 @@ export const selectShelf = (s: GameStore) => {
   const interactable = selectInteractable(s);
   return isShelf(interactable) ? interactable : null;
 };
+/** The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring, or null. */
+const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
+  const npcId = selectInteractable(s);
+  if (!isTownNpc(npcId) || !(npcId in NAMED_NPCS)) return null;
+  return startedWith(npcId as NamedNpcId, { shopping: s.basket.length > 0 });
+};
+/** The conversation E starts with the Named NPC the Character is next to, or null. */
+export const selectTalkWithE = (s: GameStore) => talkWith(s, interactionStartedWithE);
+/** The second conversation F starts with that NPC (at the till with shopping, asking where something is), or null. */
+export const selectTalkWithF = (s: GameStore) => talkWith(s, interactionStartedWithF);
 /** What the Character has taken off the shelves to pay for. */
 export const selectBasket = (s: GameStore) => s.basket;
+/**
+ * Whether shopping can go back on the shelves now: any time but in a conversation, and at the till until it's paid for,
+ * while the cashier can hear about it (not while the Player is talking, Help is open or the connection is coming back).
+ * Not the last item at the till, though: leaving the till puts everything back.
+ */
+export const selectCanPutBack = (s: GameStore) => {
+  const { conversation, basket } = s;
+  if (!conversation) return true;
+  const { interaction, outcome, reconnecting, listening, tab } = conversation;
+  const atTheTill = interaction.effect.kind === 'purchase' && !outcome;
+  const cashierListening = !reconnecting && !listening && tab === 'chat';
+  const lastItem = basket.length === 1 && basket[0]!.quantity === 1;
+  return atTheTill && cashierListening && !lastItem;
+};
 /** The grocery the cashier pointed to, marked on its shelf. */
 export const selectShelfMarker = (s: GameStore) => s.shelfMarker;
 

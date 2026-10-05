@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildNpcSession, OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
+import { basketChangedScene, buildNpcSession, OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
 import { LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
@@ -291,17 +291,26 @@ async function open(session: ReturnType<typeof buildNpcSession>) {
 }
 
 const CLOCK_10AM = { clock: { day: 2, minuteOfDay: 600 } };
-const atTheTill = (packId: LanguageCode) =>
+const atTheTill = (packId: LanguageCode, eggs = 1) =>
   open(
     buildNpcSession(INTERACTIONS.payForGroceries, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.cashier, {
       ...CLOCK_10AM,
-      basket: [{ itemId: 'eggs', quantity: 1 }],
+      basket: [{ itemId: 'eggs', quantity: eggs }],
     }),
   );
 const byTheShelves = (packId: LanguageCode) =>
   open(buildNpcSession(INTERACTIONS.findAnItem, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.cashier, CLOCK_10AM));
 const atTheCornerShop = (packId: LanguageCode) =>
   open(buildNpcSession(INTERACTIONS.buyCounterFood, CULTURE_PACKS[packId], 'A1', NAMED_NPCS['convenience-clerk'], CLOCK_10AM));
+
+/** One box of eggs and two, in each pack's money. */
+const EGGS_TOTAL = {
+  ja: { one: '¥360', two: '¥720' },
+  zh: { one: '14元', two: '28元' },
+  en: { one: '£3.60', two: '£7.20' },
+  // Intl puts a no-break space before the euro sign.
+  de: { one: '3,60 €', two: '7,20 €' },
+} as const;
 
 /** What the Player types in each pack: yes, no, eggs and a bento. And what the NPC's lines are written in. */
 const PLAYER = {
@@ -322,6 +331,8 @@ describe('mock VoiceSession: the cashier at the till (#4)', () => {
     await say(yes);
     await say(no);
     expect(toolCalls).toEqual([]);
+    // The read-back has the total, like the real cashier's.
+    expect(turns.at(-1)).toContain(EGGS_TOTAL[packId].one);
     await say(yes);
     expect(toolCalls).toEqual([{ id: expect.any(String), name: 'complete_purchase', args: { bag: true, card: false } }]);
     await answer({ result: 'served' });
@@ -329,6 +340,39 @@ describe('mock VoiceSession: the cashier at the till (#4)', () => {
     // Greeting (and the bag question), the points card question, the read-back, goodbye.
     expect(turns).toHaveLength(4);
     for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)(
+    'when the Player can’t afford it, waits for something to be put back, then reads back the new total (%s)',
+    async (packId) => {
+      const { yes, no, script } = PLAYER[packId];
+      const { turns, toolCalls, say, answer } = await atTheTill(packId, 2);
+      await say(yes);
+      await say(no);
+      expect(turns.at(-1)).toContain(EGGS_TOTAL[packId].two);
+      await say(yes);
+      await answer({ result: 'cannot_afford' });
+      expect(turns.at(-1)).toMatch(script);
+
+      await say(basketChangedScene([{ itemId: 'eggs', quantity: 1 }], packId));
+      expect(turns.at(-1)).toContain(EGGS_TOTAL[packId].one);
+      expect(turns.at(-1)).not.toContain(EGGS_TOTAL[packId].two);
+      await say(yes);
+      expect(toolCalls.map((call) => call.args)).toEqual([
+        { bag: true, card: false },
+        { bag: true, card: false },
+      ]);
+    },
+  );
+
+  it('carries on with the bag question, without greeting again, when something is put back before it is answered', async () => {
+    const { turns, say } = await atTheTill('en', 2);
+    await say(basketChangedScene([{ itemId: 'eggs', quantity: 1 }], 'en'));
+    expect(turns.at(-1)).not.toBe(turns[0]);
+    expect(turns.at(-1)).toMatch(/bag/);
+    await say('no');
+    await say('no');
+    expect(turns.at(-1)).toContain(EGGS_TOTAL.en.one);
   });
 
   it('asks again from the bag when the read-back is wrong', async () => {

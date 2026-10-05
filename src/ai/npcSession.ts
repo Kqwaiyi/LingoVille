@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  basketFacts,
   interactionFacts,
   toToolDeclaration,
   type CulturePack,
@@ -66,6 +67,18 @@ export const GREETING_SCENE = '[SCENE: A customer walks up to you. Greet them fi
 const APPROACH_SCENES: Record<ApproachId, string> = {
   nurseOnWaking: '[SCENE: The patient in the bed beside you has just woken up. Speak to them first.]',
 };
+
+/**
+ * Sent when the customer puts something back while at the till, so the cashier
+ * rings up what is on the counter now instead of the shopping in FACTS.
+ */
+export function basketChangedScene(basket: Basket, packId: LanguageCode): string {
+  return [
+    '[SCENE: The customer has put something back on the shelf. This replaces the shopping in FACTS.',
+    ...basketFacts(basket, packId),
+    "Read back the new total, and wait for them to confirm before you take payment. Don't greet them again.]",
+  ].join('\n');
+}
 
 /**
  * Follows the conversation so far when a session replaces one whose connection
@@ -233,7 +246,7 @@ function goalBlock(interaction: Interaction, who: string) {
       interaction.goal,
       `- Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the ${who} to confirm. If they correct you, read it back again.`,
       `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed. Never call it before.`,
-      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for all of it. They can put something back and come again. The conversation goes on.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.`,
       `- If ${name} answers "invalid_arguments", ask them again about the bag and the points card.`,
       `- If ${name} answers "served", hand over their shopping, thank them and say goodbye.`,
     ]);

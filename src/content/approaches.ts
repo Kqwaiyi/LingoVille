@@ -25,3 +25,11 @@ export function interactionStartedWithE(npcId: NamedNpcId, { shopping }: Bringin
   if (npcId === 'cashier') return shopping ? INTERACTIONS.payForGroceries : INTERACTIONS.findAnItem;
   return Object.values(INTERACTIONS).find((i) => i.npcId === npcId && !OPENED_BY_NPCS.has(i)) ?? null;
 }
+
+/**
+ * The second conversation F starts with this Named NPC, or null when E is the only one.
+ * With shopping, E at the cashier pays, so F asks where something else is.
+ */
+export function interactionStartedWithF(npcId: NamedNpcId, { shopping }: Bringing = { shopping: false }): Interaction | null {
+  return npcId === 'cashier' && shopping ? INTERACTIONS.findAnItem : null;
+}

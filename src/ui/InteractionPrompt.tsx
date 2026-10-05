@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { formatLocalMoney, formatTime, menuPrice, TOWN_NPCS, type TownNpcId } from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
 import {
-  selectBasket,
   selectConversation,
   selectCulturePackId,
   selectInteractable,
   selectNativeLanguage,
   selectShelf,
+  selectTalkWithE,
+  selectTalkWithF,
   selectTramHours,
   selectTramRunning,
   selectTramStop,
@@ -16,7 +17,7 @@ import {
 } from '../store/index.ts';
 import { itemLabel } from './itemLabel.ts';
 
-/** "Press E to …" while the Character is close enough to use something, and E to use it. */
+/** "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second conversation on F. */
 export function InteractionPrompt() {
   const { t } = useTranslation();
   const interactable = useGame(selectInteractable);
@@ -24,7 +25,8 @@ export function InteractionPrompt() {
   const tramRunning = useGame(selectTramRunning);
   const tramHours = useGame(selectTramHours);
   const shelf = useGame(selectShelf);
-  const hasShopping = useGame(selectBasket).length > 0;
+  const talkWithE = useGame(selectTalkWithE);
+  const talkWithF = useGame(selectTalkWithF);
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
   const talking = useGame(selectConversation) !== null;
@@ -42,17 +44,20 @@ export function InteractionPrompt() {
   useEffect(() => {
     if (!usable) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyE' || e.repeat) return;
+      if (e.repeat) return;
+      // Ctrl+F stays the browser's find.
+      if (e.code === 'KeyF' && talkWithF && !e.ctrlKey && !e.metaKey) return talk('F');
+      if (e.code !== 'KeyE') return;
       if (interactable === 'tap') drinkWater();
       else if (interactable === 'stove') cook();
       else if (interactable === 'bed') sleep();
       else if (tramStop) openTram();
       else if (shelf) takeFromShelf();
-      else talk();
+      else talk('E');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, shelf, drinkWater, cook, sleep, openTram, takeFromShelf, talk]);
+  }, [usable, interactable, tramStop, shelf, talkWithF, drinkWater, cook, sleep, openTram, takeFromShelf, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -80,12 +85,19 @@ export function InteractionPrompt() {
           components={{ kbd: <kbd /> }}
         />
       ) : (
-        <Trans
-          // With shopping in the basket, the cashier is where it's paid for.
-          i18nKey={hasShopping && TOWN_NPCS[interactable as TownNpcId].role === 'cashier' ? 'prompt.pay' : 'prompt.talk'}
-          values={{ role: t(`roles.${TOWN_NPCS[interactable as TownNpcId].role}.name`) }}
-          components={{ kbd: <kbd /> }}
-        />
+        <>
+          <Trans
+            i18nKey={talkWithE?.effect.kind === 'purchase' ? 'prompt.pay' : 'prompt.talk'}
+            values={{ role: t(`roles.${TOWN_NPCS[interactable as TownNpcId].role}.name`) }}
+            components={{ kbd: <kbd /> }}
+          />
+          {talkWithF && (
+            <>
+              {' · '}
+              <Trans i18nKey="prompt.ask" components={{ kbd: <kbd /> }} />
+            </>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 // Public interface of the ai module. Other modules import from here.
 export type { FunctionDeclaration } from '../content/index.ts';
 export {
+  basketChangedScene,
   buildNpcSession,
   GREETING_SCENE,
   NOT_UNDERSTOOD_TOOL,

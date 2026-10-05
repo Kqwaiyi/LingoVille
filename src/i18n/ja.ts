@@ -247,6 +247,7 @@ export const ja: UiStrings = {
     noTram: '路面電車は運行していません · 運行時間 {{opens}}–{{closes}}',
     take: '<kbd>E</kbd> で{{item}}を取る · {{price}}',
     pay: '<kbd>E</kbd> で会計する — {{role}}',
+    ask: '<kbd>F</kbd> で売り場を聞く',
   },
   tram: {
     heading: '路面電車で行き先を選ぶ',

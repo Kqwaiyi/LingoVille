@@ -250,6 +250,7 @@ export const en = {
     noTram: 'No tram is running · Trams run {{opens}}–{{closes}}',
     take: 'Press <kbd>E</kbd> to take {{item}} · {{price}}',
     pay: 'Press <kbd>E</kbd> to pay — {{role}}',
+    ask: 'Press <kbd>F</kbd> to ask where something is',
   },
   tram: {
     heading: 'Take the tram to…',

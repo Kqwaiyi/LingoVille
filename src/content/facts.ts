@@ -14,7 +14,7 @@ function hoursFact(what: string, hours: OpeningHours): string[] {
 }
 
 /** What the customer has put on the counter, each at its price, and the total. Nothing, before anyone brings shopping. */
-function basketFacts(basket: Basket, packId: LanguageCode): string[] {
+export function basketFacts(basket: Basket, packId: LanguageCode): string[] {
   if (basket.length === 0) return [];
   const { goods } = CULTURE_PACKS[packId];
   const money = (shifts: number) => formatLocalMoney(shifts, packId);
@@ -24,6 +24,12 @@ function basketFacts(basket: Basket, packId: LanguageCode): string[] {
     ...basket.map(({ itemId, quantity }) => `${quantity} × ${goods[itemId].name}, ${money(menuPrice(itemId, packId))} each`),
     `Total: ${money(total)}.`,
   ];
+}
+
+/** The latest total `basketFacts` wrote into this text (a system instruction or a scene), as local money, or null. */
+export function readBasketTotal(text: string): string | null {
+  const totals = [...text.matchAll(/Total: (.+)\.$/gm)];
+  return totals.at(-1)?.[1] ?? null;
 }
 
 /**

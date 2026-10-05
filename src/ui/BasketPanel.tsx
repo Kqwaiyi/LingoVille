@@ -1,13 +1,13 @@
 import { formatLocalMoney, menuPrice } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { selectBasket, selectConversation, selectCulturePackId, selectNativeLanguage, useGame } from '../store/index.ts';
+import { selectBasket, selectCanPutBack, selectCulturePackId, selectNativeLanguage, useGame } from '../store/index.ts';
 import { itemLabel } from './itemLabel.ts';
 
-/** The supermarket basket, while it holds anything: what's in it, the total, and putting things back. */
+/** The supermarket basket, while it holds anything: what's in it, the total, and putting things back (at the till too, until it's paid for). */
 export function BasketPanel() {
   const { t } = useTranslation();
   const basket = useGame(selectBasket);
-  const talking = useGame(selectConversation) !== null;
+  const canPutBack = useGame(selectCanPutBack);
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
   const putBack = useGame((s) => s.putBack);
@@ -25,7 +25,7 @@ export function BasketPanel() {
               <span>
                 {item} ×{quantity}
               </span>
-              <button type="button" aria-label={t('basket.putBack', { item })} disabled={talking} onClick={() => putBack(itemId)}>
+              <button type="button" aria-label={t('basket.putBack', { item })} disabled={!canPutBack} onClick={() => putBack(itemId)}>
                 −
               </button>
             </li>

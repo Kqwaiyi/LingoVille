@@ -1,5 +1,5 @@
 import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, type NpcSession, type ToolResponse } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, ITEMS, localPrice, type ItemId } from '../content/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, ITEMS, localPrice, readBasketTotal, type ItemId } from '../content/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
 
@@ -191,12 +191,17 @@ const CLERK_SCRIPT: Record<LanguageCode, OrderScript> = {
   },
 };
 
-/** The cashier at the till: asks about a bag, then a points card, reads both back, and takes payment. */
+/**
+ * The cashier at the till: asks about a bag, then a points card, reads back the total and both, and takes payment.
+ * Short of money, the customer can put something back, and the cashier reads back the new total.
+ */
 type TillScript = {
   greeting: string;
   resume: string;
+  /** The bag question again, without the greeting. */
+  askBag: string;
   askCard: string;
-  readBack: (bag: boolean, card: boolean) => string;
+  readBack: (total: string, bag: boolean, card: boolean) => string;
   paid: string;
   cannotAfford: string;
   /** "Yes" and "no" to a bag or a points card. "No" is listened for first: "不要" holds "要". */
@@ -207,10 +212,12 @@ const TILL_SCRIPT: Record<LanguageCode, TillScript> = {
   ja: {
     greeting: 'いらっしゃいませ。レジ袋はご利用ですか？',
     resume: '大変お待たせしました。レジ袋はご利用ですか？',
+    askBag: 'レジ袋はご利用ですか？',
     askCard: 'ポイントカードはお持ちですか？',
-    readBack: (bag, card) => `レジ袋${bag ? 'あり' : 'なし'}、ポイントカード${card ? 'あり' : 'なし'}ですね。よろしいですか？`,
+    readBack: (total, bag, card) =>
+      `合計${total}、レジ袋${bag ? 'あり' : 'なし'}、ポイントカード${card ? 'あり' : 'なし'}ですね。よろしいですか？`,
     paid: 'ありがとうございました！またお越しくださいませ。',
-    cannotAfford: '申し訳ございません、お支払いが足りないようです。',
+    cannotAfford: '申し訳ございません、お支払いが足りないようです。商品をお戻しになりますか？',
     words: {
       yes: [...SCRIPT.ja.words.yes, 'あります', 'ほしい'],
       no: [...SCRIPT.ja.words.no, 'いりません', 'ないです', 'ません', '大丈夫'],
@@ -220,10 +227,11 @@ const TILL_SCRIPT: Record<LanguageCode, TillScript> = {
   zh: {
     greeting: '欢迎光临！需要袋子吗？',
     resume: '让您久等了。需要袋子吗？',
+    askBag: '需要袋子吗？',
     askCard: '您有会员卡吗？',
-    readBack: (bag, card) => `${bag ? '要袋子' : '不要袋子'}，${card ? '有会员卡' : '没有会员卡'}，对吗？`,
+    readBack: (total, bag, card) => `一共${total}，${bag ? '要袋子' : '不要袋子'}，${card ? '有会员卡' : '没有会员卡'}，对吗？`,
     paid: '谢谢，欢迎下次光临！',
-    cannotAfford: '不好意思，您的钱好像不够。',
+    cannotAfford: '不好意思，您的钱好像不够。要放回一些东西吗？',
     words: {
       yes: [...SCRIPT.zh.words.yes, '要', '需要', '有'],
       no: [...SCRIPT.zh.words.no, '没'],
@@ -233,10 +241,12 @@ const TILL_SCRIPT: Record<LanguageCode, TillScript> = {
   en: {
     greeting: 'Hiya! Do you need a bag?',
     resume: 'Sorry about that! Do you need a bag?',
+    askBag: 'Do you need a bag?',
     askCard: 'Have you got a loyalty card?',
-    readBack: (bag, card) => `${bag ? 'With a bag' : 'No bag'}, and ${card ? 'your loyalty card' : 'no loyalty card'}. Is that right?`,
+    readBack: (total, bag, card) =>
+      `That's ${total}, ${bag ? 'with a bag' : 'no bag'}, and ${card ? 'your loyalty card' : 'no loyalty card'}. Is that right?`,
     paid: 'Lovely, there you go. Have a nice day!',
-    cannotAfford: "Sorry, it looks like that's not enough.",
+    cannotAfford: "Sorry, it looks like that's not enough. Do you want to put something back?",
     words: {
       yes: [...SCRIPT.en.words.yes, 'please', 'i have'],
       no: [...SCRIPT.en.words.no, "don't", 'not'],
@@ -246,10 +256,12 @@ const TILL_SCRIPT: Record<LanguageCode, TillScript> = {
   de: {
     greeting: 'Hallo! Brauchen Sie eine Tüte?',
     resume: 'Entschuldigung! Brauchen Sie eine Tüte?',
+    askBag: 'Brauchen Sie eine Tüte?',
     askCard: 'Haben Sie eine Kundenkarte?',
-    readBack: (bag, card) => `${bag ? 'Mit Tüte' : 'Ohne Tüte'}, ${card ? 'mit Kundenkarte' : 'ohne Kundenkarte'}, richtig?`,
+    readBack: (total, bag, card) =>
+      `Das macht ${total}, ${bag ? 'mit Tüte' : 'ohne Tüte'}, ${card ? 'mit Kundenkarte' : 'ohne Kundenkarte'}, richtig?`,
     paid: 'Danke schön! Einen schönen Tag noch!',
-    cannotAfford: 'Oh, das reicht leider nicht.',
+    cannotAfford: 'Oh, das reicht leider nicht. Möchten Sie etwas zurücklegen?',
     words: {
       yes: [...SCRIPT.de.words.yes, 'bitte'],
       no: [...SCRIPT.de.words.no, 'keine', 'kein', 'nicht'],
@@ -431,24 +443,33 @@ function orderNpc(script: OrderScript, menu: ItemId[], packId: LanguageCode, act
   };
 }
 
-function tillNpc(script: TillScript, common: OrderScript, act: Act): Npc {
+function tillNpc(script: TillScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
   let bag: boolean | null = null;
   let card: boolean | null = null;
+  // The total from FACTS, until a scene says something was put back.
+  let total = readBasketTotal(systemInstruction) ?? '';
   const { yes, no, known } = script.words;
+  /** Asks again whatever is still to be answered, or reads everything back. */
+  const currentQuestion = () => (bag === null ? script.askBag : card === null ? script.askCard : script.readBack(total, bag, card));
   return {
     ...common,
     ...script,
     hear: (line) => {
+      const newTotal = line.startsWith('[SCENE:') ? readBasketTotal(line) : null;
+      if (newTotal) {
+        total = newTotal;
+        return act.say(currentQuestion());
+      }
       // "No" first: "不要" holds "要", and "no thanks" holds "thanks".
       const answer = mentions(line, no) ? false : mentions(line, yes) ? true : null;
-      if (answer === null) return mentions(line, known) ? act.say(bag === null ? script.greeting : script.askCard) : act.notUnderstood();
+      if (answer === null) return mentions(line, known) ? act.say(currentQuestion()) : act.notUnderstood();
       if (bag === null) {
         bag = answer;
         return act.say(script.askCard);
       }
       if (card === null) {
         card = answer;
-        return act.say(script.readBack(bag, card));
+        return act.say(script.readBack(total, bag, card));
       }
       if (!answer) {
         [bag, card] = [null, null];
@@ -457,9 +478,11 @@ function tillNpc(script: TillScript, common: OrderScript, act: Act): Npc {
       const choices = { bag, card };
       [bag, card] = [null, null];
       act.call(COMPLETE_PURCHASE, choices, (response) => {
-        if (response.result === 'served') act.say(script.paid);
-        else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
-        else act.say(script.greeting);
+        if (response.result === 'served') return act.say(script.paid);
+        if (response.result !== 'cannot_afford') return act.say(script.greeting);
+        // The choices stand while the customer puts something back.
+        ({ bag, card } = choices);
+        act.say(script.cannotAfford);
       });
     },
   };
@@ -513,7 +536,7 @@ function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
   const offers = (name: string) => session.tools.some((tool) => tool.name === name);
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
-  if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], act);
+  if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
   const script = session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
   return orderNpc(script, itemsIn(session, SERVE_ORDER), packId, act);
@@ -524,7 +547,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * line in the Target Language, after a short delay. Which one it plays comes from
  * the session: the barista or the convenience store clerk reads an order back and
  * calls serve_order only once the Player confirms; the cashier at the till asks
- * about a bag and a points card, reads them back and calls complete_purchase; the
+ * about a bag and a points card, reads them back with the total and calls
+ * complete_purchase, reading back again when something is put back; the
  * cashier by the shelves checks which item and calls point_to; the nurse on the
  * ward lets the patient go home once they say how they feel. Each calls
  * not_understood for a line with no word it knows. It has no audio, so

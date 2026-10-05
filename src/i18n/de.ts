@@ -247,6 +247,7 @@ export const de: UiStrings = {
     noTram: 'Keine Straßenbahn fährt · Straßenbahnen fahren {{opens}}–{{closes}}',
     take: '<kbd>E</kbd> drücken, um {{item}} zu nehmen · {{price}}',
     pay: '<kbd>E</kbd> drücken, um zu bezahlen — {{role}}',
+    ask: '<kbd>F</kbd> drücken, um nach etwas zu fragen',
   },
   tram: {
     heading: 'Mit der Straßenbahn nach …',

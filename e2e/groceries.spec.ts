@@ -34,7 +34,7 @@ test('takes groceries off the shelf and pays at the till: bag, points card, read
   await typeLine(page, 'はい');
   await expect(npcLine(page, 'ポイントカードはお持ちですか？')).toBeVisible();
   await typeLine(page, 'いいえ');
-  await expect(npcLine(page, 'レジ袋あり、ポイントカードなしですね。よろしいですか？')).toBeVisible();
+  await expect(npcLine(page, '合計¥720、レジ袋あり、ポイントカードなしですね。よろしいですか？')).toBeVisible();
   // Nothing is charged before the Player confirms.
   await expect(money(page)).toHaveText('¥10,000');
   await typeLine(page, 'はい');
@@ -48,6 +48,40 @@ test('takes groceries off the shelf and pays at the till: bag, points card, read
   const inventory = page.getByRole('region', { name: 'Inventory' });
   await expect(inventory).toContainText('キャベツ (Cabbage) ×2');
   await expect(inventory).toContainText(`Fresh until day ${1 + GROCERIES.expiryDays}`);
+});
+
+test('puts a cabbage back at the till, and the cashier reads back the new total', async ({ page }) => {
+  await atTheCabbages(page);
+  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyE');
+  await walkUntil(page, 'KeyA', 'to pay — Cashier');
+  await page.keyboard.press('KeyE');
+  await expect(npcLine(page, 'いらっしゃいませ。レジ袋はご利用ですか？')).toBeVisible();
+  await typeLine(page, 'いいえ');
+  await typeLine(page, 'いいえ');
+  await expect(npcLine(page, '合計¥720、レジ袋なし、ポイントカードなしですね。よろしいですか？')).toBeVisible();
+
+  const putBack = basket(page).getByRole('button', { name: 'Put one キャベツ (Cabbage) back' });
+  await putBack.click();
+  await expect(npcLine(page, '合計¥360、レジ袋なし、ポイントカードなしですね。よろしいですか？')).toBeVisible();
+  // The last one stays on the counter: leaving the till puts it back.
+  await expect(putBack).toBeDisabled();
+  await typeLine(page, 'はい');
+
+  await expect(closingCard(page).getByText('Cabbage · −¥360 · Mood ↑')).toBeVisible();
+  await expect(money(page)).toHaveText('¥9,640');
+});
+
+test('with shopping in the basket, F asks the cashier where something else is', async ({ page }) => {
+  await atTheCabbages(page);
+  await page.keyboard.press('KeyE');
+  await walkUntil(page, 'KeyA', 'to ask where something is');
+  await page.keyboard.press('KeyF');
+  await expect(npcLine(page, 'いらっしゃいませ。何かお探しですか？')).toBeVisible();
+  await typeLine(page, 'うどんはどこですか');
+  await typeLine(page, 'はい');
+  await expect(closingCard(page).getByText('Udon noodles: marked on the shelf · Mood ↑')).toBeVisible();
+  await expect(basket(page)).toContainText('キャベツ (Cabbage) ×1');
 });
 
 test('asks the cashier where the noodles are, and they mark the shelf', async ({ page }) => {

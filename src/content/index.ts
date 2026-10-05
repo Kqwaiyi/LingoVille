@@ -1,6 +1,6 @@
 // Public interface of the content module. Other modules import from here.
 export { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
-export { approachInteraction, interactionStartedWithE } from './approaches.ts';
+export { approachInteraction, interactionStartedWithE, interactionStartedWithF } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {
   CULTURE_PACKS,
@@ -32,7 +32,7 @@ export {
   type ResolvedCompletion,
   type ServedItem,
 } from './defineInteraction.ts';
-export { interactionFacts } from './facts.ts';
+export { basketFacts, interactionFacts, readBasketTotal } from './facts.ts';
 export { INTERACTIONS } from './interactions.ts';
 export {
   CAFE_MENU,

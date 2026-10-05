@@ -3276,7 +3276,7 @@ YOUR GOAL
 Ring up the customer's shopping and take payment. Ask whether they need a bag and whether they have a points card.
 - Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the customer to confirm. If they correct you, read it back again.
 - Only once they have confirmed your read-back, call complete_purchase with exactly what they confirmed. Never call it before.
-- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it. They can put something back and come again. The conversation goes on.
+- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.
 - If complete_purchase answers "invalid_arguments", ask them again about the bag and the points card.
 - If complete_purchase answers "served", hand over their shopping, thank them and say goodbye.
 
@@ -3591,7 +3591,7 @@ YOUR GOAL
 Ring up the customer's shopping and take payment. Ask whether they need a bag and whether they have a points card.
 - Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the customer to confirm. If they correct you, read it back again.
 - Only once they have confirmed your read-back, call complete_purchase with exactly what they confirmed. Never call it before.
-- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it. They can put something back and come again. The conversation goes on.
+- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.
 - If complete_purchase answers "invalid_arguments", ask them again about the bag and the points card.
 - If complete_purchase answers "served", hand over their shopping, thank them and say goodbye.
 
@@ -3906,7 +3906,7 @@ YOUR GOAL
 Ring up the customer's shopping and take payment. Ask whether they need a bag and whether they have a points card.
 - Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the customer to confirm. If they correct you, read it back again.
 - Only once they have confirmed your read-back, call complete_purchase with exactly what they confirmed. Never call it before.
-- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it. They can put something back and come again. The conversation goes on.
+- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.
 - If complete_purchase answers "invalid_arguments", ask them again about the bag and the points card.
 - If complete_purchase answers "served", hand over their shopping, thank them and say goodbye.
 
@@ -4221,7 +4221,7 @@ YOUR GOAL
 Ring up the customer's shopping and take payment. Ask whether they need a bag and whether they have a points card.
 - Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the customer to confirm. If they correct you, read it back again.
 - Only once they have confirmed your read-back, call complete_purchase with exactly what they confirmed. Never call it before.
-- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it. They can put something back and come again. The conversation goes on.
+- If complete_purchase answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.
 - If complete_purchase answers "invalid_arguments", ask them again about the bag and the points card.
 - If complete_purchase answers "served", hand over their shopping, thank them and say goodbye.
 
