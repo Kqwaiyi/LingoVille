@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { formatLocalMoney, formatTime } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { METER_MAX, SAVE, WELL_BEING } from '../sim/index.ts';
+import { METER_MAX, SAVE, WELL_BEING, type MoodFace } from '../sim/index.ts';
 import {
   selectClockMinute,
   selectCulturePackId,
@@ -9,6 +9,7 @@ import {
   selectHealth,
   selectHunger,
   selectMood,
+  selectMoodFace,
   selectMoneyInShifts,
   selectPlaceHours,
   selectPlaceId,
@@ -20,6 +21,8 @@ import {
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
 import { usePlaceName } from './placeName.ts';
+
+const MOOD_FACE_ICONS: Record<MoodFace, string> = { miserable: '😫', low: '🙁', okay: '😐', good: '🙂', great: '😄' };
 
 function RingGauge({ label, icon, value, tone }: { label: string; icon: string; value: number; tone?: 'mood' }) {
   const percent = Math.round((value / METER_MAX) * 100);
@@ -117,6 +120,7 @@ export function Dock() {
   const hunger = useGame(selectHunger);
   const thirst = useGame(selectThirst);
   const mood = useGame(selectMood);
+  const moodFace = useGame(selectMoodFace);
   const minute = useGame(selectClockMinute);
   const day = useGame(selectDay);
   const weekday = useGame(selectWeekday);
@@ -128,8 +132,7 @@ export function Dock() {
         <RingGauge label={t('dock.health')} icon="❤️" value={health} />
         <RingGauge label={t('dock.hunger')} icon="🍙" value={hunger} />
         <RingGauge label={t('dock.thirst')} icon="💧" value={thirst} />
-        {/* The face starts to follow Mood once Mood moves (ticket 15). */}
-        <RingGauge label={t('dock.mood')} icon="🙂" value={mood} tone="mood" />
+        <RingGauge label={t('dock.mood')} icon={MOOD_FACE_ICONS[moodFace]} value={mood} tone="mood" />
         <div className="dock-sep" aria-hidden />
         <div className="dock-clock">
           <time className="dock-time" aria-label={t('dock.time')}>

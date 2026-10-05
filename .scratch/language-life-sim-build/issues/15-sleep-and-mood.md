@@ -6,13 +6,13 @@
 
 **Spec:** [spec.md](../spec.md): Well-being and Mood; Time and clock; Save model (autosave, backups); Decisions made before ticketing (4, 9)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Mood drains fast after about 2am, in `tick` (Vitest).
-- [ ] Unmet needs (Hunger or Thirst at 0) lower Mood (Vitest).
-- [ ] The Mood scale, the size of each change and the Mood modifier curve are defaults in the tuning module. The modifier is a pure function (Vitest).
-- [ ] The dock's Mood gauge shows a face that matches Mood.
-- [ ] `sleep` is allowed only from 20:00. It always wakes at 07:00 the next morning, even after a late bedtime, pauses decay and gives a small Mood boost. No naps (Vitest for each rule).
-- [ ] The new day triggers an autosave and the start-of-day backup.
-- [ ] Using the bed before 20:00 says it's too early, in the Native Language.
-- [ ] After loading a save made at home, the Character spawns in bed.
+- [x] Mood drains fast after about 2am, in `tick` (Vitest).
+- [x] Unmet needs (Hunger or Thirst at 0) lower Mood (Vitest).
+- [x] The Mood scale, the size of each change and the Mood modifier curve are defaults in the tuning module. The modifier is a pure function (Vitest).
+- [x] The dock's Mood gauge shows a face that matches Mood.
+- [x] `sleep` is allowed only from 20:00. It always wakes at 07:00 the next morning, even after a late bedtime, pauses decay and gives a small Mood boost. No naps (Vitest for each rule).
+- [x] The new day triggers an autosave and the start-of-day backup.
+- [x] Using the bed before 20:00 says it's too early, in the Native Language.
+- [x] After loading a save made at home, the Character spawns in bed.

@@ -43,6 +43,7 @@ import {
   addToPhrasebook,
   applyInteractionOutcome,
   applyRecapEvidence,
+  bedUsable,
   CHARACTER_NAME,
   CLOCK,
   createSave,
@@ -55,10 +56,12 @@ import {
   isUnreadableTranscript,
   MIC_CHECK,
   losePatience,
+  moodFace,
   newPlayerTurn,
   npcExpression,
   rideTram,
   SAVE,
+  sleep,
   startPatience,
   tick,
   tramTripMinutes,
@@ -196,7 +199,7 @@ export type TitleView =
 export type Arrival = 'newGame' | 'continued';
 
 /** Something in the world the Character is close enough to use with E: the tap, an NPC to talk to, or a tram stop. */
-export type Interactable = 'tap' | TownNpcId | TramStopId;
+export type Interactable = 'tap' | 'bed' | TownNpcId | TramStopId;
 
 /** Where the tram can take the Character from a stop, and how long each trip takes. */
 export type TramDestination = { stopId: TramStopId; minutes: number };
@@ -212,6 +215,8 @@ export type Toast =
   | { kind: 'npcSteppedAway'; npcId: NamedNpcId }
   | { kind: 'recapSaved' }
   | { kind: 'loadedBackup' }
+  /** The bed is used before 20:00. */
+  | { kind: 'tooEarlyForBed' }
   /** Staff standing in for a conversation that a later ticket brings. */
   | { kind: 'nothingToSay'; npcId: TownNpcId };
 
@@ -503,6 +508,8 @@ export type GameStore = {
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
   drinkWater: () => void;
+  /** Goes to bed at home: from 20:00, it wakes the next morning and saves; earlier, it says it's too early. */
+  sleep: () => void;
   /** E near an NPC: opens a conversation, and the NPC speaks first. */
   talk: () => void;
   sendTypedLine: (text: string) => void;
@@ -600,14 +607,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * Saves the game into its slot. A conversation is never saved in progress:
      * until its outcome is decided, the save keeps the game from before it.
      */
-    const save = () => {
+    const save = ({ startsDay = false } = {}) => {
       const { screen, conversation, slotId } = get();
       if (screen !== 'playing') return;
       askToPersist();
       const game = conversation && !conversation.outcome && gameBeforeConversation ? gameBeforeConversation : get().game;
       realMsSinceSave = 0;
       // Started at once: IndexedDB runs writes in the order they began, so an older game never lands after a newer one.
-      deps.saves.write(slotId, game).then(
+      deps.saves.write(slotId, game, { startsDay }).then(
         () => set({ savedCount: get().savedCount + 1 }),
         (error: unknown) => console.error('[save] could not save:', error),
       );
@@ -1247,7 +1254,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           settings.tooltipsSeen.includes(PERSIST_REFUSED) ? null : { ...settings, tooltipsSeen: [...settings.tooltipsSeen, PERSIST_REFUSED] },
         );
       },
-      saveNow: save,
+      saveNow: () => save(),
       advance: (realDeltaMs) => {
         if (get().screen !== 'playing') return;
         const before = get().game;
@@ -1292,6 +1299,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ game: after, tramChoosing: false, interactable: null, tramArrival: { stopId } });
       },
       drinkWater: () => set({ game: drinkWater(get().game) }),
+      sleep: () => {
+        const { game } = get();
+        if (!bedUsable(game.clock)) return set({ toast: { kind: 'tooEarlyForBed' } });
+        const after = sleep(game);
+        if (after === game) return;
+        set({ game: after });
+        // Waking starts the day, even after a bedtime past midnight, so the save becomes this morning's backup.
+        save({ startsDay: true });
+      },
 
       pointAtSign: (signId) => {
         const { sign } = get();
@@ -1534,6 +1550,8 @@ export const selectHealth = (s: GameStore) => s.game.character.health;
 export const selectHunger = (s: GameStore) => s.game.character.hunger;
 export const selectThirst = (s: GameStore) => s.game.character.thirst;
 export const selectMood = (s: GameStore) => s.game.character.mood;
+/** The face on the dock's Mood gauge. */
+export const selectMoodFace = (s: GameStore) => moodFace(s.game.character.mood);
 export const selectMoneyInShifts = (s: GameStore) => s.game.character.moneyInShifts;
 export const selectCulturePackId = (s: GameStore) => s.game.identity.culturePackId;
 export const selectTargetLanguage = (s: GameStore) => s.game.identity.targetLanguage;

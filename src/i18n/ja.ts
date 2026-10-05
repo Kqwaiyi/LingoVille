@@ -235,6 +235,7 @@ export const ja: UiStrings = {
   },
   prompt: {
     drink: '<kbd>E</kbd> で水道水を飲む',
+    sleep: '<kbd>E</kbd> で寝る',
     talk: '<kbd>E</kbd> で話しかける — {{role}}',
     tram: '<kbd>E</kbd> で路面電車に乗る',
     noTram: '路面電車は運行していません · 運行時間 {{opens}}–{{closes}}',
@@ -338,6 +339,7 @@ export const ja: UiStrings = {
   toast: {
     recapSaved: '振り返りを日記に保存しました',
     loadedBackup: '今朝のセーブを読み込みました',
+    tooEarlyForBed: '寝るにはまだ早いです。{{time}}から寝られます。',
     npcSteppedAway: '{{who}}は席を外しました。何も失われていません。',
     nothingToSay: '{{who}}はにっこり会釈しました。ここではまだ話すことがありません。',
   },

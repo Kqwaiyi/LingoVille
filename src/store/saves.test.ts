@@ -231,6 +231,16 @@ describe('the start-of-day backup', () => {
     expect((await get<{ game: GameState }>('slot-1/start-of-day', raw))?.game).toEqual(nextDay(morning));
   });
 
+  it('is rotated by a save that starts a day, even on the same day number, as waking after a bedtime past midnight', async () => {
+    const { saves, raw } = freshSaves();
+    const night = nextDay(lived());
+    const morning = { ...night, clock: { ...night.clock, minuteOfDay: 7 * 60 } };
+
+    await saves.write('slot-1', night);
+    await saves.write('slot-1', morning, { startsDay: true });
+    expect((await get<{ game: GameState }>('slot-1/start-of-day', raw))?.game).toEqual(morning);
+  });
+
   it('is loaded instead when the main save can’t be, and says so', async () => {
     const { saves, raw } = freshSaves();
     const morning = lived();

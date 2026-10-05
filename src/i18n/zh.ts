@@ -235,6 +235,7 @@ export const zh: UiStrings = {
   },
   prompt: {
     drink: '按 <kbd>E</kbd> 喝自来水',
+    sleep: '按 <kbd>E</kbd> 上床睡觉',
     talk: '按 <kbd>E</kbd> 交谈 — {{role}}',
     tram: '按 <kbd>E</kbd> 乘坐电车',
     noTram: '电车已停运 · 运营时间 {{opens}}–{{closes}}',
@@ -338,6 +339,7 @@ export const zh: UiStrings = {
   toast: {
     recapSaved: '回顾已保存到你的日记',
     loadedBackup: '已读取今天早上的存档',
+    tooEarlyForBed: '现在睡觉还太早。{{time}}以后才能睡。',
     npcSteppedAway: '{{who}}临时走开了。什么都没有丢失。',
     nothingToSay: '{{who}}微笑着点点头。这里暂时还没什么可聊的。',
   },

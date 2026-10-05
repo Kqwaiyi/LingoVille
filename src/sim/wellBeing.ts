@@ -1,16 +1,29 @@
 import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
 import { clampMeter } from './meters.ts';
 import type { GameState, PlaceId } from './state.ts';
-import { METER_MAX, WELL_BEING } from './tuning.ts';
+import { CLOCK, METER_MAX, MINUTES_PER_HOUR, MOOD, WELL_BEING } from './tuning.ts';
 
 const hungerPerMinute = METER_MAX / WELL_BEING.hungerFullToEmptyGameMinutes;
 const thirstPerMinute = METER_MAX / WELL_BEING.thirstFullToEmptyGameMinutes;
 const deprivedHealthPerMinute = METER_MAX / WELL_BEING.healthFullToEmptyWhileDeprivedGameMinutes;
 
+/** Game minutes from `minuteOfDay` over the next `dtGameMinutes` that fall late at night, from about 2am until morning. */
+function lateNightMinutes(minuteOfDay: number, dtGameMinutes: number): number {
+  const end = minuteOfDay + dtGameMinutes;
+  let minutes = 0;
+  for (let dayStart = 0; dayStart < end; dayStart += CLOCK.minutesPerDay) {
+    const from = Math.max(minuteOfDay, dayStart + CLOCK.lateNightFrom);
+    const until = Math.min(end, dayStart + CLOCK.wakeAt);
+    minutes += Math.max(0, until - from);
+  }
+  return minutes;
+}
+
 /**
  * Advances the game by `dtGameMinutes`. Hunger and Thirst empty steadily, and
  * Health falls only from the moment one of them reaches 0, so one long tick
- * gives the same result as many short ones.
+ * gives the same result as many short ones. Mood falls while a need is unmet
+ * and, faster, while the Character is up late at night.
  */
 export function tick(state: GameState, dtGameMinutes: number): GameState {
   if (dtGameMinutes <= 0) return state;
@@ -18,6 +31,10 @@ export function tick(state: GameState, dtGameMinutes: number): GameState {
 
   const minutesUntilDeprived = Math.min(character.hunger / hungerPerMinute, character.thirst / thirstPerMinute);
   const deprivedMinutes = Math.max(0, dtGameMinutes - minutesUntilDeprived);
+  const moodChange =
+    (MOOD.changes.unmetNeedPerGameHour * deprivedMinutes +
+      MOOD.changes.lateNightPerGameHour * lateNightMinutes(state.clock.minuteOfDay, dtGameMinutes)) /
+    MINUTES_PER_HOUR;
 
   return {
     ...state,
@@ -27,6 +44,7 @@ export function tick(state: GameState, dtGameMinutes: number): GameState {
       hunger: clampMeter(character.hunger - hungerPerMinute * dtGameMinutes),
       thirst: clampMeter(character.thirst - thirstPerMinute * dtGameMinutes),
       health: clampMeter(character.health - deprivedHealthPerMinute * deprivedMinutes),
+      mood: clampMeter(character.mood + moodChange),
     },
   };
 }

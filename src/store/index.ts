@@ -25,6 +25,7 @@ export {
   selectListening,
   selectMicLevel,
   selectMood,
+  selectMoodFace,
   selectMoneyInShifts,
   selectNativeLanguage,
   selectNpcExpression,

@@ -2,6 +2,13 @@ import { expect, type Page } from '@playwright/test';
 
 export const titleMenu = (page: Page) => page.getByRole('navigation', { name: 'Title menu' });
 
+/** Reloads the page and picks Continue on the title screen. */
+export async function reloadAndContinue(page: Page) {
+  await page.reload();
+  await titleMenu(page).getByRole('button', { name: 'Continue' }).click();
+  await expect(titleMenu(page)).toBeHidden();
+}
+
 /** Each language as its choice in setup is named: by its own name. */
 const ENDONYMS = { ja: '日本語', zh: '中文', en: 'English', de: 'Deutsch' } as const;
 export type Language = keyof typeof ENDONYMS;

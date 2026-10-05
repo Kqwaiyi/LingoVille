@@ -21,6 +21,7 @@ export function InteractionPrompt() {
   const talking = useGame(selectConversation) !== null;
   const keysOff = useGame(selectWorldKeysOff);
   const drinkWater = useGame((s) => s.drinkWater);
+  const sleep = useGame((s) => s.sleep);
   const talk = useGame((s) => s.talk);
   const openTram = useGame((s) => s.openTram);
   const active = interactable !== null && !talking && !keysOff;
@@ -32,12 +33,13 @@ export function InteractionPrompt() {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyE' || e.repeat) return;
       if (interactable === 'tap') drinkWater();
+      else if (interactable === 'bed') sleep();
       else if (tramStop) openTram();
       else talk();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, drinkWater, openTram, talk]);
+  }, [usable, interactable, tramStop, drinkWater, sleep, openTram, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -52,6 +54,8 @@ export function InteractionPrompt() {
     <div className="prompt">
       {interactable === 'tap' ? (
         <Trans i18nKey="prompt.drink" components={{ kbd: <kbd /> }} />
+      ) : interactable === 'bed' ? (
+        <Trans i18nKey="prompt.sleep" components={{ kbd: <kbd /> }} />
       ) : tramStop ? (
         <Trans i18nKey="prompt.tram" components={{ kbd: <kbd /> }} />
       ) : (

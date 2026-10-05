@@ -167,7 +167,7 @@ function readable(raw: unknown) {
 
 /**
  * Backups sit beside the save under `<slotId>/<name>`: the start-of-day backup,
- * rotated at the first save of each new day; a pre-migration backup per
+ * rotated at the first save of each new day and by a save that starts one (waking up); a pre-migration backup per
  * version migrated from; and a damaged main save, kept aside once play goes on
  * from the start-of-day backup rather than written over.
  */
@@ -190,8 +190,11 @@ export type Slot =
 export type BackupInfo = { name: string; schemaVersion: number | null; day: number | null; lastPlayedAt: string | null };
 
 export type Saves = {
-  /** Saves the game into a slot, keeping when the save was created. Returns it as stored. */
-  write(slotId: string, game: GameState): Promise<Save>;
+  /**
+   * Saves the game into a slot, keeping when the save was created. Returns it as stored.
+   * With `startsDay`, it also becomes the start-of-day backup, even on the same day number.
+   */
+  write(slotId: string, game: GameState, options?: { startsDay?: boolean }): Promise<Save>;
   /**
    * The slot's save, upgraded if it was old, or null if the slot is empty. If
    * the main save can't be loaded, this morning's backup is loaded instead.
@@ -215,9 +218,10 @@ export function createSaves(openStore: () => UseStore, { now = () => new Date() 
 
   /**
    * Stores a save in one transaction. A damaged main save is kept aside rather
-   * than written over, and the start-of-day backup is rotated on a new day.
+   * than written over, and the start-of-day backup is rotated on a new day, or
+   * whenever the save `startsDay`.
    */
-  const put = async (slotId: string, next: (old: unknown) => Save): Promise<Save> =>
+  const put = async (slotId: string, next: (old: unknown) => Save, startsDay = false): Promise<Save> =>
     db()('readwrite', (objects) => {
       let stored: Save | null = null;
       let failed: unknown = null;
@@ -235,7 +239,7 @@ export function createSaves(openStore: () => UseStore, { now = () => new Date() 
         objects.put(stored, slotId);
         const backup = objects.get(backupKey(slotId, START_OF_DAY));
         backup.onsuccess = () => {
-          if (peekNumber(backup.result, 'game', 'clock', 'day') !== stored!.game.clock.day) {
+          if (startsDay || peekNumber(backup.result, 'game', 'clock', 'day') !== stored!.game.clock.day) {
             objects.put(stored, backupKey(slotId, START_OF_DAY));
           }
         };
@@ -279,15 +283,19 @@ export function createSaves(openStore: () => UseStore, { now = () => new Date() 
   };
 
   return {
-    write: (slotId, game) => {
+    write: (slotId, game, { startsDay = false } = {}) => {
       const playedAt = now().toISOString();
-      return put(slotId, (old) => ({
-        schemaVersion: SAVE_SCHEMA_VERSION,
+      return put(
         slotId,
-        createdAt: peekString(old, 'createdAt') ?? playedAt,
-        lastPlayedAt: playedAt,
-        game,
-      }));
+        (old) => ({
+          schemaVersion: SAVE_SCHEMA_VERSION,
+          slotId,
+          createdAt: peekString(old, 'createdAt') ?? playedAt,
+          lastPlayedAt: playedAt,
+          game,
+        }),
+        startsDay,
+      );
     },
     load,
     slots: () =>

@@ -238,6 +238,7 @@ export const en = {
   },
   prompt: {
     drink: 'Press <kbd>E</kbd> to drink tap water',
+    sleep: 'Press <kbd>E</kbd> to go to bed',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
     tram: 'Press <kbd>E</kbd> to take the tram',
     noTram: 'No tram is running · Trams run {{opens}}–{{closes}}',
@@ -343,6 +344,7 @@ export const en = {
   toast: {
     recapSaved: 'Recap saved to your Journal',
     loadedBackup: 'Loaded this morning’s save',
+    tooEarlyForBed: 'It’s too early for bed. You can sleep from {{time}}.',
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
     nothingToSay: '{{who}} smiles and nods. There’s nothing to talk about here yet.',
   },

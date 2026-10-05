@@ -5,7 +5,7 @@
 // Sections marked "default" are the spec's open questions 4 (Mood) and 5 (other
 // tuning numbers): starting guesses, to be adjusted in playtesting.
 
-const MINUTES_PER_HOUR = 60;
+export const MINUTES_PER_HOUR = 60;
 
 // --- Meters -----------------------------------------------------------------
 
@@ -23,7 +23,10 @@ export const CLOCK = {
   /** Sleeping always wakes at this time. */
   wakeAt: 7 * MINUTES_PER_HOUR,
   bedUsableFrom: 20 * MINUTES_PER_HOUR,
-  /** Mood drains fast after this time until the Character sleeps. */
+  /**
+   * Mood drains fast from this time until `wakeAt`, the hour the bed would have
+   * woken the Character. Staying up all night doesn't drain on into the day.
+   */
   lateNightFrom: 2 * MINUTES_PER_HOUR,
   faintWakeAt: 8 * MINUTES_PER_HOUR,
 } as const;
@@ -187,6 +190,8 @@ export const MOOD = {
   debtPenaltyPerDay: -3,
   /** The Mood modifier on Shift pay and Life Skill XP, linear from Mood 0 to METER_MAX. */
   modifier: { atZero: 0.8, atMax: 1.2 },
+  /** The lowest Mood each face on the dock's Mood gauge shows from. */
+  faceFrom: { miserable: 0, low: 0.2 * METER_MAX, okay: 0.4 * METER_MAX, good: 0.6 * METER_MAX, great: 0.8 * METER_MAX },
 } as const;
 
 // --- Life Skills (default: open question 5) ---------------------------------

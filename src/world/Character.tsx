@@ -22,7 +22,7 @@ import {
   type Interactable,
 } from '../store/index.ts';
 import type { Control } from './controls.ts';
-import { HOME_TAP, isWaitingForTram, NPC_SPOTS, placeAt, spawnPoint, tramStopAt, tramStopSpawn, type Vec3 } from './town.ts';
+import { HOME_BED, HOME_TAP, isWaitingForTram, NPC_SPOTS, placeAt, spawnPoint, tramStopAt, tramStopSpawn, type Vec3 } from './town.ts';
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
@@ -38,13 +38,14 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: the tap, the nearest
+ * What the Character standing here could use with E: the tap or the bed, the nearest
  * person in talking range, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
 function interactableAt(x: number, z: number, tramRunning: boolean): Interactable | null {
   const placeId = placeAt(x, z);
   if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
+  if (placeId === 'home' && distanceTo(x, z, HOME_BED) <= MOVEMENT.interactRangeMetres) return 'bed';
   let nearest: Interactable | null = null;
   let nearestDistance: number = MOVEMENT.talkRangeMetres;
   for (const npcId of TOWN_NPC_IDS) {

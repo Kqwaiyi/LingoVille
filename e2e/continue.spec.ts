@@ -1,16 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { column, dock, npcLine, talkToTheBarista, typeLine } from './barista.ts';
-import { startNewGame, titleMenu } from './title.ts';
+import { reloadAndContinue, startNewGame, titleMenu } from './title.ts';
 
 const money = (page: Page) => dock(page).getByLabel('Money');
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
-
-/** Reloads the page and picks Continue on the title screen. */
-async function reloadAndContinue(page: Page) {
-  await page.reload();
-  await titleMenu(page).getByRole('button', { name: 'Continue' }).click();
-  await expect(titleMenu(page)).toBeHidden();
-}
 
 test('a browser with no saves is offered only New game', async ({ page }) => {
   await page.goto('/');

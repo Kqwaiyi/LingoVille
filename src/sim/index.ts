@@ -3,6 +3,7 @@ export { gameMinutesFor, isOpen, weekdayOf, WEEKDAYS, type OpeningHours, type We
 export { weighRecapEvidence, type EvidenceLine, type HelpShown, type RecapEvidence } from './helpEvidence.ts';
 export { applyInteractionOutcome, type InteractionOutcome, type OutcomeResult } from './interactionOutcome.ts';
 export { clampMeter } from './meters.ts';
+export { MOOD_FACES, moodFace, moodModifier, type MoodFace } from './mood.ts';
 export { addToPhrasebook } from './phrasebook.ts';
 export {
   isOutOfPatience,
@@ -36,6 +37,7 @@ export {
   type PhrasebookEntry,
   type PlaceId,
 } from './state.ts';
+export { bedUsable, sleep } from './sleep.ts';
 export { rideTram, tramTripMinutes } from './tram.ts';
 export * from './tuning.ts';
 export { drinkWater, enterPlace, tick } from './wellBeing.ts';
