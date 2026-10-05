@@ -8,6 +8,7 @@ export { cook } from './cook.ts';
 export { faint, faintedBetween } from './faint.ts';
 export { lifeSkillLevel, lifeSkillLevels } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';
+export { hire, namesMatch } from './jobs.ts';
 export { clampMeter } from './meters.ts';
 export { MOOD_FACES, moodFace, moodModifier, type MoodFace } from './mood.ts';
 export { announceNewcomerDiscount, newcomerDiscountStepDownDue } from './newcomerDiscount.ts';

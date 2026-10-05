@@ -21,6 +21,24 @@ const serveOrder = (menu: readonly [ItemId, ...ItemId[]]) => ({
   }),
 });
 
+/** When a hired applicant says they can start. Shifts have no schedule, so it is only what was agreed. */
+export const START_WHEN = ['today', 'tomorrow', 'this_week', 'next_week'] as const;
+
+/** `hire_applicant(name, start)`: the hiring Goal Interactions (#26–28) share it. The sim checks the name. */
+const hireApplicant = {
+  name: 'hire_applicant',
+  description:
+    'Hire the applicant, once they have told you their name and when they can start and confirmed your read-back. ' +
+    'Answers "done", or "wrong_name" (that is not their name: you misheard it).',
+  args: z.object({
+    name: z
+      .string()
+      .min(1)
+      .describe('Their name exactly as they said it. If they spelled it out, use that spelling; write a foreign name in Latin letters.'),
+    start: z.enum(START_WHEN).describe('When they said they can start.'),
+  }),
+};
+
 /** `accept_rent(amount)`: paying the landlord, whether the Player came to pay or the landlord caught them. */
 const acceptRent = {
   name: 'accept_rent',
@@ -42,6 +60,21 @@ export const INTERACTIONS = {
     completion: serveOrder(CAFE_MENU),
     band: 'B',
     effect: { kind: 'serveOrder' },
+  }),
+  // #26. Asking the barista for work. Until the Character is hired, F at the barista asks.
+  askBaristaForWork: defineInteraction({
+    id: 'ask-barista-for-work',
+    placeId: 'cafe',
+    npcId: 'barista',
+    goal:
+      'This person has come to the counter to ask for work as a barista, and the café is hiring. ' +
+      'Greet them as you would anyone and let them ask. Then interview them briefly: ask their name and when they can start. ' +
+      'There is no rota: once hired, they come in by the staff door any day the café is open and work a shift.',
+    facts: ['openingHours', 'placeFacts'],
+    items: [],
+    completion: hireApplicant,
+    band: 'B',
+    effect: { kind: 'hire', jobId: 'barista' },
   }),
   // #4. The cashier rings up whatever the Character brought to the till.
   payForGroceries: defineInteraction({

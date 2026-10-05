@@ -182,3 +182,26 @@ describe('buildNpcSession: the landlord', () => {
     expect(systemInstruction).toContain("From now on the tenant's weekly rent is £72.");
   });
 });
+
+describe('buildNpcSession: asking the barista for work', () => {
+  const hiringSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.askBaristaForWork, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.barista, { clock: FIRST_MORNING_CLOCK });
+
+  it.each(LANGUAGE_CODES)('builds the hiring session in the %s pack', (packId) => {
+    expect(hiringSession(packId)).toMatchSnapshot();
+  });
+
+  it('offers hire_applicant and not_understood as tools', () => {
+    expect(hiringSession('ja').tools.map((tool) => tool.name)).toEqual(['hire_applicant', 'not_understood']);
+  });
+
+  it('lets the barista ask the applicant’s name, which a customer is never asked', () => {
+    const { systemInstruction } = hiringSession('en');
+    expect(systemInstruction).not.toMatch(/don't ask for it/);
+    expect(systemInstruction).toMatch(/ask their name/);
+  });
+
+  it('has the barista ask the name again when it was misheard', () => {
+    expect(hiringSession('de').systemInstruction).toMatch(/"wrong_name".*again/);
+  });
+});

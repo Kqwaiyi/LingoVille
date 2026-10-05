@@ -127,6 +127,7 @@ function ClosingCardPanel({ card, npcId }: { card: ClosingCard; npcId: NamedNpcI
           ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
           ...(card.pointedTo ? [t('closing.pointedTo', { item: servedLine([card.pointedTo], nativeLanguage) })] : []),
           ...(card.extendedDays ? [t('closing.moreTime', { days: card.extendedDays })] : []),
+          ...(card.hired ? [t('closing.hired', { job: t(`skills.names.${card.hired}`) })] : []),
           ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
           ...mood,
         ];

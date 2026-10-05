@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { formatLocalMoney, formatTime, menuPrice, TOWN_NPCS, type TownNpcId } from '../content/index.ts';
+import { formatLocalMoney, formatTime, menuPrice, TOWN_NPCS, type EffectKind, type TownNpcId } from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
 import {
   selectConversation,
@@ -16,6 +16,12 @@ import {
   useGame,
 } from '../store/index.ts';
 import { itemLabel } from './itemLabel.ts';
+
+/** What F offers, by the second conversation's effect: asking where something is, for more time, or for work. */
+const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askForWork'>> = {
+  extendRent: 'prompt.askForTime',
+  hire: 'prompt.askForWork',
+};
 
 /** "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second conversation on F. */
 export function InteractionPrompt() {
@@ -94,7 +100,7 @@ export function InteractionPrompt() {
           {talkWithF && (
             <>
               {' · '}
-              <Trans i18nKey="prompt.ask" components={{ kbd: <kbd /> }} />
+              <Trans i18nKey={F_PROMPTS[talkWithF.effect.kind] ?? 'prompt.ask'} components={{ kbd: <kbd /> }} />
             </>
           )}
         </>

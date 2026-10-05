@@ -248,6 +248,8 @@ export const ja: UiStrings = {
     take: '<kbd>E</kbd> で{{item}}を取る · {{price}}',
     pay: '<kbd>E</kbd> で会計する — {{role}}',
     ask: '<kbd>F</kbd> で売り場を聞く',
+    askForTime: '<kbd>F</kbd> で支払いを待ってもらう',
+    askForWork: '<kbd>F</kbd> で仕事について聞く',
   },
   tram: {
     heading: '路面電車で行き先を選ぶ',
@@ -314,6 +316,7 @@ export const ja: UiStrings = {
     noCharge: '支払いなし',
     pointedTo: '{{item}}：棚に印をつけました',
     moreTime: '家賃の支払いを{{days}}日延ばしてもらいました',
+    hired: '採用されました：{{job}}',
     moodUp: '気分 ↑',
     moodDown: '気分 ↓',
     skipRecap: '振り返りを飛ばす',

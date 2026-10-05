@@ -295,3 +295,39 @@ describe('applyInteractionOutcome: the landlord', () => {
     expect(state.character.moneyInShifts).toBe(3);
   });
 });
+
+describe('applyInteractionOutcome: hiring', () => {
+  const { askBaristaForWork } = INTERACTIONS;
+  /** At the café counter, the Character named Sam Lee at setup. */
+  const applicant = (): GameState => ({ ...createSave({ ...TEST_SETUP, characterName: 'Sam Lee' }), placeId: 'cafe' });
+  const applying = (name: string) => ({ kind: 'success' as const, args: { name, start: 'tomorrow' } });
+
+  it('hires the Character when the name the barista heard is theirs, and lifts Mood', () => {
+    const { state, result } = applyInteractionOutcome(applicant(), askBaristaForWork, applying('Sam'));
+
+    expect(state.possessions.jobsHired).toEqual(['barista']);
+    expect(result).toEqual({ kind: 'success', served: [], paidInShifts: 0, moodChange: MOOD.changes.goalInteractionSuccess, hired: 'barista' });
+  });
+
+  it('turns down a name that is not theirs, changing nothing, so the barista can ask again', () => {
+    const { state, result } = applyInteractionOutcome(applicant(), askBaristaForWork, applying('Pam'));
+
+    expect(result).toEqual({ kind: 'wrong_name' });
+    expect(state).toEqual(applicant());
+  });
+
+  it('leaves the Job unhired after a failure, so the Character can try again', () => {
+    const failed = applyInteractionOutcome(applicant(), askBaristaForWork, { kind: 'failure' }).state;
+    expect(failed.possessions.jobsHired).toEqual([]);
+
+    const { state } = applyInteractionOutcome(failed, askBaristaForWork, applying('Sam Lee'));
+    expect(state.possessions.jobsHired).toEqual(['barista']);
+  });
+
+  it('records a Job only once', () => {
+    const hired = applyInteractionOutcome(applicant(), askBaristaForWork, applying('Sam')).state;
+
+    const { state } = applyInteractionOutcome(hired, askBaristaForWork, applying('Sam'));
+    expect(state.possessions.jobsHired).toEqual(['barista']);
+  });
+});

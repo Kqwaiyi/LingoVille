@@ -7,6 +7,7 @@ import {
   readBasketTotal,
   readNewWeeklyRent,
   readRentOwed,
+  START_WHEN,
   type ItemId,
 } from '../content/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
@@ -17,7 +18,7 @@ const REPLY_DELAY_MS = 600;
 
 // The completions the fake knows how to script: an order over a counter, paying at the till,
 // pointing to an item on the shelves, the nurse letting the patient go home, and the landlord
-// taking rent, giving more time, or telling the tenant their new rent.
+// taking rent, giving more time, or telling the tenant their new rent, and the barista hiring.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
 const COMPLETE_PURCHASE = INTERACTIONS.payForGroceries.completion.name;
 const POINT_TO = INTERACTIONS.findAnItem.completion.name;
@@ -25,6 +26,7 @@ const DISCHARGE_PATIENT = INTERACTIONS.wakeInWard.completion.name;
 const ACCEPT_RENT = INTERACTIONS.payRent.completion.name;
 const GRANT_EXTENSION = INTERACTIONS.askForMoreTime.completion.name;
 const FINISH_RENT_NEWS = INTERACTIONS.newcomerDiscountNews.completion.name;
+const HIRE_APPLICANT = INTERACTIONS.askBaristaForWork.completion.name;
 /** How many more days the fake landlord gives. */
 const EXTENSION_DAYS = 3;
 
@@ -486,6 +488,87 @@ const LANDLORD_SCRIPT: Record<LanguageCode, LandlordScript> = {
   },
 };
 
+/** When an applicant can start, as `hire_applicant` takes it. */
+type StartWhen = (typeof START_WHEN)[number];
+
+/** The fake barista hiring: asks the name, then when they can start, and reads both back. */
+type HiringScript = {
+  /** Words that ask for work. */
+  work: string[];
+  askName: string;
+  askStart: (name: string) => string;
+  readBack: (name: string, start: string) => string;
+  hired: string;
+  nameAgain: string;
+  /** Said around a name ("my name is"), and taken off to leave the name. */
+  introductions: string[];
+  /** How the Player might say each start, and how the barista says it back. */
+  starts: Record<StartWhen, { words: string[]; said: string }>;
+};
+
+const HIRING_SCRIPT: Record<LanguageCode, HiringScript> = {
+  ja: {
+    work: ['仕事', 'しごと', '働き', 'はたらき', 'バイト', 'job', 'work'],
+    askName: 'あ、アルバイトですね！お名前は？',
+    askStart: (name) => `${name}さんですね。いつから働けますか？`,
+    readBack: (name, start) => `${name}さん、${start}からですね。よろしいですか？`,
+    hired: '採用です！働くときは、営業中にスタッフ用のドアから来てくださいね。',
+    nameAgain: 'すみません、お名前をもう一度ゆっくりお願いします。',
+    introductions: ['私の名前は', 'わたしのなまえは', '名前は', 'なまえは', '私は', 'わたしは', 'と申します', 'といいます', 'です', 'さん'],
+    starts: {
+      today: { words: ['今日', 'きょう'], said: '今日' },
+      tomorrow: { words: ['明日', 'あした', 'あす'], said: '明日' },
+      this_week: { words: ['今週', 'こんしゅう'], said: '今週' },
+      next_week: { words: ['来週', 'らいしゅう'], said: '来週' },
+    },
+  },
+  zh: {
+    work: ['工作', '打工', '招人', 'job', 'work'],
+    askName: '哦，你想来工作？你叫什么名字？',
+    askStart: (name) => `${name}，对吧？你什么时候能开始？`,
+    readBack: (name, start) => `${name}，${start}开始。对吗？`,
+    hired: '好，你被录用了！营业时间从员工门进来就可以上班。',
+    nameAgain: '不好意思，请再慢慢说一遍你的名字。',
+    introductions: ['我的名字是', '我的名字叫', '我叫', '我是'],
+    starts: {
+      today: { words: ['今天'], said: '今天' },
+      tomorrow: { words: ['明天'], said: '明天' },
+      this_week: { words: ['这个星期', '这周', '本周'], said: '这个星期' },
+      next_week: { words: ['下个星期', '下周'], said: '下个星期' },
+    },
+  },
+  en: {
+    work: ['job', 'jobs', 'work', 'hiring'],
+    askName: "Oh, you're after a job? Lovely. What's your name?",
+    askStart: (name) => `${name}, is it? When can you start?`,
+    readBack: (name, start) => `So that's ${name}, starting ${start}. Right?`,
+    hired: "You're hired! Just come in through the staff door whenever we're open.",
+    nameAgain: 'Sorry, I think I got your name wrong. Could you say it again, slowly?',
+    introductions: ['my name is', "my name's", "i'm", 'i am', "it's", 'it is', 'call me'],
+    starts: {
+      today: { words: ['today'], said: 'today' },
+      tomorrow: { words: ['tomorrow'], said: 'tomorrow' },
+      this_week: { words: ['this week'], said: 'this week' },
+      next_week: { words: ['next week'], said: 'next week' },
+    },
+  },
+  de: {
+    work: ['arbeit', 'job', 'stelle', 'arbeiten'],
+    askName: 'Ach, Sie suchen Arbeit? Wie heißen Sie?',
+    askStart: (name) => `${name}, richtig? Ab wann können Sie anfangen?`,
+    readBack: (name, start) => `Also ${name}, ab ${start}. Stimmt das?`,
+    hired: 'Sie sind eingestellt! Kommen Sie einfach durch die Personaltür, wenn wir geöffnet haben.',
+    nameAgain: 'Entschuldigung, wie war Ihr Name noch mal? Bitte langsam.',
+    introductions: ['mein name ist', 'ich heiße', 'ich bin'],
+    starts: {
+      today: { words: ['heute'], said: 'heute' },
+      tomorrow: { words: ['morgen'], said: 'morgen' },
+      this_week: { words: ['diese woche'], said: 'dieser Woche' },
+      next_week: { words: ['nächste woche'], said: 'nächster Woche' },
+    },
+  },
+};
+
 const LATIN = /^[\p{Script=Latin}\s']+$/u;
 
 /** Whole words for Latin-script words ("no" isn't in "know"); anywhere in the line otherwise. */
@@ -696,6 +779,52 @@ function rentNewsNpc(script: LandlordScript, words: Words, session: NpcSession, 
   };
 }
 
+/** The name in a line: its first sentence, without the words said around a name. */
+function nameIn(line: string, introductions: readonly string[]): string {
+  let name = line.split(/[。．.!！?？,，、]/u)[0]!;
+  for (const words of introductions) name = name.replace(new RegExp(words.replace(/'/g, "['’]"), 'giu'), ' ');
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+/** The barista hiring: on a request for work, asks the name, then when they can start, reads both back and hires on a yes. */
+function hiringNpc(script: HiringScript, common: OrderScript, act: Act): Npc {
+  let asked = false;
+  let name: string | null = null;
+  let start: StartWhen | null = null;
+  const { yes, no, known } = common.words;
+  const nextQuestion = () =>
+    name === null ? script.askName : start === null ? script.askStart(name) : script.readBack(name, script.starts[start].said);
+  return {
+    ...common,
+    hear: (line) => {
+      if (!asked) {
+        if (!mentions(line, script.work)) return mentions(line, [...yes, ...no, ...known]) ? act.say(common.clarify[0]!) : act.notUnderstood();
+        asked = true;
+        return act.say(script.askName);
+      }
+      if (name === null) {
+        name = nameIn(line, script.introductions) || null;
+        return name === null ? act.notUnderstood() : act.say(nextQuestion());
+      }
+      if (start === null) {
+        start = START_WHEN.find((when) => mentions(line, script.starts[when].words)) ?? null;
+        return start || mentions(line, [...yes, ...no, ...known]) ? act.say(nextQuestion()) : act.notUnderstood();
+      }
+      if (mentions(line, no)) {
+        [name, start] = [null, null];
+        return act.say(script.askName);
+      }
+      if (!mentions(line, yes)) return act.say(nextQuestion());
+      act.call(HIRE_APPLICANT, { name, start }, (response) => {
+        if (response.result === 'done') return act.say(script.hired);
+        // Misheard: the start stands, and the name is asked again.
+        name = null;
+        act.say(script.nameAgain);
+      });
+    },
+  };
+}
+
 /** Which fake NPC plays this session, read from the completion it offers. */
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
@@ -705,6 +834,7 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
   if (offers(GRANT_EXTENSION)) return extensionNpc(LANDLORD_SCRIPT[packId], words, act);
   if (offers(FINISH_RENT_NEWS)) return rentNewsNpc(LANDLORD_SCRIPT[packId], words, session, act);
+  if (offers(HIRE_APPLICANT)) return hiringNpc(HIRING_SCRIPT[packId], SCRIPT[packId], act);
   if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
   const script = session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
@@ -721,7 +851,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * cashier by the shelves checks which item and calls point_to; the nurse on the
  * ward lets the patient go home once they say how they feel; the landlord takes
  * all that is owed on a yes, offers three more days, or tells the tenant their
- * new rent. Each calls
+ * new rent; the barista asked for work takes a name and a start, reads them
+ * back and hires on a yes, asking the name again if the sim says it's wrong. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.

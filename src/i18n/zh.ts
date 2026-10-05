@@ -248,6 +248,8 @@ export const zh: UiStrings = {
     take: '按 <kbd>E</kbd> 拿取{{item}} · {{price}}',
     pay: '按 <kbd>E</kbd> 结账 — {{role}}',
     ask: '按 <kbd>F</kbd> 问东西在哪里',
+    askForTime: '按 <kbd>F</kbd> 请求晚点交',
+    askForWork: '按 <kbd>F</kbd> 问工作的事',
   },
   tram: {
     heading: '乘电车去…',
@@ -314,6 +316,7 @@ export const zh: UiStrings = {
     noCharge: '未收费',
     pointedTo: '{{item}}：已在货架上标出',
     moreTime: '房租可以晚交{{days}}天',
+    hired: '被录用了：{{job}}',
     moodUp: '心情 ↑',
     moodDown: '心情 ↓',
     skipRecap: '跳过回顾',

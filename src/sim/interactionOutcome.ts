@@ -1,9 +1,10 @@
-import type { Interaction, OrderLine, RentChange, ServedItem } from '../content/index.ts';
+import type { Interaction, JobApplication, OrderLine, RentChange, ServedItem } from '../content/index.ts';
 import type { Basket } from './basket.ts';
 import { stockInventory } from './inventory.ts';
+import { hire, namesMatch } from './jobs.ts';
 import { clampMeter } from './meters.ts';
 import { grantExtension, payRent } from './rent.ts';
-import type { GameState } from './state.ts';
+import type { GameState, JobId } from './state.ts';
 import { MOOD } from './tuning.ts';
 
 /**
@@ -15,9 +16,11 @@ export type InteractionOutcome = { kind: 'success'; args: unknown; basket?: Bask
 /**
  * What happened. `served` is what the Character was handed: eaten on the spot,
  * or for a purchase, put in the inventory. `pointedTo` is the item an NPC showed
- * the way to, and `extendedDays` the more time the landlord gave. `moodChange` is the change that actually happened, after
- * clamping. `cannot_afford` and `invalid_arguments` change nothing: the NPC is
- * told, and the conversation goes on.
+ * the way to, `extendedDays` the more time the landlord gave, and `hired` the Job
+ * the Character got. `moodChange` is the change that actually happened, after
+ * clamping. `cannot_afford`, `invalid_arguments` and `wrong_name` (the NPC
+ * misheard the Character's name) change nothing: the NPC is told, and the
+ * conversation goes on.
  */
 export type OutcomeResult =
   | {
@@ -27,11 +30,13 @@ export type OutcomeResult =
       moodChange: number;
       pointedTo?: ServedItem;
       extendedDays?: number;
+      hired?: JobId;
     }
   | { kind: 'failure'; moodChange: number }
   | { kind: 'abandon' }
   | { kind: 'cannot_afford' }
-  | { kind: 'invalid_arguments'; error: string };
+  | { kind: 'invalid_arguments'; error: string }
+  | { kind: 'wrong_name' };
 
 function changeMood(state: GameState, change: number) {
   const mood = clampMeter(state.character.mood + change);
@@ -65,6 +70,13 @@ function applyRentChange(state: GameState, change: RentChange): { state: GameSta
   return { state: paid.state, result: { kind: 'success', served: [], paidInShifts, moodChange: paid.moodChange } };
 }
 
+/** A hiring completion: the Job, if the name the NPC heard is the Character's. */
+function applyJobApplication(state: GameState, { jobId, name }: JobApplication): { state: GameState; result: OutcomeResult } {
+  if (!namesMatch(name, state.identity.characterName)) return { state, result: { kind: 'wrong_name' } };
+  const hired = changeMood(hire(state, jobId), MOOD.changes.goalInteractionSuccess);
+  return { state: hired.state, result: { kind: 'success', served: [], paidInShifts: 0, moodChange: hired.moodChange, hired: jobId } };
+}
+
 /**
  * Applies the end of a Goal Interaction. Success validates the completion
  * arguments and checks the Character can afford them (money is never in the
@@ -89,6 +101,7 @@ export function applyInteractionOutcome(
       const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, outcome.basket);
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
       if (completion.rent) return applyRentChange(state, completion.rent);
+      if (completion.application) return applyJobApplication(state, completion.application);
       const { costInShifts, hunger, thirst } = orderTotals(completion.lines);
       const { character, possessions } = state;
       if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };

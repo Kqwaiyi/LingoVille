@@ -51,7 +51,8 @@ export type CompletionResponse =
   | { result: 'served' }
   | { result: 'done' }
   | { result: 'cannot_afford' }
-  | { result: 'invalid_arguments'; error: string };
+  | { result: 'invalid_arguments'; error: string }
+  | { result: 'wrong_name' };
 export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
 export type ToolResponse = CompletionResponse | NotUnderstoodResponse | { result: 'unknown_tool' };
 
@@ -196,7 +197,13 @@ function personaBlock(npc: NamedNpc, pack: CulturePack) {
   ]);
 }
 
-function youAndThisPersonBlock(who: string) {
+function youAndThisPersonBlock(interaction: Interaction, who: string) {
+  if (interaction.effect.kind === 'hire') {
+    return block('YOU AND THIS PERSON', [
+      `This ${who} is a stranger: you have never met. You don't know their name yet; asking for it is part of hiring them.`,
+      'Speak to them politely, as you would to anyone asking for a job.',
+    ]);
+  }
   if (who === 'tenant') {
     return block('YOU AND THIS PERSON', [
       "This tenant moved into one of your flats not long ago, newly arrived in town. You know them by sight but not well, and you don't use their name.",
@@ -272,6 +279,15 @@ function goalBlock(interaction: Interaction, who: string) {
       `- If ${name} answers "done", remind them kindly to pay by then, and say goodbye.`,
     ]);
   }
+  if (interaction.effect.kind === 'hire') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know their name and when they can start, read both back and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with their name as they said it and when they can start. Never call it before.`,
+      `- If ${name} answers "wrong_name", you misheard their name: apologise, and ask them to say it again slowly, or to spell it. The conversation goes on.`,
+      `- If ${name} answers "done", tell them they have the job and can start a shift at the staff door whenever you are open, and say goodbye.`,
+    ]);
+  }
   if (interaction.effect.kind === 'purchase') {
     return block('YOUR GOAL', [
       interaction.goal,
@@ -318,7 +334,7 @@ export function buildNpcSession(
   const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    youAndThisPersonBlock(who),
+    youAndThisPersonBlock(interaction, who),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
     factsBlock(interaction, culturePack, context),

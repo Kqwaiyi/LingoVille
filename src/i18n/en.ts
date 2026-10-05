@@ -251,6 +251,8 @@ export const en = {
     take: 'Press <kbd>E</kbd> to take {{item}} · {{price}}',
     pay: 'Press <kbd>E</kbd> to pay — {{role}}',
     ask: 'Press <kbd>F</kbd> to ask where something is',
+    askForTime: 'Press <kbd>F</kbd> to ask for more time',
+    askForWork: 'Press <kbd>F</kbd> to ask for work',
   },
   tram: {
     heading: 'Take the tram to…',
@@ -319,6 +321,8 @@ export const en = {
     pointedTo: '{{item}}: marked on the shelf',
     /** The landlord gave more time to pay the rent. */
     moreTime: 'Extra days to pay the rent: {{days}}',
+    /** Hired for a Job; `job` is its Life Skill name. */
+    hired: 'You got the job: {{job}}',
     moodUp: 'Mood ↑',
     moodDown: 'Mood ↓',
     skipRecap: 'Skip Recap',

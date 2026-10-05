@@ -1019,6 +1019,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           return { result: 'cannot_afford' };
         case 'invalid_arguments':
           return { result: 'invalid_arguments', error: result.error };
+        case 'wrong_name':
+          return { result: 'wrong_name' };
         default:
           throw new Error(`A completion can't end as ${result.kind}`);
       }
@@ -1801,15 +1803,15 @@ export const selectShelf = (s: GameStore) => {
   const interactable = selectInteractable(s);
   return isShelf(interactable) ? interactable : null;
 };
-/** The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring, or null. */
+/** The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring and the Jobs they have, or null. */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
   if (!isTownNpc(npcId) || !(npcId in NAMED_NPCS)) return null;
-  return startedWith(npcId as NamedNpcId, { shopping: s.basket.length > 0 });
+  return startedWith(npcId as NamedNpcId, { shopping: s.basket.length > 0, jobsHired: s.game.possessions.jobsHired });
 };
 /** The conversation E starts with the Named NPC the Character is next to, or null. */
 export const selectTalkWithE = (s: GameStore) => talkWith(s, interactionStartedWithE);
-/** The second conversation F starts with that NPC (at the till with shopping, asking where something is), or null. */
+/** The second conversation F starts with that NPC (at the till with shopping, asking where something is; asking for work), or null. */
 export const selectTalkWithF = (s: GameStore) => talkWith(s, interactionStartedWithF);
 /** What the Character has taken off the shelves to pay for. */
 export const selectBasket = (s: GameStore) => s.basket;

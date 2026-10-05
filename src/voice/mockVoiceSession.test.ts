@@ -522,3 +522,71 @@ describe('mock VoiceSession: the landlord (#16, #17)', () => {
     expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
   });
 });
+
+describe('mock VoiceSession: asking the barista for work (#26)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  async function hiring(packId: LanguageCode) {
+    const heard = listen();
+    const npcSession = buildNpcSession(INTERACTIONS.askBaristaForWork, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.barista, {
+      clock: { day: 2, minuteOfDay: 540 },
+    });
+    const session = openMockVoiceSession(npcSession, heard.events);
+    await session.connect();
+    await vi.runAllTimersAsync();
+    const say = async (text: string) => {
+      session.sendText(text);
+      await vi.runAllTimersAsync();
+    };
+    const answer = async (response: ToolResponse) => {
+      session.sendToolResponse(heard.toolCalls.at(-1)!.id, response);
+      await vi.runAllTimersAsync();
+    };
+    return { ...heard, say, answer };
+  }
+
+  it('asks the name and when they can start, and hires them once they confirm the read-back', async () => {
+    const { turns, toolCalls, say, answer } = await hiring('ja');
+
+    await say('仕事はありますか？');
+    await say('サムです。');
+    expect(turns.at(-1)).toContain('サム');
+    await say('明日から');
+    expect(toolCalls).toEqual([]);
+    await say('はい');
+
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'hire_applicant', args: { name: 'サム', start: 'tomorrow' } }]);
+    await answer({ result: 'done' });
+    expect(turns).toHaveLength(5);
+  });
+
+  it.each([
+    ['en', 'Do you have any work?', 'My name is Sam.', 'I can start today', 'Yes', 'today'],
+    ['de', 'Haben Sie Arbeit?', 'Ich heiße Sam.', 'Nächste Woche', 'Ja', 'next_week'],
+    ['zh', '你们有工作吗？', '我叫Sam。', '这个星期', '对', 'this_week'],
+  ] as const)('hears the name and start in the %s pack', async (packId, ask, name, start, yes, startWhen) => {
+    const { toolCalls, say } = await hiring(packId);
+    for (const line of [ask, name, start, yes]) await say(line);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'hire_applicant', args: { name: 'Sam', start: startWhen } }]);
+  });
+
+  it('asks for the name again when it was misheard', async () => {
+    const { turns, toolCalls, say, answer } = await hiring('en');
+    for (const line of ['Any jobs?', 'Pam', 'Tomorrow', 'Yes']) await say(line);
+    await answer({ result: 'wrong_name' });
+    const askedAgain = turns.at(-1);
+
+    await say("It's Sam");
+    await say('Yes');
+
+    expect(askedAgain).toMatch(/name/i);
+    expect(toolCalls.at(-1)).toMatchObject({ name: 'hire_applicant', args: { name: 'Sam', start: 'tomorrow' } });
+  });
+
+  it('calls not_understood for gibberish', async () => {
+    const { toolCalls, say } = await hiring('de');
+    await say('xqzt');
+    expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
+  });
+});

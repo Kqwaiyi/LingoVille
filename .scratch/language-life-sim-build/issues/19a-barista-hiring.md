@@ -6,8 +6,8 @@
 
 **Spec:** [spec.md](../spec.md): Jobs and Shifts; Goal Interactions (#26); Named NPCs (name check)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Hiring interaction #26: ask for work, give a name (the sim compares it to the setup name) and say when you can start.
-- [ ] The name check is a sim function that the later `learn_name` tool will reuse (Vitest).
-- [ ] A failure can be retried. The Job is recorded in the save.
+- [x] Hiring interaction #26: ask for work, give a name (the sim compares it to the setup name) and say when you can start.
+- [x] The name check is a sim function that the later `learn_name` tool will reuse (Vitest).
+- [x] A failure can be retried. The Job is recorded in the save.

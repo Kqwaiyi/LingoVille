@@ -27,6 +27,7 @@ export {
   type FactSource,
   type Interaction,
   type InteractionDefinition,
+  type JobApplication,
   type OrderLine,
   type ParsedArgs,
   type RentChange,
@@ -34,7 +35,7 @@ export {
   type ServedItem,
 } from './defineInteraction.ts';
 export { basketFacts, interactionFacts, readBasketTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
-export { INTERACTIONS } from './interactions.ts';
+export { INTERACTIONS, START_WHEN } from './interactions.ts';
 export {
   CAFE_MENU,
   CONVENIENCE_MENU,

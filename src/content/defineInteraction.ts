@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Basket, LanguageCode, PlaceId } from '../sim/index.ts';
+import { JOB_IDS, type Basket, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { menuPrice } from './currency.ts';
 import { ITEM_IDS, ITEMS, type ItemId, type Restores } from './items.ts';
@@ -24,22 +24,26 @@ type PointToArgs = { item: ItemId };
 type PayRentArgs = { amount: number };
 /** The arguments an `extendRent` effect reads: how many more days the landlord gives. */
 type ExtendRentArgs = { days: number };
+/** The arguments a `hire` effect reads: the applicant's name as the NPC heard it, which the sim checks. */
+type HireArgs = { name: string };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
  * `serveOrder` serves the confirmed items from the menu and charges for them.
  * `purchase` charges for what the Character brought to the till, which goes into the inventory.
  * `pointTo` marks where an item is. `payRent` pays the landlord, and `extendRent`
- * gives the Character more time to pay. `none` is flavour only.
+ * gives the Character more time to pay. `hire` gives the Character its Job, once the sim
+ * has checked the name. `none` is flavour only.
  */
-export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo' | 'payRent' | 'extendRent';
+export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo' | 'payRent' | 'extendRent' | 'hire';
 type EffectFor<Args> =
   | { kind: 'none' }
   | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
   | (Args extends PurchaseArgs ? { kind: 'purchase' } : never)
   | (Args extends PointToArgs ? { kind: 'pointTo' } : never)
   | (Args extends PayRentArgs ? { kind: 'payRent' } : never)
-  | (Args extends ExtendRentArgs ? { kind: 'extendRent' } : never);
+  | (Args extends ExtendRentArgs ? { kind: 'extendRent' } : never)
+  | (Args extends HireArgs ? { kind: 'hire'; jobId: JobId } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -68,13 +72,20 @@ export type ParsedArgs = { success: true; data: Record<string, unknown> } | { su
 /** What a completion does to the rent: money paid to the landlord, in Shifts, or more time. The sim checks it against what is owed. */
 export type RentChange = { kind: 'pay'; amountInShifts: number } | { kind: 'extend'; days: number };
 
-/** What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown, and for the landlord, the change to the rent. */
+/** A Job asked for, under the name the NPC heard. The sim checks the name against the Character's. */
+export type JobApplication = { jobId: JobId; name: string };
+
+/**
+ * What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown,
+ * for the landlord, the change to the rent, and for hiring, the application.
+ */
 export type ResolvedCompletion =
-  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange }
+  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange; application?: JobApplication }
   | { success: false; error: string };
 
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
-  effect: { kind: EffectKind };
+  /** A `hire` effect gives the Job `jobId`. */
+  effect: { kind: Exclude<EffectKind, 'hire'> } | { kind: 'hire'; jobId: JobId };
   /** The Live tool declaration, generated from `completion.args`. */
   toolDeclaration: FunctionDeclaration;
   /** Validates the NPC's completion arguments against `completion.args`. */
@@ -100,7 +111,10 @@ const definitionSchema = z.object({
     args: z.custom<z.ZodObject>((value) => value instanceof z.ZodObject, 'completion arguments must be a Zod object'),
   }),
   band: z.enum(['B', 'I', 'A']),
-  effect: z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent']) }),
+  effect: z.discriminatedUnion('kind', [
+    z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent']) }),
+    z.object({ kind: z.literal('hire'), jobId: z.enum(JOB_IDS) }),
+  ]),
 });
 
 function servedItem(itemId: ItemId, quantity: number, packId: LanguageCode): ServedItem {
@@ -118,8 +132,8 @@ function orderLines(items: Basket, packId: LanguageCode): OrderLine[] {
 }
 
 /** The definition's type only allows each effect on arguments shaped for it. */
-function resolveEffect(kind: EffectKind, args: Record<string, unknown>, packId: LanguageCode, basket: Basket): ResolvedCompletion {
-  switch (kind) {
+function resolveEffect(effect: Interaction['effect'], args: Record<string, unknown>, packId: LanguageCode, basket: Basket): ResolvedCompletion {
+  switch (effect.kind) {
     case 'none':
       return { success: true, lines: [] };
     case 'serveOrder': {
@@ -137,6 +151,8 @@ function resolveEffect(kind: EffectKind, args: Record<string, unknown>, packId: 
     }
     case 'extendRent':
       return { success: true, lines: [], rent: { kind: 'extend', days: (args as ExtendRentArgs).days } };
+    case 'hire':
+      return { success: true, lines: [], application: { jobId: effect.jobId, name: (args as HireArgs).name } };
   }
 }
 
@@ -162,7 +178,7 @@ export function defineInteraction<Args extends z.ZodObject>(definition: Interact
     resolveCompletion: (raw, packId, basket = []) => {
       const args = parseArgs(raw);
       if (!args.success) return args;
-      return resolveEffect(definition.effect.kind, args.data, packId, basket);
+      return resolveEffect(definition.effect, args.data, packId, basket);
     },
   };
 }

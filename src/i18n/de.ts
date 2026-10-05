@@ -248,6 +248,8 @@ export const de: UiStrings = {
     take: '<kbd>E</kbd> drücken, um {{item}} zu nehmen · {{price}}',
     pay: '<kbd>E</kbd> drücken, um zu bezahlen — {{role}}',
     ask: '<kbd>F</kbd> drücken, um nach etwas zu fragen',
+    askForTime: '<kbd>F</kbd> drücken, um um mehr Zeit zu bitten',
+    askForWork: '<kbd>F</kbd> drücken, um nach Arbeit zu fragen',
   },
   tram: {
     heading: 'Mit der Straßenbahn nach …',
@@ -314,6 +316,7 @@ export const de: UiStrings = {
     noCharge: 'Nichts bezahlt',
     pointedTo: '{{item}}: im Regal markiert',
     moreTime: 'Zusätzliche Tage für die Miete: {{days}}',
+    hired: 'Eingestellt: {{job}}',
     moodUp: 'Stimmung ↑',
     moodDown: 'Stimmung ↓',
     skipRecap: 'Rückblick überspringen',
