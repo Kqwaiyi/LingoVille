@@ -7,6 +7,7 @@ import {
   selectInteractable,
   selectNativeLanguage,
   selectShelf,
+  selectStaffDoor,
   selectTalkWithE,
   selectTalkWithF,
   selectTramHours,
@@ -16,6 +17,9 @@ import {
   useGame,
 } from '../store/index.ts';
 import { itemLabel } from './itemLabel.ts';
+
+/** What the staff door says when E can't start a Shift there now. */
+const STAFF_DOOR_REFUSALS = { notHired: 'prompt.staffOnly', workedToday: 'prompt.workedToday', closed: 'prompt.shiftClosed' } as const;
 
 /** What F offers, by the second conversation's effect: asking where something is, for more time, or for work. */
 const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askForWork'>> = {
@@ -31,6 +35,7 @@ export function InteractionPrompt() {
   const tramRunning = useGame(selectTramRunning);
   const tramHours = useGame(selectTramHours);
   const shelf = useGame(selectShelf);
+  const staffDoor = useGame(selectStaffDoor);
   const talkWithE = useGame(selectTalkWithE);
   const talkWithF = useGame(selectTalkWithF);
   const packId = useGame(selectCulturePackId);
@@ -43,9 +48,10 @@ export function InteractionPrompt() {
   const talk = useGame((s) => s.talk);
   const openTram = useGame((s) => s.openTram);
   const takeFromShelf = useGame((s) => s.takeFromShelf);
+  const startShift = useGame((s) => s.startShift);
   const active = interactable !== null && !talking && !keysOff;
-  // Outside the trams' hours, the stop only says so: E does nothing there.
-  const usable = active && (tramStop === null || tramRunning);
+  // Outside the trams' hours, or at a staff door that can't start a Shift now, there's only a note: E does nothing there.
+  const usable = active && (tramStop === null || tramRunning) && (staffDoor === null || staffDoor.refusal === null);
 
   useEffect(() => {
     if (!usable) return;
@@ -59,11 +65,12 @@ export function InteractionPrompt() {
       else if (interactable === 'bed') sleep();
       else if (tramStop) openTram();
       else if (shelf) takeFromShelf();
+      else if (staffDoor) startShift();
       else talk('E');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, shelf, talkWithF, drinkWater, cook, sleep, openTram, takeFromShelf, talk]);
+  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, drinkWater, cook, sleep, openTram, takeFromShelf, startShift, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -71,6 +78,13 @@ export function InteractionPrompt() {
     return (
       <div className="prompt" role="status">
         {t('prompt.noTram', { opens: formatTime(tramHours.opensAt), closes: formatTime(tramHours.closesAt) })}
+      </div>
+    );
+  }
+  if (staffDoor?.refusal) {
+    return (
+      <div className="prompt" role="status">
+        {t(STAFF_DOOR_REFUSALS[staffDoor.refusal])}
       </div>
     );
   }
@@ -84,6 +98,8 @@ export function InteractionPrompt() {
         <Trans i18nKey="prompt.sleep" components={{ kbd: <kbd /> }} />
       ) : tramStop ? (
         <Trans i18nKey="prompt.tram" components={{ kbd: <kbd /> }} />
+      ) : staffDoor ? (
+        <Trans i18nKey="prompt.startShift" values={{ job: t(`skills.names.${staffDoor.jobId}`) }} components={{ kbd: <kbd /> }} />
       ) : shelf ? (
         <Trans
           i18nKey="prompt.take"

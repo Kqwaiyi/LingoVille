@@ -1,4 +1,5 @@
 import type { AppearancePresetId, ItemId, NamedNpcId } from '../content/index.ts';
+import type { Basket } from './basket.ts';
 import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
@@ -52,6 +53,27 @@ export type NpcMemory = {
   favouriteKnown: boolean;
   lastGiftDay: number | null;
   registerOffered: boolean;
+};
+
+/** A Shift Customer at the counter: anonymous, with no memory, and a hidden order the Player has to work out. */
+export type ShiftCustomer = {
+  /** What they want, which what the Player serves is checked against exactly. Never shown. */
+  order: Basket;
+  /** Picks their voice: the gateway turns it into one of its Shift Customer voices. */
+  voiceSeed: number;
+};
+
+/** A stretch of work at a Job: a set number of Shift Customers, served one after another. */
+export type Shift = {
+  jobId: JobId;
+  /** How many Shift Customers come, drawn as the Shift starts. */
+  customers: number;
+  /** Customers served exactly what they ordered, so far. */
+  served: number;
+  /** Customers served something else, or who gave up, so far. */
+  failed: number;
+  /** The customer at the counter now, or null between customers. */
+  customer: ShiftCustomer | null;
 };
 
 export const DEBT_KINDS = ['rent', 'hospital'] as const;
@@ -127,6 +149,8 @@ export type GameState = {
      */
     newcomerDiscountStep: ProficiencyStep;
     lifeSkillXp: Record<LifeSkillId, number>;
+    /** The day the Character last started a Shift: there's at most one a day. */
+    lastShiftDay: number | null;
     /** Daily counters, reset when `day` is no longer today. */
     today: { day: number; homeMeals: number; gymSessions: number };
   };
@@ -135,8 +159,8 @@ export type GameState = {
     gymMembershipUntilDay: number | null;
     addressRegistered: boolean;
     jobsHired: JobId[];
-    /** A Shift under way. It is saved after every customer. */
-    shift: { jobId: JobId; customersServed: number; payInShifts: number } | null;
+    /** A Shift under way. */
+    shift: Shift | null;
   };
   /** The personal phrasebook. */
   phrasebook: PhrasebookEntry[];
@@ -182,6 +206,7 @@ export function createSave(setup: NewGameSetup): GameState {
       highestStep: setup.startingStep,
       newcomerDiscountStep: setup.startingStep,
       lifeSkillXp: Object.fromEntries(LIFE_SKILL_IDS.map((skill) => [skill, 0])) as Record<LifeSkillId, number>,
+      lastShiftDay: null,
       today: { day: FIRST_MORNING.day, homeMeals: 0, gymSessions: 0 },
     },
     possessions: { inventory: [], gymMembershipUntilDay: null, addressRegistered: false, jobsHired: [], shift: null },

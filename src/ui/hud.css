@@ -748,6 +748,90 @@ ruby {
   cursor: not-allowed;
 }
 
+/* --- Shifts ---------------------------------------------------------------- */
+
+/* The barista's menu grid, between the chat and the input bar while a Shift Customer is at the counter. */
+.menu-grid {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--rule);
+  background: #fff;
+}
+
+.menu-grid-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.menu-grid button {
+  padding: 8px 10px;
+  border: 1px solid #d8cfbf;
+  border-radius: 10px;
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.menu-grid-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.menu-grid-tray p {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+
+.menu-grid-tray .primary {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--ink);
+}
+
+.menu-grid button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* What the Shift paid, over the town until it's closed. */
+.shift-end {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 380px;
+  padding: 18px 22px;
+  border-radius: 14px;
+  background: #fffaf2;
+  color: #1d2433;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.shift-end h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.shift-end p {
+  margin: 0 0 10px;
+}
+
+.shift-end-pay {
+  font-weight: 600;
+}
+
+.shift-end button {
+  padding: 9px 18px;
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  background: var(--ok);
+  font: inherit;
+  cursor: pointer;
+}
+
 /* --- Voice ----------------------------------------------------------------- */
 
 /* Push-to-talk. Red with a live dot while listening; the dot swells with the mic level. */

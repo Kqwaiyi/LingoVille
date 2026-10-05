@@ -146,7 +146,7 @@ describe('the nurse, when the Character wakes from Fainting', () => {
 
     expect(selectFainting(store.getState())).toBeNull();
     expect(selectConversation(store.getState())).toMatchObject({ npcId: 'nurse', interaction: { id: 'wake-in-ward' } });
-    expect(npc.session?.voice.npcId).toBe('nurse');
+    expect(npc.session?.voice).toMatchObject({ npcId: 'nurse' });
     expect(npc.session?.openingScene).not.toBe(GREETING_SCENE);
   });
 

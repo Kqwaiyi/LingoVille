@@ -7,6 +7,7 @@ import {
   GEMINI_LIVE_WS_BASE,
   LIVE_ENDPOINT,
   MODELS,
+  SHIFT_CUSTOMER_VOICES,
   VOICES,
 } from './config.ts';
 import {
@@ -202,6 +203,18 @@ describe('POST /api/token', () => {
 
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: 'token_unavailable' });
+  });
+
+  it("gives a Shift Customer one of the Shift Customer voices, picked by the customer's seed", async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+    const voiceFor = async (seed: number) =>
+      ((await (await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: seed } })).json()) as { voiceName: string }).voiceName;
+
+    const voices = await Promise.all(SHIFT_CUSTOMER_VOICES.map((_, seed) => voiceFor(seed)));
+    expect(voices).toEqual(SHIFT_CUSTOMER_VOICES);
+    expect(await voiceFor(SHIFT_CUSTOMER_VOICES.length + 1)).toBe(SHIFT_CUSTOMER_VOICES[1]);
+    expect((await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: -1 } })).status).toBe(400);
+    expect((await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: 1.5 } })).status).toBe(400);
   });
 
   it('rejects a request for a language it has no voice for', async () => {

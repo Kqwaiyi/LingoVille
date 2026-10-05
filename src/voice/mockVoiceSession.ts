@@ -1,4 +1,4 @@
-import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, type NpcSession, type ToolResponse } from '../ai/index.ts';
+import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, readServedScene, readShiftOrder, type NpcSession, type ToolResponse } from '../ai/index.ts';
 import {
   CULTURE_PACKS,
   INTERACTIONS,
@@ -825,10 +825,70 @@ function hiringNpc(script: HiringScript, common: OrderScript, act: Act): Npc {
   };
 }
 
+/** The fake Shift Customer: orders their drink, says it again when asked, and reacts to what they are handed. */
+type CustomerScript = {
+  order: (items: string) => string;
+  /** Says the order again, for a line it understood. */
+  again: (items: string) => string;
+  thanks: string;
+  wrongOrder: string;
+  /** Words that ask the customer to repeat or clarify. */
+  repeat: string[];
+};
+
+const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
+  ja: {
+    order: (items) => `こんにちは。${items}をひとつください。`,
+    again: (items) => `${items}をひとつお願いします。`,
+    thanks: 'ありがとうございます！',
+    wrongOrder: 'あの、これは注文したものと違います…。じゃあ、いいです。',
+    repeat: ['もう一度', 'もういちど', 'なん', '何', 'えっ', 'え？'],
+  },
+  zh: {
+    order: (items) => `你好，我要一杯${items}。`,
+    again: (items) => `一杯${items}，谢谢。`,
+    thanks: '谢谢！',
+    wrongOrder: '这不是我点的……算了，再见。',
+    repeat: ['再说一遍', '什么', '请再说'],
+  },
+  en: {
+    order: (items) => `Hi! Could I get a ${items}, please?`,
+    again: (items) => `A ${items}, please.`,
+    thanks: 'Lovely, thanks!',
+    wrongOrder: "Sorry, that's not what I ordered… never mind. Bye.",
+    repeat: ['sorry', 'again', 'pardon', 'what'],
+  },
+  de: {
+    order: (items) => `Hallo! Einen ${items}, bitte.`,
+    again: (items) => `Einen ${items}, bitte.`,
+    thanks: 'Danke schön!',
+    wrongOrder: 'Das habe ich nicht bestellt… na ja, tschüss.',
+    repeat: ['nochmal', 'noch mal', 'wie bitte', 'was'],
+  },
+};
+
+/** A Shift Customer, ordering what the instruction holds by the items' local names ("1 × ラテ" is said as "ラテ"). */
+function customerNpc(script: CustomerScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
+  const items = (readShiftOrder(systemInstruction) ?? '').replace(/\d+ × /g, '');
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: script.order(items),
+    resume: script.again(items),
+    hear: (line) => {
+      const servedRight = readServedScene(line);
+      if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrongOrder);
+      if (mentions(line, [...script.repeat, ...yes, ...no, ...known])) return act.say(script.again(items));
+      act.notUnderstood();
+    },
+  };
+}
+
 /** Which fake NPC plays this session, read from the completion it offers. */
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
   const offers = (name: string) => session.tools.some((tool) => tool.name === name);
+  if ('shiftCustomerVoice' in session.voice) return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
   const { words } = SCRIPT[packId];
   if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
@@ -837,7 +897,7 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if (offers(HIRE_APPLICANT)) return hiringNpc(HIRING_SCRIPT[packId], SCRIPT[packId], act);
   if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
-  const script = session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
+  const script = 'npcId' in session.voice && session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
   return orderNpc(script, itemsIn(session, SERVE_ORDER), packId, act);
 }
 
@@ -852,7 +912,9 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * ward lets the patient go home once they say how they feel; the landlord takes
  * all that is owed on a yes, offers three more days, or tells the tenant their
  * new rent; the barista asked for work takes a name and a start, reads them
- * back and hires on a yes, asking the name again if the sim says it's wrong. Each calls
+ * back and hires on a yes, asking the name again if the sim says it's wrong; a Shift Customer orders
+ * the drink in its instruction, says it again when asked, and thanks the barista or says it's the wrong
+ * one when a scene says what it was handed. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.

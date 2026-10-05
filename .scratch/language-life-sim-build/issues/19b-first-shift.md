@@ -6,11 +6,11 @@
 
 **Spec:** [spec.md](../spec.md): Jobs and Shifts; Decisions made before ticketing (8)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] E at the staff door during opening hours starts a Shift. At most one Shift a day, with no schedule (Vitest).
-- [ ] Shift Customer sessions carry the hidden order as the customer's goal. Customers are anonymous, have no memory and get a random voice. They speak first and can be asked to repeat or clarify, with Patience as usual.
-- [ ] A barista menu grid. `applyShiftCustomer` checks the served items exactly against the hidden order, with no model judgement (Vitest).
-- [ ] `endShift` pays base × share served × Mood modifier × stake multiplier (from the highest step), minus a dock per failed customer, never below 0. Vitest covers the docks at each step.
-- [ ] Closing time doesn't cut a Shift short.
-- [ ] No Recap opens between customers, and Shift Customer conversations don't start a Recap request or move Proficiency. The combined Shift Recap comes in 19c (Vitest).
+- [x] E at the staff door during opening hours starts a Shift. At most one Shift a day, with no schedule (Vitest).
+- [x] Shift Customer sessions carry the hidden order as the customer's goal. Customers are anonymous, have no memory and get a random voice. They speak first and can be asked to repeat or clarify, with Patience as usual.
+- [x] A barista menu grid. `applyShiftCustomer` checks the served items exactly against the hidden order, with no model judgement (Vitest).
+- [x] `endShift` pays base × share served × Mood modifier × stake multiplier (from the highest step), minus a dock per failed customer, never below 0. Vitest covers the docks at each step.
+- [x] Closing time doesn't cut a Shift short.
+- [x] No Recap opens between customers, and Shift Customer conversations don't start a Recap request or move Proficiency. The combined Shift Recap comes in 19c (Vitest).

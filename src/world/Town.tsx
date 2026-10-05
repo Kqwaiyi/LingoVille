@@ -4,13 +4,21 @@ import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier'
 import { useState } from 'react';
 import { TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId, type TownNpcId, type TramStopId } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { selectIsOpen, selectNpcSpeaking, selectTramRunning, useGame } from '../store/index.ts';
+import {
+  selectIsOpen,
+  selectNpcSpeaking,
+  selectShiftCustomerAtCounter,
+  selectShiftCustomerSpeaking,
+  selectTramRunning,
+  useGame,
+} from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { Groceries } from './Groceries.tsx';
 import { Props } from './Props.tsx';
 import { Signs } from './Signs.tsx';
 import {
   BUILDINGS,
+  CAFE_STAFF_DOOR,
   FURNITURE,
   GROUND_HALF_SIZE,
   HOME_BED,
@@ -22,6 +30,7 @@ import {
   PARK,
   placeAt,
   PLATFORM,
+  SHIFT_CUSTOMER_SPOT,
   STREET,
   TRAM_STOPS,
   TREES,
@@ -66,9 +75,8 @@ function Block({ position, size, colour }: { position: Vec3; size: Vec3; colour:
 }
 
 /** A small "speaking…" over the NPC while a line of theirs is coming in. The words themselves are in the chat column. */
-function SpeakingIndicator({ npcId }: { npcId: TownNpcId }) {
+function SpeakingIndicator({ speaking }: { speaking: boolean }) {
   const { t } = useTranslation();
-  const speaking = useGame(selectNpcSpeaking) === npcId;
   if (!speaking) return null;
   return (
     <Html position={[0, 1.2, 0]} center zIndexRange={[10, 0]}>
@@ -81,6 +89,7 @@ function SpeakingIndicator({ npcId }: { npcId: TownNpcId }) {
 
 /** A greybox NPC: a capsule the Character can't walk through. */
 function Npc({ npcId }: { npcId: TownNpcId }) {
+  const speaking = useGame(selectNpcSpeaking) === npcId;
   return (
     <group position={NPC_SPOTS[npcId]}>
       <mesh castShadow>
@@ -88,7 +97,26 @@ function Npc({ npcId }: { npcId: TownNpcId }) {
         <meshStandardMaterial color={ROLE_COLOURS[TOWN_NPCS[npcId].role]} flatShading />
       </mesh>
       <CapsuleCollider args={[0.5, 0.35]} />
-      <SpeakingIndicator npcId={npcId} />
+      <SpeakingIndicator speaking={speaking} />
+    </group>
+  );
+}
+
+/** Placeholder colour for Shift Customers, until their Appearance Presets arrive (ticket 30b). */
+const SHIFT_CUSTOMER_COLOUR = '#c79a6b';
+
+/** The Shift Customer at the café counter, from walking up until they leave. */
+function ShiftCustomer() {
+  const atCounter = useGame(selectShiftCustomerAtCounter);
+  const speaking = useGame(selectShiftCustomerSpeaking);
+  if (!atCounter) return null;
+  return (
+    <group position={SHIFT_CUSTOMER_SPOT}>
+      <mesh castShadow>
+        <capsuleGeometry args={[0.35, 1, 4, 12]} />
+        <meshStandardMaterial color={SHIFT_CUSTOMER_COLOUR} flatShading />
+      </mesh>
+      <SpeakingIndicator speaking={speaking} />
     </group>
   );
 }
@@ -252,6 +280,12 @@ export function Town() {
       <Block position={HOME_STOVE} size={[1.2, 1, 0.6]} colour="#5b6170" />
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={WARD_BED} size={[1.4, 0.5, 2.2]} colour="#f4f6f7" />
+      {/* The café's staff door: a door set flat against the inside of the west wall. */}
+      <mesh position={CAFE_STAFF_DOOR.door}>
+        <boxGeometry args={[0.06, 2.2, 1]} />
+        <meshStandardMaterial color="#6b5b4d" />
+      </mesh>
+      <ShiftCustomer />
       {TOWN_NPC_IDS.filter((npcId) => tramRunning || !isWaitingForTram(npcId)).map((npcId) => (
         <Npc key={npcId} npcId={npcId} />
       ))}

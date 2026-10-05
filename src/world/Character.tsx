@@ -16,6 +16,7 @@ import {
   selectArrival,
   selectHeldStill,
   selectPlaceId,
+  selectShiftUnderway,
   selectTramArrival,
   selectTramRunning,
   selectWardArrival,
@@ -25,6 +26,8 @@ import {
 } from '../store/index.ts';
 import type { Control } from './controls.ts';
 import {
+  BEHIND_THE_COUNTER,
+  CAFE_STAFF_DOOR,
   HOME_BED,
   HOME_STOVE,
   HOME_TAP,
@@ -53,7 +56,7 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: the tap, the stove or the bed, the nearest
+ * What the Character standing here could use with E: the tap, the stove or the bed, the café's staff door, the nearest
  * person in talking range, the nearest supermarket shelf, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
@@ -62,6 +65,7 @@ function interactableAt(x: number, z: number, tramRunning: boolean): Interactabl
   if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
   if (placeId === 'home' && distanceTo(x, z, HOME_STOVE) <= MOVEMENT.interactRangeMetres) return 'stove';
   if (placeId === 'home' && distanceTo(x, z, HOME_BED) <= MOVEMENT.interactRangeMetres) return 'bed';
+  if (placeId === 'cafe' && distanceTo(x, z, CAFE_STAFF_DOOR.usedFrom) <= MOVEMENT.interactRangeMetres) return 'staff-door';
   let nearest: Interactable | null = null;
   let nearestDistance: number = MOVEMENT.talkRangeMetres;
   for (const npcId of TOWN_NPC_IDS) {
@@ -137,6 +141,8 @@ export function Character() {
   const tramArrival = useGame(selectTramArrival);
   const wardArrival = useGame(selectWardArrival);
   const tramRunning = useGame(selectTramRunning);
+  // At work: from the staff door to the end of the Shift, the Character stands behind the counter.
+  const atWork = useGame(selectShiftUnderway);
   // The camera jumps with the Character after a tram ride, instead of sweeping across town.
   const snapCamera = useRef(false);
 
@@ -153,6 +159,10 @@ export function Character() {
   useEffect(() => {
     if (tramArrival) moveTo(tramStopSpawn(tramArrival.stopId));
   }, [tramArrival]);
+
+  useEffect(() => {
+    if (atWork) moveTo(BEHIND_THE_COUNTER);
+  }, [atWork]);
 
   // Fainted: the Character is in the ward bed, beside the nurse, behind the Fainting screen.
   useEffect(() => {
@@ -184,7 +194,7 @@ export function Character() {
     const held = getKeys();
     const walkKeyHeld = held.forward || held.back || held.left || held.right;
     if (heldStill && !walkKeyHeld) letGoOfWalkKeys();
-    const keys = keysOff || heldStill ? { forward: false, back: false, left: false, right: false } : held;
+    const keys = keysOff || heldStill || atWork ? { forward: false, back: false, left: false, right: false } : held;
     const ahead = Number(keys.forward) - Number(keys.back);
     const across = Number(keys.right) - Number(keys.left);
     const move = scratch.move.set(

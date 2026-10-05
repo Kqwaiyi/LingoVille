@@ -9,6 +9,7 @@ export { faint, faintedBetween } from './faint.ts';
 export { lifeSkillLevel, lifeSkillLevels } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';
 export { hire, namesMatch } from './jobs.ts';
+export { applyShiftCustomer, cancelShift, endShift, nextShiftCustomer, shiftRefusal, startShift, type ShiftRefusal } from './shift.ts';
 export { clampMeter } from './meters.ts';
 export { MOOD_FACES, moodFace, moodModifier, type MoodFace } from './mood.ts';
 export { announceNewcomerDiscount, newcomerDiscountStepDownDue } from './newcomerDiscount.ts';
@@ -43,6 +44,8 @@ export {
   type NpcMemory,
   type PaymentPlan,
   type PhrasebookEntry,
+  type Shift,
+  type ShiftCustomer,
   type PlaceId,
 } from './state.ts';
 export { grantExtension, payRent, rentDebt, rentOwed, rentStatement, type RentPayment, type RentStatement } from './rent.ts';

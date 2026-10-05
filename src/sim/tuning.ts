@@ -104,6 +104,8 @@ export const ECONOMY = {
   faintingBillInShifts: 1.5,
   gymMembershipInShifts: 0.5,
   gymMembershipDays: 30,
+  /** Money is held in Shifts, so one Shift's base pay is 1 by definition. Every price is a ratio of it. */
+  shiftBasePayInShifts: 1,
   shiftCustomers: { min: 5, max: 8 },
   jobLifeSkillPayRaisePerLevel: 0.06,
   /** The most of one item a single order can ask for. */

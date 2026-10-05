@@ -21,10 +21,10 @@ import {
 } from '../sim/index.ts';
 
 /**
- * Which voice the NPC speaks with. The gateway resolves it to a prebuilt voice,
+ * Which voice the NPC speaks with: a Named NPC's, or a Shift Customer's drawn by its seed. The gateway resolves it to a prebuilt voice,
  * because voices live only in the gateway config.
  */
-export type VoiceRequest = { targetLanguage: LanguageCode; npcId: NamedNpcId };
+export type VoiceRequest = { targetLanguage: LanguageCode; npcId: NamedNpcId } | { targetLanguage: LanguageCode; shiftCustomerVoice: number };
 
 export type NpcSession = {
   systemInstruction: string;
@@ -95,7 +95,7 @@ export const RESUME_SCENE =
   '[SCENE: You were interrupted for a moment, and the customer is still with you. ' +
   "Don't greet them again: say sorry for the wait in a few words and carry on from where you left off.]";
 
-const notUnderstoodTool = (who: string) =>
+export const notUnderstoodTool = (who: string) =>
   toToolDeclaration(
     NOT_UNDERSTOOD_TOOL,
     `Call this only when you could not make sense of what the ${who} just said at all: gibberish, nothing heard, ` +
@@ -171,16 +171,16 @@ const DAY_PARTS: { from: number; name: string }[] = [
   { from: 21 * 60, name: 'night' },
 ];
 
-function formatTime(minuteOfDay: number) {
+export function formatTime(minuteOfDay: number) {
   const whole = Math.floor(minuteOfDay);
   return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}`;
 }
 
-function dayPart(minuteOfDay: number) {
+export function dayPart(minuteOfDay: number) {
   return DAY_PARTS.filter((part) => part.from <= minuteOfDay).at(-1)!.name;
 }
 
-function capitalise(word: string) {
+export function capitalise(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
@@ -216,7 +216,7 @@ function youAndThisPersonBlock(interaction: Interaction, who: string) {
   ]);
 }
 
-function languageRulesBlock(pack: CulturePack, who: string) {
+export function languageRulesBlock(pack: CulturePack, who: string) {
   const language = pack.languageName;
   return block('LANGUAGE RULES', [
     `- Speak only ${language}. Never use any other language, even if the ${who} does, even to help them.`,

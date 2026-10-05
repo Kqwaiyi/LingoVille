@@ -8,9 +8,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] The Shift saves after every customer (customers served, pay so far).
-- [ ] A reload mid-Shift ends the Shift with pay for the customers already served (Vitest on the load path).
-- [ ] A network abandonment replaces the customer and doesn't count. A player abandonment counts as a failure and is docked (Vitest).
+- [x] The Shift saves after every customer (customers served, pay so far). Done in 19b: the Shift (customers, served, failed, the customer at the counter) is in the save.
+- [x] A reload mid-Shift ends the Shift with pay for the customers already served (Vitest on the load path). Done in 19b (`src/store/shift.test.ts`).
+- [ ] A network abandonment replaces the customer and doesn't count. A player abandonment counts as a failure and is docked (Vitest). 19b already does both and tests them in the store; what's left is checking the docks.
 - [ ] Playwright (mock mode): a network-abandonment path in a Shift.
 - [ ] A single `/api/recap` call over the whole Shift's transcript when it ends. The request builder has a snapshot for the Shift case.
 - [ ] One Journal entry and one CEFR estimate per Shift.

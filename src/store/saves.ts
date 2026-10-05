@@ -21,7 +21,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 7;
+export const SAVE_SCHEMA_VERSION = 8;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -41,6 +41,9 @@ const NpcMemorySchema = z.object({
   lastGiftDay: day.nullable(),
   registerOffered: z.boolean(),
 });
+
+/** One line of items: in the inventory, or a Shift Customer's order. */
+const orderLine = z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1) });
 
 const GameStateSchema = z.object({
   rngState: z.int().min(0),
@@ -80,14 +83,23 @@ const GameStateSchema = z.object({
     highestStep: z.enum(PROFICIENCY_STEPS),
     newcomerDiscountStep: z.enum(PROFICIENCY_STEPS),
     lifeSkillXp: z.record(z.enum(LIFE_SKILL_IDS), z.number().min(0)),
+    lastShiftDay: day.nullable(),
     today: z.object({ day, homeMeals: z.int().min(0), gymSessions: z.int().min(0) }),
   }),
   possessions: z.object({
-    inventory: z.array(z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1), expiresOnDay: day.nullable() })),
+    inventory: z.array(orderLine.extend({ expiresOnDay: day.nullable() })),
     gymMembershipUntilDay: day.nullable(),
     addressRegistered: z.boolean(),
     jobsHired: z.array(z.enum(JOB_IDS)),
-    shift: z.object({ jobId: z.enum(JOB_IDS), customersServed: z.int().min(0), payInShifts: z.number().min(0) }).nullable(),
+    shift: z
+      .object({
+        jobId: z.enum(JOB_IDS),
+        customers: z.int().min(1),
+        served: z.int().min(0),
+        failed: z.int().min(0),
+        customer: z.object({ order: z.array(orderLine).readonly(), voiceSeed: z.int().min(0) }).nullable(),
+      })
+      .nullable(),
   }),
   phrasebook: z.array(
     z.object({ text: z.string(), reading: z.string(), gloss: z.string(), glossLanguage: z.enum(LANGUAGE_CODES), dayAdded: day }),
@@ -159,6 +171,16 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       game: { ...save.game, rent: { dueDay, owedInShifts, extendedThroughDay: null, remindedOnDay: null } },
     };
   },
+  // 7 → 8: Shifts can be worked. No Shift could start before, so none is under way and none was worked.
+  (save) => ({
+    ...save,
+    schemaVersion: 8,
+    game: {
+      ...save.game,
+      progression: { ...(save.game.progression as object), lastShiftDay: null },
+      possessions: { ...(save.game.possessions as object), shift: null },
+    },
+  }),
 ];
 
 /** A loose look at a stored field, for bytes that may not be a readable save. */

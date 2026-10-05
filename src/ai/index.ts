@@ -1,6 +1,13 @@
 // Public interface of the ai module. Other modules import from here.
 export type { FunctionDeclaration } from '../content/index.ts';
 export {
+  buildShiftCustomerSession,
+  readServedScene,
+  readShiftOrder,
+  shiftCustomerServedScene,
+  type ShiftCustomerContext,
+} from './shiftCustomerSession.ts';
+export {
   basketChangedScene,
   buildNpcSession,
   GREETING_SCENE,

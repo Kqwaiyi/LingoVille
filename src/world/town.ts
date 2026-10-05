@@ -133,6 +133,13 @@ export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
 /** The stove at home, along the back wall to the right of the tap. */
 export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
 
+/** The café's staff door, in its west wall level with the counter, and where the Character stands to use it. */
+export const CAFE_STAFF_DOOR = { door: [7.22, 1.1, -2.2] as Vec3, usedFrom: [7.7, 1, -2.2] as Vec3 } as const;
+/** Where the Character works a Shift: behind the café counter, beside the barista. */
+export const BEHIND_THE_COUNTER: Vec3 = [13.4, 1, -4];
+/** Where a Shift Customer stands: across the counter from the Character. */
+export const SHIFT_CUSTOMER_SPOT: Vec3 = [13.4, 1, -1.8];
+
 /** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */
 export const SIGNS: Record<SignId, { position: Vec3; size: readonly [width: number, height: number] }> = {
   // Over the café door, on the outside of the front wall.

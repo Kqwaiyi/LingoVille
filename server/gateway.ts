@@ -24,6 +24,7 @@ import {
   GEMINI_LIVE_WS_BASE,
   LIVE_ENDPOINT,
   MODELS,
+  SHIFT_CUSTOMER_VOICES,
   VOICES,
   type TargetLanguage,
 } from './config.ts';
@@ -85,19 +86,28 @@ const TOKEN_LIFETIME_MS = 30 * 60_000;
 
 const MOCK_TOKEN = 'mock-ephemeral-token';
 
-function requestedLanguage(body: unknown): TargetLanguage | undefined {
-  const language = (body as { voice?: { targetLanguage?: unknown } } | undefined)?.voice?.targetLanguage;
-  return typeof language === 'string' && Object.hasOwn(VOICES, language) ? (language as TargetLanguage) : undefined;
+/**
+ * The prebuilt voice a token request asks for: the Target Language's, or for a Shift Customer
+ * (`shiftCustomerVoice`, a whole number from the sim's RNG), one of the Shift Customer voices. Undefined if neither.
+ */
+function requestedVoice(body: unknown): string | undefined {
+  const voice = (body as { voice?: { targetLanguage?: unknown; shiftCustomerVoice?: unknown } } | undefined)?.voice;
+  const language = voice?.targetLanguage;
+  if (typeof language !== 'string' || !Object.hasOwn(VOICES, language)) return undefined;
+  const seed = voice?.shiftCustomerVoice;
+  if (seed === undefined) return VOICES[language as TargetLanguage];
+  if (typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0) return undefined;
+  return SHIFT_CUSTOMER_VOICES[seed % SHIFT_CUSTOMER_VOICES.length];
 }
 
 /** POST /api/token: a one-use ephemeral token for one Live session, with everything the browser needs to open it. */
 async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
-  const language = requestedLanguage(await readJson(req));
-  if (!language) return sendJson(res, 400, { error: 'bad_request' });
+  const voiceName = requestedVoice(await readJson(req));
+  if (!voiceName) return sendJson(res, 400, { error: 'bad_request' });
 
   const session = {
     model: MODELS.live,
-    voiceName: VOICES[language],
+    voiceName,
     url: `${GEMINI_LIVE_WS_BASE}${ENDPOINT_VERSIONS.live}.${LIVE_ENDPOINT}`,
   };
   if (env.mock) return sendJson(res, 200, { mock: true, token: MOCK_TOKEN, ...session });

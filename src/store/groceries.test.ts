@@ -156,7 +156,7 @@ describe('paying at the till (#4)', () => {
 
   it('with shopping in the basket, E at the cashier starts paying, and the cashier knows what is on the counter', () => {
     const { s, fake } = atTheTillWithEggs();
-    expect(selectConversation(s())?.interaction.id).toBe('pay-for-groceries');
+    expect(selectConversation(s())?.interaction?.id).toBe('pay-for-groceries');
     expect(fake.session!.systemInstruction).toContain('2 × 卵');
   });
 
@@ -259,7 +259,7 @@ describe('asking where an item is (#5)', () => {
 
   it('with nothing in the basket, E at the cashier asks for help finding something', () => {
     const { s } = askingTheCashier();
-    expect(selectConversation(s())?.interaction.id).toBe('find-an-item');
+    expect(selectConversation(s())?.interaction?.id).toBe('find-an-item');
   });
 
   it('marks the item on its shelf once the cashier points to it, until the Character takes one', () => {
@@ -285,7 +285,7 @@ describe('asking where an item is (#5)', () => {
     expect(selectTalkWithF(s())?.id).toBe('find-an-item');
 
     s().talk('F');
-    expect(selectConversation(s())?.interaction.id).toBe('find-an-item');
+    expect(selectConversation(s())?.interaction?.id).toBe('find-an-item');
     expect(fake.calls('point_to', { item: 'noodles' })).toEqual({ result: 'done' });
     expect(selectShelfMarker(s())).toBe('noodles');
     expect(selectBasket(s())).toEqual([{ itemId: 'eggs', quantity: 1 }]);
@@ -314,7 +314,7 @@ describe('counter food at the convenience store (#7)', () => {
     s().setInteractable('convenience-clerk');
     s().talk();
     fake.says('いらっしゃいませ！');
-    expect(selectConversation(s())?.interaction.id).toBe('buy-counter-food');
+    expect(selectConversation(s())?.interaction?.id).toBe('buy-counter-food');
     const hunger = s().game.character.hunger;
 
     expect(fake.calls('serve_order', { items: [{ item: 'bento', quantity: 1 }] })).toEqual({ result: 'served' });

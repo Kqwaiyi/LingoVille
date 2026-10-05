@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { formatLocalMoney, localPlaceName, TOWN_NPCS, type NamedNpcId, type ServedItem } from '../content/index.ts';
+import { formatLocalMoney, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
@@ -15,8 +15,10 @@ import {
   selectMicLevel,
   selectNativeLanguage,
   selectNpcExpression,
+  selectPlaceId,
   selectReconnecting,
   selectRecap,
+  selectShift,
   selectTargetLanguage,
   selectTranslation,
   selectTyping,
@@ -29,6 +31,7 @@ import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
+import { MenuGrid } from './ShiftPanel.tsx';
 
 /** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
 function NpcLineHelp({ index, text }: { index: number; text: string }) {
@@ -82,7 +85,8 @@ function Bubble({ line, index, finished }: { line: ChatLine; index: number; fini
 // A placeholder face until real NPC faces arrive (ticket 30). It's the only way Patience shows.
 const FACE: Record<NpcExpression, string> = { relaxed: '🙂', puzzled: '😕', strained: '😟' };
 
-function NpcFace({ npcId }: { npcId: NamedNpcId }) {
+/** The face of whoever the Player is talking to; `who` names them to start a sentence. */
+function NpcFace({ who }: { who: string }) {
   const { t } = useTranslation();
   const expression = useGame(selectNpcExpression);
   if (!expression) return null;
@@ -90,7 +94,7 @@ function NpcFace({ npcId }: { npcId: NamedNpcId }) {
     <span
       className="npc-face"
       role="img"
-      aria-label={t(`faces.${expression}`, { who: t(`roles.${TOWN_NPCS[npcId].role}.subject`) })}
+      aria-label={t(`faces.${expression}`, { who })}
       data-expression={expression}
     >
       {FACE[expression]}
@@ -110,7 +114,7 @@ function servedLine(served: readonly ServedItem[], nativeLanguage: LanguageCode)
 }
 
 /** Replaces the input bar once the conversation is over: the outcome, its effects, and the way on to the Recap. */
-function ClosingCardPanel({ card, npcId }: { card: ClosingCard; npcId: NamedNpcId }) {
+function ClosingCardPanel({ card, who }: { card: ClosingCard; who: string }) {
   const { t } = useTranslation();
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
@@ -134,7 +138,7 @@ function ClosingCardPanel({ card, npcId }: { card: ClosingCard; npcId: NamedNpcI
 
   return (
     <section className="closing-card" aria-label={t('closing.label')} data-outcome={card.kind}>
-      <h2>{card.kind === 'success' ? t('closing.success') : t('closing.notUnderstood', { who: t(`roles.${TOWN_NPCS[npcId].role}.subject`) })}</h2>
+      <h2>{card.kind === 'success' ? t('closing.success') : t('closing.notUnderstood', { who })}</h2>
       <p>{outcome.join(' · ')}</p>
       <div className="closing-card-actions">
         <button type="button" onClick={skipRecap} autoFocus>
@@ -317,6 +321,8 @@ export function ConversationColumn() {
   const typing = useGame(selectTyping);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const toggleHelp = useGame((s) => s.toggleHelp);
+  const placeId = useGame(selectPlaceId);
+  const shift = useGame(selectShift);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
 
@@ -345,16 +351,22 @@ export function ConversationColumn() {
 
   if (!conversation) return null;
   const { npcId } = conversation;
+  // A Shift Customer is anonymous: just "Customer", and how far into the Shift they come. One already dealt with
+  // counts as done while they say goodbye, so they keep their own number until they leave.
+  const who = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.subject`) : t('shift.customerSubject');
+  const name = npcId
+    ? t(`roles.${TOWN_NPCS[npcId].role}.name`)
+    : t('shift.customer', { number: (shift?.done ?? 0) + (conversation.outcome ? 0 : 1), count: shift?.customers ?? 1 });
 
   return (
     <aside className="chat-column" aria-label={t('chat.label')}>
       <header className="chat-header">
         <div className="chat-who">
-          <NpcFace npcId={npcId} />
-          <span>{t(`roles.${TOWN_NPCS[npcId].role}.name`)}</span>
+          <NpcFace who={who} />
+          <span>{name}</span>
         </div>
         <div className="chat-meta">
-          {localPlaceName(conversation.interaction.placeId, packId)} · {formatClock(minute)}
+          {localPlaceName(conversation.interaction?.placeId ?? placeId, packId)} · {formatClock(minute)}
         </div>
         <div className="chat-tabs">
           <div role="tablist" aria-label={t('chat.tabs')}>
@@ -394,7 +406,8 @@ export function ConversationColumn() {
               )}
             </div>
           )}
-          {closingCard ? <ClosingCardPanel card={closingCard} npcId={npcId} /> : <InputBar />}
+          {conversation.shiftCustomer && <MenuGrid />}
+          {closingCard ? <ClosingCardPanel card={closingCard} who={who} /> : <InputBar />}
         </>
       )}
     </aside>

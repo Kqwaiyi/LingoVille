@@ -33,3 +33,7 @@ export const VOICES: Record<TargetLanguage, string> = {
   en: 'Puck',
   de: 'Charon',
 };
+
+// Shift Customers are anonymous, so each gets one of these by its seed, from the sim's RNG.
+// None is a Named NPC's voice, so a customer never sounds like the staff.
+export const SHIFT_CUSTOMER_VOICES: readonly string[] = ['Aoede', 'Fenrir', 'Orus', 'Zephyr'];

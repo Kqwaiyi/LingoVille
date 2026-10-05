@@ -36,6 +36,7 @@ export {
 } from './defineInteraction.ts';
 export { basketFacts, interactionFacts, readBasketTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
 export { INTERACTIONS, START_WHEN } from './interactions.ts';
+export { jobAt, JOB_PLACES, SHIFT_MENUS, SHIFT_TEMPLATES, shiftTemplate, type ShiftTemplate } from './shifts.ts';
 export {
   CAFE_MENU,
   CONVENIENCE_MENU,

@@ -35,6 +35,7 @@ function lived(): GameState {
       ...game.progression,
       proficiencyScore: 0.8,
       lifeSkillXp: { ...game.progression.lifeSkillXp, barista: 9 },
+      lastShiftDay: 3,
       today: { day: 3, homeMeals: 1, gymSessions: 0 },
     },
     possessions: {
@@ -42,7 +43,7 @@ function lived(): GameState {
       gymMembershipUntilDay: 33,
       addressRegistered: true,
       jobsHired: ['barista'],
-      shift: { jobId: 'barista', customersServed: 2, payInShifts: 0.3 },
+      shift: { jobId: 'barista', customers: 6, served: 2, failed: 1, customer: { order: [{ itemId: 'latte', quantity: 1 }], voiceSeed: 4242 } },
     },
     phrasebook: [{ text: 'ラテ', reading: 'らて', gloss: 'latte', glossLanguage: 'en', dayAdded: 1 }],
     onboarding: { firstMorningStepsDone: 2, firstMorningSkipped: false },
@@ -67,9 +68,23 @@ const later = (game: GameState): GameState => ({ ...game, clock: { ...game.clock
 /** The same game, just after midnight. */
 const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.clock.day + 1, minuteOfDay: 0 } });
 
+/** The game before Shifts could be worked: version 7. No Shift could start, so none was ever under way. */
+function beforeShifts() {
+  const game = lived();
+  const progression: Partial<GameState['progression']> = { ...game.progression };
+  delete progression.lastShiftDay;
+  return { ...game, progression, possessions: { ...game.possessions, shift: null } };
+}
+
+/** What a save from before Shifts is upgraded to: no Shift under way, and none worked yet. */
+function withNoShiftYet(): GameState {
+  const game = lived();
+  return { ...game, progression: { ...game.progression, lastShiftDay: null }, possessions: { ...game.possessions, shift: null } };
+}
+
 /** The game before rent fell due: version 6. Nothing ever set what was owed. */
 function beforeRent() {
-  return { ...lived(), rent: { dueDay: 7, owedInShifts: 0 } };
+  return { ...beforeShifts(), rent: { dueDay: 7, owedInShifts: 0 } };
 }
 
 /** The game before cooking recorded a food poisoning chance: version 5. */
@@ -181,7 +196,7 @@ describe('saves', () => {
     const loaded = (await saves.load('slot-1'))?.save;
 
     expect(loaded?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-    expect(loaded?.game).toEqual({ ...lived(), phrasebook: [] });
+    expect(loaded?.game).toEqual({ ...withNoShiftYet(), phrasebook: [] });
     expect(loaded?.lastPlayedAt).toBe(v1.lastPlayedAt);
     expect(await get('slot-1/pre-migration-v1', raw)).toEqual(v1);
     // The upgraded save is stored, so the next load needs no migration.
@@ -192,7 +207,7 @@ describe('saves', () => {
     const { saves, raw } = freshSaves();
     await set('slot-1', { schemaVersion: 2, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeSkippingFirstMornings() }, raw);
 
-    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+    expect((await saves.load('slot-1'))?.save.game).toEqual(withNoShiftYet());
   });
 
   it('upgrades a save from before conversations moved Proficiency as one with none assessed yet', async () => {
@@ -202,7 +217,7 @@ describe('saves', () => {
     const game = (await saves.load('slot-1'))?.save.game;
 
     expect(game?.progression.evidenceSoFar).toBe(0);
-    expect(game).toEqual(lived());
+    expect(game).toEqual(withNoShiftYet());
   });
 
   it('upgrades a save from before Fainting as a Character who has never fainted', async () => {
@@ -212,7 +227,7 @@ describe('saves', () => {
     const game = (await saves.load('slot-1'))?.save.game;
 
     expect(game?.wokeInWardOnDay).toBeNull();
-    expect(game).toEqual(lived());
+    expect(game).toEqual(withNoShiftYet());
   });
 
   it('upgrades a save from before cooking as a Character with no food poisoning chance', async () => {
@@ -222,14 +237,14 @@ describe('saves', () => {
     const game = (await saves.load('slot-1'))?.save.game;
 
     expect(game?.character.foodPoisoningChance).toBe(0);
-    expect(game).toEqual(lived());
+    expect(game).toEqual(withNoShiftYet());
   });
 
   it("upgrades a save from before rent fell due as one owing this week's rent, with no extension or reminder yet", async () => {
     const { saves, raw } = freshSaves();
     await set('slot-1', { schemaVersion: 6, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeRent() }, raw);
 
-    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+    expect((await saves.load('slot-1'))?.save.game).toEqual(withNoShiftYet());
   });
 
   it('upgrades a save already past its first due day to the next due day, forgiving the weeks that never fell due', async () => {
@@ -241,6 +256,13 @@ describe('saves', () => {
 
     expect(loaded?.rent.dueDay).toBe(21);
     expect(loaded?.debts).toEqual(lived().debts);
+  });
+
+  it('upgrades a save from before Shifts as one with no Shift under way and none worked yet', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 7, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeShifts() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(withNoShiftYet());
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {
@@ -318,7 +340,7 @@ describe('the start-of-day backup', () => {
     await set('slot-1', 'not a save at all', raw);
     await set('slot-1/start-of-day', { schemaVersion: 1, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforePhrasebooks() }, raw);
 
-    expect((await saves.load('slot-1'))?.save.game).toEqual({ ...lived(), phrasebook: [] });
+    expect((await saves.load('slot-1'))?.save.game).toEqual({ ...withNoShiftYet(), phrasebook: [] });
   });
 
   it('when it can’t be loaded either, the slot fails naming itself, and nothing is deleted', async () => {
