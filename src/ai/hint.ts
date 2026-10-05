@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CULTURE_PACKS, interactionFacts, NAMED_NPCS, toGeminiSchema } from '../content/index.ts';
+import { CULTURE_PACKS, interactionFacts, localPlaceName, NAMED_NPCS, toGeminiSchema } from '../content/index.ts';
 import {
   block,
   InteractionIdSchema,
@@ -53,7 +53,7 @@ export function buildHintRequest(request: HintRequest): GenerateContentBody {
     block('WHO YOU ARE', [
       `You help a learner who speaks ${native} and is learning ${target} by living in a small town in ${pack.setting}. ` +
         `Their level is about CEFR ${request.step}.`,
-      `They are a customer at ${pack.cafe.name}, talking to the ${role}, and they have asked for help with what to say next.`,
+      `They are a customer at ${localPlaceName(interaction.placeId, pack.id)}, talking to the ${role}, and they have asked for help with what to say next.`,
     ]),
     block('THE SITUATION', [
       `The ${role}'s goal: ${interaction.goal}`,

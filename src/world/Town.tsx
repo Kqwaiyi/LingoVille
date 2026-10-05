@@ -6,6 +6,7 @@ import { TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId, type TownNpcId, type T
 import { useTranslation } from '../i18n/index.ts';
 import { selectIsOpen, selectNpcSpeaking, selectTramRunning, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
+import { Groceries } from './Groceries.tsx';
 import { Props } from './Props.tsx';
 import { Signs } from './Signs.tsx';
 import {
@@ -254,6 +255,7 @@ export function Town() {
       ))}
       <Signs />
       <Props />
+      <Groceries />
     </RigidBody>
   );
 }

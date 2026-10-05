@@ -1,18 +1,25 @@
 import type { Interaction, OrderLine, ServedItem } from '../content/index.ts';
+import type { Basket } from './basket.ts';
+import { stockInventory } from './inventory.ts';
 import { clampMeter } from './meters.ts';
 import type { GameState } from './state.ts';
 import { MOOD } from './tuning.ts';
 
-/** How a Goal Interaction ended, as the store saw it. `args` are the NPC's completion arguments, unchecked. */
-export type InteractionOutcome = { kind: 'success'; args: unknown } | { kind: 'failure' } | { kind: 'abandon' };
+/**
+ * How a Goal Interaction ended, as the store saw it. `args` are the NPC's
+ * completion arguments, unchecked; `basket` is what the Character brought to the till.
+ */
+export type InteractionOutcome = { kind: 'success'; args: unknown; basket?: Basket } | { kind: 'failure' } | { kind: 'abandon' };
 
 /**
- * What happened. `moodChange` is the change that actually happened, after
+ * What happened. `served` is what the Character was handed: eaten on the spot,
+ * or for a purchase, put in the inventory. `pointedTo` is the item an NPC showed
+ * the way to. `moodChange` is the change that actually happened, after
  * clamping. `cannot_afford` and `invalid_arguments` change nothing: the NPC is
  * told, and the conversation goes on.
  */
 export type OutcomeResult =
-  | { kind: 'success'; served: ServedItem[]; paidInShifts: number; moodChange: number }
+  | { kind: 'success'; served: ServedItem[]; paidInShifts: number; moodChange: number; pointedTo?: ServedItem }
   | { kind: 'failure'; moodChange: number }
   | { kind: 'abandon' }
   | { kind: 'cannot_afford' }
@@ -56,14 +63,18 @@ export function applyInteractionOutcome(
     }
 
     case 'success': {
-      const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId);
+      const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, outcome.basket);
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
       const { costInShifts, hunger, thirst } = orderTotals(completion.lines);
-      const { character } = state;
+      const { character, possessions } = state;
       if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
 
+      // A purchase is taken home; an order is eaten or drunk on the spot (groceries fill nothing until cooked).
+      const inventory =
+        interaction.effect.kind === 'purchase' ? stockInventory(possessions.inventory, completion.lines, state.clock.day) : possessions.inventory;
       const paid: GameState = {
         ...state,
+        possessions: { ...possessions, inventory },
         character: {
           ...character,
           moneyInShifts: character.moneyInShifts - costInShifts,
@@ -75,7 +86,13 @@ export function applyInteractionOutcome(
       const served = completion.lines.map(({ itemId, name, glosses, quantity }) => ({ itemId, name, glosses, quantity }));
       return {
         state: succeeded.state,
-        result: { kind: 'success', served, paidInShifts: costInShifts, moodChange: succeeded.moodChange },
+        result: {
+          kind: 'success',
+          served,
+          paidInShifts: costInShifts,
+          moodChange: succeeded.moodChange,
+          ...(completion.pointedTo && { pointedTo: completion.pointedTo }),
+        },
       };
     }
   }

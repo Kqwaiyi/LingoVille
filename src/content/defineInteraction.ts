@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { LanguageCode, PlaceId } from '../sim/index.ts';
+import type { Basket, LanguageCode, PlaceId } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { menuPrice } from './currency.ts';
 import { ITEM_IDS, ITEMS, type ItemId, type Restores } from './items.ts';
@@ -11,18 +11,28 @@ import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.t
 export type Band = 'B' | 'I' | 'A';
 
 /** Which Culture Pack facts the NPC is told, so it can answer side questions. */
-export const FACT_SOURCES = ['openingHours', 'menu', 'placeFacts', 'customs', 'ward'] as const;
+export const FACT_SOURCES = ['openingHours', 'menu', 'shelves', 'basket', 'placeFacts', 'customs', 'ward'] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 /** The arguments a `serveOrder` effect reads from its completion function. */
 type ServeOrderArgs = { items: { item: ItemId; quantity: number }[] };
+/** The arguments a `purchase` effect's completion carries: the Character's choices at the till. */
+type PurchaseArgs = { bag: boolean; card: boolean };
+/** The arguments a `pointTo` effect reads: the item the NPC shows the way to. */
+type PointToArgs = { item: ItemId };
 
 /**
- * The effect on success. `serveOrder` serves the confirmed items from the menu
- * and charges for them, so it's only allowed on a completion whose arguments
- * name menu items. `none` is flavour only.
+ * The effect on success, each only allowed on a completion whose arguments it can read.
+ * `serveOrder` serves the confirmed items from the menu and charges for them.
+ * `purchase` charges for what the Character brought to the till, which goes into the inventory.
+ * `pointTo` marks where an item is. `none` is flavour only.
  */
-type EffectFor<Args> = { kind: 'none' } | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never);
+export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo';
+type EffectFor<Args> =
+  | { kind: 'none' }
+  | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
+  | (Args extends PurchaseArgs ? { kind: 'purchase' } : never)
+  | (Args extends PointToArgs ? { kind: 'pointTo' } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -32,7 +42,7 @@ export type InteractionDefinition<Args extends z.ZodObject> = {
   /** The one goal, in plain English, as the NPC is told it. */
   goal: string;
   facts: FactSource[];
-  /** The items the NPC can sell (its menu), by id. Every Culture Pack must sell them all. */
+  /** The items the NPC sells or knows about (its menu or shelves), by id. Every Culture Pack must sell them all. */
   items: readonly ItemId[];
   /** The function the NPC calls once the goal is done and confirmed. */
   completion: { name: string; description: string; args: Args };
@@ -43,22 +53,25 @@ export type InteractionDefinition<Args extends z.ZodObject> = {
 /** An item as served: its local name, and its glosses in the other Native Languages. */
 export type ServedItem = { itemId: ItemId; name: string; glosses: Glosses; quantity: number };
 
-/** One line of a confirmed order, with what each one costs and gives back. The sim adds them up. */
-export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores };
+/** One line of a confirmed order or purchase, with what each one costs and gives back, and whether it goes off (groceries). The sim adds them up. */
+export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores; goesOff: boolean };
 
 export type ParsedArgs = { success: true; data: Record<string, unknown> } | { success: false; error: string };
 
+/** What a completion comes to in this pack: the lines to pay for, and for `pointTo`, the item shown. */
+export type ResolvedCompletion = { success: true; lines: OrderLine[]; pointedTo?: ServedItem } | { success: false; error: string };
+
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
-  effect: { kind: 'none' | 'serveOrder' };
+  effect: { kind: EffectKind };
   /** The Live tool declaration, generated from `completion.args`. */
   toolDeclaration: FunctionDeclaration;
   /** Validates the NPC's completion arguments against `completion.args`. */
   parseArgs: (raw: unknown) => ParsedArgs;
-  /** Validates the arguments and looks up what they order in this Culture Pack (nothing, for a `none` effect). */
-  resolveCompletion: (
-    raw: unknown,
-    packId: LanguageCode,
-  ) => { success: true; lines: OrderLine[] } | { success: false; error: string };
+  /**
+   * Validates the arguments and looks up what they come to in this Culture Pack:
+   * the order, or for a `purchase`, the `basket` the Character brought to the till.
+   */
+  resolveCompletion: (raw: unknown, packId: LanguageCode, basket?: Basket) => ResolvedCompletion;
 };
 
 const definitionSchema = z.object({
@@ -75,15 +88,38 @@ const definitionSchema = z.object({
     args: z.custom<z.ZodObject>((value) => value instanceof z.ZodObject, 'completion arguments must be a Zod object'),
   }),
   band: z.enum(['B', 'I', 'A']),
-  effect: z.discriminatedUnion('kind', [z.object({ kind: z.literal('none') }), z.object({ kind: z.literal('serveOrder') })]),
+  effect: z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo']) }),
 });
 
-function serveOrder({ items }: ServeOrderArgs, packId: LanguageCode): OrderLine[] {
-  const { goods } = CULTURE_PACKS[packId];
-  return items.map(({ item, quantity }) => {
-    const { name, glosses } = goods[item];
-    return { itemId: item, name, glosses, quantity, priceInShifts: menuPrice(item, packId), restores: ITEMS[item].restores };
-  });
+function servedItem(itemId: ItemId, quantity: number, packId: LanguageCode): ServedItem {
+  const { name, glosses } = CULTURE_PACKS[packId].goods[itemId];
+  return { itemId, name, glosses, quantity };
+}
+
+function orderLines(items: Basket, packId: LanguageCode): OrderLine[] {
+  return items.map(({ itemId, quantity }) => ({
+    ...servedItem(itemId, quantity, packId),
+    priceInShifts: menuPrice(itemId, packId),
+    restores: ITEMS[itemId].restores,
+    goesOff: ITEMS[itemId].meals !== undefined,
+  }));
+}
+
+/** The definition's type only allows each effect on arguments shaped for it. */
+function resolveEffect(kind: EffectKind, args: Record<string, unknown>, packId: LanguageCode, basket: Basket): ResolvedCompletion {
+  switch (kind) {
+    case 'none':
+      return { success: true, lines: [] };
+    case 'serveOrder': {
+      const { items } = args as ServeOrderArgs;
+      return { success: true, lines: orderLines(items.map(({ item, quantity }) => ({ itemId: item, quantity })), packId) };
+    }
+    case 'purchase':
+      if (basket.length === 0) return { success: false, error: 'The customer has brought nothing to the till.' };
+      return { success: true, lines: orderLines(basket, packId) };
+    case 'pointTo':
+      return { success: true, lines: [], pointedTo: servedItem((args as PointToArgs).item, 1, packId) };
+  }
 }
 
 /**
@@ -105,12 +141,10 @@ export function defineInteraction<Args extends z.ZodObject>(definition: Interact
     ...definition,
     toolDeclaration: toToolDeclaration(completion.name, completion.description, completion.args),
     parseArgs,
-    resolveCompletion: (raw, packId) => {
+    resolveCompletion: (raw, packId, basket = []) => {
       const args = parseArgs(raw);
       if (!args.success) return args;
-      // The definition's type only allows serveOrder on arguments shaped like ServeOrderArgs.
-      const lines = definition.effect.kind === 'serveOrder' ? serveOrder(args.data as ServeOrderArgs, packId) : [];
-      return { success: true, lines };
+      return resolveEffect(definition.effect.kind, args.data, packId, basket);
     },
   };
 }

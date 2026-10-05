@@ -1,3 +1,4 @@
+import { throwOutSpoiled } from './inventory.ts';
 import { clampMeter } from './meters.ts';
 import type { GameState } from './state.ts';
 import { CLOCK, MOOD } from './tuning.ts';
@@ -16,9 +17,9 @@ export function sleep(state: GameState): GameState {
   if (state.placeId !== 'home' || !bedUsable(state.clock)) return state;
   const { day, minuteOfDay } = state.clock;
   const wakeDay = minuteOfDay < CLOCK.wakeAt ? day : day + 1;
-  return {
+  return throwOutSpoiled({
     ...state,
     clock: { day: wakeDay, minuteOfDay: CLOCK.wakeAt },
     character: { ...state.character, mood: clampMeter(state.character.mood + MOOD.changes.sleep) },
-  };
+  });
 }

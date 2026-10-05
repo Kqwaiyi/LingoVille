@@ -6,12 +6,12 @@
 
 **Spec:** [spec.md](../spec.md): Goal Interactions (#4, #5, #7); Economy; Save model (inventory)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Interaction #4 (`complete_purchase(bag, card)`) is defined.
-- [ ] Inventory records item id, quantity and expiry day. `tick` handles expired items (Vitest).
-- [ ] Grocery prices are the cheapest food, at about 0.06 Shift per meal.
-- [ ] The Player can see what's in the inventory.
-- [ ] Interaction #5 (`point_to(item)`) is defined, and success puts a marker on the item in the world.
-- [ ] Interaction #7 (`serve_order`) is defined, and success raises Hunger.
-- [ ] #4, #5 and #7 all work in mock and real modes, in all four packs, and pass the cross-reference check.
+- [x] Interaction #4 (`complete_purchase(bag, card)`) is defined.
+- [x] Inventory records item id, quantity and expiry day. `tick` handles expired items (Vitest).
+- [x] Grocery prices are the cheapest food, at about 0.06 Shift per meal.
+- [x] The Player can see what's in the inventory.
+- [x] Interaction #5 (`point_to(item)`) is defined, and success puts a marker on the item in the world.
+- [x] Interaction #7 (`serve_order`) is defined, and success raises Hunger.
+- [x] #4, #5 and #7 all work in mock and real modes, in all four packs, and pass the cross-reference check.

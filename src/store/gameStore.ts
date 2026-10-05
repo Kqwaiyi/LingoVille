@@ -23,6 +23,7 @@ import {
   APPEARANCE_PRESET_IDS,
   approachInteraction,
   CULTURE_PACKS,
+  GROCERIES_SOLD,
   interactionStartedWithE,
   localPlaceName,
   NAMED_NPCS,
@@ -31,7 +32,9 @@ import {
   placePhrasebook,
   worldSign,
   type AppearancePresetId,
+  type GroceryId,
   type Interaction,
+  type ItemId,
   type NamedNpcId,
   type PlacePhrase,
   type SignId,
@@ -42,6 +45,7 @@ import {
   type TramStopId,
 } from '../content/index.ts';
 import {
+  addToBasket,
   addToPhrasebook,
   applyInteractionOutcome,
   approachDue,
@@ -55,6 +59,7 @@ import {
   faintedBetween,
   enterPlace,
   gameMinutesFor,
+  isGoneOff,
   isOpen,
   isOutOfPatience,
   LANGUAGE_CODES,
@@ -64,6 +69,7 @@ import {
   moodFace,
   newPlayerTurn,
   npcExpression,
+  putBackFromBasket,
   rideTram,
   SAVE,
   sleep,
@@ -72,8 +78,10 @@ import {
   tramTripMinutes,
   weekdayOf,
   type ApproachId,
+  type Basket,
   type ConversationEvidence,
   type GameState,
+  type InventoryItem,
   type LanguageCode,
   type NewGameSetup,
   type NpcExpression,
@@ -208,7 +216,10 @@ export type TitleView =
 export type Arrival = 'newGame' | 'continued';
 
 /** Something in the world the Character is close enough to use with E: the tap, an NPC to talk to, or a tram stop. */
-export type Interactable = 'tap' | 'bed' | TownNpcId | TramStopId;
+export type Interactable = 'tap' | 'bed' | TownNpcId | TramStopId | GroceryId;
+
+/** One thing in the inventory, and whether it has gone off yet. */
+export type InventoryLine = InventoryItem & { goneOff: boolean };
 
 /** Where the tram can take the Character from a stop, and how long each trip takes. */
 export type TramDestination = { stopId: TramStopId; minutes: number };
@@ -295,6 +306,8 @@ export type Conversation = {
   usage: TokenUsage;
   /** Hidden. The UI only ever sees it as the NPC's expression. */
   patience: Patience;
+  /** What the Character brought to the counter: at the till, the shopping to pay for. */
+  basket: Basket;
   /** The outcome is applied; the session closes once the NPC finishes saying goodbye. */
   outcome: ClosingCard | null;
   /** The session is over and the closing card shows. */
@@ -465,6 +478,10 @@ export type GameStore = {
   tramChoosing: boolean;
   tramArrival: TramArrival | null;
   conversation: Conversation | null;
+  /** What the Character has taken off the supermarket's shelves and not paid for yet. Never saved. */
+  basket: Basket;
+  /** The grocery the cashier last pointed to, marked on its shelf until the Character takes one or leaves. */
+  shelfMarker: GroceryId | null;
   /** The typed field has focus, so keys type into it instead of moving or acting. */
   typing: boolean;
   /** How loud the Player is while push-to-talk is held, or on the mic check, from 0 to 1. */
@@ -537,6 +554,10 @@ export type GameStore = {
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
   drinkWater: () => void;
+  /** E at a supermarket shelf: one of its grocery into the basket. */
+  takeFromShelf: () => void;
+  /** Puts one of an item in the basket back on its shelf. */
+  putBack: (itemId: ItemId) => void;
   /** Closes the Fainting screen: the Character wakes in the ward bed, and the nurse comes over. */
   wakeInWard: () => void;
   /** Goes to bed at home: from 20:00, it wakes the next morning and saves; earlier, it says it's too early. */
@@ -582,6 +603,9 @@ const isTownNpc = (interactable: Interactable | null): interactable is TownNpcId
 
 const isTramStop = (interactable: Interactable | null): interactable is TramStopId =>
   (TRAM_LINE as readonly (Interactable | null)[]).includes(interactable);
+
+const isShelf = (interactable: Interactable | null): interactable is GroceryId =>
+  (GROCERIES_SOLD as readonly (Interactable | null)[]).includes(interactable);
 
 /** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
 const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
@@ -655,7 +679,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
       realMsSinceSave = 0;
-      set({ screen: 'playing', title: null, game, slotId, arrival, toast });
+      set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null });
       // While the town loads, so the first line doesn't wait for a dictionary.
       deps.readings.preload(game.identity.targetLanguage).then(
         () => {
@@ -950,12 +974,16 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (name === NOT_UNDERSTOOD_TOOL) return { result: notUnderstood(conversation) ? 'out_of_patience' : 'noted' };
       if (name !== conversation.interaction.completion.name || conversation.outcome) return { result: 'unknown_tool' };
 
-      const { state, result } = applyInteractionOutcome(get().game, conversation.interaction, { kind: 'success', args });
+      const { basket, interaction } = conversation;
+      const { state, result } = applyInteractionOutcome(get().game, interaction, { kind: 'success', args, basket });
       switch (result.kind) {
         case 'success':
+          // Paid-for shopping leaves the basket for the inventory; an item pointed to is marked on its shelf.
+          if (interaction.effect.kind === 'purchase') set({ basket: [] });
+          if (result.pointedTo) set({ shelfMarker: result.pointedTo.itemId as GroceryId });
           settleOutcome(state, result);
-          // Only an order is served; anything else is simply done.
-          return { result: conversation.interaction.effect.kind === 'serveOrder' ? 'served' : 'done' };
+          // An order or shopping is handed over; anything else is simply done.
+          return { result: interaction.effect.kind === 'serveOrder' || interaction.effect.kind === 'purchase' ? 'served' : 'done' };
         case 'cannot_afford':
           return { result: 'cannot_afford' };
         case 'invalid_arguments':
@@ -1192,12 +1220,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const startConversation = (interaction: Interaction, approach: ApproachId | null) => {
       const { game } = get();
       const npc = NAMED_NPCS[interaction.npcId];
+      // At the till, the cashier rings up the basket as it is now.
+      const basket = interaction.effect.kind === 'purchase' ? get().basket : [];
       gameBeforeConversation = game;
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
       const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
         clock: game.clock,
         ...(approach && { approach }),
+        ...(basket.length > 0 && { basket }),
       });
 
       set({
@@ -1214,6 +1245,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           retried: false,
           usage: NO_USAGE,
           patience: startPatience(game.proficiencyStep),
+          basket,
           outcome: null,
           closed: false,
           recap: null,
@@ -1260,6 +1292,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       tramChoosing: false,
       tramArrival: null,
       conversation: null,
+      basket: [],
+      shelfMarker: null,
       typing: false,
       micLevel: 0,
       toast: null,
@@ -1405,7 +1439,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const hours = OPEN_AIR_PLACES.includes(placeId) ? null : placeHours(placeId, before.identity.culturePackId);
         const game = enterPlace(before, placeId, hours);
         if (game === get().game) return;
-        set({ game });
+        // Anything not paid for goes back on the supermarket's shelves, and its marker goes.
+        set({ game, ...(placeId !== 'supermarket' && { basket: [], shelfMarker: null }) });
         // Through a door.
         save();
         noticeApproach(before, game);
@@ -1435,6 +1470,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         noticeApproach(game, after);
       },
       drinkWater: () => set({ game: drinkWater(get().game) }),
+      takeFromShelf: () => {
+        const { interactable, conversation, basket, shelfMarker, game } = get();
+        if (conversation || !isShelf(interactable) || !isPlaceOpen('supermarket', game)) return;
+        set({ basket: addToBasket(basket, interactable), ...(shelfMarker === interactable && { shelfMarker: null }) });
+      },
+      putBack: (itemId) => {
+        if (get().conversation) return;
+        set({ basket: putBackFromBasket(get().basket, itemId) });
+      },
       wakeInWard: () => {
         if (!get().fainting) return;
         set({ fainting: null });
@@ -1472,7 +1516,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       talk: () => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
-        const interaction = interactable in NAMED_NPCS ? interactionStartedWithE(interactable as NamedNpcId) : null;
+        const shopping = get().basket.length > 0;
+        const interaction = interactable in NAMED_NPCS ? interactionStartedWithE(interactable as NamedNpcId, { shopping }) : null;
         if (!interaction) return set({ toast: { kind: 'nothingToSay', npcId: interactable } });
         startConversation(interaction, null);
       },
@@ -1674,8 +1719,33 @@ export const selectWeekday = (s: GameStore) => weekdayOf(s.game.clock.day);
 export const selectClockMinute = (s: GameStore) => Math.floor(s.game.clock.minuteOfDay);
 export const selectPlaceId = (s: GameStore) => s.game.placeId;
 /** What E would use here. Staff at a closed place don't count: there's no one to talk to. */
-export const selectInteractable = (s: GameStore) =>
-  isTownNpc(s.interactable) && !isAtWork(s.interactable, s.game) ? null : s.interactable;
+export const selectInteractable = (s: GameStore) => {
+  if (isTownNpc(s.interactable) && !isAtWork(s.interactable, s.game)) return null;
+  // The shelves are only for shopping while the supermarket is open.
+  if (isShelf(s.interactable) && !isPlaceOpen('supermarket', s.game)) return null;
+  return s.interactable;
+};
+/** The shelf the Character could take a grocery from, or null. */
+export const selectShelf = (s: GameStore) => {
+  const interactable = selectInteractable(s);
+  return isShelf(interactable) ? interactable : null;
+};
+/** What the Character has taken off the shelves to pay for. */
+export const selectBasket = (s: GameStore) => s.basket;
+/** The grocery the cashier pointed to, marked on its shelf. */
+export const selectShelfMarker = (s: GameStore) => s.shelfMarker;
+
+const inventoryLines = new WeakMap<readonly InventoryItem[], { day: number; lines: readonly InventoryLine[] }>();
+/** What the Character owns, and which groceries have gone off today. The same array until either changes. */
+export const selectInventory = (s: GameStore): readonly InventoryLine[] => {
+  const { inventory } = s.game.possessions;
+  const { day } = s.game.clock;
+  const kept = inventoryLines.get(inventory);
+  if (kept?.day === day) return kept.lines;
+  const lines = inventory.map((item) => ({ ...item, goneOff: isGoneOff(item, day) }));
+  inventoryLines.set(inventory, { day, lines });
+  return lines;
+};
 /** The tram stop the Character is standing at, or null. */
 export const selectTramStop = (s: GameStore) => (isTramStop(s.interactable) ? s.interactable : null);
 /** A tram runs now. Outside the trams' hours, the stop says none is running. */

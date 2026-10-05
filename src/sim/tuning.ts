@@ -85,6 +85,10 @@ export const WELL_BEING = {
   cafeDrinkThirst: 0.4 * METER_MAX,
   /** Hunger one café pastry gives back. */
   cafeFoodHunger: 0.25 * METER_MAX,
+  /** Hunger a convenience store counter snack gives back. */
+  counterSnackHunger: 0.2 * METER_MAX,
+  /** Hunger a convenience store bento gives back: a proper meal. */
+  bentoHunger: 0.5 * METER_MAX,
   /** Where the ward's care leaves Well-being when the Character comes round after Fainting (default). */
   afterFainting: { health: 0.5 * METER_MAX, hunger: 0.5 * METER_MAX, thirst: 0.5 * METER_MAX },
 } as const;
@@ -242,5 +246,8 @@ export const ILLNESS = {
 } as const;
 
 export const GROCERIES = {
+  /** Groceries stay fresh until the end of this many days after the day they were bought. */
   expiryDays: 3,
+  /** Gone-off groceries stay in the inventory this many days (they can still be cooked, at a risk), then get thrown out. */
+  goneOffDaysKept: 2,
 } as const;

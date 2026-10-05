@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CULTURE_PACKS, NAMED_NPCS, toGeminiSchema, type CulturePack, type NamedNpcId } from '../content/index.ts';
+import { CULTURE_PACKS, localPlaceName, NAMED_NPCS, toGeminiSchema, type CulturePack, type NamedNpcId } from '../content/index.ts';
 import {
   block,
   InteractionIdSchema,
@@ -117,7 +117,7 @@ function conversationBlock(heading: string, conversation: RecapConversation, pac
   const interaction = interactionById(conversation.interactionId);
   const { role } = NAMED_NPCS[interaction.npcId];
   return block(heading, [
-    `With the ${role} at ${pack.cafe.name}. The ${role}'s goal: ${interaction.goal} Outcome: ${OUTCOMES[conversation.outcome]}.`,
+    `With the ${role} at ${localPlaceName(interaction.placeId, pack.id)}. The ${role}'s goal: ${interaction.goal} Outcome: ${OUTCOMES[conversation.outcome]}.`,
     ...transcriptLines(conversation.transcript),
     ...helpLines(conversation.helpLog),
   ]);
@@ -182,7 +182,7 @@ function conversationsText(request: RecapRequest, pack: CulturePack) {
     case 'smallTalk': {
       const { role } = NAMED_NPCS[request.npcId];
       return block('THE CHAT', [
-        `Small Talk with the ${role} at ${pack.cafe.name}.`,
+        `Small Talk with the ${role} at ${localPlaceName(NAMED_NPCS[request.npcId].placeId, pack.id)}.`,
         ...transcriptLines(request.transcript),
         ...helpLines(request.helpLog),
       ]);

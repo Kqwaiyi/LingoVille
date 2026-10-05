@@ -8,7 +8,15 @@ import {
   type NamedNpc,
   type NamedNpcId,
 } from '../content/index.ts';
-import { weekdayOf, type ApproachId, type GameState, type LanguageCode, type PlaceId, type ProficiencyStep } from '../sim/index.ts';
+import {
+  weekdayOf,
+  type ApproachId,
+  type Basket,
+  type GameState,
+  type LanguageCode,
+  type PlaceId,
+  type ProficiencyStep,
+} from '../sim/index.ts';
 
 /**
  * Which voice the NPC speaks with. The gateway resolves it to a prebuilt voice,
@@ -28,6 +36,8 @@ export type NpcSessionContext = {
   clock: GameState['clock'];
   /** The NPC starts this conversation by approaching the Character, rather than the Player pressing E. */
   approach?: ApproachId;
+  /** At the till: the shopping the Character has put on the counter. */
+  basket?: Basket;
 };
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
@@ -77,6 +87,8 @@ const notUnderstoodTool = (who: string) =>
 type Workplace = { at: (pack: CulturePack) => string; who: string };
 const WORKPLACES: Partial<Record<PlaceId, Workplace>> = {
   cafe: { at: (pack) => `${pack.cafe.name}, a café`, who: 'customer' },
+  supermarket: { at: (pack) => `${pack.supermarket.name}, a supermarket`, who: 'customer' },
+  'convenience-store': { at: (pack) => `${pack.convenienceStore.name}, a convenience store`, who: 'customer' },
   clinic: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
 };
 
@@ -189,10 +201,10 @@ function stepBlock(step: ProficiencyStep, who: string) {
   return block('HOW TO SPEAK', [`The ${who} ${first}`, ...rest]);
 }
 
-function factsBlock(interaction: Interaction, pack: CulturePack) {
+function factsBlock(interaction: Interaction, pack: CulturePack, basket: Basket | undefined) {
   return block('FACTS', [
     "Answer side questions using only these facts. If asked something not covered, say you don't know.",
-    ...interactionFacts(interaction, pack.id).map((fact) => `- ${fact}`),
+    ...interactionFacts(interaction, pack.id, basket).map((fact) => `- ${fact}`),
   ]);
 }
 
@@ -204,6 +216,26 @@ function goalBlock(interaction: Interaction, who: string) {
       `- Only once the ${who} has told you what you need, call ${name} with what they told you. Never call it before.`,
       `- If ${name} answers "invalid_arguments", ask them again.`,
       `- If ${name} answers "done", say goodbye kindly.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'pointTo') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you think you know what they want, check with them which item they mean, and wait for them to confirm.`,
+      `- Only once they have confirmed, call ${name} with that item. Never call it before.`,
+      `- If they ask for something not in FACTS, tell them kindly you don't sell it.`,
+      `- If ${name} answers "invalid_arguments", ask them again what they are looking for.`,
+      `- If ${name} answers "done", tell them simply where it is, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'purchase') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for all of it. They can put something back and come again. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again about the bag and the points card.`,
+      `- If ${name} answers "served", hand over their shopping, thank them and say goodbye.`,
     ]);
   }
   return block('YOUR GOAL', [
@@ -245,7 +277,7 @@ export function buildNpcSession(
     youAndThisPersonBlock(who),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
-    factsBlock(interaction, culturePack),
+    factsBlock(interaction, culturePack, context.basket),
     goalBlock(interaction, who),
     situationBlock(context, who),
   ].join('\n\n');

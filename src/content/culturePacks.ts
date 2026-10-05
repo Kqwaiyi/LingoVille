@@ -35,6 +35,9 @@ export type Currency = {
 export const PROP_IDS = ['noren', 'lucky-cat', 'red-lantern', 'tea-set', 'cake-stand', 'pretzel-basket', 'teapot', 'bunting'] as const;
 export type PropId = (typeof PROP_IDS)[number];
 
+/** A shop the Character can be served at: its local name, glosses, and facts its staff know (in English). */
+export type Shop = { name: string; nameGlosses: Glosses; facts: string[] };
+
 /** Words that go on signs, apart from place names and goods. */
 export const SIGN_WORDS = ['openingHours', 'menu'] as const;
 export type SignWord = (typeof SIGN_WORDS)[number];
@@ -54,12 +57,9 @@ export type CulturePack = {
   ambient: string[];
   goods: Record<ItemId, Good>;
   signs: Record<SignWord, { text: string; glosses: Glosses }>;
-  cafe: {
-    name: string;
-    nameGlosses: Glosses;
-    /** Facts the café staff know, in English. */
-    facts: string[];
-  };
+  cafe: Shop;
+  supermarket: Shop;
+  convenienceStore: Shop;
   /** The clinic and hospital, by its local name: where the Fainting ward is. */
   hospital: { name: string; nameGlosses: Glosses };
   /** Persona localisations: each Named NPC's local name. */
@@ -96,6 +96,7 @@ export function culturePackSchema(packId: LanguageCode) {
     .min(1)
     .refine((steps) => steps.every((s, i) => (i === steps.length - 1) === (s.below === undefined)), 'Only the last price step has no "below".')
     .refine((steps) => steps.every((s, i) => i === 0 || s.below === undefined || s.below > steps[i - 1]!.below!), 'Price steps go up.');
+  const shop = z.object({ name: text, nameGlosses: glosses, facts: z.array(text) });
 
   return z.object({
     id: z.literal(packId),
@@ -113,7 +114,9 @@ export function culturePackSchema(packId: LanguageCode) {
     ambient: z.array(kebab),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
-    cafe: z.object({ name: text, nameGlosses: glosses, facts: z.array(text) }),
+    cafe: shop,
+    supermarket: shop,
+    convenienceStore: shop,
     hospital: z.object({ name: text, nameGlosses: glosses }),
     personas: z.record(z.string(), z.object({ name: text })),
     appearances: z.object({
@@ -147,6 +150,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       coffee: { name: 'ブレンドコーヒー', glosses: { zh: '招牌混合咖啡', en: 'House blend coffee', de: 'Kaffee der Hausmischung' } },
       tea: { name: '紅茶', glosses: { zh: '红茶', en: 'Black tea', de: 'Schwarzer Tee' } },
       pastry: { name: 'メロンパン', glosses: { zh: '菠萝包', en: 'Melon bread', de: 'Melonenbrötchen' } },
+      snack: { name: 'からあげ', glosses: { zh: '日式炸鸡块', en: 'Japanese fried chicken', de: 'Japanisches Brathähnchen' } },
+      bento: { name: 'のり弁当', glosses: { zh: '海苔便当', en: 'Seaweed bento box', de: 'Nori-Bento' } },
+      vegetables: { name: 'キャベツ', glosses: { zh: '卷心菜', en: 'Cabbage', de: 'Weißkohl' } },
+      eggs: { name: '卵', glosses: { zh: '鸡蛋', en: 'Eggs', de: 'Eier' } },
+      noodles: { name: 'うどん', glosses: { zh: '乌冬面', en: 'Udon noodles', de: 'Udon-Nudeln' } },
     },
     signs: {
       openingHours: { text: '営業時間', glosses: { zh: '营业时间', en: 'Opening hours', de: 'Öffnungszeiten' } },
@@ -157,13 +165,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { zh: '星星咖啡', en: 'Star Coffee', de: 'Stern-Kaffee' },
       facts: ['Cash, card and IC cards are all fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
+    supermarket: {
+      name: 'スーパーまるやま',
+      nameGlosses: { zh: '丸山超市', en: 'Maruyama Supermarket', de: 'Supermarkt Maruyama' },
+      facts: [
+        'Plastic bags cost nothing here; the cashier asks whether the customer wants one.',
+        'The points card is free; customers who have one show it at the till.',
+        'Cash, card and IC cards are all fine.',
+      ],
+    },
+    convenienceStore: {
+      name: 'ニコニコマート',
+      nameGlosses: { zh: '笑笑便利店', en: 'Smile Mart', de: 'Smile-Markt' },
+      facts: [
+        'Bentos are heated in the microwave behind the counter for free; the clerk asks whether to heat one.',
+        'Hot snacks are kept in the warmer by the till.',
+        'Cash, card and IC cards are all fine.',
+      ],
+    },
     hospital: {
       name: 'みどり総合病院',
       nameGlosses: { zh: '绿树综合医院', en: 'Midori General Hospital', de: 'Allgemeines Krankenhaus Midori' },
     },
-    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' } },
+    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' }, cashier: { name: '鈴木' }, 'convenience-clerk': { name: '田中' } },
     appearances: {
-      npcs: { barista: 'preset-2', nurse: 'preset-4' },
+      npcs: { barista: 'preset-2', nurse: 'preset-4', cashier: 'preset-1', 'convenience-clerk': 'preset-3' },
       customerWeights: { 'preset-1': 3, 'preset-2': 3, 'preset-3': 2, 'preset-4': 2 },
     },
     props: ['noren', 'lucky-cat'],
@@ -187,6 +213,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       coffee: { name: '美式咖啡', glosses: { ja: 'アメリカーノ', en: 'Americano', de: 'Americano' } },
       tea: { name: '红茶', glosses: { ja: '紅茶', en: 'Black tea', de: 'Schwarzer Tee' } },
       pastry: { name: '蛋挞', glosses: { ja: 'エッグタルト', en: 'Egg tart', de: 'Puddingtörtchen' } },
+      snack: { name: '茶叶蛋', glosses: { ja: '茶葉卵', en: 'Tea egg', de: 'Tee-Ei' } },
+      bento: { name: '盒饭', glosses: { ja: 'お弁当', en: 'Boxed rice meal', de: 'Reis-Box' } },
+      vegetables: { name: '青菜', glosses: { ja: 'チンゲン菜', en: 'Bok choy', de: 'Pak Choi' } },
+      eggs: { name: '鸡蛋', glosses: { ja: '卵', en: 'Eggs', de: 'Eier' } },
+      noodles: { name: '挂面', glosses: { ja: '乾麺', en: 'Dried noodles', de: 'Getrocknete Nudeln' } },
     },
     signs: {
       openingHours: { text: '营业时间', glosses: { ja: '営業時間', en: 'Opening hours', de: 'Öffnungszeiten' } },
@@ -197,13 +228,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: 'スターコーヒー', en: 'Star Coffee', de: 'Stern-Kaffee' },
       facts: ['WeChat Pay, Alipay and cash are all fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
+    supermarket: {
+      name: '好又多超市',
+      nameGlosses: { ja: 'ハオヨウドゥオ・スーパー', en: 'Good-and-Plenty Supermarket', de: 'Supermarkt Gut-und-Viel' },
+      facts: [
+        'Plastic bags are free here; the cashier asks whether the customer wants one.',
+        'The membership points card is free; customers who have one show it at the till.',
+        'WeChat Pay, Alipay and cash are all fine.',
+      ],
+    },
+    convenienceStore: {
+      name: '快客便利店',
+      nameGlosses: { ja: 'クイック・コンビニ', en: 'Quick Stop', de: 'Quick-Stop-Laden' },
+      facts: [
+        'Boxed meals are heated in the microwave behind the counter for free; the clerk asks whether to heat one.',
+        'Tea eggs simmer in a pot by the till.',
+        'WeChat Pay, Alipay and cash are all fine.',
+      ],
+    },
     hospital: {
       name: '绿城医院',
       nameGlosses: { ja: '緑城病院', en: 'Green City Hospital', de: 'Krankenhaus Grünstadt' },
     },
-    personas: { barista: { name: '小李' }, nurse: { name: '王芳' } },
+    personas: { barista: { name: '小李' }, nurse: { name: '王芳' }, cashier: { name: '张敏' }, 'convenience-clerk': { name: '小陈' } },
     appearances: {
-      npcs: { barista: 'preset-3', nurse: 'preset-1' },
+      npcs: { barista: 'preset-3', nurse: 'preset-1', cashier: 'preset-2', 'convenience-clerk': 'preset-4' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['red-lantern', 'tea-set'],
@@ -229,6 +278,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       coffee: { name: 'Filter coffee', glosses: { ja: 'ドリップコーヒー', zh: '滴滤咖啡', de: 'Filterkaffee' } },
       tea: { name: 'Cup of tea', glosses: { ja: '紅茶', zh: '一杯红茶', de: 'Tasse Tee' } },
       pastry: { name: 'Scone', glosses: { ja: 'スコーン', zh: '司康饼', de: 'Scone' } },
+      snack: { name: 'Sausage roll', glosses: { ja: 'ソーセージロール', zh: '香肠卷', de: 'Würstchen im Blätterteig' } },
+      bento: { name: 'Microwave lasagne', glosses: { ja: 'レンジで温めるラザニア', zh: '微波炉千层面', de: 'Mikrowellen-Lasagne' } },
+      vegetables: { name: 'Carrots', glosses: { ja: 'にんじん', zh: '胡萝卜', de: 'Karotten' } },
+      eggs: { name: 'Eggs', glosses: { ja: '卵', zh: '鸡蛋', de: 'Eier' } },
+      noodles: { name: 'Spaghetti', glosses: { ja: 'スパゲッティ', zh: '意大利面', de: 'Spaghetti' } },
     },
     signs: {
       openingHours: { text: 'Opening hours', glosses: { ja: '営業時間', zh: '营业时间', de: 'Öffnungszeiten' } },
@@ -239,13 +293,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: '小さな星カフェ', zh: '小星星咖啡馆', de: 'Café Kleiner Stern' },
       facts: ['Card and cash are both fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
+    supermarket: {
+      name: 'Brooks Supermarket',
+      nameGlosses: { ja: 'ブルックス・スーパー', zh: '布鲁克斯超市', de: 'Brooks Supermarkt' },
+      facts: [
+        'Bags are free here; the cashier asks whether the customer wants one.',
+        'The loyalty card is free; customers who have one show it at the till.',
+        'Card and cash are both fine.',
+      ],
+    },
+    convenienceStore: {
+      name: 'Patel’s Corner Shop',
+      nameGlosses: { ja: 'パテルさんの街角の店', zh: '帕特尔街角小店', de: 'Patels Eckladen' },
+      facts: [
+        'Ready meals are heated in the microwave behind the counter for free; the clerk asks whether to heat one.',
+        'Sausage rolls are kept warm in the cabinet by the till.',
+        'Card and cash are both fine.',
+      ],
+    },
     hospital: {
       name: 'St Mary’s Hospital',
       nameGlosses: { ja: 'セント・メアリー病院', zh: '圣玛丽医院', de: 'St.-Marien-Krankenhaus' },
     },
-    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' } },
+    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' }, cashier: { name: 'Priya' }, 'convenience-clerk': { name: 'Dev' } },
     appearances: {
-      npcs: { barista: 'preset-1', nurse: 'preset-3' },
+      npcs: { barista: 'preset-1', nurse: 'preset-3', cashier: 'preset-4', 'convenience-clerk': 'preset-2' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 2, 'preset-4': 3 },
     },
     props: ['teapot', 'bunting'],
@@ -279,6 +351,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       coffee: { name: 'Filterkaffee', glosses: { ja: 'ドリップコーヒー', zh: '滴滤咖啡', en: 'Filter coffee' } },
       tea: { name: 'Schwarztee', glosses: { ja: '紅茶', zh: '红茶', en: 'Black tea' } },
       pastry: { name: 'Butterbrezel', glosses: { ja: 'バタープレッツェル', zh: '黄油扭结饼', en: 'Butter pretzel' } },
+      snack: { name: 'Bockwurst', glosses: { ja: 'ボックヴルスト（ソーセージ）', zh: '德式香肠', en: 'Bockwurst sausage' } },
+      bento: { name: 'Fertiggericht', glosses: { ja: '温めて食べる調理済みの料理', zh: '速食餐', en: 'Ready meal' } },
+      vegetables: { name: 'Kartoffeln', glosses: { ja: 'じゃがいも', zh: '土豆', en: 'Potatoes' } },
+      eggs: { name: 'Eier', glosses: { ja: '卵', zh: '鸡蛋', en: 'Eggs' } },
+      noodles: { name: 'Spätzle', glosses: { ja: 'シュペッツレ（卵の麺）', zh: '德式鸡蛋面', en: 'Spätzle (egg noodles)' } },
     },
     signs: {
       openingHours: { text: 'Öffnungszeiten', glosses: { ja: '営業時間', zh: '营业时间', en: 'Opening hours' } },
@@ -289,23 +366,50 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: 'カフェ・シュテルン（星）', zh: '星星咖啡馆', en: 'Star Café' },
       facts: ['Card and cash are both fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
+    supermarket: {
+      name: 'Frischmarkt Krause',
+      nameGlosses: { ja: 'クラウゼ生鮮マーケット', zh: '克劳泽生鲜超市', en: 'Krause Fresh Market' },
+      facts: [
+        'Bags are free here; the cashier asks whether the customer wants one.',
+        'The points card is free; customers who have one show it at the till.',
+        'Card and cash are both fine.',
+      ],
+    },
+    convenienceStore: {
+      name: 'Späti am Eck',
+      nameGlosses: { ja: '角の深夜商店（シュペーティ）', zh: '街角深夜小店', en: 'Late shop on the corner' },
+      facts: [
+        'Ready meals are heated in the microwave behind the counter for free; the clerk asks whether to heat one.',
+        'Bockwurst is kept hot in a pot by the till.',
+        'Card and cash are both fine.',
+      ],
+    },
     hospital: {
       name: 'Klinikum am Park',
       nameGlosses: { ja: '公園前総合病院', zh: '公园医院', en: 'Park Hospital' },
     },
-    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' } },
+    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' }, cashier: { name: 'Jonas' }, 'convenience-clerk': { name: 'Murat' } },
     appearances: {
-      npcs: { barista: 'preset-4', nurse: 'preset-2' },
+      npcs: { barista: 'preset-4', nurse: 'preset-2', cashier: 'preset-3', 'convenience-clerk': 'preset-1' },
       customerWeights: { 'preset-1': 2, 'preset-2': 3, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['cake-stand', 'pretzel-basket'],
   },
 };
 
-/** A staffed place by its local name in this pack, as the Journal keeps it: the café, or the hospital. */
-export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
+/** The shop at a place in this pack, or null if the place isn't a shop. */
+export function localShop(placeId: PlaceId, packId: LanguageCode): Shop | null {
   const pack = CULTURE_PACKS[packId];
-  if (placeId === 'cafe') return pack.cafe.name;
-  if (placeId === 'clinic') return pack.hospital.name;
+  if (placeId === 'cafe') return pack.cafe;
+  if (placeId === 'supermarket') return pack.supermarket;
+  if (placeId === 'convenience-store') return pack.convenienceStore;
+  return null;
+}
+
+/** A staffed place by its local name in this pack, as the Journal keeps it: a shop, or the hospital. */
+export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
+  if (placeId === 'clinic') return CULTURE_PACKS[packId].hospital.name;
+  const shop = localShop(placeId, packId);
+  if (shop) return shop.name;
   throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CULTURE_PACKS, formatLocalMoney, INTERACTIONS, menuPrice, type ItemId } from '../content/index.ts';
-import { applyInteractionOutcome, createSave, METER_MAX, MOOD, WELL_BEING, type GameState } from './index.ts';
+import { applyInteractionOutcome, createSave, GROCERIES, METER_MAX, MOOD, WELL_BEING, type GameState } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
 
 const { orderDrink } = INTERACTIONS;
@@ -127,5 +127,128 @@ describe('applyInteractionOutcome', () => {
 
     expect(after).toBe(state);
     expect(result).toEqual({ kind: 'abandon' });
+  });
+});
+
+describe('applyInteractionOutcome: paying for groceries (#4)', () => {
+  const { payForGroceries } = INTERACTIONS;
+  const BAG_NO_CARD = { bag: true, card: false };
+
+  function atTheTill(inventory: GameState['possessions']['inventory'] = [], money?: number): GameState {
+    const state = createSave(TEST_SETUP);
+    return {
+      ...state,
+      placeId: 'supermarket',
+      clock: { day: 3, minuteOfDay: 10 * 60 },
+      character: { ...state.character, moneyInShifts: money ?? state.character.moneyInShifts },
+      possessions: { ...state.possessions, inventory },
+    };
+  }
+
+  it('charges for the basket and puts it in the inventory, going off after expiryDays', () => {
+    const state = atTheTill();
+    const basket = [
+      { itemId: 'eggs', quantity: 2 },
+      { itemId: 'noodles', quantity: 1 },
+    ] as const;
+
+    const { state: after, result } = applyInteractionOutcome(state, payForGroceries, { kind: 'success', args: BAG_NO_CARD, basket });
+
+    const cost = 2 * price('eggs') + price('noodles');
+    expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - cost);
+    expect(after.possessions.inventory).toEqual([
+      { itemId: 'eggs', quantity: 2, expiresOnDay: 3 + GROCERIES.expiryDays },
+      { itemId: 'noodles', quantity: 1, expiresOnDay: 3 + GROCERIES.expiryDays },
+    ]);
+    expect(result).toMatchObject({ kind: 'success', paidInShifts: cost, served: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'noodles', quantity: 1 }] });
+  });
+
+  it('fills no meter: groceries are for cooking', () => {
+    const state = atTheTill();
+    const { state: after } = applyInteractionOutcome(state, payForGroceries, {
+      kind: 'success',
+      args: BAG_NO_CARD,
+      basket: [{ itemId: 'vegetables', quantity: 1 }],
+    });
+    expect(after.character.hunger).toBe(state.character.hunger);
+    expect(after.character.thirst).toBe(state.character.thirst);
+  });
+
+  it('adds to groceries bought the same day, and keeps older ones apart, since they go off sooner', () => {
+    const older = { itemId: 'eggs' as const, quantity: 1, expiresOnDay: 2 + GROCERIES.expiryDays };
+    const today = { itemId: 'eggs' as const, quantity: 1, expiresOnDay: 3 + GROCERIES.expiryDays };
+    const state = atTheTill([older, today]);
+
+    const { state: after } = applyInteractionOutcome(state, payForGroceries, {
+      kind: 'success',
+      args: BAG_NO_CARD,
+      basket: [{ itemId: 'eggs', quantity: 2 }],
+    });
+
+    expect(after.possessions.inventory).toEqual([older, { ...today, quantity: 3 }]);
+  });
+
+  it('refuses a basket the Character cannot afford, changing nothing', () => {
+    const state = atTheTill([], price('eggs'));
+    const basket = [{ itemId: 'eggs', quantity: 2 }] as const;
+
+    const { state: after, result } = applyInteractionOutcome(state, payForGroceries, { kind: 'success', args: BAG_NO_CARD, basket });
+
+    expect(after).toBe(state);
+    expect(result).toEqual({ kind: 'cannot_afford' });
+  });
+
+  it('has nothing to charge with an empty basket', () => {
+    const state = atTheTill();
+    const { state: after, result } = applyInteractionOutcome(state, payForGroceries, { kind: 'success', args: BAG_NO_CARD, basket: [] });
+    expect(after).toBe(state);
+    expect(result.kind).toBe('invalid_arguments');
+  });
+});
+
+describe('applyInteractionOutcome: asking where an item is (#5)', () => {
+  const { findAnItem } = INTERACTIONS;
+
+  it('points to the item, charging nothing, and lifts Mood', () => {
+    const state = { ...createSave(TEST_SETUP), placeId: 'supermarket' as const };
+
+    const { state: after, result } = applyInteractionOutcome(state, findAnItem, { kind: 'success', args: { item: 'noodles' } });
+
+    expect(after.character.moneyInShifts).toBe(state.character.moneyInShifts);
+    expect(after.possessions.inventory).toEqual([]);
+    expect(result).toEqual({
+      kind: 'success',
+      served: [],
+      paidInShifts: 0,
+      moodChange: MOOD.changes.goalInteractionSuccess,
+      pointedTo: { itemId: 'noodles', name: CULTURE_PACKS.ja.goods.noodles.name, glosses: CULTURE_PACKS.ja.goods.noodles.glosses, quantity: 1 },
+    });
+  });
+});
+
+describe('applyInteractionOutcome: counter food at the convenience store (#7)', () => {
+  const { buyCounterFood } = INTERACTIONS;
+
+  it('serves a bento, charging for it and raising Hunger', () => {
+    const state = { ...atTheCafe({ hunger: 10 }), placeId: 'convenience-store' as const };
+
+    const { state: after, result } = applyInteractionOutcome(state, buyCounterFood, {
+      kind: 'success',
+      args: { items: [{ item: 'bento', quantity: 1 }] },
+    });
+
+    expect(after.character.hunger).toBe(10 + WELL_BEING.bentoHunger);
+    expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - price('bento'));
+    expect(after.possessions.inventory).toEqual([]);
+    expect(result).toMatchObject({ kind: 'success', served: [{ itemId: 'bento', quantity: 1 }] });
+  });
+
+  it('a counter snack raises Hunger by less', () => {
+    const state = atTheCafe({ hunger: 10 });
+    const { state: after } = applyInteractionOutcome(state, buyCounterFood, {
+      kind: 'success',
+      args: { items: [{ item: 'snack', quantity: 1 }] },
+    });
+    expect(after.character.hunger).toBe(10 + WELL_BEING.counterSnackHunger);
   });
 });

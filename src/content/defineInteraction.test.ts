@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { CAFE_MENU, defineInteraction, INTERACTIONS } from './index.ts';
+import { CAFE_MENU, CONVENIENCE_MENU, defineInteraction, GROCERIES_SOLD, INTERACTIONS } from './index.ts';
 
 function interactionWith(args: z.ZodObject) {
   return defineInteraction({
@@ -115,5 +115,81 @@ describe('Goal Interaction #1: order a drink', () => {
     expect(orderDrink.parseArgs({ items: [{ item: 'latte', quantity: 1 }] }).success).toBe(true);
     expect(orderDrink.parseArgs({ items: [{ item: 'champagne', quantity: 1 }] }).success).toBe(false);
     expect(orderDrink.parseArgs({ items: [] }).success).toBe(false);
+  });
+});
+
+describe('Goal Interaction #4: pay for groceries at the supermarket', () => {
+  const { payForGroceries } = INTERACTIONS;
+
+  it('is the cashier’s, at the supermarket, a beginner interaction that sells groceries', () => {
+    expect(payForGroceries).toMatchObject({ npcId: 'cashier', placeId: 'supermarket', band: 'B', effect: { kind: 'purchase' } });
+    expect(payForGroceries.items).toEqual([...GROCERIES_SOLD]);
+  });
+
+  it('declares complete_purchase(bag, card)', () => {
+    const { name, parameters } = payForGroceries.toolDeclaration;
+    expect(name).toBe('complete_purchase');
+    expect(parameters.required).toEqual(['bag', 'card']);
+    expect(parameters.properties!.bag!.type).toBe('BOOLEAN');
+    expect(parameters.properties!.card!.type).toBe('BOOLEAN');
+  });
+
+  it('accepts a bag and points card choice and rejects anything else', () => {
+    expect(payForGroceries.parseArgs({ bag: true, card: false }).success).toBe(true);
+    expect(payForGroceries.parseArgs({ bag: 'yes', card: false }).success).toBe(false);
+    expect(payForGroceries.parseArgs({ bag: true }).success).toBe(false);
+  });
+
+  it('charges for what the Character brought to the till, not for anything in the arguments', () => {
+    const basket = [{ itemId: 'eggs' as const, quantity: 2 }];
+    const resolved = payForGroceries.resolveCompletion({ bag: true, card: true }, 'ja', basket);
+    expect(resolved).toMatchObject({ success: true, lines: [{ itemId: 'eggs', quantity: 2 }] });
+  });
+
+  it('has nothing to charge for with an empty basket', () => {
+    expect(payForGroceries.resolveCompletion({ bag: true, card: true }, 'ja', []).success).toBe(false);
+  });
+});
+
+describe('Goal Interaction #5: ask where an item is', () => {
+  const { findAnItem } = INTERACTIONS;
+
+  it('is the cashier’s, at the supermarket, a beginner interaction', () => {
+    expect(findAnItem).toMatchObject({ npcId: 'cashier', placeId: 'supermarket', band: 'B', effect: { kind: 'pointTo' } });
+  });
+
+  it('declares point_to(item) over the groceries on the shelves', () => {
+    expect(findAnItem.toolDeclaration.name).toBe('point_to');
+    expect(findAnItem.toolDeclaration.parameters.properties!.item!.enum).toEqual([...GROCERIES_SOLD]);
+    expect(findAnItem.parseArgs({ item: 'eggs' }).success).toBe(true);
+    expect(findAnItem.parseArgs({ item: 'latte' }).success).toBe(false);
+  });
+
+  it('points to the item, in the pack’s words, and sells nothing', () => {
+    expect(findAnItem.resolveCompletion({ item: 'eggs' }, 'de')).toEqual({
+      success: true,
+      lines: [],
+      pointedTo: { itemId: 'eggs', name: 'Eier', glosses: { ja: '卵', zh: '鸡蛋', en: 'Eggs' }, quantity: 1 },
+    });
+  });
+});
+
+describe('Goal Interaction #7: counter food at the convenience store', () => {
+  const { buyCounterFood } = INTERACTIONS;
+
+  it('is the clerk’s, at the convenience store, a beginner order', () => {
+    expect(buyCounterFood).toMatchObject({
+      npcId: 'convenience-clerk',
+      placeId: 'convenience-store',
+      band: 'B',
+      effect: { kind: 'serveOrder' },
+    });
+  });
+
+  it('declares serve_order over the counter menu: a snack and a bento', () => {
+    expect(buyCounterFood.toolDeclaration.name).toBe('serve_order');
+    expect(buyCounterFood.toolDeclaration.parameters.properties!.items!.items!.properties!.item!.enum).toEqual([...CONVENIENCE_MENU]);
+    expect(buyCounterFood.parseArgs({ items: [{ item: 'bento', quantity: 1 }] }).success).toBe(true);
+    expect(buyCounterFood.parseArgs({ items: [{ item: 'latte', quantity: 1 }] }).success).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { formatLocalMoney, localPlaceName, type NamedNpcId } from '../content/index.ts';
+import { formatLocalMoney, localPlaceName, TOWN_NPCS, type NamedNpcId, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
@@ -90,7 +90,7 @@ function NpcFace({ npcId }: { npcId: NamedNpcId }) {
     <span
       className="npc-face"
       role="img"
-      aria-label={t(`faces.${expression}`, { who: t(`roles.${npcId}.subject`) })}
+      aria-label={t(`faces.${expression}`, { who: t(`roles.${TOWN_NPCS[npcId].role}.subject`) })}
       data-expression={expression}
     >
       {FACE[expression]}
@@ -98,9 +98,9 @@ function NpcFace({ npcId }: { npcId: NamedNpcId }) {
   );
 }
 
-/** What was served, in the Native Language. */
-function servedLine(card: Extract<ClosingCard, { kind: 'success' }>, nativeLanguage: LanguageCode) {
-  return card.served
+/** What was served (or pointed to), in the Native Language. */
+function servedLine(served: readonly ServedItem[], nativeLanguage: LanguageCode) {
+  return served
     .map(({ name, glosses, quantity }) => {
       // A pack glosses its items in every Native Language but its own, where the local name already reads.
       const gloss = glosses[nativeLanguage] ?? name;
@@ -122,11 +122,17 @@ function ClosingCardPanel({ card, npcId }: { card: ClosingCard; npcId: NamedNpcI
   const outcome =
     card.kind === 'failure'
       ? [t('closing.noCharge'), ...mood]
-      : [servedLine(card, nativeLanguage), `−${formatLocalMoney(card.paidInShifts, packId)}`, ...mood];
+      : [
+          // Only what happened: nothing served or paid for (the nurse letting the patient go) shows no line for it.
+          ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
+          ...(card.pointedTo ? [t('closing.pointedTo', { item: servedLine([card.pointedTo], nativeLanguage) })] : []),
+          ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
+          ...mood,
+        ];
 
   return (
     <section className="closing-card" aria-label={t('closing.label')} data-outcome={card.kind}>
-      <h2>{card.kind === 'success' ? t('closing.success') : t('closing.notUnderstood', { who: t(`roles.${npcId}.subject`) })}</h2>
+      <h2>{card.kind === 'success' ? t('closing.success') : t('closing.notUnderstood', { who: t(`roles.${TOWN_NPCS[npcId].role}.subject`) })}</h2>
       <p>{outcome.join(' · ')}</p>
       <div className="closing-card-actions">
         <button type="button" onClick={skipRecap} autoFocus>
@@ -343,7 +349,7 @@ export function ConversationColumn() {
       <header className="chat-header">
         <div className="chat-who">
           <NpcFace npcId={npcId} />
-          <span>{t(`roles.${npcId}.name`)}</span>
+          <span>{t(`roles.${TOWN_NPCS[npcId].role}.name`)}</span>
         </div>
         <div className="chat-meta">
           {localPlaceName(conversation.interaction.placeId, packId)} · {formatClock(minute)}

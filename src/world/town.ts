@@ -1,4 +1,4 @@
-import { TOWN_NPCS, TRAM_LINE, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
+import { TOWN_NPCS, TRAM_LINE, type GroceryId, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
 import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
 import type { Arrival } from '../store/index.ts';
 
@@ -105,6 +105,16 @@ export const FURNITURE: readonly { position: Vec3; size: Vec3; colour: string }[
   { position: [-6, 0.25, 17.4], size: [2, 0.5, 0.6], colour: '#8b6a4f' },
   { position: [3, 0.25, 22.4], size: [2, 0.5, 0.6], colour: '#8b6a4f' },
 ];
+
+/**
+ * Where each grocery sits on the supermarket's aisle shelves, facing the aisle south of it.
+ * The vegetables and eggs face the door; the noodles are down the aisle between the shelves.
+ */
+export const SHELF_SPOTS: Record<GroceryId, Vec3> = {
+  vegetables: [27, 1, -0.05],
+  eggs: [30.5, 1, -0.05],
+  noodles: [29, 1, -2.55],
+};
 
 /** Park trees: trunk positions on the ground. */
 export const TREES: readonly Vec2[] = [

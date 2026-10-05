@@ -20,6 +20,7 @@ const HOUR = 60;
 const MONDAY = 1;
 const TRAMS = placeHours('tram-stop', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
 const SUPERMARKET = placeHours('supermarket', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
+const BOOKSHOP = placeHours('bookshop', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
 const [WEST, CENTRAL, EAST] = TRAM_LINE as readonly TramStopId[];
 
 /** A game at `minuteOfDay` on Monday, the Character standing wherever `placeId` says. */
@@ -53,10 +54,10 @@ describe('walking around town', () => {
   });
 
   it('says so when staff have nothing to talk about yet, and opens no conversation', () => {
-    const store = playingAt(SUPERMARKET.opensAt, 'supermarket');
-    store.getState().setInteractable('cashier');
+    const store = playingAt(BOOKSHOP.opensAt, 'bookshop');
+    store.getState().setInteractable('shopkeeper');
     store.getState().talk();
-    expect(selectToast(store.getState())).toEqual({ kind: 'nothingToSay', npcId: 'cashier' });
+    expect(selectToast(store.getState())).toEqual({ kind: 'nothingToSay', npcId: 'shopkeeper' });
     expect(store.getState().conversation).toBeNull();
   });
 });

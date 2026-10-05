@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildNpcSession, OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
-import type { LanguageCode } from '../sim/index.ts';
+import { LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
@@ -270,5 +270,136 @@ describe('mock VoiceSession: the nurse on the ward', () => {
 
     await say('xqzt');
     expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
+  });
+});
+
+/** A connected fake NPC for any session, which has already spoken first. */
+async function open(session: ReturnType<typeof buildNpcSession>) {
+  const heard = listen();
+  const voice = openMockVoiceSession(session, heard.events);
+  await voice.connect();
+  await vi.runAllTimersAsync();
+  const say = async (text: string) => {
+    voice.sendText(text);
+    await vi.runAllTimersAsync();
+  };
+  const answer = async (response: ToolResponse) => {
+    voice.sendToolResponse(heard.toolCalls.at(-1)!.id, response);
+    await vi.runAllTimersAsync();
+  };
+  return { ...heard, say, answer };
+}
+
+const CLOCK_10AM = { clock: { day: 2, minuteOfDay: 600 } };
+const atTheTill = (packId: LanguageCode) =>
+  open(
+    buildNpcSession(INTERACTIONS.payForGroceries, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.cashier, {
+      ...CLOCK_10AM,
+      basket: [{ itemId: 'eggs', quantity: 1 }],
+    }),
+  );
+const byTheShelves = (packId: LanguageCode) =>
+  open(buildNpcSession(INTERACTIONS.findAnItem, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.cashier, CLOCK_10AM));
+const atTheCornerShop = (packId: LanguageCode) =>
+  open(buildNpcSession(INTERACTIONS.buyCounterFood, CULTURE_PACKS[packId], 'A1', NAMED_NPCS['convenience-clerk'], CLOCK_10AM));
+
+/** What the Player types in each pack: yes, no, eggs and a bento. And what the NPC's lines are written in. */
+const PLAYER = {
+  ja: { yes: 'はい、お願いします', no: 'いいえ、いりません', eggs: '卵はどこですか', bento: 'のり弁当 ください', script: /[ぁ-んァ-ン]/ },
+  zh: { yes: '好的，要', no: '不要', eggs: '鸡蛋在哪里', bento: '我要盒饭', script: /[一-龯]/ },
+  en: { yes: 'yes please', no: 'no thanks', eggs: 'where are the eggs', bento: 'a lasagne please', script: /^[ -~’£…]+$/ },
+  de: { yes: 'ja bitte', no: 'nein danke', eggs: 'wo sind die Eier', bento: 'ein Fertiggericht bitte', script: /[A-Za-zäöüß]/ },
+} as const;
+
+describe('mock VoiceSession: the cashier at the till (#4)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('asks about a bag and a points card, reads them back, then takes payment (%s)', async (packId) => {
+    const { yes, no, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheTill(packId);
+
+    await say(yes);
+    await say(no);
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'complete_purchase', args: { bag: true, card: false } }]);
+    await answer({ result: 'served' });
+
+    // Greeting (and the bag question), the points card question, the read-back, goodbye.
+    expect(turns).toHaveLength(4);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('asks again from the bag when the read-back is wrong', async () => {
+    const { toolCalls, say } = await atTheTill('en');
+    await say('yes');
+    await say('yes');
+    await say('no');
+    await say('no');
+    await say('no');
+    await say('yes');
+    expect(toolCalls.map((call) => call.args)).toEqual([{ bag: false, card: false }]);
+  });
+
+  it('calls not_understood for gibberish', async () => {
+    const { toolCalls, say } = await atTheTill('ja');
+    await say('xqzt');
+    expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
+  });
+});
+
+describe('mock VoiceSession: the cashier finding an item (#5)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('checks which item, then points to it and says where it is (%s)', async (packId) => {
+    const { yes, eggs, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await byTheShelves(packId);
+    const name = CULTURE_PACKS[packId].goods.eggs.name;
+
+    await say(eggs);
+    expect(turns.at(-1)).toContain(name);
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'point_to', args: { item: 'eggs' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    expect(turns.at(-1)).toContain(name);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+});
+
+describe('mock VoiceSession: the clerk at the convenience store counter (#7)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('reads back a bento with its price, then serves it (%s)', async (packId) => {
+    const { yes, bento, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheCornerShop(packId);
+
+    await say(bento);
+    expect(turns.at(-1)!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods.bento.name.toLowerCase());
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'serve_order', args: { items: [{ item: 'bento', quantity: 1 }] } }]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('greets as the clerk, not as the barista', async () => {
+    const barista = await atTheCounter('ja');
+    const clerk = await atTheCornerShop('ja');
+    expect(clerk.turns[0]).not.toBe(barista.turns[0]);
+  });
+
+  it('doesn’t sell what the café sells', async () => {
+    const { turns, toolCalls, say } = await atTheCornerShop('en');
+    await say('a latte please');
+    await say('yes');
+    expect(toolCalls).toEqual([]);
+    expect(turns).toHaveLength(3);
   });
 });

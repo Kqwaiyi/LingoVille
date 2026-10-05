@@ -10,7 +10,7 @@ import {
 } from '@react-three/rapier';
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Vector3, type Group } from 'three';
-import { TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
+import { GROCERIES_SOLD, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
 import {
   selectArrival,
@@ -30,6 +30,7 @@ import {
   isWaitingForTram,
   NPC_SPOTS,
   placeAt,
+  SHELF_SPOTS,
   spawnPoint,
   tramStopAt,
   tramStopSpawn,
@@ -51,7 +52,7 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 
 /**
  * What the Character standing here could use with E: the tap or the bed, the nearest
- * person in talking range, or else the tram stop whose platform this is.
+ * person in talking range, the nearest supermarket shelf, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
 function interactableAt(x: number, z: number, tramRunning: boolean): Interactable | null {
@@ -64,6 +65,14 @@ function interactableAt(x: number, z: number, tramRunning: boolean): Interactabl
     if (TOWN_NPCS[npcId].placeId !== placeId || (!tramRunning && isWaitingForTram(npcId))) continue;
     const distance = distanceTo(x, z, NPC_SPOTS[npcId]);
     if (distance <= nearestDistance) [nearest, nearestDistance] = [npcId, distance];
+  }
+  if (nearest) return nearest;
+  if (placeId === 'supermarket') {
+    let nearestShelf: number = MOVEMENT.interactRangeMetres;
+    for (const itemId of GROCERIES_SOLD) {
+      const distance = distanceTo(x, z, SHELF_SPOTS[itemId]);
+      if (distance <= nearestShelf) [nearest, nearestShelf] = [itemId, distance];
+    }
   }
   return nearest ?? tramStopAt(x, z);
 }

@@ -3,7 +3,7 @@ import type { PlaceId } from '../sim/index.ts';
 // Named NPC personas. Each Culture Pack localises the name (see culturePacks.ts).
 // The full persona schema, with a favourite gift, arrives with ticket 23.
 
-export type NamedNpcId = 'barista' | 'nurse';
+export type NamedNpcId = 'barista' | 'nurse' | 'cashier' | 'convenience-clerk';
 
 export type NamedNpc = {
   id: NamedNpcId;
@@ -31,5 +31,21 @@ export const NAMED_NPCS: Record<NamedNpcId, NamedNpc> = {
     age: 46,
     temperament: 'calm, kind and practical, used to patients waking up confused',
     quirks: 'checks the time on the watch pinned to the uniform and gently tells people off for skipping meals',
+  },
+  cashier: {
+    id: 'cashier',
+    role: 'cashier',
+    placeId: 'supermarket',
+    age: 34,
+    temperament: 'brisk and cheerful, good at keeping the queue moving without rushing anyone',
+    quirks: 'knows exactly which aisle everything is in and is a little proud of it',
+  },
+  'convenience-clerk': {
+    id: 'convenience-clerk',
+    role: 'clerk',
+    placeId: 'convenience-store',
+    age: 21,
+    temperament: 'easy-going and polite, a student working shifts around lectures',
+    quirks: 'always offers to heat things up and remembers which snacks are fresh out of the fryer',
   },
 };

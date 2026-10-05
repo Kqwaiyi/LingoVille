@@ -74,3 +74,54 @@ describe('buildNpcSession: an NPC who starts the conversation', () => {
     expect(nurseSession('zh').tools.map((tool) => tool.name)).toEqual(['discharge_patient', 'not_understood']);
   });
 });
+
+describe('buildNpcSession: the supermarket and convenience store', () => {
+  const MORNING = { day: 2, minuteOfDay: 10 * 60 };
+  const BASKET = [
+    { itemId: 'eggs', quantity: 2 },
+    { itemId: 'noodles', quantity: 1 },
+  ] as const;
+
+  const tillSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.payForGroceries, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.cashier, { clock: MORNING, basket: BASKET });
+  const shelvesSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.findAnItem, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.cashier, { clock: MORNING });
+  const counterSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.buyCounterFood, CULTURE_PACKS[packId], 'A1', NAMED_NPCS['convenience-clerk'], { clock: MORNING });
+
+  it.each(LANGUAGE_CODES)('builds the cashier at the till, the cashier at the shelves and the clerk at the counter in the %s pack', (packId) => {
+    expect(tillSession(packId)).toMatchSnapshot();
+    expect(shelvesSession(packId)).toMatchSnapshot();
+    expect(counterSession(packId)).toMatchSnapshot();
+  });
+
+  it('tells the cashier what is on the counter and the total, in the pack’s money', () => {
+    const { systemInstruction } = tillSession('ja');
+    expect(systemInstruction).toContain('2 × 卵, ¥360 each');
+    expect(systemInstruction).toContain('1 × うどん, ¥360 each');
+    expect(systemInstruction).toContain('Total: ¥1,080');
+  });
+
+  it('has the cashier read back the total, the bag and the points card before taking payment', () => {
+    const { systemInstruction, tools } = tillSession('en');
+    expect(systemInstruction).toMatch(/read back the total.*bag.*points card/i);
+    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', 'not_understood']);
+  });
+
+  it('works at Brooks Supermarket and the corner shop, by their local names', () => {
+    expect(tillSession('en').systemInstruction).toContain('Brooks Supermarket');
+    expect(counterSession('en').systemInstruction).toContain('Patel’s Corner Shop');
+    expect(counterSession('en').systemInstruction).not.toMatch(/café/i);
+  });
+
+  it('gives the cashier the shelf ids to point to, and has them check the item first', () => {
+    const { systemInstruction, tools } = shelvesSession('de');
+    expect(systemInstruction).toContain('Eier (shelf id "eggs")');
+    expect(systemInstruction).toMatch(/check.*which item/i);
+    expect(tools.map((tool) => tool.name)).toEqual(['point_to', 'not_understood']);
+  });
+
+  it('says the convenience store never closes', () => {
+    expect(counterSession('ja').systemInstruction).toContain('ニコニコマート is open 24 hours.');
+  });
+});

@@ -1,3 +1,4 @@
+import { TOWN_NPCS } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
 import { selectInPhrasebook, selectReadingAids, useGame, type JournalPage, type NewWord } from '../store/index.ts';
@@ -31,7 +32,7 @@ function ConversationLines({ page }: { page: JournalPage }) {
       <ol>
         {page.lines.map((line, i) => (
           <li key={i} data-speaker={line.speaker}>
-            <span className="journal-line-speaker">{line.speaker === 'npc' ? (page.npcName ?? t(`roles.${page.npcId}.name`)) : t('page.you')}</span>
+            <span className="journal-line-speaker">{line.speaker === 'npc' ? (page.npcName ?? t(`roles.${TOWN_NPCS[page.npcId].role}.name`)) : t('page.you')}</span>
             <ReadingLine language={page.targetLanguage} text={line.text} segments={line.reading} />
           </li>
         ))}
@@ -67,7 +68,7 @@ function usePageTranslation(page: Pick<JournalPage, 'nativeLanguage'>) {
 export function usePageHeading(page: JournalPage) {
   const { t } = usePageTranslation(page);
   return {
-    title: `${page.npcName ?? t(`roles.${page.npcId}.name`)} · ${page.placeName}`,
+    title: `${page.npcName ?? t(`roles.${TOWN_NPCS[page.npcId].role}.name`)} · ${page.placeName}`,
     when: t('page.when', { day: page.day, time: formatClock(Math.floor(page.minuteOfDay)) }),
   };
 }

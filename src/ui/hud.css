@@ -244,6 +244,109 @@ body,
   color: var(--hud-muted);
 }
 
+/* --- Shopping and the inventory ------------------------------------------- */
+
+/* The supermarket basket: what's in it and the total, at the left, clear of the dock. */
+.basket {
+  position: absolute;
+  left: 16px;
+  bottom: 160px;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 13px;
+}
+
+.basket h2,
+.inventory h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.basket ul,
+.inventory ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.basket li,
+.inventory li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.basket li + li,
+.inventory li + li {
+  margin-top: 4px;
+}
+
+.basket button,
+.dock-inventory button {
+  padding: 2px 10px;
+  border: 1px solid var(--hud-track);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.basket button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.basket-total {
+  margin: 10px 0 0;
+  color: var(--hud-muted);
+}
+
+.dock-inventory {
+  position: relative;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Opens upwards from its button in the dock, solid and over the prompt and place line. */
+.inventory {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% + 18px);
+  width: min(300px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(20, 24, 36);
+  white-space: normal;
+}
+
+.inventory-empty {
+  margin: 0;
+  color: var(--hud-muted);
+}
+
+.inventory-fresh {
+  color: var(--hud-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.inventory li[data-gone-off] .inventory-fresh {
+  color: var(--low);
+}
+
+.dock-inventory .inventory-close {
+  margin-top: 10px;
+  width: 100%;
+  border-color: transparent;
+  color: var(--hud-muted);
+}
+
 /* --- Signs ---------------------------------------------------------------- */
 
 /* Pointing at a sign or menu: its words with their reading aid, and Translate. */
@@ -1346,7 +1449,8 @@ ruby {
 .persist-callout {
   position: absolute;
   right: 20px;
-  bottom: 20px;
+  /* Above the dock's line, so it never covers the dock's buttons. */
+  bottom: 150px;
   display: flex;
   align-items: center;
   gap: 12px;

@@ -24,7 +24,7 @@ export function Toast() {
       {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'loadedBackup' && t('toast.loadedBackup')}
       {toast.kind === 'tooEarlyForBed' && t('toast.tooEarlyForBed', { time: formatTime(CLOCK.bedUsableFrom) })}
-      {toast.kind === 'npcSteppedAway' && t('toast.npcSteppedAway', { who: t(`roles.${toast.npcId}.subject`) })}
+      {toast.kind === 'npcSteppedAway' && t('toast.npcSteppedAway', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
       {toast.kind === 'nothingToSay' && t('toast.nothingToSay', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
     </div>
   );

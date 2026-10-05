@@ -1,14 +1,15 @@
-import { CULTURE_PACKS } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import {
   selectCulturePackId,
   selectHints,
   selectNativeLanguage,
   selectPhrasebook,
+  selectPlaceId,
   selectPlacePhrasebook,
   useGame,
 } from '../store/index.ts';
 import { HearItSaid, Reading } from './JournalPage.tsx';
+import { usePlaceName } from './placeName.ts';
 
 function Hints() {
   const { t } = useTranslation();
@@ -40,11 +41,12 @@ function PlacePhrasebook() {
   const phrases = useGame(selectPlacePhrasebook);
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
+  const placeId = useGame(selectPlaceId);
+  const placeName = usePlaceName();
   if (phrases.length === 0) return null;
   return (
     <section className="help-section" aria-label={t('help.placePhrasebook')}>
-      {/* The café is the only staffed place until the whole town lands (ticket 13). */}
-      <h4>{t('help.at', { place: CULTURE_PACKS[packId].cafe.name })}</h4>
+      <h4>{t('help.at', { place: placeName(placeId, packId) })}</h4>
       <ul className="help-list">
         {phrases.map((phrase) => (
           <li key={phrase.text}>

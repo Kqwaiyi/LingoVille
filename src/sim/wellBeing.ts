@@ -1,5 +1,6 @@
 import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
 import { faint } from './faint.ts';
+import { throwOutSpoiled } from './inventory.ts';
 import { clampMeter } from './meters.ts';
 import type { GameState, PlaceId } from './state.ts';
 import { CLOCK, METER_MAX, MINUTES_PER_HOUR, MOOD, WELL_BEING } from './tuning.ts';
@@ -35,12 +36,13 @@ function minutesUntilFainting(character: GameState['character']): number {
  * gives the same result as many short ones. Mood falls while a need is unmet
  * and, faster, while the Character is up late at night. The moment Health
  * reaches 0, the Character faints, and the rest of the tick is lost.
+ * Groceries that have been off too long are thrown out.
  */
 export function tick(state: GameState, dtGameMinutes: number): GameState {
   if (dtGameMinutes <= 0) return state;
   const untilFainting = minutesUntilFainting(state.character);
   if (untilFainting <= dtGameMinutes) return faint(decay(state, untilFainting));
-  return decay(state, dtGameMinutes);
+  return throwOutSpoiled(decay(state, dtGameMinutes));
 }
 
 function decay(state: GameState, dtGameMinutes: number): GameState {

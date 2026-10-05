@@ -18,4 +18,13 @@ describe('NPCs who start conversations themselves', () => {
   it('starts the barista’s order with E', () => {
     expect(interactionStartedWithE('barista')).toBe(INTERACTIONS.orderDrink);
   });
+
+  it('starts paying at the cashier when the Character brings shopping, and asking where something is when not', () => {
+    expect(interactionStartedWithE('cashier', { shopping: true })).toBe(INTERACTIONS.payForGroceries);
+    expect(interactionStartedWithE('cashier', { shopping: false })).toBe(INTERACTIONS.findAnItem);
+  });
+
+  it('starts the convenience store order with E at the clerk', () => {
+    expect(interactionStartedWithE('convenience-clerk')).toBe(INTERACTIONS.buyCounterFood);
+  });
 });

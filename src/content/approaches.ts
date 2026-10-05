@@ -14,7 +14,14 @@ export function approachInteraction(approachId: ApproachId): Interaction {
 
 const OPENED_BY_NPCS = new Set(Object.values(APPROACH_INTERACTIONS));
 
-/** The conversation E starts with this Named NPC, or null if they only ever start one themselves. */
-export function interactionStartedWithE(npcId: NamedNpcId): Interaction | null {
+/** What the Character brings to the conversation: shopping from the supermarket's shelves, or none. */
+export type Bringing = { shopping: boolean };
+
+/**
+ * The conversation E starts with this Named NPC, or null if they only ever start one themselves.
+ * The cashier takes payment for shopping brought to the till, and otherwise helps find something.
+ */
+export function interactionStartedWithE(npcId: NamedNpcId, { shopping }: Bringing = { shopping: false }): Interaction | null {
+  if (npcId === 'cashier') return shopping ? INTERACTIONS.payForGroceries : INTERACTIONS.findAnItem;
   return Object.values(INTERACTIONS).find((i) => i.npcId === npcId && !OPENED_BY_NPCS.has(i)) ?? null;
 }

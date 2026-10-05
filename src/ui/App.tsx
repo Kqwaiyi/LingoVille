@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useShowNativeLanguage } from '../i18n/index.ts';
 import { selectConversation, selectNativeLanguage, selectScreen, useGame } from '../store/index.ts';
 import { Scene } from '../world/index.ts';
+import { BasketPanel } from './BasketPanel.tsx';
 import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { FaintingScreen } from './FaintingScreen.tsx';
@@ -55,6 +56,7 @@ function Hud() {
       <GatewayStatus />
       <InteractionPrompt />
       <TramPanel />
+      <BasketPanel />
       <SignTooltip />
       <Dock />
       <ConversationColumn />

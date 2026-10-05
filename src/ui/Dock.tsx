@@ -9,9 +9,11 @@ import {
   selectDebts,
   selectHealth,
   selectHunger,
+  selectInventory,
   selectMood,
   selectMoodFace,
   selectMoneyInShifts,
+  selectNativeLanguage,
   selectPlaceHours,
   selectPlaceId,
   selectPlaceOpen,
@@ -21,6 +23,7 @@ import {
   useGame,
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
+import { itemLabel } from './itemLabel.ts';
 import { usePlaceName } from './placeName.ts';
 
 const MOOD_FACE_ICONS: Record<MoodFace, string> = { miserable: '😫', low: '🙁', okay: '😐', good: '🙂', great: '😄' };
@@ -64,6 +67,48 @@ function Money() {
             <li key={kind}>{t(`dock.debt.${kind}`, { amount: formatLocalMoney(amountInShifts, packId) })}</li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/** What the Character owns, behind a button in the dock: each thing, how many, and whether groceries are still fresh. */
+function Inventory() {
+  const { t } = useTranslation();
+  const inventory = useGame(selectInventory);
+  const packId = useGame(selectCulturePackId);
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const [open, setOpen] = useState(false);
+  const count = inventory.reduce((sum, { quantity }) => sum + quantity, 0);
+
+  return (
+    <div className="dock-inventory">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {t('inventory.open', { count })}
+      </button>
+      {open && (
+        <section className="inventory" aria-label={t('inventory.label')}>
+          <h2>{t('inventory.label')}</h2>
+          {inventory.length === 0 ? (
+            <p className="inventory-empty">{t('inventory.empty')}</p>
+          ) : (
+            <ul>
+              {inventory.map(({ itemId, quantity, expiresOnDay, goneOff }) => (
+                <li key={`${itemId}-${expiresOnDay}`} data-gone-off={goneOff || undefined}>
+                  <span>
+                    {itemLabel(itemId, packId, nativeLanguage)} ×{quantity}
+                  </span>
+                  {expiresOnDay !== null && (
+                    <span className="inventory-fresh">{goneOff ? t('inventory.goneOff') : t('inventory.freshUntil', { day: expiresOnDay })}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" className="inventory-close" onClick={() => setOpen(false)}>
+            {t('inventory.close')}
+          </button>
+        </section>
       )}
     </div>
   );
@@ -155,6 +200,8 @@ export function Dock() {
         </div>
         <div className="dock-sep" aria-hidden />
         <Money />
+        <div className="dock-sep" aria-hidden />
+        <Inventory />
       </section>
     </div>
   );
