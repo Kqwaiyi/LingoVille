@@ -26,7 +26,7 @@ The [Anatomy of an interaction](02-anatomy-of-an-interaction.md) ticket adds req
 
 Resolved by grilling on 2026-10-03.
 
-**One town, four Culture Packs.** One shared 3D layout. Each Target Language gets a **Culture Pack** (see `CONTEXT.md`) containing its menus and goods, currency, customs, signs and opening-hour overrides: onigiri and bowing in Japanese, Brezel and Sunday closing in German. English uses a **UK** setting, which means no tipping, so the restaurant flow is the same in every pack.
+**One town, four Culture Packs.** One shared 3D layout. Each Target Language gets a **Culture Pack** (see `GLOSSARY.md`) containing its menus and goods, currency, customs, signs and opening-hour overrides: onigiri and bowing in Japanese, Brezel and Sunday closing in German. English uses a **UK** setting, which means no tipping, so the restaurant flow is the same in every pack.
 
 **Places (11).**
 

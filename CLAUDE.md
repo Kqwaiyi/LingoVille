@@ -12,7 +12,7 @@ Uses the five default triage roles as-is (`needs-triage`, `needs-info`, `ready-f
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 ### Implementation
 

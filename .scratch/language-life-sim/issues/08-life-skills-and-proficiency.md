@@ -28,7 +28,7 @@ The [Town and content scope](07-town-and-content-scope.md) ticket adds the follo
 
 ## Answer
 
-Resolved by grilling on 2026-10-03. New term in `CONTEXT.md`: **Proficiency Step**. The Life Skill entry now lists all five skills.
+Resolved by grilling on 2026-10-03. New term in `GLOSSARY.md`: **Proficiency Step**. The Life Skill entry now lists all five skills.
 
 ### Language Proficiency
 

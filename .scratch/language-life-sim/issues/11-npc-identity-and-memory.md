@@ -17,7 +17,7 @@ The [Technical architecture](10-technical-architecture.md) ticket fixes the foll
 
 ## Answer
 
-Resolved by grilling on 2026-10-03. Terms are defined in `CONTEXT.md`: Named NPC, Shift Customer, Familiarity, NPC Memory.
+Resolved by grilling on 2026-10-03. Terms are defined in `GLOSSARY.md`: Named NPC, Shift Customer, Familiarity, NPC Memory.
 
 **Who is named.** Every counter's staff, the 3–4 park regulars and the landlord are **Named NPCs**: about 15 people, each with one authored persona (name, age, temperament, a few quirks, one favourite gift). A Culture Pack localises the same person with a local name and local dressing. Personas live in `content` as Zod-typed data keyed by a stable NPC id. **Shift Customers** stay anonymous, with a random look and voice per customer and no memory. A recurring customer cast is not part of launch.
 

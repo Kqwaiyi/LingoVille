@@ -38,4 +38,4 @@ What do the game and its town look and sound like? Decide:
 
 ### Glossary
 
-Added **Appearance Preset** to `CONTEXT.md`.
+Added **Appearance Preset** to `GLOSSARY.md`.

@@ -35,4 +35,4 @@
   - The "with shopping, the cashier means pay" rule is in both `content/approaches.ts` and `InteractionPrompt.tsx`.
   - `goesOff` is inferred from `meals !== undefined`.
   - `items.test.ts` copies the 0.06 and 0.12 ratios.
-  - Basket, Inventory and Groceries aren't in `CONTEXT.md` yet.
+  - Basket, Inventory and Groceries aren't in `GLOSSARY.md` yet.

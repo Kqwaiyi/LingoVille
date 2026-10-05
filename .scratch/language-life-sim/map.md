@@ -9,7 +9,7 @@ A **game design doc + technical spec** for a single-player, low-poly 3D, desktop
 
 ## Notes
 
-**Domain & glossary.** Use the terms in `CONTEXT.md` (Character, Well-being, Mood, Life Skill, Language Proficiency, Target Language, Native Language, Job, Fainting, Speaking, Typed Fallback, Help). Grilling tickets: call the Skill tool for `grilling` and `domain-modeling`; update `CONTEXT.md` as terms resolve. Research tickets: `research` skill, findings in `.scratch/language-life-sim/research/`. Prototype tickets: `prototype` skill.
+**Domain & glossary.** Use the terms in `GLOSSARY.md` (Character, Well-being, Mood, Life Skill, Language Proficiency, Target Language, Native Language, Job, Fainting, Speaking, Typed Fallback, Help). Grilling tickets: call the Skill tool for `grilling` and `domain-modeling`; update `GLOSSARY.md` as terms resolve. Research tickets: `research` skill, findings in `.scratch/language-life-sim/research/`. Prototype tickets: `prototype` skill.
 
 **Who & constraints.** Solo dev building with AI agents; understands web-dev workflow and reviews agent output. Hackathon, ~2 months, but time is explicitly not a constraint on design ambition. Runs **locally only** — never publicly deployed — using the dev's own **Google Gemini** API key.
 

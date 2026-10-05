@@ -10,7 +10,7 @@ What is the exact shape of one goal-driven NPC interaction, start to finish? Pin
 
 ## Answer
 
-Resolved by grilling on 2026-10-03. Terms are defined in `CONTEXT.md`: Goal Interaction, Small Talk, Patience, Recap, Journal.
+Resolved by grilling on 2026-10-03. Terms are defined in `GLOSSARY.md`: Goal Interaction, Small Talk, Patience, Recap, Journal.
 
 **Trigger.** The player starts most conversations by walking up to an NPC and pressing **E**. The NPC always speaks first, so the player never faces silence. Some roles start conversations themselves: Job customers walking up to the counter, the landlord's rent reminder, and the doctor calling you in.
 

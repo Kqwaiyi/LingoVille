@@ -3,7 +3,7 @@
 Status: ready-for-agent
 Map: [Language-learning life sim](../language-life-sim/map.md)
 
-This spec puts the 16 resolved tickets on the map into one place. Each decision links back to the ticket it came from, and terms follow `CONTEXT.md`. Where two tickets disagree, the later ticket wins; [Further Notes](#further-notes) lists every such case, and the questions no ticket answered, which the dev decided before ticketing. Build tickets are in [issues/](issues/).
+This spec puts the 16 resolved tickets on the map into one place. Each decision links back to the ticket it came from, and terms follow `GLOSSARY.md`. Where two tickets disagree, the later ticket wins; [Further Notes](#further-notes) lists every such case, and the questions no ticket answered, which the dev decided before ticketing. Build tickets are in [issues/](issues/).
 
 ## Problem Statement
 
