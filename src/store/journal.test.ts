@@ -33,7 +33,43 @@ const entry = (day: number, outcome = `Ordered a latte on day ${day}.`): NewJour
   helpLog: [],
 });
 
+/** A Shift's one combined entry: two customers, the first served right and the second walked away from. */
+const shiftEntry: NewJournalEntry = {
+  kind: 'shift',
+  jobId: 'barista',
+  customers: 6,
+  served: 1,
+  placeName: 'ほしコーヒー',
+  day: 4,
+  minuteOfDay: 11 * 60,
+  targetLanguage: 'ja',
+  nativeLanguage: 'en',
+  recap: { outcome: 'You served one of two customers right.', corrections: [], newWords: [] },
+  lines: [
+    { speaker: 'npc', text: 'ラテをください。', customer: 1 },
+    { speaker: 'player', text: 'はい', typed: true, customer: 1 },
+    { speaker: 'npc', text: '紅茶を一つ。', customer: 2 },
+  ],
+  helpLog: [{ afterLine: 3, kind: 'translate', text: '紅茶を一つ。' }],
+};
+
 describe('the Journal', () => {
+  it('keeps a Shift’s combined Recap as one entry, with every customer’s lines', async () => {
+    const { journal } = freshJournal();
+    await journal.append('slot-1', entry(1));
+    const stored = await journal.append('slot-1', shiftEntry);
+
+    expect(stored).toMatchObject({ ...shiftEntry, noHelpNeeded: false });
+    expect(await journal.list('slot-1')).toEqual([stored, expect.objectContaining({ kind: 'goal' })]);
+  });
+
+  it('reads an entry from before Shift entries were kept as the Goal Interaction’s it was', async () => {
+    const { journal } = freshJournal();
+    const goal = await journal.append('slot-1', entry(1));
+
+    expect(parseJournalEntry({ ...goal, schemaVersion: 3 })).toEqual(goal);
+  });
+
   it('keeps every entry for a slot, newest first', async () => {
     const { journal } = freshJournal();
 

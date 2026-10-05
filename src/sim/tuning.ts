@@ -164,6 +164,11 @@ export const PROFICIENCY = {
   /** How far past a step boundary the score must go before the current step changes, so it doesn't flicker (default). */
   stepBuffer: 0.15,
   /**
+   * A Shift's results as listening evidence (default): a Shift where every order was missed pulls this far below the step
+   * the customers spoke at, in steps, and the listening counts this much beside what the Player said (1: as much).
+   */
+  shiftListening: { missedOrderPull: 1, weight: 1 },
+  /**
    * The middle of each step on the hidden score (default), which runs from 0 to the number of steps.
    * A new save starts here (only A1–B2 can be a starting step), and a Recap's estimate pulls the score here.
    */

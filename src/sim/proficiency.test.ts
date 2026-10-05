@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyRecapEvidence,
+  applyShiftEvidence,
   createSave,
   PROFICIENCY,
   PROFICIENCY_STEPS,
@@ -9,6 +10,8 @@ import {
   type GameState,
   type HelpShown,
   type ProficiencyStep,
+  type ShiftCustomerEvidence,
+  type ShiftEvidence,
   type StartingStep,
 } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
@@ -187,5 +190,71 @@ describe('applyRecapEvidence', () => {
     expect(highest.map((step) => PROFICIENCY_STEPS.indexOf(step))).toEqual(
       highest.map((step) => PROFICIENCY_STEPS.indexOf(step)).toSorted((a, b) => a - b),
     );
+  });
+});
+
+describe('applyShiftEvidence', () => {
+  /** A Shift Customer who said their order, and whom the Player served without a word: listening only. */
+  const listenedTo = (served: boolean): ShiftCustomerEvidence => ({
+    lines: [{ speaker: 'npc', text: 'A latte, please.' }],
+    helpLog: [],
+    notUnderstoodTurns: 0,
+    served,
+  });
+
+  /** A Shift of five customers at B1, served or not, with a Recap that saw too little speaking to judge. */
+  const shift = (served: boolean[], change: Partial<ShiftEvidence> = {}): ShiftEvidence => ({
+    cefrEstimate: 'A1',
+    listenedAt: 'B1',
+    customers: served.map(listenedTo),
+    ...change,
+  });
+
+  it('counts serving every order as listening evidence of the step the customers spoke at, even when the Player never spoke', () => {
+    const state = settledSave('A1');
+    const before = state.progression.proficiencyScore;
+
+    const after = applyShiftEvidence(state, shift([true, true, true, true, true]));
+
+    expect(after.progression.proficiencyScore).toBeGreaterThan(before);
+    expect(after.progression.proficiencyScore).toBeLessThan(PROFICIENCY.stepCentre.B1);
+  });
+
+  it('takes each missed order as evidence of a lower level', () => {
+    const state = settledSave('B1');
+    const score = (served: boolean[]) => applyShiftEvidence(state, shift(served)).progression.proficiencyScore;
+
+    expect(score([true, true, true, true, false])).toBeLessThan(score([true, true, true, true, true]));
+    expect(score([false, false, false, false, false])).toBeLessThan(score([true, true, true, true, false]));
+    expect(score([false, false, false, false, false])).toBeLessThan(state.progression.proficiencyScore);
+  });
+
+  it('counts a whole Shift as one piece of evidence, however many customers it had', () => {
+    const state = settledSave('A1');
+    const after = applyShiftEvidence(state, shift(Array.from({ length: 8 }, () => true), { cefrEstimate: 'B1' }));
+
+    expect(after.progression.evidenceSoFar - state.progression.evidenceSoFar).toBeGreaterThan(0);
+    expect(after.progression.evidenceSoFar - state.progression.evidenceSoFar).toBeLessThanOrEqual(1);
+  });
+
+  it('counts a customer whose lines the Player had translated for nothing as listening evidence', () => {
+    const state = settledSave('A1');
+    const translated: ShiftCustomerEvidence = {
+      ...listenedTo(true),
+      helpLog: [{ afterLine: 1, kind: 'translate', text: 'A latte, please.' }],
+    };
+
+    const after = applyShiftEvidence(state, { ...shift([]), customers: [translated, translated] });
+
+    expect(after).toEqual(state);
+  });
+
+  it('also counts what the Player said, as the Recap judged it', () => {
+    const state = settledSave('A1');
+    const talked: ShiftCustomerEvidence = { lines: linesWithPlayerTurns(3), helpLog: [], notUnderstoodTurns: 0, served: true };
+    const score = (cefrEstimate: ProficiencyStep) =>
+      applyShiftEvidence(state, { cefrEstimate, listenedAt: 'A1', customers: [talked, talked] }).progression.proficiencyScore;
+
+    expect(score('B2')).toBeGreaterThan(score('A1'));
   });
 });

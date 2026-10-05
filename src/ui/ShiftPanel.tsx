@@ -11,6 +11,7 @@ import {
   useGame,
 } from '../store/index.ts';
 import { itemLabel } from './itemLabel.ts';
+import { JournalPageView } from './JournalPage.tsx';
 
 /**
  * The barista's menu grid, between the chat and the input bar while a Shift Customer is at the counter:
@@ -54,7 +55,7 @@ export function MenuGrid() {
   );
 }
 
-/** Shown when a Shift ends: how many customers were served and what it paid, until the Player closes it. */
+/** Shown when a Shift ends: how many customers were served, what it paid, and the Shift's one combined Recap, until the Player closes it. */
 export function ShiftEndCard() {
   const { t } = useTranslation();
   const shiftEnd = useGame(selectShiftEnd);
@@ -67,6 +68,21 @@ export function ShiftEndCard() {
       <h2 id="shift-end-title">{t('shift.endTitle', { job: t(`skills.names.${shiftEnd.jobId}`) })}</h2>
       <p>{t('shift.served', { served: shiftEnd.served, count: shiftEnd.customers })}</p>
       <p className="shift-end-pay">{t('shift.pay', { amount: formatLocalMoney(shiftEnd.payInShifts, packId) })}</p>
+      {shiftEnd.recap && (
+        <section className="shift-end-recap" aria-label={t('recap.label')} aria-busy={shiftEnd.recap.status === 'writing'}>
+          {shiftEnd.recap.status === 'writing' && (
+            <p className="recap-writing" role="status">
+              {t('recap.writing')}
+            </p>
+          )}
+          {shiftEnd.recap.status === 'failed' && (
+            <p className="recap-writing" role="status">
+              {t('recap.failed')}
+            </p>
+          )}
+          {shiftEnd.recap.status === 'ready' && <JournalPageView page={shiftEnd.recap.entry} />}
+        </section>
+      )}
       <button type="button" className="primary" onClick={closeShiftEnd} autoFocus>
         {t('shift.done')}
       </button>

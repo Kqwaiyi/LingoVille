@@ -372,6 +372,8 @@ export const zh: UiStrings = {
   },
   page: {
     label: '日记页',
+    customer: '顾客 {{number}}',
+    shift: '班次 — {{job}}',
     when: '第 {{day}} 天 · {{time}}',
     noHelpNeeded: '无需帮助',
     corrections: '纠正',

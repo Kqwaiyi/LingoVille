@@ -225,8 +225,8 @@ describe('the Recap', () => {
     regular.npc.says('ありがとうございました。');
     await regular.recaps[0]!.arrives(RECAP);
 
-    expect((await stranger.journal.list('slot-1'))[0]?.npcName).toBeNull();
-    expect((await regular.journal.list('slot-1'))[0]?.npcName).toBe(CULTURE_PACKS[DEV_SETUP.culturePackId].personas.barista.name);
+    expect((await stranger.journal.list('slot-1'))[0]).toMatchObject({ npcName: null });
+    expect((await regular.journal.list('slot-1'))[0]).toHaveProperty('npcName',CULTURE_PACKS[DEV_SETUP.culturePackId].personas.barista.name);
   });
 
   it('Skip Recap still saves the Recap to the Journal when it arrives, and says so', async () => {

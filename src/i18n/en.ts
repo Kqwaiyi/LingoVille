@@ -379,6 +379,8 @@ export const en = {
   // A Journal page shows in the Native Language it was written in.
   page: {
     label: 'Journal page',
+    customer: 'Customer {{number}}',
+    shift: 'Shift — {{job}}',
     when: 'Day {{day}} · {{time}}',
     noHelpNeeded: 'No Help needed',
     corrections: 'Corrections',

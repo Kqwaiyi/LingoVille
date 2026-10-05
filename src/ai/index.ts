@@ -29,6 +29,7 @@ export {
   type HelpLogEntry,
   type Recap,
   type RecapConversation,
+  type ShiftRecapCustomer,
   type RecapLine,
   type RecapRequest,
   type RecapRequestBody,

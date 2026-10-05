@@ -24,7 +24,7 @@ export {
   type NpcExpression,
   type Patience,
 } from './patience.ts';
-export { applyRecapEvidence, type ConversationEvidence } from './proficiency.ts';
+export { applyRecapEvidence, applyShiftEvidence, type ConversationEvidence, type ShiftCustomerEvidence, type ShiftEvidence } from './proficiency.ts';
 export {
   createSave,
   DEBT_KINDS,

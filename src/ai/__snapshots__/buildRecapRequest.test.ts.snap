@@ -137,18 +137,23 @@ exports[`buildRecapRequest > builds one combined Recap for a whole Shift 1`] = `
       "parts": [
         {
           "text": "CUSTOMER 1
-With the barista at ほしコーヒー. The barista's goal: Take the customer's order. Outcome: succeeded.
-1. NPC: 欢迎光临！您要点什么？
-2. PLAYER (heard as, may be misheard): 我要一百拿铁
-3. NPC: 一杯热拿铁，对吗？二十八块。
-4. PLAYER (typed): 对
-5. NPC: 好的，请拿好。慢走！
+They ordered: 1 × ホットラテ. The barista served it right.
+1. NPC: すみません、ラテを一つください。
+2. PLAYER (heard as, may be misheard): ラテ…ですか？
+3. NPC: はい、ラテです。
 Help used: none.
 
 CUSTOMER 2
-With the barista at ほしコーヒー. The barista's goal: Take the customer's order. Outcome: failed.
-1. NPC: 欢迎光临！您要点什么？
-2. PLAYER (heard as, may be misheard): 我要一百拿铁
+They ordered: 1 × ホットラテ. The barista served 1 × 紅茶 instead.
+1. NPC: すみません、ラテを一つください。
+2. PLAYER (heard as, may be misheard): ラテ…ですか？
+3. NPC: はい、ラテです。
+Help used:
+- after line 1: translated NPC line: すみません、ラテを一つください。
+
+CUSTOMER 3
+They ordered: 1 × ブレンドコーヒー. The barista never served them, and they left.
+1. NPC: すみません、ラテを一つください。
 Help used: none.",
         },
       ],
@@ -246,7 +251,7 @@ Help used: none.",
       {
         "text": "WHO YOU ARE
 You are a warm, encouraging language coach. Your learner speaks Mandarin Chinese and is learning Japanese by living in a small town in Japan. Their level is about CEFR A2.
-Write a short Recap of a whole work Shift, where the learner was the staff member serving several customers, for them to read straight afterwards and keep in their Journal.
+Write a short Recap of a whole work Shift, where the learner was the barista serving several customers, for them to read straight afterwards and keep in their Journal.
 
 HOW TO READ THE TRANSCRIPT
 - NPC lines are exactly what the NPC said.

@@ -6,12 +6,12 @@
 
 **Spec:** [spec.md](../spec.md): Jobs and Shifts (including Shift Recap); Voice pipeline (connection failure); Save model; Recap and Journal; Decisions made before ticketing (11)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The Shift saves after every customer (customers served, pay so far). Done in 19b: the Shift (customers, served, failed, the customer at the counter) is in the save.
 - [x] A reload mid-Shift ends the Shift with pay for the customers already served (Vitest on the load path). Done in 19b (`src/store/shift.test.ts`).
-- [ ] A network abandonment replaces the customer and doesn't count. A player abandonment counts as a failure and is docked (Vitest). 19b already does both and tests them in the store; what's left is checking the docks.
-- [ ] Playwright (mock mode): a network-abandonment path in a Shift.
-- [ ] A single `/api/recap` call over the whole Shift's transcript when it ends. The request builder has a snapshot for the Shift case.
-- [ ] One Journal entry and one CEFR estimate per Shift.
-- [ ] Shift results feed listening evidence into Proficiency (Vitest).
+- [x] A network abandonment replaces the customer and doesn't count, with a "The customer had to step away" toast. A player abandonment counts as a failure and is docked (Vitest, at B1 where the dock isn't 0).
+- [x] Playwright (mock mode): a network-abandonment path in a Shift.
+- [x] A single `/api/recap` call over the whole Shift's transcript when it ends. The request builder has a snapshot for the Shift case. Each customer carries their order and how the sim's exact check found them served; one lost to the network isn't sent. It opens with the pay on the Shift-end card. A reload saves no conversations, so a Shift it ends has no Recap.
+- [x] One Journal entry and one CEFR estimate per Shift. Journal entries are v4: a `shift` kind beside `goal`, with every customer's lines in order.
+- [x] Shift results feed listening evidence into Proficiency (Vitest). `applyShiftEvidence`: serving every order is evidence of the step the customers spoke at, each missed one pulls lower (`PROFICIENCY.shiftListening`), and lines the Player had translated count for nothing as listening. The whole Shift counts as one piece of evidence.

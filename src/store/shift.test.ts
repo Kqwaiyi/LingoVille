@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { NpcSession, ToolResponse } from '../ai/index.ts';
+import type { NpcSession, Recap, RecapRequest, ToolResponse } from '../ai/index.ts';
 import { SHIFT_TEMPLATES, type ItemId } from '../content/index.ts';
-import { createSave, ECONOMY, hire, type GameState } from '../sim/index.ts';
+import { createSave, ECONOMY, hire, PROFICIENCY_STEP_TABLE, type GameState } from '../sim/index.ts';
 import { VoiceServiceUnavailableError, type OpenVoiceSession, type VoiceSessionEvents } from '../voice/index.ts';
 import {
   createGameStore,
   DEFAULT_DEVICE_SETTINGS,
   DEV_SETUP,
+  JOURNAL_SCHEMA_VERSION,
   SAVE_SCHEMA_VERSION,
+  type Journal,
+  type NewJournalEntry,
   selectClosingCard,
   selectConversation,
   selectShift,
@@ -47,22 +50,42 @@ function fakeCustomers() {
   };
 }
 
+/** Recaps the test answers: each request asked for, which arrives or fails when the test says. */
+function fakeRecaps() {
+  const asked: { request: RecapRequest; arrives: (recap: Recap) => void; fails: () => void }[] = [];
+  const requestRecap = (request: RecapRequest) =>
+    new Promise<Recap>((resolve, reject) => asked.push({ request, arrives: resolve, fails: () => reject(new Error('recap_unavailable')) }));
+  return { asked, requestRecap };
+}
+
+/** A Journal that keeps what it's given in memory. */
+function keptJournal() {
+  const kept: NewJournalEntry[] = [];
+  const journal: Journal = {
+    append: async (_, entry) => (kept.push(entry), { ...entry, id: 'entry', writtenAt: '', schemaVersion: JOURNAL_SCHEMA_VERSION, noHelpNeeded: false }),
+    list: async () => [],
+    raw: async () => [],
+    restore: async () => {},
+    remove: async () => {},
+  };
+  return { kept, journal };
+}
+
 /** A hired barista at the staff door at 10:00 on day 3. */
 function atTheStaffDoor(change: (game: GameState) => GameState = (game) => game) {
   const { saves, written } = recordingSaves();
   const customers = fakeCustomers();
-  let recapsAsked = 0;
+  const recaps = fakeRecaps();
+  const { kept, journal } = keptJournal();
   const game = hire(createSave(DEV_SETUP), 'barista');
   const store = createGameStore(change({ ...game, placeId: 'cafe', clock: { day: 3, minuteOfDay: 10 * 60 } }), {
     saves,
     openVoiceSession: customers.openVoiceSession,
-    requestRecap: () => {
-      recapsAsked++;
-      return new Promise(() => {});
-    },
+    requestRecap: recaps.requestRecap,
+    journal,
   });
   store.getState().setInteractable('staff-door');
-  return { store, customers, written, recapsAsked: () => recapsAsked };
+  return { store, customers, written, recaps: recaps.asked, recapsAsked: () => recaps.asked.length, kept };
 }
 
 /** The hidden order of the customer at the counter, as the sim holds it. */
@@ -220,7 +243,7 @@ describe('the end of a Shift', () => {
     expect(selectConversation(store.getState())).toBeNull();
     expect(selectShift(store.getState())).toBeNull();
     // Every customer served at A1 and neutral Mood: one Shift's base pay.
-    expect(selectShiftEnd(store.getState())).toEqual({ jobId: 'barista', customers: count, served: count, payInShifts: ECONOMY.shiftBasePayInShifts });
+    expect(selectShiftEnd(store.getState())).toMatchObject({ jobId: 'barista', customers: count, served: count, payInShifts: ECONOMY.shiftBasePayInShifts });
     expect(store.getState().game.character.moneyInShifts).toBeCloseTo(money + ECONOMY.shiftBasePayInShifts);
     expect(written.at(-1)?.game.possessions.shift).toBeNull();
     expect(written.at(-1)?.game.character.moneyInShifts).toBeCloseTo(money + ECONOMY.shiftBasePayInShifts);
@@ -232,7 +255,7 @@ describe('the end of a Shift', () => {
 });
 
 describe('a Shift and the connection', () => {
-  it('replaces a Shift Customer lost to the network, who doesn’t count', () => {
+  it('replaces a Shift Customer lost to the network, who doesn’t count, saying they had to step away', () => {
     const { store, customers } = atTheStaffDoor();
     store.getState().startShift();
     customers.current().events.onDisconnect();
@@ -243,6 +266,158 @@ describe('a Shift and the connection', () => {
     expect(customers.opened).toHaveLength(3);
     expect(selectShift(store.getState())).toMatchObject({ done: 0 });
     expect(selectConversation(store.getState())).toMatchObject({ shiftCustomer: { tray: [] }, retried: false });
+    expect(store.getState().toast).toEqual({ kind: 'npcSteppedAway', npcId: null });
+  });
+});
+
+describe('the Shift Recap', () => {
+  const RECAP: Recap = {
+    outcome: 'Most customers got what they ordered.',
+    corrections: [{ said: 'はい', natural: 'かしこまりました', why: 'Staff say this to customers.' }],
+    newWords: [{ base: 'ください', reading: 'ください', gloss: 'please' }],
+    cefrEstimate: 'A2',
+  };
+
+  /**
+   * A whole Shift: the first customer says their order, the Player answers and serves it; the second is lost to the
+   * network and replaced; the Player walks away from the next; and everyone after is served right.
+   */
+  function workAShift() {
+    const shift = atTheStaffDoor();
+    const { store, customers } = shift;
+    store.getState().startShift();
+    const count = store.getState().game.possessions.shift!.customers;
+    const firstOrder = orderNow(store);
+    customers.says('ラテをください。');
+    store.getState().sendTypedLine('はい');
+    serve(store, customers, firstOrder);
+    customers.current().events.onDisconnect();
+    customers.current().events.onDisconnect();
+    const walkedAwayFrom = orderNow(store);
+    customers.says('紅茶をひとつ。');
+    store.getState().leaveConversation();
+    while (store.getState().game.possessions.shift) serve(store, customers, orderNow(store));
+    return { ...shift, count, firstOrder, walkedAwayFrom };
+  }
+
+  it('asks for one Recap over the whole Shift when it ends, with every customer dealt with but none lost to the network', () => {
+    const { recaps, count, firstOrder, walkedAwayFrom } = workAShift();
+
+    expect(recaps).toHaveLength(1);
+    const { request } = recaps[0]!;
+    expect(request).toMatchObject({ kind: 'shift', jobId: 'barista', culturePackId: 'ja', step: 'A1' });
+    if (request.kind !== 'shift') throw new Error('not a Shift Recap');
+    expect(request.customers).toHaveLength(count);
+    expect(request.customers[0]).toEqual({
+      order: firstOrder,
+      result: 'served',
+      served: firstOrder,
+      transcript: [
+        { speaker: 'npc', text: 'ラテをください。' },
+        { speaker: 'player', text: 'はい', typed: true },
+        { speaker: 'npc', text: 'ありがとう！' },
+      ],
+      helpLog: [],
+    });
+    expect(request.customers[1]).toEqual({
+      order: walkedAwayFrom,
+      result: 'walkedOut',
+      served: [],
+      transcript: [{ speaker: 'npc', text: '紅茶をひとつ。' }],
+      helpLog: [],
+    });
+  });
+
+  it('opens the combined Recap with the pay, and keeps it as one Journal entry', async () => {
+    const { store, recaps, kept, count } = workAShift();
+    expect(selectShiftEnd(store.getState())?.recap).toEqual({ status: 'writing' });
+
+    recaps[0]!.arrives(RECAP);
+
+    await vi.waitFor(() => expect(kept).toHaveLength(1));
+    expect(selectShiftEnd(store.getState())?.recap).toMatchObject({
+      status: 'ready',
+      entry: { kind: 'shift', jobId: 'barista', recap: { outcome: RECAP.outcome, corrections: RECAP.corrections } },
+    });
+    expect(kept[0]).toMatchObject({ kind: 'shift', jobId: 'barista', customers: count, served: count - 1, recap: { outcome: RECAP.outcome } });
+    expect(kept[0]!.lines.slice(0, 4)).toEqual([
+      { speaker: 'npc', text: 'ラテをください。', customer: 1 },
+      { speaker: 'player', text: 'はい', typed: true, customer: 1 },
+      { speaker: 'npc', text: 'ありがとう！', customer: 1 },
+      { speaker: 'npc', text: '紅茶をひとつ。', customer: 2 },
+    ]);
+  });
+
+  it('counts the Shift’s results as Proficiency evidence once its Recap arrives, and saves it', async () => {
+    const { store, recaps, written } = workAShift();
+    const before = store.getState().game.progression;
+
+    recaps[0]!.arrives(RECAP);
+
+    await vi.waitFor(() => expect(store.getState().game.progression.evidenceSoFar).toBeGreaterThan(before.evidenceSoFar));
+    expect(store.getState().game.progression.proficiencyScore).not.toBe(before.proficiencyScore);
+    expect(written.at(-1)!.game.progression).toEqual(store.getState().game.progression);
+  });
+
+  it('still keeps a Recap that arrives after the card is closed, saying so when the card is closed', async () => {
+    const { store, recaps, kept } = workAShift();
+    const before = store.getState().game.progression;
+
+    store.getState().closeShiftEnd();
+    expect(store.getState().toast).toEqual({ kind: 'recapSaved' });
+    recaps[0]!.arrives(RECAP);
+
+    await vi.waitFor(() => expect(kept).toHaveLength(1));
+    expect(selectShiftEnd(store.getState())).toBeNull();
+    expect(store.getState().game.progression.evidenceSoFar).toBeGreaterThan(before.evidenceSoFar);
+  });
+
+  it('keeps the Shift in the Journal with no Recap if none could be written, and leaves Proficiency alone', async () => {
+    const { store, recaps, kept } = workAShift();
+    const before = store.getState().game.progression;
+
+    recaps[0]!.fails();
+
+    await vi.waitFor(() => expect(kept).toHaveLength(1));
+    expect(kept[0]).toMatchObject({ kind: 'shift', recap: null });
+    expect(selectShiftEnd(store.getState())?.recap).toEqual({ status: 'failed' });
+    expect(store.getState().game.progression).toEqual(before);
+  });
+});
+
+describe('docks at the end of a Shift', () => {
+  /** Reached B1, where each failed customer is docked. */
+  const atB1 = (game: GameState): GameState => ({ ...game, proficiencyStep: 'B1', progression: { ...game.progression, highestStep: 'B1' } });
+  const { stakeMultiplier, failedCustomerDock } = PROFICIENCY_STEP_TABLE.B1;
+  const base = ECONOMY.shiftBasePayInShifts;
+
+  /** Serves every customer still to come their order. */
+  function serveTheRest(store: ReturnType<typeof createGameStore>, customers: ReturnType<typeof fakeCustomers>) {
+    while (store.getState().game.possessions.shift) serve(store, customers, orderNow(store));
+  }
+
+  it('docks a customer the Player walked away from as a failure', () => {
+    const { store, customers } = atTheStaffDoor(atB1);
+    store.getState().startShift();
+    const count = store.getState().game.possessions.shift!.customers;
+    store.getState().leaveConversation();
+    serveTheRest(store, customers);
+
+    // 1.25 × base × (n − 1)/n, less one B1 dock (0.05 of base).
+    expect(failedCustomerDock).toBeGreaterThan(0);
+    expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(base * ((count - 1) / count) * stakeMultiplier - failedCustomerDock * base);
+  });
+
+  it('doesn’t dock a customer lost to the network, who is replaced', () => {
+    const { store, customers } = atTheStaffDoor(atB1);
+    store.getState().startShift();
+    const count = store.getState().game.possessions.shift!.customers;
+    customers.current().events.onDisconnect();
+    customers.current().events.onDisconnect();
+    serveTheRest(store, customers);
+
+    expect(selectShiftEnd(store.getState())).toMatchObject({ customers: count, served: count });
+    expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(base * stakeMultiplier);
   });
 });
 
@@ -323,6 +498,8 @@ describe('a Shift and the save', () => {
     expect(selectConversation(reloaded.getState())).toBeNull();
     // One customer of `count` served, at A1 (no dock) and neutral Mood.
     expect(selectShiftEnd(reloaded.getState())).toMatchObject({ served: 1, customers: count, payInShifts: ECONOMY.shiftBasePayInShifts / count });
+    // The conversations aren't saved, so there's nothing to write a Recap from.
+    expect(selectShiftEnd(reloaded.getState())?.recap).toBeNull();
     expect(reloaded.getState().game.character.moneyInShifts).toBeCloseTo(savedMidShift.character.moneyInShifts + ECONOMY.shiftBasePayInShifts / count);
   });
 });

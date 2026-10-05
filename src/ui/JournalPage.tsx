@@ -23,16 +23,21 @@ export function Reading({ base, reading, language }: { base: string; reading: st
   return <RubyText language={language} segments={[{ base, reading }]} />;
 }
 
-/** The conversation as it was said, with the NPC's lines as corrected by the time the page was written. */
+/** The conversation as it was said, with the NPC's lines as corrected by the time the page was written. A Shift's has every customer's. */
 function ConversationLines({ page }: { page: JournalPage }) {
   const { t } = usePageTranslation(page);
+  const npc = useNpcName(page);
+  const speaker = (line: JournalPage['lines'][number]) => {
+    if (line.speaker === 'player') return t('page.you');
+    return page.kind === 'shift' ? t('page.customer', { number: line.customer ?? 1 }) : npc;
+  };
   return (
     <details className="journal-lines">
       <summary>{t('page.conversation')}</summary>
       <ol>
         {page.lines.map((line, i) => (
           <li key={i} data-speaker={line.speaker}>
-            <span className="journal-line-speaker">{line.speaker === 'npc' ? (page.npcName ?? t(`roles.${TOWN_NPCS[page.npcId].role}.name`)) : t('page.you')}</span>
+            <span className="journal-line-speaker">{speaker(line)}</span>
             <ReadingLine language={page.targetLanguage} text={line.text} segments={line.reading} />
           </li>
         ))}
@@ -64,11 +69,19 @@ function usePageTranslation(page: Pick<JournalPage, 'nativeLanguage'>) {
   return useTranslation(undefined, { lng: page.nativeLanguage });
 }
 
-/** Who and where (the NPC by the name the Character knew them by then, or by their role), and when. */
+/** A Goal Interaction page's NPC, by the name the Character knew them by then, or by their role. Null on a Shift's page. */
+function useNpcName(page: JournalPage) {
+  const { t } = usePageTranslation(page);
+  return page.kind === 'shift' ? null : (page.npcName ?? t(`roles.${TOWN_NPCS[page.npcId].role}.name`));
+}
+
+/** Who and where (the NPC, or the Shift worked), and when. */
 export function usePageHeading(page: JournalPage) {
   const { t } = usePageTranslation(page);
+  const npc = useNpcName(page);
+  const who = page.kind === 'shift' ? t('page.shift', { job: t(`skills.names.${page.jobId}`) }) : npc;
   return {
-    title: `${page.npcName ?? t(`roles.${TOWN_NPCS[page.npcId].role}.name`)} · ${page.placeName}`,
+    title: `${who} · ${page.placeName}`,
     when: t('page.when', { day: page.day, time: formatClock(Math.floor(page.minuteOfDay)) }),
   };
 }

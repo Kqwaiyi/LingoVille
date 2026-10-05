@@ -372,6 +372,8 @@ export const de: UiStrings = {
   },
   page: {
     label: 'Tagebuchseite',
+    customer: 'Kunde {{number}}',
+    shift: 'Schicht — {{job}}',
     when: 'Tag {{day}} · {{time}}',
     noHelpNeeded: 'Ohne Hilfe',
     corrections: 'Korrekturen',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INTERACTIONS } from '../content/index.ts';
-import { buildRecapRequest, RecapRequestSchema, RecapSchema, type RecapConversation, type RecapRequest } from './index.ts';
+import { buildRecapRequest, RecapRequestSchema, RecapSchema, type RecapConversation, type RecapLine, type RecapRequest } from './index.ts';
 
 const ORDER: RecapConversation = {
   interactionId: INTERACTIONS.orderDrink.id,
@@ -13,6 +13,31 @@ const ORDER: RecapConversation = {
     { speaker: 'npc', text: '好的，请拿好。慢走！' },
   ],
   helpLog: [],
+};
+
+const SHIFT_LINES: RecapLine[] = [
+  { speaker: 'npc', text: 'すみません、ラテを一つください。' },
+  { speaker: 'player', text: 'ラテ…ですか？' },
+  { speaker: 'npc', text: 'はい、ラテです。' },
+];
+
+const shift: RecapRequest = {
+  kind: 'shift',
+  jobId: 'barista',
+  culturePackId: 'ja',
+  step: 'A2',
+  nativeLanguage: 'zh',
+  customers: [
+    { order: [{ itemId: 'latte', quantity: 1 }], result: 'served', served: [{ itemId: 'latte', quantity: 1 }], transcript: SHIFT_LINES, helpLog: [] },
+    {
+      order: [{ itemId: 'latte', quantity: 1 }],
+      result: 'wrongOrder',
+      served: [{ itemId: 'tea', quantity: 1 }],
+      transcript: SHIFT_LINES,
+      helpLog: [{ afterLine: 1, kind: 'translate', text: 'すみません、ラテを一つください。' }],
+    },
+    { order: [{ itemId: 'coffee', quantity: 1 }], result: 'walkedOut', served: [], transcript: SHIFT_LINES.slice(0, 1), helpLog: [] },
+  ],
 };
 
 const goal: RecapRequest = { kind: 'goal', culturePackId: 'zh', step: 'A1', nativeLanguage: 'en', conversation: ORDER };
@@ -45,15 +70,21 @@ describe('buildRecapRequest', () => {
   });
 
   it('builds one combined Recap for a whole Shift', () => {
-    expect(
-      buildRecapRequest({
-        kind: 'shift',
-        culturePackId: 'ja',
-        step: 'A2',
-        nativeLanguage: 'zh',
-        customers: [ORDER, { ...ORDER, outcome: 'failure', transcript: ORDER.transcript.slice(0, 2) }],
-      }),
-    ).toMatchSnapshot();
+    expect(buildRecapRequest(shift)).toMatchSnapshot();
+  });
+
+  it('tells the coach, for each Shift Customer, what they ordered and how the learner served them', () => {
+    const prompt = text(shift);
+
+    expect(prompt).toMatch(/learner was the barista/);
+    expect(prompt).toContain('CUSTOMER 1\nThey ordered: 1 × ホットラテ. The barista served it right.');
+    expect(prompt).toContain('CUSTOMER 2\nThey ordered: 1 × ホットラテ. The barista served 1 × 紅茶 instead.');
+    expect(prompt).toContain('CUSTOMER 3\nThey ordered: 1 × ブレンドコーヒー. The barista never served them, and they left.');
+    expect(prompt).toContain('2. PLAYER (heard as, may be misheard): ラテ…ですか？');
+  });
+
+  it('asks for at most three corrections across the whole Shift', () => {
+    expect(buildRecapRequest(shift).generationConfig.responseSchema.properties!.corrections!.maxItems).toBe(3);
   });
 
   it('marks spoken player lines as possibly misheard, and typed ones as typed', () => {

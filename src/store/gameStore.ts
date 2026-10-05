@@ -20,6 +20,7 @@ import {
   type Recap,
   type RecapRequest,
   type Segment,
+  type ShiftRecapCustomer,
   type ToolResponse,
 } from '../ai/index.ts';
 import {
@@ -60,6 +61,7 @@ import {
   cancelShift,
   approachDue,
   applyRecapEvidence,
+  applyShiftEvidence,
   bedUsable,
   CHARACTER_NAME,
   CLOCK,
@@ -258,7 +260,8 @@ export type ChatLine = TranscriptLine & { typed?: true };
 
 /** A short notice over the game that clears itself. */
 export type Toast =
-  | { kind: 'npcSteppedAway'; npcId: NamedNpcId }
+  /** A network abandonment: the NPC (null for a Shift Customer, who is replaced) had to step away. */
+  | { kind: 'npcSteppedAway'; npcId: NamedNpcId | null }
   | { kind: 'recapSaved' }
   | { kind: 'loadedBackup' }
   /** The bed is used before 20:00. */
@@ -268,8 +271,11 @@ export type Toast =
   /** Staff standing in for a conversation that a later ticket brings. */
   | { kind: 'nothingToSay'; npcId: TownNpcId };
 
-/** The Shift is over: how it went and what it paid, shown until the Player closes it. */
-export type ShiftEnd = { jobId: JobId; customers: number; served: number; payInShifts: number };
+/**
+ * The Shift is over: how it went and what it paid, shown until the Player closes it, with its one combined Recap
+ * (null if there was nothing to write it from, as when a reload ended the Shift).
+ */
+export type ShiftEnd = { jobId: JobId; customers: number; served: number; payInShifts: number; recap: RecapView | null };
 
 /** The staff door the Character is at: whether E starts a Shift there now (`refusal` null), or why not. */
 export type StaffDoor = { jobId: JobId; refusal: Exclude<ShiftRefusal, 'underway'> | null };
@@ -317,10 +323,19 @@ export type NewWord = Recap['newWords'][number];
 export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }>;
 
 /** How a Shift Customer was dealt with: served what they ordered, served something else, or gone unserved. */
-export type ShiftCustomerOutcome = { kind: 'served' | 'wrongOrder' | 'walkedOut' };
+export type ShiftCustomerOutcome = { kind: ShiftRecapCustomer['result'] };
 
 /** The Shift Customer at the counter, as the conversation shows them: what the Player has put on the tray to serve. */
 export type ShiftCustomerView = { tray: Basket };
+
+/** A Shift Customer the Player dealt with, kept for the Shift's Recap: their order, how it went, and their conversation once they've gone. */
+type ShiftLogEntry = {
+  conversationId: number;
+  order: Basket;
+  result: ShiftCustomerOutcome['kind'];
+  served: Basket;
+  conversation: Conversation | null;
+};
 
 /** Who the conversation is with: a Named NPC in a Goal Interaction, or an anonymous Shift Customer. */
 type Partner =
@@ -714,6 +729,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let conversations = 0;
   // The game as it was when the open conversation began: what a save holds until its outcome is decided.
   let gameBeforeConversation: GameState | null = null;
+  // The Shift Customers dealt with so far this Shift, for its one combined Recap. One lost to the network isn't among them.
+  let shiftLog: ShiftLogEntry[] = [];
+  // Tells each Shift's end apart, so a late Shift Recap only lands on the end it was written for.
+  let shiftsEnded = 0;
   // An NPC due to come up to the Character while the Player is busy, who waits until the Player is free.
   let pendingApproach: ApproachId | null = null;
   let realMsSinceSave = 0;
@@ -765,6 +784,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
       realMsSinceSave = 0;
+      // A Shift from another game is over without its Recap: its customers' readings go too.
+      shiftLog.forEach(({ conversationId }) => lineReadings.delete(conversationId));
+      shiftLog = [];
       set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null });
       // While the town loads, so the first line doesn't wait for a dictionary.
       deps.readings.preload(game.identity.targetLanguage).then(
@@ -968,7 +990,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (get().conversation?.id === conversationId) updateConversation({ recap });
     };
 
-    /** The Recap's evidence moves the hidden Language Proficiency, which is saved at once. */
+    /** A Recap's evidence moves the hidden Language Proficiency (`apply`), which is saved at once. */
+    const applyEvidence = (apply: (game: GameState) => GameState) => {
+      // A later conversation may have begun: a save during it writes the game from before it, which needs the evidence too.
+      if (gameBeforeConversation) gameBeforeConversation = apply(gameBeforeConversation);
+      set({ game: apply(get().game) });
+      save();
+    };
+
     const applyProficiencyEvidence = (conversation: NpcConversation, recap: Recap) => {
       const evidence: ConversationEvidence = {
         cefrEstimate: recap.cefrEstimate,
@@ -976,11 +1005,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         helpLog: conversation.helpLog,
         notUnderstoodTurns: conversation.patience.turnsNotUnderstood,
       };
-      // A later conversation may have begun: a save during it writes the game from before it, which needs the evidence too.
-      if (gameBeforeConversation) gameBeforeConversation = applyRecapEvidence(gameBeforeConversation, evidence);
-      set({ game: applyRecapEvidence(get().game, evidence) });
-      save();
+      applyEvidence((game) => applyRecapEvidence(game, evidence));
     };
+
+    /** A Recap as the Journal keeps it: each new word with its reading if that passes the checks, or with the library's. */
+    const journalRecap = (recap: Recap, targetLanguage: LanguageCode) => ({
+      outcome: recap.outcome,
+      corrections: recap.corrections,
+      newWords: recap.newWords.map((word) =>
+        hasReadingAids(targetLanguage) ? { ...word, reading: wordReading(targetLanguage, word, deps.readings.read(targetLanguage, word.base)) } : word,
+      ),
+    });
+
+    /** A conversation's lines as a Recap reads them: a typed player line is marked, so it isn't taken as misheard. */
+    const transcriptOf = (lines: ChatLine[]) => lines.map(({ speaker, text, typed }) => (typed ? { speaker, text, typed } : { speaker, text }));
 
     /**
      * Starts writing the Recap the moment the conversation ends. It goes to the
@@ -990,7 +1028,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const writeRecap = (conversation: NpcConversation, outcome: ClosingCard) => {
       const { game, nativeLanguage } = get();
       const { culturePackId, targetLanguage } = game.identity;
-      const transcript = conversation.lines.map(({ speaker, text, typed }) => (typed ? { speaker, text, typed } : { speaker, text }));
+      const transcript = transcriptOf(conversation.lines);
       const request: RecapRequest = {
         kind: 'goal',
         culturePackId,
@@ -1009,19 +1047,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         targetLanguage,
         nativeLanguage,
         outcome: outcome.kind,
-        recap: recap && { outcome: recap.outcome, corrections: recap.corrections, newWords: recap.newWords.map(checkedWord) },
+        recap: recap && journalRecap(recap, targetLanguage),
         lines: transcript.map((line, i) => {
           const reading = (lineReadings.get(conversation.id)?.readings ?? conversation.readings)[i];
           return reading && line.speaker === 'npc' ? { ...line, reading: reading.segments } : line;
         }),
         helpLog: conversation.helpLog,
       });
-      /** A new word with its reading if that passes the checks, or with the library's. */
-      const checkedWord = (word: NewWord): NewWord =>
-        hasReadingAids(targetLanguage)
-          ? { ...word, reading: wordReading(targetLanguage, word, deps.readings.read(targetLanguage, word.base)) }
-          : word;
-
       updateConversation({ recap: { status: 'writing' } });
       deps
         .requestRecap(request)
@@ -1212,23 +1244,122 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * checks it exactly, and it's saved. The customer says goodbye next, then leaves. Returns whether it was their order.
      */
     const settleShiftCustomer = (served: Basket | null) => {
-      const { state, correct } = applyShiftCustomer(get().game, served);
+      const { game, conversation } = get();
+      const customer = game.possessions.shift?.customer;
+      const { state, correct } = applyShiftCustomer(game, served);
+      const result = correct ? 'served' : served ? 'wrongOrder' : 'walkedOut';
+      if (customer && conversation) shiftLog.push({ conversationId: conversation.id, order: customer.order, result, served: served ?? [], conversation: null });
       set({ game: state });
-      updateConversation({ outcome: { kind: correct ? 'served' : served ? 'wrongOrder' : 'walkedOut' } });
+      updateConversation({ outcome: { kind: result } });
       save();
       return correct;
     };
 
-    /** The Shift is over: it's paid, the pay shows, and it's saved. Any customer still at the counter goes. */
+    /**
+     * A Shift Customer's conversation is over: if they were dealt with, it's kept for the Shift's Recap, with its
+     * readings until the Journal entry is written. One lost before they were dealt with is forgotten.
+     */
+    const keepShiftCustomerLines = (conversation: Conversation) => {
+      const logged = shiftLog.find((entry) => entry.conversationId === conversation.id);
+      if (logged) logged.conversation = conversation;
+      else lineReadings.delete(conversation.id);
+    };
+
+    /** The Shift is over: it's paid, the pay shows, and it's saved. Any customer still at the counter goes. Its Recap is written from every customer dealt with. */
     const finishShift = () => {
       const { shift } = get().game.possessions;
       if (!shift) return;
       closeSession();
+      const conversation = get().conversation;
+      if (conversation?.shiftCustomer) keepShiftCustomerLines(conversation);
+      const log = shiftLog;
+      shiftLog = [];
+      const shiftId = ++shiftsEnded;
       const { state, payInShifts } = endShift(get().game);
       const { jobId, customers, served } = shift;
-      set({ game: state, conversation: null, typing: false, micLevel: 0, shiftEnd: { jobId, customers, served, payInShifts } });
+      const recap: RecapView | null = log.length > 0 ? { status: 'writing' } : null;
+      set({ game: state, conversation: null, typing: false, micLevel: 0, shiftEnd: { jobId, customers, served, payInShifts, recap } });
       save();
+      if (log.length > 0) writeShiftRecap(shiftId, shift, log);
       approachIfFree();
+    };
+
+    /**
+     * Writes the Shift's one combined Recap over every customer dealt with, the moment it ends. Its evidence moves
+     * Proficiency, with the Shift's results as listening evidence, and it goes to the Journal as one entry.
+     */
+    const writeShiftRecap = (shiftId: number, { jobId, customers, served }: Shift, log: ShiftLogEntry[]) => {
+      const { game, nativeLanguage } = get();
+      const { culturePackId, targetLanguage } = game.identity;
+      const listenedAt = game.proficiencyStep;
+      const dealtWith: ShiftRecapCustomer[] = log.map(({ order, result, served: handed, conversation }) => ({
+        order,
+        result,
+        served: handed,
+        transcript: transcriptOf(conversation?.lines ?? []),
+        helpLog: conversation?.helpLog ?? [],
+      }));
+      const request: RecapRequest = { kind: 'shift', jobId, culturePackId, step: listenedAt, nativeLanguage, customers: dealtWith };
+      // Every customer's lines in order, each marked with its customer, and the Help log placed among them.
+      const entry = (recap: Recap | null): NewJournalEntry => {
+        const lines: NewJournalEntry['lines'] = [];
+        const helpLog: HelpLogEntry[] = [];
+        log.forEach(({ conversationId, conversation }, i) => {
+          const { transcript, helpLog: helped } = dealtWith[i]!;
+          const readings = lineReadings.get(conversationId)?.readings ?? conversation?.readings ?? {};
+          helpLog.push(...helped.map((help) => ({ ...help, afterLine: help.afterLine + lines.length })));
+          transcript.forEach((line, n) => {
+            const reading = line.speaker === 'npc' ? readings[n] : undefined;
+            lines.push({ ...line, ...(reading && { reading: reading.segments }), customer: i + 1 });
+          });
+        });
+        return {
+          kind: 'shift',
+          jobId,
+          customers,
+          served,
+          placeName: localPlaceName(JOB_PLACES[jobId], culturePackId),
+          day: game.clock.day,
+          minuteOfDay: game.clock.minuteOfDay,
+          targetLanguage,
+          nativeLanguage,
+          recap: recap && journalRecap(recap, targetLanguage),
+          lines,
+          helpLog,
+        };
+      };
+      const landed = (recap: RecapView) => {
+        const shiftEnd = get().shiftEnd;
+        if (shiftEnd && shiftId === shiftsEnded) set({ shiftEnd: { ...shiftEnd, recap } });
+      };
+
+      deps
+        .requestRecap(request)
+        .then(
+          (recap) => {
+            const customersSeen = log.map(({ result, conversation }) => ({
+              lines: (conversation?.lines ?? []).map(({ speaker, text }) => ({ speaker, text })),
+              helpLog: conversation?.helpLog ?? [],
+              notUnderstoodTurns: conversation?.patience.turnsNotUnderstood ?? 0,
+              served: result === 'served',
+            }));
+            applyEvidence((state) => applyShiftEvidence(state, { cefrEstimate: recap.cefrEstimate, listenedAt, customers: customersSeen }));
+            landed({ status: 'ready', entry: journalPage(entry(recap)) });
+            return recap;
+          },
+          (error: unknown) => {
+            console.warn('[recap] the Shift Recap could not be written:', error instanceof Error ? error.message : error);
+            landed({ status: 'failed' });
+            return null;
+          },
+        )
+        // The Journal keeps the corrected readings, so it waits for the last lines' annotations.
+        .then(async (recap) => {
+          await Promise.allSettled(log.flatMap(({ conversationId }) => lineReadings.get(conversationId)?.annotating ?? []));
+          return deps.journal.append(get().slotId, entry(recap));
+        })
+        .catch((error: unknown) => console.error('[journal] could not save an entry:', error))
+        .finally(() => log.forEach(({ conversationId }) => lineReadings.delete(conversationId)));
     };
 
     /** The next Shift Customer walks up to the counter and speaks first. With every customer seen to, the Shift ends. */
@@ -1254,7 +1385,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const shiftCustomerLeft = () => {
       closeSession();
       const conversation = get().conversation;
-      if (conversation) lineReadings.delete(conversation.id);
+      if (conversation) keepShiftCustomerLines(conversation);
       set({ conversation: null, typing: false, micLevel: 0 });
       nextShiftCustomerOrEnd();
     };
@@ -1365,7 +1496,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       }
       if (conversation.retried) {
         // A Shift Customer lost to the network is replaced by the next, and doesn't count.
-        if (conversation.shiftCustomer) return shiftCustomerLeft();
+        if (conversation.shiftCustomer) {
+          set({ toast: { kind: 'npcSteppedAway', npcId: null } });
+          return shiftCustomerLeft();
+        }
         return dropConversation({ toast: { kind: 'npcSteppedAway', npcId: conversation.npcId } });
       }
       set({
@@ -1763,7 +1897,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const correct = settleShiftCustomer(tray);
         voice.sendText(shiftCustomerServedScene(tray, correct, CULTURE_PACKS[get().game.identity.culturePackId]));
       },
-      closeShiftEnd: () => set({ shiftEnd: null }),
+      closeShiftEnd: () => {
+        // Closed before its Recap was there to read: it still goes to the Journal.
+        const writing = get().shiftEnd?.recap?.status === 'writing';
+        set({ shiftEnd: null, ...(writing && { toast: { kind: 'recapSaved' } as const }) });
+      },
       talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;

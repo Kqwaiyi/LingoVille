@@ -2,36 +2,32 @@ import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import { SegmentSchema } from '../ai/index.ts';
 import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import { JOB_IDS } from '../sim/index.ts';
 
 // The Journal: every Recap the Player has had, kept per slot in its own IndexedDB
 // database, apart from the save. Entries are only ever added. Each holds the
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
-export const JOURNAL_SCHEMA_VERSION = 3;
+export const JOURNAL_SCHEMA_VERSION = 4;
 
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
 const INTERACTION_IDS = Object.values(INTERACTIONS).map((interaction) => interaction.id) as [string, ...string[]];
 
-const JournalEntrySchema = z.object({
+// What every entry has, whatever it is a Recap of.
+const shared = {
   schemaVersion: z.literal(JOURNAL_SCHEMA_VERSION),
   id: z.string(),
   /** When it was written, in real time. */
   writtenAt: z.string(),
-  kind: z.literal('goal'),
-  npcId: z.enum(NPC_IDS),
-  /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
-  npcName: z.string().nullable(),
-  interactionId: z.enum(INTERACTION_IDS),
   placeName: z.string(),
-  /** The game time the conversation ended. */
+  /** The game time the conversation (or Shift) ended. */
   day: z.int(),
   minuteOfDay: z.number(),
   targetLanguage: z.enum(LANGUAGES),
   nativeLanguage: z.enum(LANGUAGES),
-  outcome: z.enum(['success', 'failure']),
   /** The Recap as shown, or null if it couldn't be written. */
   recap: z
     .object({
@@ -47,17 +43,42 @@ const JournalEntrySchema = z.object({
       typed: z.boolean().optional(),
       /** An NPC line's reading aid (zh and ja), as corrected by the time the entry was written. */
       reading: z.array(SegmentSchema).optional(),
+      /** In a Shift's entry, which customer (from 1, in the order the Player dealt with them) the line was said with. */
+      customer: z.int().min(1).optional(),
     }),
   ),
   helpLog: z.array(z.object({ afterLine: z.int().min(0), kind: z.enum(['hint', 'phrasebook', 'translate']), text: z.string() })),
   noHelpNeeded: z.boolean(),
-});
+};
+
+const JournalEntrySchema = z.discriminatedUnion('kind', [
+  /** A Goal Interaction's Recap. */
+  z.object({
+    ...shared,
+    kind: z.literal('goal'),
+    npcId: z.enum(NPC_IDS),
+    /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
+    npcName: z.string().nullable(),
+    interactionId: z.enum(INTERACTION_IDS),
+    outcome: z.enum(['success', 'failure']),
+  }),
+  /** A whole Shift's one combined Recap, with every customer's lines in order. */
+  z.object({
+    ...shared,
+    kind: z.literal('shift'),
+    jobId: z.enum(JOB_IDS),
+    /** How many Shift Customers the Shift had, and how many were served right. */
+    customers: z.int().min(1),
+    served: z.int().min(0),
+  }),
+]);
 
 export type JournalEntry = z.infer<typeof JournalEntrySchema>;
 /** What the game hands the Journal; the Journal stamps the rest. */
-export type NewJournalEntry = Omit<JournalEntry, 'schemaVersion' | 'id' | 'writtenAt' | 'noHelpNeeded'>;
+export type NewJournalEntry = DistributiveOmit<JournalEntry, 'schemaVersion' | 'id' | 'writtenAt' | 'noHelpNeeded'>;
 /** What a Journal page shows, whether or not it has been stored yet. */
-export type JournalPage = Omit<JournalEntry, 'schemaVersion' | 'id' | 'writtenAt'>;
+export type JournalPage = DistributiveOmit<JournalEntry, 'schemaVersion' | 'id' | 'writtenAt'>;
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** The "No Help needed" sticker shows only when the Help log is empty. */
 export function journalPage(entry: NewJournalEntry): JournalPage {
@@ -77,6 +98,8 @@ const MIGRATIONS: readonly ((entry: StoredEntry) => StoredEntry)[] = [
   (entry) => ({ ...entry, schemaVersion: 2, npcName: null }),
   // 2 → 3: NPC lines may keep their reading aid. Older ones have none.
   (entry) => ({ ...entry, schemaVersion: 3 }),
+  // 3 → 4: a Shift gets its own kind of entry. Older ones are all Goal Interactions'.
+  (entry) => ({ ...entry, schemaVersion: 4 }),
 ];
 
 /** Reads one stored entry as an entry of today's version, through the migrations. Throws, saying why, if it can't. */

@@ -307,7 +307,14 @@ describe('POST /api/recap', () => {
   });
 
   it('checks a combined Shift Recap against the Shift limits, not one conversation’s', async () => {
-    const shift: RecapRequest = { kind: 'shift', culturePackId: 'ja', step: 'A1', nativeLanguage: 'en', customers: [REQUEST.conversation] };
+    const shift: RecapRequest = {
+      kind: 'shift',
+      jobId: 'barista',
+      culturePackId: 'ja',
+      step: 'A1',
+      nativeLanguage: 'en',
+      customers: [{ order: [{ itemId: 'latte', quantity: 1 }], result: 'served', served: [{ itemId: 'latte', quantity: 1 }], transcript: REQUEST.conversation.transcript, helpLog: [] }],
+    };
     const maxWords = buildRecapRequest(shift).generationConfig.responseSchema.properties!.newWords!.maxItems!;
     const recap = { ...RECAP, newWords: Array.from({ length: maxWords }, () => RECAP.newWords[0]!) };
     const base = await start({ GEMINI_API_KEY: 'k' }, fakeGemini(() => geminiText(JSON.stringify(recap))));

@@ -372,6 +372,8 @@ export const ja: UiStrings = {
   },
   page: {
     label: '日記のページ',
+    customer: 'お客さん {{number}}',
+    shift: 'シフト — {{job}}',
     when: '{{day}}日目 · {{time}}',
     noHelpNeeded: 'ヘルプなし',
     corrections: '直し',

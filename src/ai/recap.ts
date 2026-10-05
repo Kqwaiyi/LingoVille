@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { CULTURE_PACKS, localPlaceName, NAMED_NPCS, toGeminiSchema, type CulturePack, type NamedNpcId } from '../content/index.ts';
+import { CULTURE_PACKS, ITEM_IDS, localPlaceName, NAMED_NPCS, toGeminiSchema, type CulturePack, type NamedNpcId } from '../content/index.ts';
+import { JOB_IDS, type Basket } from '../sim/index.ts';
 import {
   block,
   InteractionIdSchema,
@@ -31,6 +32,20 @@ const RecapConversationSchema = z.object({
   helpLog: z.array(HelpLogEntrySchema),
 });
 
+const BasketLineSchema = z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1) });
+
+/**
+ * One Shift Customer as the Recap reads them: what they ordered, how the game's exact check found the learner served
+ * them (`served` is what was handed over, empty if nothing), and what was said.
+ */
+const ShiftRecapCustomerSchema = z.object({
+  order: z.array(BasketLineSchema).min(1).readonly(),
+  result: z.enum(['served', 'wrongOrder', 'walkedOut']),
+  served: z.array(BasketLineSchema).readonly(),
+  transcript: z.array(RecapLineSchema),
+  helpLog: z.array(HelpLogEntrySchema),
+});
+
 const shared = {
   culturePackId: LanguageSchema,
   step: StepSchema,
@@ -47,12 +62,13 @@ export const RecapRequestSchema = z.discriminatedUnion('kind', [
     transcript: z.array(RecapLineSchema),
     helpLog: z.array(HelpLogEntrySchema),
   }),
-  z.object({ kind: z.literal('shift'), ...shared, customers: z.array(RecapConversationSchema).min(1) }),
+  z.object({ kind: z.literal('shift'), ...shared, jobId: z.enum(JOB_IDS), customers: z.array(ShiftRecapCustomerSchema).min(1) }),
 ]);
 
 export type RecapLine = TranscriptLine;
 export type HelpLogEntry = z.infer<typeof HelpLogEntrySchema>;
 export type RecapConversation = z.infer<typeof RecapConversationSchema>;
+export type ShiftRecapCustomer = z.infer<typeof ShiftRecapCustomerSchema>;
 export type RecapRequest = z.infer<typeof RecapRequestSchema>;
 
 /** How much each kind of Recap may hold. Small Talk gets a lighter one, so a casual chat isn't turned into a lesson. */
@@ -123,12 +139,34 @@ function conversationBlock(heading: string, conversation: RecapConversation, pac
   ]);
 }
 
+/** The items as they're named in this pack: "1 × ラテ". */
+function itemsSaid(items: Basket, pack: CulturePack) {
+  return items.map(({ itemId, quantity }) => `${quantity} × ${pack.goods[itemId]!.name}`).join(', ');
+}
+
+/** What the customer ordered, and whether the learner (the `staff`) served it right, served something else, or never served them. */
+function servedLine({ order, result, served }: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+  const ordered = `They ordered: ${itemsSaid(order, pack)}.`;
+  switch (result) {
+    case 'served':
+      return `${ordered} The ${staff} served it right.`;
+    case 'wrongOrder':
+      return `${ordered} The ${staff} served ${served.length > 0 ? itemsSaid(served, pack) : 'nothing'} instead.`;
+    case 'walkedOut':
+      return `${ordered} The ${staff} never served them, and they left.`;
+  }
+}
+
+function shiftCustomerBlock(heading: string, customer: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+  return block(heading, [servedLine(customer, staff, pack), ...transcriptLines(customer.transcript), ...helpLines(customer.helpLog)]);
+}
+
 function coachBlock(request: RecapRequest, pack: CulturePack) {
   const native = CULTURE_PACKS[request.nativeLanguage].languageName;
   const what = {
     goal: 'one conversation',
     smallTalk: 'one Small Talk chat: a casual conversation with no goal, which cannot fail',
-    shift: 'a whole work Shift, where the learner was the staff member serving several customers',
+    shift: `a whole work Shift, where the learner was the ${request.kind === 'shift' ? request.jobId : 'staff member'} serving several customers`,
   }[request.kind];
   return block('WHO YOU ARE', [
     `You are a warm, encouraging language coach. Your learner speaks ${native} and is learning ${pack.languageName} ` +
@@ -189,7 +227,7 @@ function conversationsText(request: RecapRequest, pack: CulturePack) {
       ]);
     }
     case 'shift':
-      return request.customers.map((customer, i) => conversationBlock(`CUSTOMER ${i + 1}`, customer, pack)).join('\n\n');
+      return request.customers.map((customer, i) => shiftCustomerBlock(`CUSTOMER ${i + 1}`, customer, request.jobId, pack)).join('\n\n');
   }
 }
 

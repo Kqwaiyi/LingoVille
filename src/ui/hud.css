@@ -802,7 +802,10 @@ ruby {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
   padding: 18px 22px;
   border-radius: 14px;
   background: #fffaf2;
@@ -815,15 +818,24 @@ ruby {
   font-size: 18px;
 }
 
-.shift-end p {
+.shift-end > p {
   margin: 0 0 10px;
+}
+
+/* The Shift's combined Recap, under the pay: it scrolls if it's long. */
+.shift-end-recap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -8px 12px;
 }
 
 .shift-end-pay {
   font-weight: 600;
 }
 
-.shift-end button {
+.shift-end > button {
+  align-self: flex-start;
   padding: 9px 18px;
   border: 1px solid var(--ok);
   border-radius: 999px;
