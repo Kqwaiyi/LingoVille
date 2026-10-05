@@ -6,11 +6,11 @@
 
 **Spec:** [spec.md](../spec.md): AI quality evaluation
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A top-level `evals` harness that imports the real `ai` builders and `content`, and never ships.
-- [ ] Zod-typed cases by kind and language: Recap (a canned transcript, Help log and expected step) and annotate (a line and its gold readings).
-- [ ] Hard bars with zero failures: every Recap matches its schema; Help discounting never lowers the CEFR estimate; `base` segments concatenate to the line exactly.
-- [ ] Rate bars for CEFR within ±1 step and annotate validation failures. Any rate that drops more than 5 points against the baseline fails the run.
-- [ ] `--quick` runs a few cases per language. Each run prints an estimated cost and asks before continuing. Reports go to a timestamped JSON file.
-- [ ] The harness can't update the baseline. Only a human does that, by hand.
+- [x] A top-level `evals` harness that imports the real `ai` builders and `content`, and never ships.
+- [x] Zod-typed cases by kind and language: Recap (a canned transcript, Help log and expected step) and annotate (a line and its gold readings).
+- [x] Hard bars with zero failures: every Recap matches its schema; Help discounting never lowers the CEFR estimate; `base` segments concatenate to the line exactly.
+- [x] Rate bars for CEFR within ±1 step and annotate validation failures. Any rate that drops more than 5 points against the baseline fails the run.
+- [x] `--quick` runs a few cases per language. Each run prints an estimated cost and asks before continuing. Reports go to a timestamped JSON file.
+- [x] The harness can't update the baseline. Only a human does that, by hand.

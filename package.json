@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "eval": "tsx evals/index.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
