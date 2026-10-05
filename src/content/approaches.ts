@@ -6,6 +6,8 @@ import type { NamedNpcId } from './npcs.ts';
 /** The conversation an NPC opens when they approach the Character. */
 const APPROACH_INTERACTIONS: Record<ApproachId, Interaction> = {
   nurseOnWaking: INTERACTIONS.wakeInWard,
+  landlordRentDue: INTERACTIONS.rentReminder,
+  landlordDiscountStepDown: INTERACTIONS.newcomerDiscountNews,
 };
 
 export function approachInteraction(approachId: ApproachId): Interaction {
@@ -28,8 +30,10 @@ export function interactionStartedWithE(npcId: NamedNpcId, { shopping }: Bringin
 
 /**
  * The second conversation F starts with this Named NPC, or null when E is the only one.
- * With shopping, E at the cashier pays, so F asks where something else is.
+ * With shopping, E at the cashier pays, so F asks where something else is. E at the
+ * landlord pays the rent, and F asks for more time.
  */
 export function interactionStartedWithF(npcId: NamedNpcId, { shopping }: Bringing = { shopping: false }): Interaction | null {
+  if (npcId === 'landlord') return INTERACTIONS.askForMoreTime;
   return npcId === 'cashier' && shopping ? INTERACTIONS.findAnItem : null;
 }

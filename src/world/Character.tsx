@@ -14,6 +14,7 @@ import { GROCERIES_SOLD, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
 import {
   selectArrival,
+  selectHeldStill,
   selectPlaceId,
   selectTramArrival,
   selectTramRunning,
@@ -130,6 +131,9 @@ export function Character() {
   const setInteractable = useGame((s) => s.setInteractable);
   // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
   const keysOff = useGame(selectWorldKeysOff);
+  // An NPC who came up to the Character stopped them: keys held then count only once let go.
+  const heldStill = useGame(selectHeldStill);
+  const letGoOfWalkKeys = useGame((s) => s.letGoOfWalkKeys);
   const tramArrival = useGame(selectTramArrival);
   const wardArrival = useGame(selectWardArrival);
   const tramRunning = useGame(selectTramRunning);
@@ -177,7 +181,10 @@ export function Character() {
     const { yaw, pitch } = orbit.current;
 
     // Walk relative to the camera: forward is away from it, across the ground.
-    const keys = keysOff ? { forward: false, back: false, left: false, right: false } : getKeys();
+    const held = getKeys();
+    const walkKeyHeld = held.forward || held.back || held.left || held.right;
+    if (heldStill && !walkKeyHeld) letGoOfWalkKeys();
+    const keys = keysOff || heldStill ? { forward: false, back: false, left: false, right: false } : held;
     const ahead = Number(keys.forward) - Number(keys.back);
     const across = Number(keys.right) - Number(keys.left);
     const move = scratch.move.set(

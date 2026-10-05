@@ -62,6 +62,8 @@ export type CulturePack = {
   convenienceStore: Shop;
   /** The clinic and hospital, by its local name: where the Fainting ward is. */
   hospital: { name: string; nameGlosses: Glosses };
+  /** The apartment block the Character lives in, by its local name: where the landlord is. */
+  apartments: { name: string; nameGlosses: Glosses };
   /** Persona localisations: each Named NPC's local name. */
   personas: Record<NamedNpcId, { name: string }>;
   appearances: {
@@ -118,6 +120,7 @@ export function culturePackSchema(packId: LanguageCode) {
     supermarket: shop,
     convenienceStore: shop,
     hospital: z.object({ name: text, nameGlosses: glosses }),
+    apartments: z.object({ name: text, nameGlosses: glosses }),
     personas: z.record(z.string(), z.object({ name: text })),
     appearances: z.object({
       npcs: z.record(z.string(), z.enum(APPEARANCE_PRESET_IDS)),
@@ -187,9 +190,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       name: 'みどり総合病院',
       nameGlosses: { zh: '绿树综合医院', en: 'Midori General Hospital', de: 'Allgemeines Krankenhaus Midori' },
     },
-    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' }, cashier: { name: '鈴木' }, 'convenience-clerk': { name: '田中' } },
+    apartments: { name: 'さくら荘', nameGlosses: { zh: '樱花庄', en: 'Sakura House', de: 'Haus Sakura' } },
+    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' }, cashier: { name: '鈴木' }, 'convenience-clerk': { name: '田中' }, landlord: { name: '山本' } },
     appearances: {
-      npcs: { barista: 'preset-2', nurse: 'preset-4', cashier: 'preset-1', 'convenience-clerk': 'preset-3' },
+      npcs: { barista: 'preset-2', nurse: 'preset-4', cashier: 'preset-1', 'convenience-clerk': 'preset-3', landlord: 'preset-3' },
       customerWeights: { 'preset-1': 3, 'preset-2': 3, 'preset-3': 2, 'preset-4': 2 },
     },
     props: ['noren', 'lucky-cat'],
@@ -250,9 +254,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       name: '绿城医院',
       nameGlosses: { ja: '緑城病院', en: 'Green City Hospital', de: 'Krankenhaus Grünstadt' },
     },
-    personas: { barista: { name: '小李' }, nurse: { name: '王芳' }, cashier: { name: '张敏' }, 'convenience-clerk': { name: '小陈' } },
+    apartments: { name: '幸福公寓', nameGlosses: { ja: '幸福アパート', en: 'Happiness Apartments', de: 'Wohnhaus Glück' } },
+    personas: { barista: { name: '小李' }, nurse: { name: '王芳' }, cashier: { name: '张敏' }, 'convenience-clerk': { name: '小陈' }, landlord: { name: '刘阿姨' } },
     appearances: {
-      npcs: { barista: 'preset-3', nurse: 'preset-1', cashier: 'preset-2', 'convenience-clerk': 'preset-4' },
+      npcs: { barista: 'preset-3', nurse: 'preset-1', cashier: 'preset-2', 'convenience-clerk': 'preset-4', landlord: 'preset-4' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['red-lantern', 'tea-set'],
@@ -315,9 +320,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       name: 'St Mary’s Hospital',
       nameGlosses: { ja: 'セント・メアリー病院', zh: '圣玛丽医院', de: 'St.-Marien-Krankenhaus' },
     },
-    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' }, cashier: { name: 'Priya' }, 'convenience-clerk': { name: 'Dev' } },
+    apartments: { name: 'Rosewood House', nameGlosses: { ja: 'ローズウッド・ハウス', zh: '玫瑰木公寓', de: 'Rosewood House' } },
+    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' }, cashier: { name: 'Priya' }, 'convenience-clerk': { name: 'Dev' }, landlord: { name: 'Mrs Hughes' } },
     appearances: {
-      npcs: { barista: 'preset-1', nurse: 'preset-3', cashier: 'preset-4', 'convenience-clerk': 'preset-2' },
+      npcs: { barista: 'preset-1', nurse: 'preset-3', cashier: 'preset-4', 'convenience-clerk': 'preset-2', landlord: 'preset-2' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 2, 'preset-4': 3 },
     },
     props: ['teapot', 'bunting'],
@@ -388,9 +394,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       name: 'Klinikum am Park',
       nameGlosses: { ja: '公園前総合病院', zh: '公园医院', en: 'Park Hospital' },
     },
-    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' }, cashier: { name: 'Jonas' }, 'convenience-clerk': { name: 'Murat' } },
+    apartments: { name: 'Haus Lindenhof', nameGlosses: { ja: 'リンデンホーフ荘', zh: '椴树庭公寓', en: 'Lindenhof House' } },
+    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' }, cashier: { name: 'Jonas' }, 'convenience-clerk': { name: 'Murat' }, landlord: { name: 'Frau Becker' } },
     appearances: {
-      npcs: { barista: 'preset-4', nurse: 'preset-2', cashier: 'preset-3', 'convenience-clerk': 'preset-1' },
+      npcs: { barista: 'preset-4', nurse: 'preset-2', cashier: 'preset-3', 'convenience-clerk': 'preset-1', landlord: 'preset-1' },
       customerWeights: { 'preset-1': 2, 'preset-2': 3, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['cake-stand', 'pretzel-basket'],
@@ -406,9 +413,10 @@ export function localShop(placeId: PlaceId, packId: LanguageCode): Shop | null {
   return null;
 }
 
-/** A staffed place by its local name in this pack, as the Journal keeps it: a shop, or the hospital. */
+/** A staffed place by its local name in this pack, as the Journal keeps it: a shop, the hospital, or the apartment block. */
 export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
   if (placeId === 'clinic') return CULTURE_PACKS[packId].hospital.name;
+  if (placeId === 'home') return CULTURE_PACKS[packId].apartments.name;
   const shop = localShop(placeId, packId);
   if (shop) return shop.name;
   throw new Error(`The ${placeId} has no local name in the ${packId} pack`);

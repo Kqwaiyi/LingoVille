@@ -73,6 +73,7 @@ export {
   selectVoiceUnavailable,
   selectWeekday,
   selectWardArrival,
+  selectHeldStill,
   selectWorldKeysOff,
   useGame,
   type Arrival,

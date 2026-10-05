@@ -252,3 +252,46 @@ describe('applyInteractionOutcome: counter food at the convenience store (#7)', 
     expect(after.character.hunger).toBe(10 + WELL_BEING.counterSnackHunger);
   });
 });
+
+describe('applyInteractionOutcome: the landlord', () => {
+  /** At home on day 9, owing 0.5 in rent debt as well as this week's rent, with 3 Shifts to pay it. */
+  const tenant = (): GameState => {
+    const state = createSave(TEST_SETUP);
+    return {
+      ...state,
+      clock: { day: 9, minuteOfDay: 10 * 60 },
+      rent: { ...state.rent, dueDay: 14 },
+      debts: [{ kind: 'rent', amountInShifts: 0.5 }],
+      character: { ...state.character, moneyInShifts: 3 },
+    };
+  };
+
+  it('accept_rent takes the money, clears rent debt first, and lifts Mood', () => {
+    // ¥9,000 in the ja pack is 1.5 Shifts: the 0.5 debt and a whole week at the A1 discount.
+    const { state, result } = applyInteractionOutcome(tenant(), INTERACTIONS.payRent, { kind: 'success', args: { amount: 9000 } });
+
+    expect(result).toMatchObject({ kind: 'success', paidInShifts: 1.5, moodChange: MOOD.changes.goalInteractionSuccess });
+    expect(state.debts).toEqual([]);
+    expect(state.rent.owedInShifts).toBe(0);
+    expect(state.character.moneyInShifts).toBeCloseTo(1.5);
+  });
+
+  it('refuses more than the tenant owes, or more than they have, changing nothing', () => {
+    const tooMuch = applyInteractionOutcome(tenant(), INTERACTIONS.payRent, { kind: 'success', args: { amount: 12000 } });
+    expect(tooMuch.result.kind).toBe('invalid_arguments');
+    expect(tooMuch.state).toEqual(tenant());
+
+    const broke = { ...tenant(), character: { ...tenant().character, moneyInShifts: 0.2 } };
+    const cannot = applyInteractionOutcome(broke, INTERACTIONS.rentReminder, { kind: 'success', args: { amount: 3000 } });
+    expect(cannot.result.kind).toBe('cannot_afford');
+    expect(cannot.state).toEqual(broke);
+  });
+
+  it('grant_extension gives the days agreed, with nothing paid', () => {
+    const { state, result } = applyInteractionOutcome(tenant(), INTERACTIONS.askForMoreTime, { kind: 'success', args: { days: 3 } });
+
+    expect(result).toMatchObject({ kind: 'success', paidInShifts: 0, extendedDays: 3 });
+    expect(state.rent.extendedThroughDay).toBe(11);
+    expect(state.character.moneyInShifts).toBe(3);
+  });
+});

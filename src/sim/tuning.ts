@@ -97,7 +97,10 @@ export const WELL_BEING = {
 
 export const ECONOMY = {
   rentPeriodDays: 7,
+  /** Weekly rent at full price, before the Newcomer Discount. */
   weeklyRentInShifts: 2.0,
+  /** The most days of extra time the landlord will give at once. */
+  maxRentExtensionDays: 7,
   faintingBillInShifts: 1.5,
   gymMembershipInShifts: 0.5,
   gymMembershipDays: 30,
@@ -193,6 +196,7 @@ export const MOOD = {
   /** Working this many or more days in one week counts as overwork. */
   overworkDaysPerWeek: 5,
   overworkPenaltyPerShift: -6,
+  /** At the end of each day rent debt is owed, unless the landlord gave more time. */
   debtPenaltyPerDay: -3,
   /** The Mood modifier on Shift pay and Life Skill XP, linear from Mood 0 to METER_MAX. */
   modifier: { atZero: 0.8, atMax: 1.2 },

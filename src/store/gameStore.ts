@@ -61,6 +61,8 @@ import {
   ECONOMY,
   faintedBetween,
   enterPlace,
+  hallwayApproach,
+  hallwayApproachMade,
   gameMinutesFor,
   isGoneOff,
   isOpen,
@@ -74,6 +76,7 @@ import {
   newPlayerTurn,
   npcExpression,
   putBackFromBasket,
+  rentStatement,
   rideTram,
   SAVE,
   sleep,
@@ -363,6 +366,8 @@ export type GameStoreDeps = {
   newRngSeed: () => number;
   /** Dev only: the hour a new game starts at instead of the First Morning's, or null. */
   devStartHour: () => number | null;
+  /** Dev only: a new game starts on this day (rent is still first due on day 7), or on day 1 (null). */
+  devStartDay: () => number | null;
   /** Dev only: a new game starts about to faint, with money for the bill or (`broke`) none, or as usual (null). */
   devFaintSoon: () => 'paying' | 'broke' | null;
   /** Opens the mic for the mic check. */
@@ -443,6 +448,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   downloadFile: downloadInBrowser,
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
   devStartHour: devStartHourFromUrl,
+  devStartDay: devStartDayFromUrl,
   devFaintSoon: devFaintSoonFromUrl,
   openMic: openBrowserMic,
 };
@@ -452,6 +458,13 @@ function devStartHourFromUrl(): number | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const hour = Number(new URLSearchParams(window.location.search).get('at') ?? NaN);
   return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
+}
+
+/** Dev only: `?day=7` starts a new game on day 7, so a smoke test can reach the day rent falls due. */
+function devStartDayFromUrl(): number | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const day = Number(new URLSearchParams(window.location.search).get('day') ?? NaN);
+  return Number.isInteger(day) && day >= 1 ? day : null;
 }
 
 /** Dev only: `?faint` starts a new game seconds from Fainting, so a smoke test can reach the ward; `?faint=broke` with no money. */
@@ -486,6 +499,8 @@ export type GameStore = {
   interactable: Interactable | null;
   /** The Player is choosing where to take the tram. */
   tramChoosing: boolean;
+  /** An NPC has come up to the Character and stopped them: walking keys held then don't count until they are let go. */
+  heldStill: boolean;
   tramArrival: TramArrival | null;
   conversation: Conversation | null;
   /** What the Character has taken off the supermarket's shelves and not paid for yet. Never saved. */
@@ -553,6 +568,8 @@ export type GameStore = {
   /** E at a tram stop while the trams run: choose a stop to ride to. */
   openTram: () => void;
   closeTram: () => void;
+  /** No walking key is held any more, so the Character can walk again after an NPC stopped them. */
+  letGoOfWalkKeys: () => void;
   /** Rides the tram from this stop to `stopId`: free, but time passes. */
   rideTram: (stopId: TramStopId) => void;
   /** The pointer is on a sign within range: shows its tooltip. */
@@ -807,8 +824,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         rngSeed: deps.newRngSeed(),
       });
       const startHour = deps.devStartHour();
+      const startDay = deps.devStartDay();
       const faintSoon = deps.devFaintSoon();
-      const atHour = startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
+      const onDay = startDay === null ? game : { ...game, clock: { ...game.clock, day: startDay } };
+      const atHour = startHour === null ? onDay : { ...onDay, clock: { ...onDay.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
       play(
         faintSoon === null
           ? atHour
@@ -1246,10 +1265,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           clock: game.clock,
           ...(approach && { approach }),
           ...(onCounter.length > 0 && { basket: onCounter }),
+          ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
         });
 
       set({
         voiceUnavailable: false,
+        // An NPC who comes up to the Character stops them where they are.
+        ...(approach && { heldStill: true }),
         conversation: {
           id,
           npcId: npc.id,
@@ -1287,6 +1309,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       startConversation(approachInteraction(approach), approach);
     };
 
+    /**
+     * The Character has come within reach of the landlord, who stands in the hallway by the door, so passes
+     * them on the way out: about rent due and unpaid, or a Newcomer Discount step-down, the landlord speaks
+     * first. Only then and there, so a Player who is busy is let by rather than caught later somewhere else.
+     */
+    const catchInHallway = () => {
+      const { game, conversation, fainting, journal, screen } = get();
+      if (conversation || fainting || journal || screen !== 'playing') return;
+      const approach = hallwayApproach(game, placeHours('landlord', game.identity.culturePackId));
+      if (!approach) return;
+      set({ game: hallwayApproachMade(game, approach) });
+      startConversation(approachInteraction(approach), approach);
+    };
+
     /** Whether this change to the game brings an NPC over to the Character. */
     const noticeApproach = (before: GameState, after: GameState) => {
       const due = approachDue(before, after);
@@ -1307,6 +1343,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       tabHidden: false,
       interactable: null,
       tramChoosing: false,
+      heldStill: false,
       tramArrival: null,
       conversation: null,
       basket: [],
@@ -1468,6 +1505,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // Walking away is like Leave: no cost before the outcome, the closing card after it.
         if (conversation && !conversation.closed && interactable !== conversation.npcId) get().leaveConversation();
         set({ interactable, tramChoosing: false });
+        if (interactable === 'landlord') catchInHallway();
       },
       openTram: () => {
         const { interactable, conversation, game } = get();
@@ -1475,6 +1513,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ tramChoosing: true });
       },
       closeTram: () => set({ tramChoosing: false }),
+      letGoOfWalkKeys: () => {
+        if (get().heldStill) set({ heldStill: false });
+      },
       rideTram: (stopId) => {
         const { interactable, conversation, game, tramChoosing } = get();
         if (!tramChoosing || conversation || !isTramStop(interactable)) return;
@@ -1835,6 +1876,8 @@ export const selectConversation = (s: GameStore) => s.conversation;
 const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;
 export const selectTyping = (s: GameStore) => s.typing;
+/** An NPC who came up to the Character has stopped them, until the walking keys held then are let go. */
+export const selectHeldStill = (s: GameStore) => s.heldStill;
 /** Keys belong to the UI, not the world: the typed field has focus, the Journal or the Fainting screen is open, or the Player is choosing a tram stop. */
 export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null || s.fainting !== null || s.tramChoosing;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;

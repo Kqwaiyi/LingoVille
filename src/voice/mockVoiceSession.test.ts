@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { basketChangedScene, buildNpcSession, OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
-import { LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { LANGUAGE_CODES, type ApproachId, type LanguageCode } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
@@ -445,5 +445,80 @@ describe('mock VoiceSession: the clerk at the convenience store counter (#7)', (
     await say('yes');
     expect(toolCalls).toEqual([]);
     expect(turns).toHaveLength(3);
+  });
+});
+
+describe('mock VoiceSession: the landlord (#16, #17)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // A week at the A1 Newcomer Discount owed, due today, and 0.5 Shifts owed from before.
+  const RENT = { today: 7, dueDay: 7, owedThisWeekInShifts: 1, debtInShifts: 0.5, weeklyRentInShifts: 1.2 };
+
+  async function landlord(interaction: Interaction, packId: LanguageCode, approach?: ApproachId) {
+    const heard = listen();
+    const npcSession = buildNpcSession(interaction, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.landlord, {
+      clock: { day: 7, minuteOfDay: 540 },
+      rent: RENT,
+      ...(approach && { approach }),
+    });
+    const session = openMockVoiceSession(npcSession, heard.events);
+    await session.connect();
+    await vi.runAllTimersAsync();
+    const say = async (text: string) => {
+      session.sendText(text);
+      await vi.runAllTimersAsync();
+    };
+    const answer = async (response: ToolResponse) => {
+      session.sendToolResponse(heard.toolCalls.at(-1)!.id, response);
+      await vi.runAllTimersAsync();
+    };
+    return { ...heard, say, answer };
+  }
+
+  it('says what is owed, and takes it all once the tenant agrees', async () => {
+    const { turns, toolCalls, say, answer } = await landlord(INTERACTIONS.payRent, 'ja');
+    expect(turns[0]).toContain('¥9,000');
+
+    await say('はい');
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'accept_rent', args: { amount: 9000 } }]);
+    await answer({ result: 'done' });
+    expect(turns).toHaveLength(2);
+  });
+
+  it('catches the tenant in the hallway with a reminder, and lets them go when they can’t pay', async () => {
+    const pay = await landlord(INTERACTIONS.payRent, 'en');
+    const { turns, toolCalls, say } = await landlord(INTERACTIONS.rentReminder, 'en', 'landlordRentDue');
+    expect(turns[0]).not.toBe(pay.turns[0]);
+    expect(turns[0]).toContain('£90');
+
+    await say('No, sorry');
+    expect(toolCalls).toEqual([]);
+    expect(turns).toHaveLength(2);
+  });
+
+  it('agrees on three more days, and gives them once the tenant confirms', async () => {
+    const { turns, toolCalls, say, answer } = await landlord(INTERACTIONS.askForMoreTime, 'de');
+
+    await say('Bitte, mehr Zeit');
+    expect(toolCalls).toEqual([]);
+    await say('Ja');
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'grant_extension', args: { days: 3 } }]);
+    await answer({ result: 'done' });
+    expect(turns).toHaveLength(3);
+  });
+
+  it('tells the tenant the new weekly rent, and finishes once they answer', async () => {
+    const { turns, toolCalls, say } = await landlord(INTERACTIONS.newcomerDiscountNews, 'zh', 'landlordDiscountStepDown');
+    expect(turns[0]).toContain('288元');
+
+    await say('好的');
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'finish_rent_news', args: { understood: true } }]);
+  });
+
+  it('calls not_understood for gibberish', async () => {
+    const { toolCalls, say } = await landlord(INTERACTIONS.payRent, 'en');
+    await say('xqzt');
+    expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
   });
 });

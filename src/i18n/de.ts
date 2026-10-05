@@ -313,6 +313,7 @@ export const de: UiStrings = {
     notUnderstood: '{{who}} hat dich nicht verstanden',
     noCharge: 'Nichts bezahlt',
     pointedTo: '{{item}}: im Regal markiert',
+    moreTime: 'Zusätzliche Tage für die Miete: {{days}}',
     moodUp: 'Stimmung ↑',
     moodDown: 'Stimmung ↓',
     skipRecap: 'Rückblick überspringen',

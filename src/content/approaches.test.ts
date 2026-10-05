@@ -30,6 +30,16 @@ describe('NPCs who start conversations themselves', () => {
     expect(interactionStartedWithF('barista')).toBeNull();
   });
 
+  it('opens a rent reminder or the Newcomer Discount news when the landlord catches the Character in the hallway', () => {
+    expect(approachInteraction('landlordRentDue')).toBe(INTERACTIONS.rentReminder);
+    expect(approachInteraction('landlordDiscountStepDown')).toBe(INTERACTIONS.newcomerDiscountNews);
+  });
+
+  it('pays the rent with E at the landlord, and asks for more time with F', () => {
+    expect(interactionStartedWithE('landlord')).toBe(INTERACTIONS.payRent);
+    expect(interactionStartedWithF('landlord')).toBe(INTERACTIONS.askForMoreTime);
+  });
+
   it('starts the convenience store order with E at the clerk', () => {
     expect(interactionStartedWithE('convenience-clerk')).toBe(INTERACTIONS.buyCounterFood);
   });

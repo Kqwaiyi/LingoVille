@@ -317,6 +317,8 @@ export const en = {
     notUnderstood: '{{who}} couldn’t understand you',
     noCharge: 'No charge',
     pointedTo: '{{item}}: marked on the shelf',
+    /** The landlord gave more time to pay the rent. */
+    moreTime: 'Extra days to pay the rent: {{days}}',
     moodUp: 'Mood ↑',
     moodDown: 'Mood ↓',
     skipRecap: 'Skip Recap',

@@ -2,6 +2,7 @@ import { addDebt } from './debts.ts';
 import { throwOutSpoiled } from './inventory.ts';
 import type { GameState } from './state.ts';
 import { clampMeter } from './meters.ts';
+import { endDaysSince } from './rent.ts';
 import { CLOCK, ECONOMY, MOOD, WELL_BEING } from './tuning.ts';
 
 /**
@@ -18,7 +19,7 @@ export function faint(state: GameState): GameState {
   const { day, minuteOfDay } = state.clock;
   // Before the night is over (when the bed would wake the Character), the next day is the same day number.
   const wakeDay = minuteOfDay < CLOCK.wakeAt ? day : day + 1;
-  return throwOutSpoiled({
+  const fainted: GameState = {
     ...state,
     clock: { day: wakeDay, minuteOfDay: CLOCK.faintWakeAt },
     placeId: 'clinic',
@@ -30,7 +31,8 @@ export function faint(state: GameState): GameState {
       moneyInShifts: canPay ? character.moneyInShifts - bill : character.moneyInShifts,
     },
     debts: canPay ? state.debts : addDebt(state.debts, { kind: 'hospital', amountInShifts: bill }),
-  });
+  };
+  return throwOutSpoiled(endDaysSince(day, fainted));
 }
 
 /** The Character fainted somewhere between these two states of the game. */

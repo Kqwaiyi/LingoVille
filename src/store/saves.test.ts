@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { createStore, get, keys, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
-import { createSave, type GameState } from '../sim/index.ts';
+import { createSave, weeklyRent, type GameState } from '../sim/index.ts';
 import { createSaves, DEV_SETUP, SAVE_SCHEMA_VERSION, SLOT_IDS } from './index.ts';
 
 let databases = 0;
@@ -28,7 +28,7 @@ function lived(): GameState {
     clock: { day: 3, minuteOfDay: 14 * 60 + 25.5 },
     placeId: 'cafe',
     character: { ...game.character, moneyInShifts: 1.25, mood: 61, illness: { illnessId: 'cold', onsetDay: 2 } },
-    rent: { dueDay: 7, owedInShifts: 2 },
+    rent: { dueDay: 7, owedInShifts: weeklyRent('A1'), extendedThroughDay: null, remindedOnDay: null },
     debts: [{ kind: 'hospital', amountInShifts: 1.5 }],
     paymentPlans: [{ debtKind: 'hospital', instalmentInShifts: 0.5, nextDueDay: 5 }],
     progression: {
@@ -67,9 +67,14 @@ const later = (game: GameState): GameState => ({ ...game, clock: { ...game.clock
 /** The same game, just after midnight. */
 const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.clock.day + 1, minuteOfDay: 0 } });
 
+/** The game before rent fell due: version 6. Nothing ever set what was owed. */
+function beforeRent() {
+  return { ...lived(), rent: { dueDay: 7, owedInShifts: 0 } };
+}
+
 /** The game before cooking recorded a food poisoning chance: version 5. */
 function beforeCooking() {
-  const game = lived();
+  const game = beforeRent();
   const character: Partial<GameState['character']> = { ...game.character };
   delete character.foodPoisoningChance;
   return { ...game, character };
@@ -218,6 +223,24 @@ describe('saves', () => {
 
     expect(game?.character.foodPoisoningChance).toBe(0);
     expect(game).toEqual(lived());
+  });
+
+  it("upgrades a save from before rent fell due as one owing this week's rent, with no extension or reminder yet", async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 6, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeRent() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('upgrades a save already past its first due day to the next due day, forgiving the weeks that never fell due', async () => {
+    const { saves, raw } = freshSaves();
+    const game = { ...beforeRent(), clock: { day: 16, minuteOfDay: 600 } };
+    await set('slot-1', { schemaVersion: 6, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game }, raw);
+
+    const loaded = (await saves.load('slot-1'))?.save.game;
+
+    expect(loaded?.rent.dueDay).toBe(21);
+    expect(loaded?.debts).toEqual(lived().debts);
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {

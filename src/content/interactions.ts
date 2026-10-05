@@ -21,6 +21,16 @@ const serveOrder = (menu: readonly [ItemId, ...ItemId[]]) => ({
   }),
 });
 
+/** `accept_rent(amount)`: paying the landlord, whether the Player came to pay or the landlord caught them. */
+const acceptRent = {
+  name: 'accept_rent',
+  description:
+    'Take rent from the tenant: the amount they confirmed after your read-back, in local money as a plain number ' +
+    '(for example 6000 for ¥6,000, or 72.5 for €72.50). Answers "done", "cannot_afford" (they do not have that much) ' +
+    'or "invalid_arguments" (more than they owe).',
+  args: z.object({ amount: z.number().positive().describe('The amount handed over, in local money.') }),
+};
+
 export const INTERACTIONS = {
   orderDrink: defineInteraction({
     id: 'order-drink',
@@ -98,6 +108,69 @@ export const INTERACTIONS = {
       name: 'discharge_patient',
       description: 'Let the patient go home, once they have told you how they feel. Answers "done".',
       args: z.object({ feeling: z.enum(['well', 'unwell']).describe('How the patient said they feel.') }),
+    },
+    band: 'B',
+    effect: { kind: 'none' },
+  }),
+  // #16. Pay the landlord at home: rent debt first, then this week's rent.
+  payRent: defineInteraction({
+    id: 'pay-rent',
+    placeId: 'home',
+    npcId: 'landlord',
+    goal: 'Your tenant has come to pay rent. Find out how much they want to pay of what they owe, and take it.',
+    facts: ['rent'],
+    items: [],
+    completion: acceptRent,
+    band: 'B',
+    effect: { kind: 'payRent' },
+  }),
+  // #17. Ask the landlord for more time to pay.
+  askForMoreTime: defineInteraction({
+    id: 'ask-for-more-time',
+    placeId: 'home',
+    npcId: 'landlord',
+    goal:
+      'Your tenant wants more time to pay the rent. Hear them out: why, and how long they need. ' +
+      `Agree on a number of extra days, never more than ${ECONOMY.maxRentExtensionDays}. If they ask for more, haggle them down.`,
+    facts: ['rent'],
+    items: [],
+    completion: {
+      name: 'grant_extension',
+      description: 'Give the tenant more days to pay, once they have confirmed the number of days you agreed. Answers "done".',
+      args: z.object({ days: z.int().min(1).max(ECONOMY.maxRentExtensionDays).describe('How many extra days you agreed.') }),
+    },
+    band: 'A',
+    effect: { kind: 'extendRent' },
+  }),
+  // Not one the Player starts: the landlord catches the Character in the hallway when rent is due and unpaid.
+  rentReminder: defineInteraction({
+    id: 'rent-reminder',
+    placeId: 'home',
+    npcId: 'landlord',
+    goal:
+      'You have caught your tenant in the hallway: their rent is due and unpaid. Remind them politely what they owe and by when, ' +
+      'and take it if they want to pay now. If they cannot pay, tell them they can come and ask you for more time.',
+    facts: ['rent'],
+    items: [],
+    completion: acceptRent,
+    band: 'B',
+    effect: { kind: 'payRent' },
+  }),
+  // Not one the Player starts: the landlord tells the Character their Newcomer Discount has stepped down.
+  newcomerDiscountNews: defineInteraction({
+    id: 'newcomer-discount-news',
+    placeId: 'home',
+    npcId: 'landlord',
+    goal:
+      "You have stopped your tenant in the hallway with news: their newcomer's discount on the rent is getting smaller, " +
+      'because they are settling in and their language has come on so well. Tell them, with the new weekly rent, ' +
+      'and make sure they have understood. Never speak of percentages.',
+    facts: ['newcomerDiscount'],
+    items: [],
+    completion: {
+      name: 'finish_rent_news',
+      description: 'Finish telling the tenant about their new rent, once they have answered you. Answers "done".',
+      args: z.object({ understood: z.boolean().describe('The tenant showed they understood the new rent.') }),
     },
     band: 'B',
     effect: { kind: 'none' },

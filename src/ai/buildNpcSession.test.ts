@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
-import { CLOCK, LANGUAGE_CODES, PROFICIENCY_STEPS, type LanguageCode, type ProficiencyStep } from '../sim/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { CLOCK, LANGUAGE_CODES, PROFICIENCY_STEPS, type ApproachId, type LanguageCode, type ProficiencyStep, type RentStatement } from '../sim/index.ts';
 import { buildNpcSession, GREETING_SCENE } from './index.ts';
 
 const FIRST_MORNING_CLOCK = { day: 1, minuteOfDay: CLOCK.wakeAt + 12 };
@@ -123,5 +123,62 @@ describe('buildNpcSession: the supermarket and convenience store', () => {
 
   it('says the convenience store never closes', () => {
     expect(counterSession('ja').systemInstruction).toContain('ニコニコマート is open 24 hours.');
+  });
+});
+
+describe('buildNpcSession: the landlord', () => {
+  // Day 7, a Sunday: this week's rent of 1 Shift is due today, with 0.5 owed from before.
+  const RENT: RentStatement = { today: 7, dueDay: 7, owedThisWeekInShifts: 1, debtInShifts: 0.5, weeklyRentInShifts: 1.2 };
+  const HALLWAY_MORNING = { day: 7, minuteOfDay: 9 * 60 };
+
+  function landlordSession(interaction: Interaction, packId: LanguageCode, approach?: ApproachId) {
+    return buildNpcSession(interaction, CULTURE_PACKS[packId], 'A2', NAMED_NPCS.landlord, {
+      clock: HALLWAY_MORNING,
+      rent: RENT,
+      ...(approach && { approach }),
+    });
+  }
+
+  it.each(LANGUAGE_CODES)('builds the session for paying rent in the %s pack', (packId) => {
+    expect(landlordSession(INTERACTIONS.payRent, packId)).toMatchSnapshot();
+  });
+
+  it('tells the landlord what the tenant owes, in local money and as accept_rent’s plain number', () => {
+    const { systemInstruction } = landlordSession(INTERACTIONS.payRent, 'ja');
+    expect(systemInstruction).toContain("This week's rent still to pay: ¥6,000, due by the end of today.");
+    expect(systemInstruction).toContain('Unpaid rent from before, owed now: ¥3,000.');
+    expect(systemInstruction).toContain('Altogether the tenant owes ¥9,000 (for accept_rent: 9000).');
+  });
+
+  it('speaks of a tenant, not a customer', () => {
+    const { systemInstruction, openingScene } = landlordSession(INTERACTIONS.askForMoreTime, 'en');
+    expect(openingScene).toBe('[SCENE: A tenant walks up to you. Greet them first.]');
+    expect(systemInstruction).not.toMatch(/customer/i);
+    expect(systemInstruction).toContain('tenant');
+    expect(systemInstruction).toContain('Rosewood House');
+  });
+
+  it('offers accept_rent, or grant_extension for more time', () => {
+    expect(landlordSession(INTERACTIONS.payRent, 'de').tools.map((tool) => tool.name)).toEqual(['accept_rent', 'not_understood']);
+    expect(landlordSession(INTERACTIONS.askForMoreTime, 'de').tools.map((tool) => tool.name)).toEqual(['grant_extension', 'not_understood']);
+  });
+
+  it('catches the tenant in the hallway, speaking first, when rent is due', () => {
+    const { openingScene } = landlordSession(INTERACTIONS.rentReminder, 'zh', 'landlordRentDue');
+    expect(openingScene).not.toBe(GREETING_SCENE);
+    expect(openingScene).toMatch(/^\[SCENE: .*hallway.*rent.*\]$/);
+  });
+
+  it.each(LANGUAGE_CODES)('announces a Newcomer Discount step-down with the new weekly rent, never a percentage, in the %s pack', (packId) => {
+    const session = landlordSession(INTERACTIONS.newcomerDiscountNews, packId, 'landlordDiscountStepDown');
+    expect(session).toMatchSnapshot();
+    expect(session.openingScene).toMatch(/hallway/);
+    expect(session.systemInstruction).toMatch(/Never speak of percentages/);
+    expect(session.systemInstruction).not.toMatch(/\d+\s?%/);
+  });
+
+  it('gives the new weekly rent', () => {
+    const { systemInstruction } = landlordSession(INTERACTIONS.newcomerDiscountNews, 'en', 'landlordDiscountStepDown');
+    expect(systemInstruction).toContain("From now on the tenant's weekly rent is £72.");
   });
 });

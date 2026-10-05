@@ -11,7 +11,7 @@ import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.t
 export type Band = 'B' | 'I' | 'A';
 
 /** Which Culture Pack facts the NPC is told, so it can answer side questions. */
-export const FACT_SOURCES = ['openingHours', 'menu', 'shelves', 'basket', 'placeFacts', 'customs', 'ward'] as const;
+export const FACT_SOURCES = ['openingHours', 'menu', 'shelves', 'basket', 'placeFacts', 'customs', 'ward', 'rent', 'newcomerDiscount'] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 /** The arguments a `serveOrder` effect reads from its completion function. */
@@ -20,19 +20,26 @@ type ServeOrderArgs = { items: { item: ItemId; quantity: number }[] };
 type PurchaseArgs = { bag: boolean; card: boolean };
 /** The arguments a `pointTo` effect reads: the item the NPC shows the way to. */
 type PointToArgs = { item: ItemId };
+/** The arguments a `payRent` effect reads: what the tenant hands over, in local money. */
+type PayRentArgs = { amount: number };
+/** The arguments an `extendRent` effect reads: how many more days the landlord gives. */
+type ExtendRentArgs = { days: number };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
  * `serveOrder` serves the confirmed items from the menu and charges for them.
  * `purchase` charges for what the Character brought to the till, which goes into the inventory.
- * `pointTo` marks where an item is. `none` is flavour only.
+ * `pointTo` marks where an item is. `payRent` pays the landlord, and `extendRent`
+ * gives the Character more time to pay. `none` is flavour only.
  */
-export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo';
+export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo' | 'payRent' | 'extendRent';
 type EffectFor<Args> =
   | { kind: 'none' }
   | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
   | (Args extends PurchaseArgs ? { kind: 'purchase' } : never)
-  | (Args extends PointToArgs ? { kind: 'pointTo' } : never);
+  | (Args extends PointToArgs ? { kind: 'pointTo' } : never)
+  | (Args extends PayRentArgs ? { kind: 'payRent' } : never)
+  | (Args extends ExtendRentArgs ? { kind: 'extendRent' } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -58,8 +65,13 @@ export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores
 
 export type ParsedArgs = { success: true; data: Record<string, unknown> } | { success: false; error: string };
 
-/** What a completion comes to in this pack: the lines to pay for, and for `pointTo`, the item shown. */
-export type ResolvedCompletion = { success: true; lines: OrderLine[]; pointedTo?: ServedItem } | { success: false; error: string };
+/** What a completion does to the rent: money paid to the landlord, in Shifts, or more time. The sim checks it against what is owed. */
+export type RentChange = { kind: 'pay'; amountInShifts: number } | { kind: 'extend'; days: number };
+
+/** What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown, and for the landlord, the change to the rent. */
+export type ResolvedCompletion =
+  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange }
+  | { success: false; error: string };
 
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
   effect: { kind: EffectKind };
@@ -88,7 +100,7 @@ const definitionSchema = z.object({
     args: z.custom<z.ZodObject>((value) => value instanceof z.ZodObject, 'completion arguments must be a Zod object'),
   }),
   band: z.enum(['B', 'I', 'A']),
-  effect: z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo']) }),
+  effect: z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent']) }),
 });
 
 function servedItem(itemId: ItemId, quantity: number, packId: LanguageCode): ServedItem {
@@ -119,6 +131,12 @@ function resolveEffect(kind: EffectKind, args: Record<string, unknown>, packId: 
       return { success: true, lines: orderLines(basket, packId) };
     case 'pointTo':
       return { success: true, lines: [], pointedTo: servedItem((args as PointToArgs).item, 1, packId) };
+    case 'payRent': {
+      const amountInShifts = (args as PayRentArgs).amount / CULTURE_PACKS[packId].currency.perShift;
+      return { success: true, lines: [], rent: { kind: 'pay', amountInShifts } };
+    }
+    case 'extendRent':
+      return { success: true, lines: [], rent: { kind: 'extend', days: (args as ExtendRentArgs).days } };
   }
 }
 

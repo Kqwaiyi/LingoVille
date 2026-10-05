@@ -50,7 +50,9 @@ export const PLATFORM = { size: [8, 1.6] as Vec2, height: 0.12 } as const;
 
 /** Where each person in town stands. Staff stand behind their counter, facing the door. */
 export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
-  landlord: [-12.8, 1, 2.2],
+  // In the hallway beside the front door, so the Character passes within talking range on the way out
+  // (and the landlord can catch them), but not from where a new game starts.
+  landlord: [-11.4, 1, 2.7],
   barista: [12, 1, -4.1],
   cashier: [24, 1, -0.7],
   'convenience-clerk': [0.5, 1, -3.2],

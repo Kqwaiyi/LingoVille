@@ -1,7 +1,8 @@
-import type { Interaction, OrderLine, ServedItem } from '../content/index.ts';
+import type { Interaction, OrderLine, RentChange, ServedItem } from '../content/index.ts';
 import type { Basket } from './basket.ts';
 import { stockInventory } from './inventory.ts';
 import { clampMeter } from './meters.ts';
+import { grantExtension, payRent } from './rent.ts';
 import type { GameState } from './state.ts';
 import { MOOD } from './tuning.ts';
 
@@ -14,12 +15,19 @@ export type InteractionOutcome = { kind: 'success'; args: unknown; basket?: Bask
 /**
  * What happened. `served` is what the Character was handed: eaten on the spot,
  * or for a purchase, put in the inventory. `pointedTo` is the item an NPC showed
- * the way to. `moodChange` is the change that actually happened, after
+ * the way to, and `extendedDays` the more time the landlord gave. `moodChange` is the change that actually happened, after
  * clamping. `cannot_afford` and `invalid_arguments` change nothing: the NPC is
  * told, and the conversation goes on.
  */
 export type OutcomeResult =
-  | { kind: 'success'; served: ServedItem[]; paidInShifts: number; moodChange: number; pointedTo?: ServedItem }
+  | {
+      kind: 'success';
+      served: ServedItem[];
+      paidInShifts: number;
+      moodChange: number;
+      pointedTo?: ServedItem;
+      extendedDays?: number;
+    }
   | { kind: 'failure'; moodChange: number }
   | { kind: 'abandon' }
   | { kind: 'cannot_afford' }
@@ -40,6 +48,21 @@ function orderTotals(lines: OrderLine[]) {
     thirst += (restores.thirst ?? 0) * quantity;
   }
   return { costInShifts, hunger, thirst };
+}
+
+/** The landlord's completion: rent paid, checked against what is owed and what the Character has, or more time given. */
+function applyRentChange(state: GameState, change: RentChange): { state: GameState; result: OutcomeResult } {
+  if (change.kind === 'extend') {
+    const extended = changeMood(grantExtension(state, change.days), MOOD.changes.goalInteractionSuccess);
+    const result: OutcomeResult = { kind: 'success', served: [], paidInShifts: 0, moodChange: extended.moodChange, extendedDays: change.days };
+    return { state: extended.state, result };
+  }
+  const payment = payRent(state, change.amountInShifts);
+  if (payment.kind === 'cannot_afford') return { state, result: { kind: 'cannot_afford' } };
+  if (payment.kind === 'wrong_amount') return { state, result: { kind: 'invalid_arguments', error: 'That is more than the tenant owes.' } };
+  const paid = changeMood(payment.state, MOOD.changes.goalInteractionSuccess);
+  const paidInShifts = state.character.moneyInShifts - payment.state.character.moneyInShifts;
+  return { state: paid.state, result: { kind: 'success', served: [], paidInShifts, moodChange: paid.moodChange } };
 }
 
 /**
@@ -65,6 +88,7 @@ export function applyInteractionOutcome(
     case 'success': {
       const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, outcome.basket);
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
+      if (completion.rent) return applyRentChange(state, completion.rent);
       const { costInShifts, hunger, thirst } = orderTotals(completion.lines);
       const { character, possessions } = state;
       if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };

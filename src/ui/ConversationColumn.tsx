@@ -126,6 +126,7 @@ function ClosingCardPanel({ card, npcId }: { card: ClosingCard; npcId: NamedNpcI
           // Only what happened: nothing served or paid for (the nurse letting the patient go) shows no line for it.
           ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
           ...(card.pointedTo ? [t('closing.pointedTo', { item: servedLine([card.pointedTo], nativeLanguage) })] : []),
+          ...(card.extendedDays ? [t('closing.moreTime', { days: card.extendedDays })] : []),
           ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
           ...mood,
         ];

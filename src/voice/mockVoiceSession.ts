@@ -1,5 +1,14 @@
 import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, type NpcSession, type ToolResponse } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, ITEMS, localPrice, readBasketTotal, type ItemId } from '../content/index.ts';
+import {
+  CULTURE_PACKS,
+  INTERACTIONS,
+  ITEMS,
+  localPrice,
+  readBasketTotal,
+  readNewWeeklyRent,
+  readRentOwed,
+  type ItemId,
+} from '../content/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
 
@@ -7,11 +16,17 @@ import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from '
 const REPLY_DELAY_MS = 600;
 
 // The completions the fake knows how to script: an order over a counter, paying at the till,
-// pointing to an item on the shelves, and the nurse letting the patient go home.
+// pointing to an item on the shelves, the nurse letting the patient go home, and the landlord
+// taking rent, giving more time, or telling the tenant their new rent.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
 const COMPLETE_PURCHASE = INTERACTIONS.payForGroceries.completion.name;
 const POINT_TO = INTERACTIONS.findAnItem.completion.name;
 const DISCHARGE_PATIENT = INTERACTIONS.wakeInWard.completion.name;
+const ACCEPT_RENT = INTERACTIONS.payRent.completion.name;
+const GRANT_EXTENSION = INTERACTIONS.askForMoreTime.completion.name;
+const FINISH_RENT_NEWS = INTERACTIONS.newcomerDiscountNews.completion.name;
+/** How many more days the fake landlord gives. */
+const EXTENSION_DAYS = 3;
 
 /**
  * Typed to the fake NPC, this makes its connection drop, so the smoke tests can
@@ -383,6 +398,94 @@ const WARD_SCRIPT: Record<LanguageCode, WardScript> = {
   },
 };
 
+/** The fake landlord: taking rent (asked to pay, or catching the tenant in the hallway), giving more time, or telling them their new rent. */
+type LandlordScript = {
+  /** Greets a tenant who has come to pay, with what they owe. */
+  payGreeting: (owed: string) => string;
+  /** Catches the tenant in the hallway with what they owe. */
+  reminder: (owed: string) => string;
+  nothingOwed: string;
+  paid: string;
+  cannotAfford: string;
+  /** The tenant won't pay now. */
+  later: string;
+  askTime: string;
+  readBackTime: (days: number) => string;
+  timeGiven: string;
+  news: (rent: string) => string;
+  newsDone: string;
+  resume: string;
+  notUnderstood: string;
+  outOfPatience: string;
+};
+
+const LANDLORD_SCRIPT: Record<LanguageCode, LandlordScript> = {
+  ja: {
+    payGreeting: (owed) => `こんにちは。家賃ですね。全部で${owed}です。お支払いになりますか？`,
+    reminder: (owed) => `あ、ちょっといいですか。家賃がまだなんです。全部で${owed}です。今払えますか？`,
+    nothingOwed: '今は払っていただくものはありませんよ。',
+    paid: 'はい、確かに。ありがとうございます。',
+    cannotAfford: 'あら、足りないみたいですね。一部だけでも大丈夫ですよ。',
+    later: 'そうですか。待ってほしいときは、相談してくださいね。',
+    askTime: 'どうしました？',
+    readBackTime: (days) => `じゃあ、あと${days}日待ちましょう。いいですか？`,
+    timeGiven: 'わかりました。それまでにお願いしますね。',
+    news: (rent) => `ちょっといいですか。日本語、上手になりましたね。来週から家賃は${rent}になります。わかりましたか？`,
+    newsDone: 'よろしくお願いしますね。',
+    resume: 'すみません、どこまで話しましたっけ。',
+    notUnderstood: 'すみません、よくわかりませんでした。',
+    outOfPatience: 'すみません…。また今度話しましょう。',
+  },
+  zh: {
+    payGreeting: (owed) => `你好，来交房租吧？一共${owed}。现在交吗？`,
+    reminder: (owed) => `哎，等一下。你的房租还没交，一共${owed}。现在能交吗？`,
+    nothingOwed: '你现在不欠房租。',
+    paid: '好的，收到了，谢谢。',
+    cannotAfford: '哎呀，好像钱不够。先交一部分也行。',
+    later: '好吧。需要晚点交的话，跟我说一声。',
+    askTime: '怎么了？',
+    readBackTime: (days) => `那我再等你${days}天，行吗？`,
+    timeGiven: '好，那到时候记得交。',
+    news: (rent) => `等一下，你的中文进步真大！从下个星期开始，房租是${rent}。明白了吗？`,
+    newsDone: '好，那就这样。',
+    resume: '不好意思，我们说到哪儿了？',
+    notUnderstood: '不好意思，我没听懂。',
+    outOfPatience: '不好意思……下次再说吧。',
+  },
+  en: {
+    payGreeting: (owed) => `Hello, love. Come about the rent? It's ${owed} altogether. Paying now?`,
+    reminder: (owed) => `Oh, have you got a minute? Your rent's due and not paid yet: ${owed} altogether. Can you pay now?`,
+    nothingOwed: "You don't owe me anything at the moment.",
+    paid: "That's lovely, thank you.",
+    cannotAfford: "Oh dear, that's not quite enough. A bit of it will do for now.",
+    later: 'All right. If you need more time, just ask me.',
+    askTime: 'What can I do for you?',
+    readBackTime: (days) => `I'll give you ${days} more days, then. All right?`,
+    timeGiven: "Right you are. Don't forget, will you?",
+    news: (rent) => `Have you got a minute? Your English is ever so good now. From next week the rent's ${rent}. All right?`,
+    newsDone: 'Lovely. Thanks, dear.',
+    resume: 'Sorry, where were we?',
+    notUnderstood: "Sorry, I didn't catch that.",
+    outOfPatience: "Sorry, love, I can't quite follow. Another time.",
+  },
+  de: {
+    payGreeting: (owed) => `Guten Tag! Wegen der Miete? Das sind insgesamt ${owed}. Zahlen Sie jetzt?`,
+    reminder: (owed) => `Ach, haben Sie kurz Zeit? Die Miete ist noch offen: insgesamt ${owed}. Können Sie jetzt zahlen?`,
+    nothingOwed: 'Sie schulden mir im Moment nichts.',
+    paid: 'Danke schön, alles in Ordnung.',
+    cannotAfford: 'Oh, das reicht leider nicht. Ein Teil davon geht auch.',
+    later: 'Na gut. Wenn Sie mehr Zeit brauchen, fragen Sie mich einfach.',
+    askTime: 'Was gibt’s?',
+    readBackTime: (days) => `Dann warte ich noch ${days} Tage. Einverstanden?`,
+    timeGiven: 'Gut. Aber dann bitte pünktlich.',
+    news: (rent) => `Haben Sie kurz Zeit? Ihr Deutsch ist richtig gut geworden. Ab nächster Woche kostet die Miete ${rent}. Verstanden?`,
+    newsDone: 'Gut, danke.',
+    resume: 'Entschuldigung, wo waren wir?',
+    notUnderstood: 'Entschuldigung, das habe ich nicht verstanden.',
+    outOfPatience: 'Tut mir leid… Ein andermal.',
+  },
+};
+
 const LATIN = /^[\p{Script=Latin}\s']+$/u;
 
 /** Whole words for Latin-script words ("no" isn't in "know"); anywhere in the line otherwise. */
@@ -531,11 +634,77 @@ function wardNpc(ward: WardScript, act: Act): Npc {
   };
 }
 
+/** The landlord taking rent: all that is owed, on a yes. Caught in the hallway, the greeting is a reminder. */
+function rentNpc(script: LandlordScript, words: Words, session: NpcSession, act: Act): Npc {
+  const owed = readRentOwed(session.systemInstruction);
+  const caught = session.openingScene.includes('hallway');
+  const { yes, no, known } = words;
+  return {
+    ...script,
+    greeting: !owed ? script.nothingOwed : caught ? script.reminder(owed.money) : script.payGreeting(owed.money),
+    hear: (line) => {
+      // "No" first: "不要" holds "要".
+      if (owed && mentions(line, no)) return act.say(script.later);
+      if (owed && mentions(line, yes)) {
+        return act.call(ACCEPT_RENT, { amount: owed.amount }, (response) =>
+          act.say(response.result === 'done' ? script.paid : response.result === 'cannot_afford' ? script.cannotAfford : script.later),
+        );
+      }
+      if (mentions(line, known)) return act.say(owed ? script.payGreeting(owed.money) : script.nothingOwed);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** The landlord giving more time: offers three days for any line it understands, and gives them on a yes. */
+function extensionNpc(script: LandlordScript, words: Words, act: Act): Npc {
+  let offered = false;
+  const { yes, no, known } = words;
+  return {
+    ...script,
+    greeting: script.askTime,
+    hear: (line) => {
+      if (offered && mentions(line, no)) {
+        offered = false;
+        return act.say(script.askTime);
+      }
+      if (offered && mentions(line, yes)) {
+        offered = false;
+        return act.call(GRANT_EXTENSION, { days: EXTENSION_DAYS }, () => act.say(script.timeGiven));
+      }
+      if (mentions(line, [...yes, ...no, ...known])) {
+        offered = true;
+        return act.say(script.readBackTime(EXTENSION_DAYS));
+      }
+      act.notUnderstood();
+    },
+  };
+}
+
+/** The landlord's news of the new weekly rent, finished once the tenant answers. */
+function rentNewsNpc(script: LandlordScript, words: Words, session: NpcSession, act: Act): Npc {
+  const news = script.news(readNewWeeklyRent(session.systemInstruction) ?? '');
+  const { yes, no, known } = words;
+  return {
+    ...script,
+    greeting: news,
+    hear: (line) => {
+      if (mentions(line, no)) return act.say(news);
+      if (mentions(line, [...yes, ...known])) return act.call(FINISH_RENT_NEWS, { understood: true }, () => act.say(script.newsDone));
+      act.notUnderstood();
+    },
+  };
+}
+
 /** Which fake NPC plays this session, read from the completion it offers. */
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
   const offers = (name: string) => session.tools.some((tool) => tool.name === name);
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
+  const { words } = SCRIPT[packId];
+  if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
+  if (offers(GRANT_EXTENSION)) return extensionNpc(LANDLORD_SCRIPT[packId], words, act);
+  if (offers(FINISH_RENT_NEWS)) return rentNewsNpc(LANDLORD_SCRIPT[packId], words, session, act);
   if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
   const script = session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
@@ -550,7 +719,9 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * about a bag and a points card, reads them back with the total and calls
  * complete_purchase, reading back again when something is put back; the
  * cashier by the shelves checks which item and calls point_to; the nurse on the
- * ward lets the patient go home once they say how they feel. Each calls
+ * ward lets the patient go home once they say how they feel; the landlord takes
+ * all that is owed on a yes, offers three more days, or tells the tenant their
+ * new rent. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.

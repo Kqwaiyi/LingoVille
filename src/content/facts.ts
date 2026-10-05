@@ -1,4 +1,4 @@
-import { ECONOMY, type Basket, type LanguageCode, type OpeningHours } from '../sim/index.ts';
+import { ECONOMY, weekdayOf, WEEKDAYS, type Basket, type LanguageCode, type OpeningHours, type RentStatement } from '../sim/index.ts';
 import { CULTURE_PACKS, localPlaceName, localShop } from './culturePacks.ts';
 import { chargeInShifts, formatLocalMoney, menuPrice } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
@@ -32,12 +32,62 @@ export function readBasketTotal(text: string): string | null {
   return totals.at(-1)?.[1] ?? null;
 }
 
+/** A day the rent is due, as the landlord would say it. */
+function dueOn(day: number, today: number) {
+  if (day === today) return 'today';
+  const weekday = weekdayOf(day);
+  return `${day - today < WEEKDAYS.length ? 'this' : 'next'} ${weekday[0]!.toUpperCase()}${weekday.slice(1)}`;
+}
+
+/** Local money as a plain number, as `accept_rent` takes it. */
+const plainAmount = (shifts: number, packId: LanguageCode) => Math.round(shifts * CULTURE_PACKS[packId].currency.perShift * 100) / 100;
+
+/** What the tenant owes the landlord: this week's rent, rent debt, and the total in local money and as `accept_rent`'s plain number. */
+function rentFacts({ today, dueDay, owedThisWeekInShifts, debtInShifts, weeklyRentInShifts }: RentStatement, packId: LanguageCode): string[] {
+  const money = (shifts: number) => formatLocalMoney(shifts, packId);
+  const total = owedThisWeekInShifts + debtInShifts;
+  return [
+    owedThisWeekInShifts > 0
+      ? `This week's rent still to pay: ${money(owedThisWeekInShifts)}, due by the end of ${dueOn(dueDay, today)}.`
+      : `This week's rent is paid. Next week's rent is ${money(weeklyRentInShifts)}.`,
+    ...(debtInShifts > 0 ? [`Unpaid rent from before, owed now: ${money(debtInShifts)}.`] : []),
+    total > 0
+      ? `Altogether the tenant owes ${money(total)} (for accept_rent: ${plainAmount(total, packId)}).`
+      : 'The tenant owes nothing at the moment.',
+    'Rent is paid to you, here. A payment goes to unpaid rent from before first, then to this week’s rent.',
+  ];
+}
+
+/** The landlord's news: what each week's rent is now the Newcomer Discount is smaller. */
+function newcomerDiscountFacts({ weeklyRentInShifts }: RentStatement, packId: LanguageCode): string[] {
+  return [
+    `From now on the tenant's weekly rent is ${formatLocalMoney(weeklyRentInShifts, packId)}.`,
+    'Rent already owed stays as it was.',
+    'Their discount was for newcomers who are still finding their feet. Now they are settling in, they get less of it.',
+  ];
+}
+
+/** What `rentFacts` wrote into this text that the tenant owes altogether, as local money and as `accept_rent`'s plain number, or null. */
+export function readRentOwed(text: string): { money: string; amount: number } | null {
+  const owed = [...text.matchAll(/Altogether the tenant owes (.+) \(for accept_rent: ([\d.]+)\)\.$/gm)].at(-1);
+  return owed ? { money: owed[1]!, amount: Number(owed[2]) } : null;
+}
+
+/** The new weekly rent `newcomerDiscountFacts` wrote into this text, as local money, or null. */
+export function readNewWeeklyRent(text: string): string | null {
+  return /From now on the tenant's weekly rent is (.+)\.$/m.exec(text)?.[1] ?? null;
+}
+
+/** What the NPC is told about the moment: the shopping on the counter, and for the landlord, the rent. */
+export type FactsContext = { basket?: Basket; rent?: RentStatement };
+
 /**
  * The facts an interaction's NPC knows, in English, pulled from the Culture
  * Pack, or for the ward, from what Fainting costs. At the till, the cashier
- * also knows what the customer has brought to the counter (`basket`).
+ * also knows what the customer has brought to the counter (`basket`), and the
+ * landlord knows what the tenant owes (`rent`).
  */
-export function interactionFacts(interaction: Interaction, packId: LanguageCode, basket: Basket = []): string[] {
+export function interactionFacts(interaction: Interaction, packId: LanguageCode, { basket = [], rent }: FactsContext = {}): string[] {
   const { goods, customs } = CULTURE_PACKS[packId];
   const { placeId } = interaction;
   return interaction.facts.flatMap((source) => {
@@ -67,6 +117,10 @@ export function interactionFacts(interaction: Interaction, packId: LanguageCode,
           'Patients who faint have usually gone too long without eating or drinking.',
         ];
       }
+      case 'rent':
+        return rent ? rentFacts(rent, packId) : [];
+      case 'newcomerDiscount':
+        return rent ? newcomerDiscountFacts(rent, packId) : [];
     }
   });
 }

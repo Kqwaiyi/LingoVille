@@ -313,6 +313,7 @@ export const ja: UiStrings = {
     notUnderstood: '{{who}}に伝わりませんでした',
     noCharge: '支払いなし',
     pointedTo: '{{item}}：棚に印をつけました',
+    moreTime: '家賃の支払いを{{days}}日延ばしてもらいました',
     moodUp: '気分 ↑',
     moodDown: '気分 ↓',
     skipRecap: '振り返りを飛ばす',

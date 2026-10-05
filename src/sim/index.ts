@@ -3,13 +3,14 @@ export { gameMinutesFor, isOpen, weekdayOf, WEEKDAYS, type OpeningHours, type We
 export { weighRecapEvidence, type EvidenceLine, type HelpShown, type RecapEvidence } from './helpEvidence.ts';
 export { applyInteractionOutcome, type InteractionOutcome, type OutcomeResult } from './interactionOutcome.ts';
 export { addToBasket, putBackFromBasket, type Basket } from './basket.ts';
-export { APPROACH_IDS, approachDue, type ApproachId } from './approaches.ts';
+export { APPROACH_IDS, approachDue, hallwayApproach, hallwayApproachMade, type ApproachId, type HallwayApproachId } from './approaches.ts';
 export { cook } from './cook.ts';
 export { faint, faintedBetween } from './faint.ts';
 export { lifeSkillLevel, lifeSkillLevels } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';
 export { clampMeter } from './meters.ts';
 export { MOOD_FACES, moodFace, moodModifier, type MoodFace } from './mood.ts';
+export { announceNewcomerDiscount, newcomerDiscountStepDownDue } from './newcomerDiscount.ts';
 export { addToPhrasebook } from './phrasebook.ts';
 export {
   isOutOfPatience,
@@ -43,6 +44,8 @@ export {
   type PhrasebookEntry,
   type PlaceId,
 } from './state.ts';
+export { grantExtension, payRent, rentDebt, rentOwed, rentStatement, type RentPayment, type RentStatement } from './rent.ts';
+export { weeklyRent } from './rentPrice.ts';
 export { bedUsable, sleep } from './sleep.ts';
 export { rideTram, tramTripMinutes } from './tram.ts';
 export * from './tuning.ts';

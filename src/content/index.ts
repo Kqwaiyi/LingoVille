@@ -29,10 +29,11 @@ export {
   type InteractionDefinition,
   type OrderLine,
   type ParsedArgs,
+  type RentChange,
   type ResolvedCompletion,
   type ServedItem,
 } from './defineInteraction.ts';
-export { basketFacts, interactionFacts, readBasketTotal } from './facts.ts';
+export { basketFacts, interactionFacts, readBasketTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
 export { INTERACTIONS } from './interactions.ts';
 export {
   CAFE_MENU,

@@ -57,11 +57,10 @@ describe('createSave', () => {
     expect(progression.today).toEqual({ day: FIRST_MORNING.day, homeMeals: 0, gymSessions: 0 });
   });
 
-  it('starts healthy, owing nothing, with empty pockets, no Job, no phrasebook and no one met', () => {
+  it('starts healthy, in no debt, with empty pockets, no Job, no phrasebook and no one met', () => {
     const state = createSave(setup);
 
     expect(state.character.illness).toBeNull();
-    expect(state.rent.owedInShifts).toBe(0);
     expect(state.debts).toEqual([]);
     expect(state.paymentPlans).toEqual([]);
     expect(state.possessions).toEqual({

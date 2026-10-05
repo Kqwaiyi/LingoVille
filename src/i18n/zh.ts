@@ -313,6 +313,7 @@ export const zh: UiStrings = {
     notUnderstood: '{{who}}没听懂你的话',
     noCharge: '未收费',
     pointedTo: '{{item}}：已在货架上标出',
+    moreTime: '房租可以晚交{{days}}天',
     moodUp: '心情 ↑',
     moodDown: '心情 ↓',
     skipRecap: '跳过回顾',

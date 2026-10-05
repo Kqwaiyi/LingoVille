@@ -1,4 +1,5 @@
 import type { AppearancePresetId, ItemId, NamedNpcId } from '../content/index.ts';
+import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
 
@@ -95,8 +96,16 @@ export type GameState = {
      */
     foodPoisoningChance: number;
   };
-  /** Rent falls due at the end of `dueDay`; `owedInShifts` is what is due then. */
-  rent: { dueDay: number; owedInShifts: number };
+  rent: {
+    /** This week's rent falls due at the end of this day. */
+    dueDay: number;
+    /** What is still to pay of this week's rent. Whatever is unpaid at the end of `dueDay` becomes rent debt. */
+    owedInShifts: number;
+    /** An extension from the landlord: rent debt costs no Mood at the end of any day up to this one. */
+    extendedThroughDay: number | null;
+    /** The day the landlord last caught the Character in the hallway about rent: once a day at most. */
+    remindedOnDay: number | null;
+  };
   debts: Debt[];
   paymentPlans: PaymentPlan[];
   /** The day the Character last woke in the ward after Fainting, or null if they never have fainted. Each Fainting wakes on a new day. */
@@ -112,6 +121,10 @@ export type GameState = {
     evidenceSoFar: number;
     /** Ratchets: drives the Newcomer Discount and Shift stakes. */
     highestStep: ProficiencyStep;
+    /**
+     * The Newcomer Discount step the landlord has told the Character about. Rent follows `highestStep`
+     * from each new week; this catches up with it when the landlord announces the step-down.
+     */
     newcomerDiscountStep: ProficiencyStep;
     lifeSkillXp: Record<LifeSkillId, number>;
     /** Daily counters, reset when `day` is no longer today. */
@@ -153,7 +166,12 @@ export function createSave(setup: NewGameSetup): GameState {
       illness: null,
       foodPoisoningChance: 0,
     },
-    rent: { dueDay: FIRST_MORNING.rentDueDay, owedInShifts: 0 },
+    rent: {
+      dueDay: FIRST_MORNING.rentDueDay,
+      owedInShifts: weeklyRent(setup.startingStep),
+      extendedThroughDay: null,
+      remindedOnDay: null,
+    },
     debts: [],
     paymentPlans: [],
     wokeInWardOnDay: null,

@@ -17,6 +17,7 @@ import {
   type LanguageCode,
   type PlaceId,
   type ProficiencyStep,
+  type RentStatement,
 } from '../sim/index.ts';
 
 /**
@@ -39,6 +40,8 @@ export type NpcSessionContext = {
   approach?: ApproachId;
   /** At the till: the shopping the Character has put on the counter. */
   basket?: Basket;
+  /** For the landlord: what the Character owes in rent. */
+  rent?: RentStatement;
 };
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
@@ -60,12 +63,15 @@ export const OUT_OF_PATIENCE_SCENE =
   "[SCENE: Again you couldn't make sense of anything the customer said, and you have run out of patience. " +
   'Apologise politely and say goodbye: the conversation is over.]';
 
-/** Opens every conversation the Player starts with E, so the NPC speaks first. */
-export const GREETING_SCENE = '[SCENE: A customer walks up to you. Greet them first.]';
+/** Opens every conversation the Player starts with E, so the NPC speaks first: a customer, or the landlord's tenant, walking up. */
+export const greetingScene = (who: string) => `[SCENE: A ${who} walks up to you. Greet them first.]`;
+export const GREETING_SCENE = greetingScene('customer');
 
 /** Opens a conversation the NPC starts, saying why they speak to the Character first. */
 const APPROACH_SCENES: Record<ApproachId, string> = {
   nurseOnWaking: '[SCENE: The patient in the bed beside you has just woken up. Speak to them first.]',
+  landlordRentDue: '[SCENE: Your tenant is walking past you in the hallway. Their rent is due and unpaid: stop them and speak to them first.]',
+  landlordDiscountStepDown: '[SCENE: Your tenant is walking past you in the hallway. Stop them and speak to them first: you have news about their rent.]',
 };
 
 /**
@@ -103,6 +109,7 @@ const WORKPLACES: Partial<Record<PlaceId, Workplace>> = {
   supermarket: { at: (pack) => `${pack.supermarket.name}, a supermarket`, who: 'customer' },
   'convenience-store': { at: (pack) => `${pack.convenienceStore.name}, a convenience store`, who: 'customer' },
   clinic: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
+  home: { at: (pack) => `${pack.apartments.name}, the apartment block where you live and let flats,`, who: 'tenant' },
 };
 
 function workplace(npc: NamedNpc): Workplace {
@@ -190,6 +197,12 @@ function personaBlock(npc: NamedNpc, pack: CulturePack) {
 }
 
 function youAndThisPersonBlock(who: string) {
+  if (who === 'tenant') {
+    return block('YOU AND THIS PERSON', [
+      "This tenant moved into one of your flats not long ago, newly arrived in town. You know them by sight but not well, and you don't use their name.",
+      'Speak to them politely, as you would to any tenant.',
+    ]);
+  }
   return block('YOU AND THIS PERSON', [
     `This ${who} is a stranger: you have never met. You don't know their name and don't ask for it.`,
     `Speak to them politely, as you would to any ${who}.`,
@@ -214,10 +227,10 @@ function stepBlock(step: ProficiencyStep, who: string) {
   return block('HOW TO SPEAK', [`The ${who} ${first}`, ...rest]);
 }
 
-function factsBlock(interaction: Interaction, pack: CulturePack, basket: Basket | undefined) {
+function factsBlock(interaction: Interaction, pack: CulturePack, context: NpcSessionContext) {
   return block('FACTS', [
     "Answer side questions using only these facts. If asked something not covered, say you don't know.",
-    ...interactionFacts(interaction, pack.id, basket).map((fact) => `- ${fact}`),
+    ...interactionFacts(interaction, pack.id, context).map((fact) => `- ${fact}`),
   ]);
 }
 
@@ -239,6 +252,24 @@ function goalBlock(interaction: Interaction, who: string) {
       `- If they ask for something not in FACTS, tell them kindly you don't sell it.`,
       `- If ${name} answers "invalid_arguments", ask them again what they are looking for.`,
       `- If ${name} answers "done", tell them simply where it is, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'payRent') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take any money, read back the amount the ${who} is paying, and wait for them to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with that amount as the plain number. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly they don't have that much with them, and ask whether they want to pay part of it. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", tell them that is more than they owe, and say what they do owe.`,
+      `- If ${name} answers "done", thank them and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'extendRent') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you have agreed a number of days, read it back with the day the rent will then be needed by, and wait for the ${who} to confirm.`,
+      `- Only once they have confirmed, call ${name} with that number of days. Never call it before.`,
+      `- If ${name} answers "done", remind them kindly to pay by then, and say goodbye.`,
     ]);
   }
   if (interaction.effect.kind === 'purchase') {
@@ -290,7 +321,7 @@ export function buildNpcSession(
     youAndThisPersonBlock(who),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
-    factsBlock(interaction, culturePack, context.basket),
+    factsBlock(interaction, culturePack, context),
     goalBlock(interaction, who),
     situationBlock(context, who),
   ].join('\n\n');
@@ -299,6 +330,6 @@ export function buildNpcSession(
     systemInstruction,
     tools: [interaction.toolDeclaration, notUnderstoodTool(who)],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
-    openingScene: context.approach ? APPROACH_SCENES[context.approach] : GREETING_SCENE,
+    openingScene: context.approach ? APPROACH_SCENES[context.approach] : greetingScene(who),
   };
 }

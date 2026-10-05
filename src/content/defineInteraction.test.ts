@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { ECONOMY } from '../sim/index.ts';
 import { CAFE_MENU, CONVENIENCE_MENU, defineInteraction, GROCERIES_SOLD, INTERACTIONS } from './index.ts';
 
 function interactionWith(args: z.ZodObject) {
@@ -191,5 +192,23 @@ describe('Goal Interaction #7: counter food at the convenience store', () => {
     expect(buyCounterFood.toolDeclaration.parameters.properties!.items!.items!.properties!.item!.enum).toEqual([...CONVENIENCE_MENU]);
     expect(buyCounterFood.parseArgs({ items: [{ item: 'bento', quantity: 1 }] }).success).toBe(true);
     expect(buyCounterFood.parseArgs({ items: [{ item: 'latte', quantity: 1 }] }).success).toBe(false);
+  });
+});
+
+describe('the landlord’s completions', () => {
+  it('reads accept_rent’s amount as local money, and turns it into Shifts in each pack', () => {
+    expect(INTERACTIONS.payRent.resolveCompletion({ amount: 6000 }, 'ja')).toEqual({ success: true, lines: [], rent: { kind: 'pay', amountInShifts: 1 } });
+    expect(INTERACTIONS.payRent.resolveCompletion({ amount: 90 }, 'de')).toEqual({ success: true, lines: [], rent: { kind: 'pay', amountInShifts: 1.5 } });
+    expect(INTERACTIONS.rentReminder.resolveCompletion({ amount: 240 }, 'zh')).toEqual({ success: true, lines: [], rent: { kind: 'pay', amountInShifts: 1 } });
+  });
+
+  it('refuses an amount that is not a positive sum of money', () => {
+    for (const amount of [0, -60, 'sixty']) expect(INTERACTIONS.payRent.resolveCompletion({ amount }, 'en').success).toBe(false);
+  });
+
+  it('reads grant_extension’s days, from 1 up to the most the landlord will give', () => {
+    expect(INTERACTIONS.askForMoreTime.resolveCompletion({ days: 3 }, 'en')).toEqual({ success: true, lines: [], rent: { kind: 'extend', days: 3 } });
+    expect(INTERACTIONS.askForMoreTime.resolveCompletion({ days: 0 }, 'en').success).toBe(false);
+    expect(INTERACTIONS.askForMoreTime.resolveCompletion({ days: ECONOMY.maxRentExtensionDays + 1 }, 'en').success).toBe(false);
   });
 });

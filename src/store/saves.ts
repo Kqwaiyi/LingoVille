@@ -3,14 +3,17 @@ import { z } from 'zod';
 import { APPEARANCE_PRESET_IDS, ITEM_IDS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 import {
   DEBT_KINDS,
+  ECONOMY,
   ILLNESS_IDS,
   JOB_IDS,
   LANGUAGE_CODES,
   LIFE_SKILL_IDS,
   PLACE_IDS,
   PROFICIENCY_STEPS,
+  weeklyRent,
   type GameState,
   type LanguageCode,
+  type ProficiencyStep,
 } from '../sim/index.ts';
 
 // Saves: one Character's whole life per slot, in IndexedDB. A save is the sim
@@ -18,7 +21,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 6;
+export const SAVE_SCHEMA_VERSION = 7;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -59,7 +62,12 @@ const GameStateSchema = z.object({
     illness: z.object({ illnessId: z.enum(ILLNESS_IDS), onsetDay: day }).nullable(),
     foodPoisoningChance: z.number().min(0).max(1),
   }),
-  rent: z.object({ dueDay: day, owedInShifts: z.number().min(0) }),
+  rent: z.object({
+    dueDay: day,
+    owedInShifts: z.number().min(0),
+    extendedThroughDay: day.nullable(),
+    remindedOnDay: day.nullable(),
+  }),
   debts: z.array(z.object({ kind: z.enum(DEBT_KINDS), amountInShifts: z.number().min(0) })),
   paymentPlans: z.array(
     z.object({ debtKind: z.enum(DEBT_KINDS), instalmentInShifts: z.number().min(0), nextDueDay: day }),
@@ -133,6 +141,24 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
     schemaVersion: 6,
     game: { ...save.game, character: { ...(save.game.character as object), foodPoisoningChance: 0 } },
   }),
+  // 6 → 7: rent falls due. Nothing ever set what was owed, so this week's rent is owed in full, at the
+  // Newcomer Discount for the highest step reached. A save already past its first due day moves on to the
+  // next one: the weeks that never fell due are forgiven rather than turned into debt.
+  (save) => {
+    const { clock, rent, progression } = save.game as {
+      clock: { day: number };
+      rent: { dueDay: number };
+      progression: { highestStep: ProficiencyStep };
+    };
+    let { dueDay } = rent;
+    while (dueDay < clock.day) dueDay += ECONOMY.rentPeriodDays;
+    const owedInShifts = weeklyRent(progression.highestStep);
+    return {
+      ...save,
+      schemaVersion: 7,
+      game: { ...save.game, rent: { dueDay, owedInShifts, extendedThroughDay: null, remindedOnDay: null } },
+    };
+  },
 ];
 
 /** A loose look at a stored field, for bytes that may not be a readable save. */
