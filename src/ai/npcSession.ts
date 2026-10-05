@@ -59,18 +59,48 @@ const NOT_UNDERSTOOD = toToolDeclaration(
   z.object({ reason: z.enum(['unintelligible', 'other_language', 'nothing_heard']) }),
 );
 
-// Block 4: how the NPC speaks at each Proficiency Step.
-const STEP_ADAPTATION: Record<ProficiencyStep, string> = {
-  A1:
-    'The customer is a beginner (CEFR A1). Use very short sentences and only the most common words. Speak slowly and clearly. ' +
-    'Offer choices up front (for example "hot or iced?"). The first time they seem lost, say the same thing once more, more simply.',
-  A2:
-    'The customer is an elementary learner (CEFR A2). Use short, simple sentences and everyday words. Speak slowly and clearly. ' +
-    'Offer choices up front when it helps. The first time they seem lost, say the same thing once more, more simply.',
-  B1: 'The customer is an intermediate learner (CEFR B1). Speak plainly at a moderate pace, with everyday vocabulary and one or two sentences per turn.',
-  B2: 'The customer is an upper-intermediate learner (CEFR B2). Speak at natural speed with everyday vocabulary. Let them volunteer the details rather than offering choices.',
-  C1: 'The customer is an advanced learner (CEFR C1). Speak at natural speed, with the idioms and set phrases normal in your job. Let them volunteer the details.',
-  C2: 'The customer speaks at near-native level (CEFR C2). Speak exactly as you would to a local, at natural speed. Let them volunteer the details.',
+// Block 4: how the NPC speaks at each Proficiency Step: vocabulary and grammar,
+// how much it says per turn, its speed, whether it offers choices up front, and
+// (at A1–A2) one simpler rephrase the first time the customer seems lost.
+const STEP_ADAPTATION: Record<ProficiencyStep, string[]> = {
+  A1: [
+    'The customer is a beginner (CEFR A1). Use only the most common words and the simplest grammar.',
+    'Say one very short sentence per turn.',
+    'Speak slowly and clearly.',
+    'Offer choices up front (for example "hot or iced?"), so they can answer with a word.',
+    'The first time they seem lost, say the same thing once more, more simply. After that, just ask again.',
+  ],
+  A2: [
+    'The customer is an elementary learner (CEFR A2). Use everyday words and simple grammar.',
+    'Say one or two short sentences per turn.',
+    'Speak slowly and clearly.',
+    'Offer choices up front when it helps.',
+    'The first time they seem lost, say the same thing once more, more simply. After that, just ask again.',
+  ],
+  B1: [
+    'The customer is an intermediate learner (CEFR B1). Use everyday vocabulary and plain grammar.',
+    'Say one or two sentences per turn.',
+    'Speak plainly, a little slower than natural speed.',
+    'Ask open questions, and offer choices only if they hesitate.',
+  ],
+  B2: [
+    'The customer is an upper-intermediate learner (CEFR B2). Use the vocabulary normal in your job.',
+    'Say as much per turn as you naturally would at work.',
+    'Speak at natural speed.',
+    'Let them volunteer the details rather than offering choices.',
+  ],
+  C1: [
+    'The customer is an advanced learner (CEFR C1). Use the idioms and set phrases normal in your job.',
+    'Say as much per turn as you naturally would at work.',
+    'Speak at natural speed.',
+    'Let them volunteer the details; expect them to.',
+  ],
+  C2: [
+    'The customer speaks at near-native level (CEFR C2). Speak exactly as you would to a local, with no simplification.',
+    'Say as much per turn as you naturally would at work.',
+    'Speak at natural speed.',
+    'Let them volunteer the details; expect them to.',
+  ],
 };
 
 const DAY_PARTS: { from: number; name: string }[] = [
@@ -103,7 +133,7 @@ function personaBlock(npc: NamedNpc, pack: CulturePack) {
   return block('WHO YOU ARE', [
     `You are ${name}, the ${npc.role} at ${pack.cafe.name}, a café in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
     `You are ${npc.age}: ${npc.temperament}. Quirks: ${npc.quirks}.`,
-    'Keep each turn short (one or two sentences), like a real, friendly person at work.',
+    'Talk like a real, friendly person at work.',
   ]);
 }
 
@@ -128,7 +158,7 @@ function languageRulesBlock(pack: CulturePack) {
 }
 
 function stepBlock(step: ProficiencyStep) {
-  return block('HOW TO SPEAK', [STEP_ADAPTATION[step]]);
+  return block('HOW TO SPEAK', STEP_ADAPTATION[step]);
 }
 
 function factsBlock(interaction: Interaction, pack: CulturePack) {

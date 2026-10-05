@@ -6,20 +6,20 @@
 
 **Spec:** [spec.md](../spec.md): Language Proficiency (including NPC adaptation); Help (Help log weighting); NPC prompt assembly
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `applyRecapEvidence`, with Vitest:
+- [x] `applyRecapEvidence`, with Vitest:
   - the score moves about 0.15 of the gap to the estimate normally, and about 0.3 during the first 10 interactions;
   - 1–2 player turns count very little;
   - each `not_understood()` is evidence of a lower level;
   - Help-log turns are discounted, and Help never lowers the estimate.
-- [ ] Six steps, A1–C2, with a buffer at the boundaries so the current step doesn't flicker. The step moves in both directions.
-- [ ] The highest step reached is tracked separately and only ever goes up.
-- [ ] Starting Patience follows the current step: 4/4/3/3/2/2.
-- [ ] Neither the level nor Patience appears anywhere on screen.
-- [ ] The step-adaptation prompt block varies:
+- [x] Six steps, A1–C2, with a buffer at the boundaries so the current step doesn't flicker. The step moves in both directions.
+- [x] The highest step reached is tracked separately and only ever goes up.
+- [x] Starting Patience follows the current step: 4/4/3/3/2/2.
+- [x] Neither the level nor Patience appears anywhere on screen.
+- [x] The step-adaptation prompt block varies:
   - vocabulary and sentence length;
   - speed: "slowly and clearly" at A1–A2, natural from B2 up;
   - choices offered up front at low steps, and one simpler rephrase at A1–A2.
-- [ ] Snapshots cover each language × step.
-- [ ] The session is built from the current step, not the highest step reached.
+- [x] Snapshots cover each language × step.
+- [x] The session is built from the current step, not the highest step reached.

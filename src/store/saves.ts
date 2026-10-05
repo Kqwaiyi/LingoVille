@@ -18,7 +18,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 3;
+export const SAVE_SCHEMA_VERSION = 4;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -66,6 +66,7 @@ const GameStateSchema = z.object({
   proficiencyStep: z.enum(PROFICIENCY_STEPS),
   progression: z.object({
     proficiencyScore: z.number().min(0),
+    evidenceSoFar: z.number().min(0),
     highestStep: z.enum(PROFICIENCY_STEPS),
     newcomerDiscountStep: z.enum(PROFICIENCY_STEPS),
     lifeSkillXp: z.record(z.enum(LIFE_SKILL_IDS), z.number().min(0)),
@@ -115,6 +116,12 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
     ...save,
     schemaVersion: 3,
     game: { ...save.game, onboarding: { ...(save.game.onboarding as object), firstMorningSkipped: false } },
+  }),
+  // 3 → 4: Recap evidence moves Language Proficiency. No conversation has moved it yet.
+  (save) => ({
+    ...save,
+    schemaVersion: 4,
+    game: { ...save.game, progression: { ...(save.game.progression as object), evidenceSoFar: 0 } },
   }),
 ];
 

@@ -44,7 +44,7 @@ describe('createSave', () => {
   it('starts the score in the starting step, which is also the highest step reached and the Newcomer Discount step', () => {
     const { progression } = createSave({ ...setup, startingStep: 'B1' });
 
-    expect(progression.proficiencyScore).toBe(PROFICIENCY.startingScore.B1);
+    expect(progression.proficiencyScore).toBe(PROFICIENCY.stepCentre.B1);
     expect(progression.highestStep).toBe('B1');
     expect(progression.newcomerDiscountStep).toBe('B1');
   });

@@ -67,9 +67,17 @@ const later = (game: GameState): GameState => ({ ...game, clock: { ...game.clock
 /** The same game, just after midnight. */
 const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.clock.day + 1, minuteOfDay: 0 } });
 
+/** The game before conversations moved Language Proficiency: version 3. */
+function beforeProficiencyEvidence() {
+  const game = lived();
+  const progression: Partial<GameState['progression']> = { ...game.progression };
+  delete progression.evidenceSoFar;
+  return { ...game, progression };
+}
+
 /** The game before the First Morning could be skipped: version 2. */
 function beforeSkippingFirstMornings() {
-  const game = lived();
+  const game = beforeProficiencyEvidence();
   return { ...game, onboarding: { firstMorningStepsDone: game.onboarding.firstMorningStepsDone } };
 }
 
@@ -165,6 +173,16 @@ describe('saves', () => {
     await set('slot-1', { schemaVersion: 2, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeSkippingFirstMornings() }, raw);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('upgrades a save from before conversations moved Proficiency as one with none assessed yet', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 3, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeProficiencyEvidence() }, raw);
+
+    const game = (await saves.load('slot-1'))?.save.game;
+
+    expect(game?.progression.evidenceSoFar).toBe(0);
+    expect(game).toEqual(lived());
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {

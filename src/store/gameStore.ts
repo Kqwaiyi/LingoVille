@@ -42,6 +42,7 @@ import {
 import {
   addToPhrasebook,
   applyInteractionOutcome,
+  applyRecapEvidence,
   CHARACTER_NAME,
   CLOCK,
   createSave,
@@ -62,6 +63,7 @@ import {
   tick,
   tramTripMinutes,
   weekdayOf,
+  type ConversationEvidence,
   type GameState,
   type LanguageCode,
   type NewGameSetup,
@@ -798,6 +800,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (get().conversation?.id === conversationId) updateConversation({ recap });
     };
 
+    /** The Recap's evidence moves the hidden Language Proficiency, which is saved at once. */
+    const applyProficiencyEvidence = (conversation: Conversation, recap: Recap) => {
+      const evidence: ConversationEvidence = {
+        cefrEstimate: recap.cefrEstimate,
+        lines: conversation.lines.map(({ speaker, text }) => ({ speaker, text })),
+        helpLog: conversation.helpLog,
+        notUnderstoodTurns: conversation.patience.turnsNotUnderstood,
+      };
+      // A later conversation may have begun: a save during it writes the game from before it, which needs the evidence too.
+      if (gameBeforeConversation) gameBeforeConversation = applyRecapEvidence(gameBeforeConversation, evidence);
+      set({ game: applyRecapEvidence(get().game, evidence) });
+      save();
+    };
+
     /**
      * Starts writing the Recap the moment the conversation ends. It goes to the
      * Journal whether or not the Player looks at it, and shows in the column only
@@ -843,6 +859,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         .requestRecap(request)
         .then(
           (recap) => {
+            applyProficiencyEvidence(conversation, recap);
             updateRecap(conversation.id, { status: 'ready', entry: journalPage(entry(recap)) });
             return recap;
           },

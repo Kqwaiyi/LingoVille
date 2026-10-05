@@ -143,8 +143,17 @@ export const PROFICIENCY = {
   updateRate: 0.15,
   fastStartUpdateRate: 0.3,
   fastStartInteractions: 10,
-  /** Where the hidden score starts for each step (default): the middle of the step. Only A1–B2 can be a starting step. */
-  startingScore: { A1: 0.5, A2: 1.5, B1: 2.5, B2: 3.5, C1: 4.5, C2: 5.5 } satisfies Record<ProficiencyStep, number>,
+  /** A conversation with this many player turns or fewer ("yes, the usual") counts only this much (default). */
+  shortConversation: { maxPlayerTurns: 2, weight: 0.15 },
+  /** How far below the Recap's estimate each turn the NPC couldn't make sense of pulls the score (default), in steps. */
+  notUnderstoodPull: 0.4,
+  /** How far past a step boundary the score must go before the current step changes, so it doesn't flicker (default). */
+  stepBuffer: 0.15,
+  /**
+   * The middle of each step on the hidden score (default), which runs from 0 to the number of steps.
+   * A new save starts here (only A1–B2 can be a starting step), and a Recap's estimate pulls the score here.
+   */
+  stepCentre: { A1: 0.5, A2: 1.5, B1: 2.5, B2: 3.5, C1: 4.5, C2: 5.5 } satisfies Record<ProficiencyStep, number>,
 } as const;
 
 /** How Help discounts a conversation as Proficiency evidence (default). Help only ever reduces weight. */

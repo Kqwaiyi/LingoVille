@@ -1,20 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
-import { CLOCK, type LanguageCode } from '../sim/index.ts';
+import { CLOCK, LANGUAGE_CODES, PROFICIENCY_STEPS, type LanguageCode, type ProficiencyStep } from '../sim/index.ts';
 import { buildNpcSession } from './index.ts';
 
 const FIRST_MORNING_CLOCK = { day: 1, minuteOfDay: CLOCK.wakeAt + 12 };
 
-function baristaSession(packId: LanguageCode) {
-  return buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.barista, {
+function baristaSession(packId: LanguageCode, step: ProficiencyStep = 'A1') {
+  return buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS[packId], step, NAMED_NPCS.barista, {
     clock: FIRST_MORNING_CLOCK,
   });
 }
 
 describe('buildNpcSession', () => {
-  it.each(['ja', 'zh', 'en', 'de'] as const)('builds the barista session in the %s pack at A1', (packId) => {
-    expect(baristaSession(packId)).toMatchSnapshot();
-  });
+  it.each(LANGUAGE_CODES.flatMap((packId) => PROFICIENCY_STEPS.map((step) => [packId, step] as const)))(
+    'builds the barista session in the %s pack at %s',
+    (packId, step) => {
+      expect(baristaSession(packId, step)).toMatchSnapshot();
+    },
+  );
 
   it('builds the instruction from the ordered blocks', () => {
     const { systemInstruction } = baristaSession('ja');
@@ -23,13 +26,6 @@ describe('buildNpcSession', () => {
 
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
-  });
-
-  it.each(['A2', 'B1', 'B2', 'C1', 'C2'] as const)('adapts how the barista speaks at %s', (step) => {
-    const session = buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS.ja, step, NAMED_NPCS.barista, {
-      clock: FIRST_MORNING_CLOCK,
-    });
-    expect(session.systemInstruction).toMatchSnapshot();
   });
 
   it("offers the interaction's completion function and not_understood as tools", () => {

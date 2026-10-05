@@ -98,6 +98,11 @@ export type GameState = {
   proficiencyStep: ProficiencyStep;
   progression: {
     proficiencyScore: number;
+    /**
+     * Recap evidence so far, counted in full interactions: a short or Help-heavy one counts as part of one.
+     * The score moves faster until there's `PROFICIENCY.fastStartInteractions` worth.
+     */
+    evidenceSoFar: number;
     /** Ratchets: drives the Newcomer Discount and Shift stakes. */
     highestStep: ProficiencyStep;
     newcomerDiscountStep: ProficiencyStep;
@@ -145,7 +150,8 @@ export function createSave(setup: NewGameSetup): GameState {
     paymentPlans: [],
     proficiencyStep: setup.startingStep,
     progression: {
-      proficiencyScore: PROFICIENCY.startingScore[setup.startingStep],
+      proficiencyScore: PROFICIENCY.stepCentre[setup.startingStep],
+      evidenceSoFar: 0,
       highestStep: setup.startingStep,
       newcomerDiscountStep: setup.startingStep,
       lifeSkillXp: Object.fromEntries(LIFE_SKILL_IDS.map((skill) => [skill, 0])) as Record<LifeSkillId, number>,

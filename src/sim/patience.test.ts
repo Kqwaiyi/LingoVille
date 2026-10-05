@@ -36,7 +36,16 @@ describe('Patience', () => {
   it('never goes below zero', () => {
     const out = afterUnintelligibleTurns(startPatience('C2'), PROFICIENCY_STEP_TABLE.C2.startingPatience);
 
-    expect(afterUnintelligibleTurns(out, 3)).toEqual(out);
+    expect(afterUnintelligibleTurns(out, 3).left).toBe(0);
+  });
+
+  it('counts each turn the NPC could not make sense of once, even after it has run out', () => {
+    const turn = newPlayerTurn(startPatience('C2'));
+
+    expect(losePatience(losePatience(turn)).turnsNotUnderstood).toBe(1);
+    expect(afterUnintelligibleTurns(startPatience('C2'), PROFICIENCY_STEP_TABLE.C2.startingPatience + 2).turnsNotUnderstood).toBe(
+      PROFICIENCY_STEP_TABLE.C2.startingPatience + 2,
+    );
   });
 
   it('shows on the NPC’s face: relaxed at the start, puzzled as it wears thin, strained near the end', () => {
