@@ -17,8 +17,8 @@ export const LIVE_ENDPOINT = 'GenerativeService.BidiGenerateContentConstrained';
 export const MODELS = {
   live: 'gemini-3.8-live',
   recap: 'gemini-3.8-flash',
-  annotate: 'gemini-3.8-flash-lite',
-  hint: 'gemini-3.8-flash-lite',
+  annotate: 'gemini-3.5-flash-lite',
+  hint: 'gemini-3.5-flash-lite',
   tts: 'gemini-3.8-flash-lite-tts',
   evalJudge: 'gemini-3.8-pro',
 } as const;

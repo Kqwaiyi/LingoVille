@@ -68,6 +68,10 @@ describe('buildRecapRequest', () => {
     expect(text(goal)).toMatch(/pronunciation point/i);
   });
 
+  it('never lets the Help the Player used lower the level estimate', () => {
+    expect(text(goal)).toMatch(/never lower cefrEstimate because Help was used/);
+  });
+
   it('asks for the explanations in the Native Language and the examples in the Target Language', () => {
     const prompt = text({ ...goal, nativeLanguage: 'de' });
 

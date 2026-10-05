@@ -146,8 +146,9 @@ function readingBlock() {
       '(for example yī bǎi, "a hundred", where yī bēi, "a cup", was meant), treat it as a pronunciation point: ' +
       'a correction whose "said" is what was heard, whose "natural" is what they meant, and whose "why" says how to say it ' +
       'so it is heard right. Never blame them for a typo-like word they probably said correctly.',
-    '- A player turn that closely repeats a hint shown just before it shows little about what they can do alone. ' +
-      'An NPC line they had translated shows nothing about their listening.',
+    '- The Help log lists the hints, phrasebook entries and translations the learner used. Using Help is never evidence of ' +
+      'a lower level, and the game already gives helped turns less weight, so never lower cefrEstimate because Help was used: ' +
+      'give the level the transcript would show if they had used no Help.',
   ]);
 }
 
