@@ -218,6 +218,11 @@ export const zh: UiStrings = {
     money: '钱',
     day: '第 {{day}} 天 · {{weekday}}',
     saved: '已保存 ✓',
+    debts: '欠款',
+    debt: {
+      hospital: '医院欠款 {{amount}}',
+      rent: '房租欠款 {{amount}}',
+    },
   },
   placeLine: {
     label: '地点',
@@ -342,6 +347,14 @@ export const zh: UiStrings = {
     tooEarlyForBed: '现在睡觉还太早。{{time}}以后才能睡。',
     npcSteppedAway: '{{who}}临时走开了。什么都没有丢失。',
     nothingToSay: '{{who}}微笑着点点头。这里暂时还没什么可聊的。',
+  },
+  fainting: {
+    title: '你晕倒了',
+    body: '你太久没有吃东西、喝水了。第二天早上 {{time}}，你在医院病房里醒来。',
+    paid: '医药费 {{amount}} 已付清。',
+    debt: '你付不起医药费 {{amount}}，所以欠下了这笔钱。可以在前台结清。',
+    moodDown: '心情 ↓',
+    wake: '醒来',
   },
   voiceUnavailable: {
     title: '语音服务不可用：请检查本地服务器',

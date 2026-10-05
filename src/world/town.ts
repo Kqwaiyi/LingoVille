@@ -178,6 +178,11 @@ export function spawnAt(placeId: PlaceId): Vec3 {
 /** Back from a save at home, the Character wakes up in bed. It drops onto the mattress. */
 export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
 
+/** The Fainting ward's bed, at the back of the clinic, within talking range of the nurse. */
+export const WARD_BED: Vec3 = [-21.2, 0.25, 19.4];
+/** After Fainting, the Character wakes up in the ward bed. */
+export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
+
 /**
  * Where the Character appears. A new game starts the First Morning at home
  * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the

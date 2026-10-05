@@ -21,8 +21,10 @@ import {
 } from '../ai/index.ts';
 import {
   APPEARANCE_PRESET_IDS,
+  approachInteraction,
   CULTURE_PACKS,
-  INTERACTIONS,
+  interactionStartedWithE,
+  localPlaceName,
   NAMED_NPCS,
   OPEN_AIR_PLACES,
   placeHours,
@@ -42,12 +44,15 @@ import {
 import {
   addToPhrasebook,
   applyInteractionOutcome,
+  approachDue,
   applyRecapEvidence,
   bedUsable,
   CHARACTER_NAME,
   CLOCK,
   createSave,
   drinkWater,
+  ECONOMY,
+  faintedBetween,
   enterPlace,
   gameMinutesFor,
   isOpen,
@@ -66,6 +71,7 @@ import {
   tick,
   tramTripMinutes,
   weekdayOf,
+  type ApproachId,
   type ConversationEvidence,
   type GameState,
   type LanguageCode,
@@ -117,6 +123,9 @@ export const DEV_SETUP: NewGameSetup = {
   skipFirstMorning: false,
   rngSeed: 20261003,
 };
+
+/** Dev only: Health for a game started about to faint: a few real seconds' worth with Hunger and Thirst empty. */
+const DEV_FAINT_SOON_HEALTH = 0.5;
 
 /** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
@@ -219,6 +228,12 @@ export type Toast =
   | { kind: 'tooEarlyForBed' }
   /** Staff standing in for a conversation that a later ticket brings. */
   | { kind: 'nothingToSay'; npcId: TownNpcId };
+
+/** The Fainting screen: the Character has fainted and is out until the Player wakes them in the ward. Shows what the bill was and whether it was paid. */
+export type Fainting = { billInShifts: number; paid: boolean };
+
+/** The Character has fainted and is taken to the ward. Each Fainting is a new object, so the world moves the Character into the ward bed once per Fainting. */
+export type WardArrival = { wokeInWardOnDay: number };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -325,6 +340,8 @@ export type GameStoreDeps = {
   newRngSeed: () => number;
   /** Dev only: the hour a new game starts at instead of the First Morning's, or null. */
   devStartHour: () => number | null;
+  /** Dev only: a new game starts about to faint, with money for the bill or (`broke`) none, or as usual (null). */
+  devFaintSoon: () => 'paying' | 'broke' | null;
   /** Opens the mic for the mic check. */
   openMic: OpenMic;
 };
@@ -403,6 +420,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   downloadFile: downloadInBrowser,
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
   devStartHour: devStartHourFromUrl,
+  devFaintSoon: devFaintSoonFromUrl,
   openMic: openBrowserMic,
 };
 
@@ -411,6 +429,14 @@ function devStartHourFromUrl(): number | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const hour = Number(new URLSearchParams(window.location.search).get('at') ?? NaN);
   return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
+}
+
+/** Dev only: `?faint` starts a new game seconds from Fainting, so a smoke test can reach the ward; `?faint=broke` with no money. */
+function devFaintSoonFromUrl(): 'paying' | 'broke' | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const faint = new URLSearchParams(window.location.search).get('faint');
+  if (faint === null) return null;
+  return faint === 'broke' ? 'broke' : 'paying';
 }
 
 export type GameStore = {
@@ -448,6 +474,9 @@ export type GameStore = {
   voiceUnavailable: boolean;
   /** The full-screen Journal, while it is open. */
   journal: JournalView | null;
+  /** The Fainting screen, while it shows. Time stands still behind it. */
+  fainting: Fainting | null;
+  wardArrival: WardArrival | null;
   /** The sign the Player is pointing at, and whether the pointer is on its tooltip, which keeps it open. */
   sign: { tooltip: SignTooltip; held: boolean } | null;
   /** The browser refused to keep saves safe from clearing, and the Player hasn't dismissed the callout yet. */
@@ -508,6 +537,8 @@ export type GameStore = {
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
   drinkWater: () => void;
+  /** Closes the Fainting screen: the Character wakes in the ward bed, and the nurse comes over. */
+  wakeInWard: () => void;
   /** Goes to bed at home: from 20:00, it wakes the next morning and saves; earlier, it says it's too early. */
   sleep: () => void;
   /** E near an NPC: opens a conversation, and the NPC speaks first. */
@@ -573,6 +604,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let conversations = 0;
   // The game as it was when the open conversation began: what a save holds until its outcome is decided.
   let gameBeforeConversation: GameState | null = null;
+  // An NPC due to come up to the Character while the Player is busy, who waits until the Player is free.
+  let pendingApproach: ApproachId | null = null;
   let realMsSinceSave = 0;
   // Found by the title screen: what Continue and Load a save play.
   let slots: Slot[] = [];
@@ -738,8 +771,21 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         rngSeed: deps.newRngSeed(),
       });
       const startHour = deps.devStartHour();
+      const faintSoon = deps.devFaintSoon();
+      const atHour = startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
       play(
-        startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } },
+        faintSoon === null
+          ? atHour
+          : {
+              ...atHour,
+              character: {
+                ...atHour.character,
+                health: DEV_FAINT_SOON_HEALTH,
+                hunger: 0,
+                thirst: 0,
+                ...(faintSoon === 'broke' && { moneyInShifts: 0 }),
+              },
+            },
         setup.slotId,
         'newGame',
       );
@@ -842,7 +888,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         npcId: conversation.npcId,
         npcName: game.people[conversation.npcId]?.knowsName ? CULTURE_PACKS[culturePackId].personas[conversation.npcId].name : null,
         interactionId: conversation.interaction.id,
-        placeName: CULTURE_PACKS[culturePackId].cafe.name,
+        placeName: localPlaceName(conversation.interaction.placeId, culturePackId),
         day: game.clock.day,
         minuteOfDay: game.clock.minuteOfDay,
         targetLanguage,
@@ -908,7 +954,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       switch (result.kind) {
         case 'success':
           settleOutcome(state, result);
-          return { result: 'served' };
+          // Only an order is served; anything else is simply done.
+          return { result: conversation.interaction.effect.kind === 'serveOrder' ? 'served' : 'done' };
         case 'cannot_afford':
           return { result: 'cannot_afford' };
         case 'invalid_arguments':
@@ -1033,6 +1080,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const conversation = get().conversation;
       if (conversation && !conversation.outcome) lineReadings.delete(conversation.id);
       set({ conversation: null, typing: false, micLevel: 0, ...instead });
+      approachIfFree();
     };
 
     const endConversation = () => {
@@ -1122,6 +1170,82 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       openSession(npcSession, conversation.lines);
     };
 
+    /**
+     * Health ran out during this tick: the Fainting screen shows, with the Character
+     * already in the ward the next morning. Waking there starts the day, so it's saved as this morning's backup.
+     */
+    const fainted = (before: GameState, after: GameState) => {
+      // A conversation under way ends where the Character collapsed: abandoned, or closed if its outcome was decided.
+      const conversation = get().conversation;
+      if (conversation?.outcome && !conversation.closed) showClosingCard();
+      if (get().conversation) endConversation();
+      const billInShifts = ECONOMY.faintingBillInShifts;
+      set({
+        fainting: { billInShifts, paid: after.character.moneyInShifts < before.character.moneyInShifts },
+        wardArrival: { wokeInWardOnDay: after.wokeInWardOnDay! },
+      });
+      save({ startsDay: true });
+      noticeApproach(before, after);
+    };
+
+    /** Opens a conversation with a Named NPC, who speaks first: greeting the Character, or saying why they have come over. */
+    const startConversation = (interaction: Interaction, approach: ApproachId | null) => {
+      const { game } = get();
+      const npc = NAMED_NPCS[interaction.npcId];
+      gameBeforeConversation = game;
+      const id = ++conversations;
+      lineReadings.set(id, { readings: {}, annotating: [] });
+      const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
+        clock: game.clock,
+        ...(approach && { approach }),
+      });
+
+      set({
+        voiceUnavailable: false,
+        conversation: {
+          id,
+          npcId: npc.id,
+          interaction,
+          lines: [],
+          npcLine: null,
+          heardLine: null,
+          listening: false,
+          reconnecting: false,
+          retried: false,
+          usage: NO_USAGE,
+          patience: startPatience(game.proficiencyStep),
+          outcome: null,
+          closed: false,
+          recap: null,
+          showingRecap: false,
+          tab: 'chat',
+          hints: null,
+          annotations: {},
+          translated: [],
+          readings: {},
+          helpLog: [],
+        },
+      });
+      openSession(npcSession);
+    };
+
+    /** An NPC who is due comes up to the Character, unless the Player is busy: then they wait until the Player is free. */
+    const approachIfFree = () => {
+      const approach = pendingApproach;
+      const { conversation, fainting, journal, screen } = get();
+      if (!approach || conversation || fainting || journal || screen !== 'playing') return;
+      pendingApproach = null;
+      startConversation(approachInteraction(approach), approach);
+    };
+
+    /** Whether this change to the game brings an NPC over to the Character. */
+    const noticeApproach = (before: GameState, after: GameState) => {
+      const due = approachDue(before, after);
+      if (!due) return;
+      pendingApproach = due;
+      approachIfFree();
+    };
+
     return {
       screen: initial ? 'playing' : 'title',
       title: initial ? null : { status: 'checking' },
@@ -1145,6 +1269,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       inputMode: DEFAULT_DEVICE_SETTINGS.inputMode,
       micCheckPassed: DEFAULT_DEVICE_SETTINGS.micCheckPassed,
       journal: null,
+      fainting: null,
+      wardArrival: null,
       persistCallout: false,
       sign: null,
       openTitle: () => {
@@ -1261,7 +1387,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const dt = gameMinutesFor(realDeltaMs, selectTimeScale(get()));
         if (dt > 0) set({ game: tick(before, dt) });
         realMsSinceSave += realDeltaMs;
-        if (get().game.clock.day !== before.clock.day || realMsSinceSave >= SAVE.everyRealMs) save();
+        const after = get().game;
+        if (faintedBetween(before, after)) return fainted(before, after);
+        if (after.clock.day !== before.clock.day || realMsSinceSave >= SAVE.everyRealMs) save();
+        noticeApproach(before, after);
       },
       setTabHidden: (tabHidden) => {
         set({ tabHidden });
@@ -1269,6 +1398,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       // The world calls these every frame, so they only notify on a change.
       enterPlace: (placeId) => {
+        // Behind the Fainting screen the Character is in the ward, wherever the world last had them standing.
+        if (get().fainting) return;
         const before = get().game;
         // Out in the open, there's no door to keep anyone out.
         const hours = OPEN_AIR_PLACES.includes(placeId) ? null : placeHours(placeId, before.identity.culturePackId);
@@ -1277,6 +1408,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ game });
         // Through a door.
         save();
+        noticeApproach(before, game);
       },
       setInteractable: (interactable) => {
         if (get().interactable === interactable) return;
@@ -1296,9 +1428,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!tramChoosing || conversation || !isTramStop(interactable)) return;
         const after = rideTram(game, stopsBetween(interactable, stopId), placeHours('tram-stop', game.identity.culturePackId));
         if (after === game) return;
-        set({ game: after, tramChoosing: false, interactable: null, tramArrival: { stopId } });
+        set({ game: after, tramChoosing: false, interactable: null });
+        // Health can run out on the way, and then the Character wakes in the ward instead of getting off.
+        if (faintedBetween(game, after)) return fainted(game, after);
+        set({ tramArrival: { stopId } });
+        noticeApproach(game, after);
       },
       drinkWater: () => set({ game: drinkWater(get().game) }),
+      wakeInWard: () => {
+        if (!get().fainting) return;
+        set({ fainting: null });
+        approachIfFree();
+      },
       sleep: () => {
         const { game } = get();
         if (!bedUsable(game.clock)) return set({ toast: { kind: 'tooEarlyForBed' } });
@@ -1307,6 +1448,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ game: after });
         // Waking starts the day, even after a bedtime past midnight, so the save becomes this morning's backup.
         save({ startsDay: true });
+        noticeApproach(game, after);
       },
 
       pointAtSign: (signId) => {
@@ -1330,43 +1472,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       talk: () => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
-        if (!(interactable in NAMED_NPCS)) return set({ toast: { kind: 'nothingToSay', npcId: interactable } });
-        const npc = NAMED_NPCS[interactable as NamedNpcId];
-        const interaction = Object.values(INTERACTIONS).find((i) => i.npcId === npc.id)!;
-        gameBeforeConversation = game;
-        const id = ++conversations;
-        lineReadings.set(id, { readings: {}, annotating: [] });
-        const npcSession = buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
-          clock: game.clock,
-        });
-
-        set({
-          voiceUnavailable: false,
-          conversation: {
-            id,
-            npcId: npc.id,
-            interaction,
-            lines: [],
-            npcLine: null,
-            heardLine: null,
-            listening: false,
-            reconnecting: false,
-            retried: false,
-            usage: NO_USAGE,
-            patience: startPatience(game.proficiencyStep),
-            outcome: null,
-            closed: false,
-            recap: null,
-            showingRecap: false,
-            tab: 'chat',
-            hints: null,
-            annotations: {},
-            translated: [],
-            readings: {},
-            helpLog: [],
-          },
-        });
-        openSession(npcSession);
+        const interaction = interactable in NAMED_NPCS ? interactionStartedWithE(interactable as NamedNpcId) : null;
+        if (!interaction) return set({ toast: { kind: 'nothingToSay', npcId: interactable } });
+        startConversation(interaction, null);
       },
       sendTypedLine: (text) => {
         const conversation = get().conversation;
@@ -1479,7 +1587,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           },
         );
       },
-      closeJournal: () => set({ journal: null }),
+      closeJournal: () => {
+        set({ journal: null });
+        approachIfFree();
+      },
       setTyping: (typing) => set({ typing }),
       dismissToast: () => set({ toast: null }),
       dismissVoiceUnavailable: () => set({ voiceUnavailable: false }),
@@ -1543,7 +1654,7 @@ export const selectTitlePlaceId = (s: GameStore): PlaceId => {
 };
 
 export const selectTimeScale = (s: GameStore) => {
-  if (s.tabHidden || s.journal || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
+  if (s.tabHidden || s.journal || s.fainting || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
   return s.conversation ? CLOCK.timeScale.conversation : CLOCK.timeScale.normal;
 };
 export const selectHealth = (s: GameStore) => s.game.character.health;
@@ -1553,6 +1664,8 @@ export const selectMood = (s: GameStore) => s.game.character.mood;
 /** The face on the dock's Mood gauge. */
 export const selectMoodFace = (s: GameStore) => moodFace(s.game.character.mood);
 export const selectMoneyInShifts = (s: GameStore) => s.game.character.moneyInShifts;
+/** What the Character owes, by kind, for the dock to show next to the money. */
+export const selectDebts = (s: GameStore) => s.game.debts;
 export const selectCulturePackId = (s: GameStore) => s.game.identity.culturePackId;
 export const selectTargetLanguage = (s: GameStore) => s.game.identity.targetLanguage;
 export const selectDay = (s: GameStore) => s.game.clock.day;
@@ -1588,8 +1701,8 @@ export const selectConversation = (s: GameStore) => s.conversation;
 const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;
 export const selectTyping = (s: GameStore) => s.typing;
-/** Keys belong to the UI, not the world: the typed field has focus, the Journal is open, or the Player is choosing a tram stop. */
-export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null || s.tramChoosing;
+/** Keys belong to the UI, not the world: the typed field has focus, the Journal or the Fainting screen is open, or the Player is choosing a tram stop. */
+export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null || s.fainting !== null || s.tramChoosing;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;
@@ -1601,6 +1714,8 @@ export const selectClosingCard = (s: GameStore) => (s.conversation?.closed ? s.c
 /** The Recap in the column, once See Recap is chosen. */
 export const selectRecap = (s: GameStore) => (s.conversation?.showingRecap ? s.conversation.recap : null);
 export const selectJournal = (s: GameStore) => s.journal;
+export const selectFainting = (s: GameStore) => s.fainting;
+export const selectWardArrival = (s: GameStore) => s.wardArrival;
 /** The NPC's face: Patience shows only like this, never as a number. */
 export const selectNpcExpression = (s: GameStore): NpcExpression | null =>
   s.conversation ? npcExpression(s.conversation.patience) : null;

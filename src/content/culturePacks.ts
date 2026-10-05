@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours } from '../sim/index.ts';
+import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
 import { ITEM_IDS, type ItemId } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
@@ -60,6 +60,8 @@ export type CulturePack = {
     /** Facts the café staff know, in English. */
     facts: string[];
   };
+  /** The clinic and hospital, by its local name: where the Fainting ward is. */
+  hospital: { name: string; nameGlosses: Glosses };
   /** Persona localisations: each Named NPC's local name. */
   personas: Record<NamedNpcId, { name: string }>;
   appearances: {
@@ -112,6 +114,7 @@ export function culturePackSchema(packId: LanguageCode) {
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
     cafe: z.object({ name: text, nameGlosses: glosses, facts: z.array(text) }),
+    hospital: z.object({ name: text, nameGlosses: glosses }),
     personas: z.record(z.string(), z.object({ name: text })),
     appearances: z.object({
       npcs: z.record(z.string(), z.enum(APPEARANCE_PRESET_IDS)),
@@ -154,9 +157,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { zh: '星星咖啡', en: 'Star Coffee', de: 'Stern-Kaffee' },
       facts: ['Cash, card and IC cards are all fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
-    personas: { barista: { name: '佐藤' } },
+    hospital: {
+      name: 'みどり総合病院',
+      nameGlosses: { zh: '绿树综合医院', en: 'Midori General Hospital', de: 'Allgemeines Krankenhaus Midori' },
+    },
+    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' } },
     appearances: {
-      npcs: { barista: 'preset-2' },
+      npcs: { barista: 'preset-2', nurse: 'preset-4' },
       customerWeights: { 'preset-1': 3, 'preset-2': 3, 'preset-3': 2, 'preset-4': 2 },
     },
     props: ['noren', 'lucky-cat'],
@@ -190,9 +197,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: 'スターコーヒー', en: 'Star Coffee', de: 'Stern-Kaffee' },
       facts: ['WeChat Pay, Alipay and cash are all fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
-    personas: { barista: { name: '小李' } },
+    hospital: {
+      name: '绿城医院',
+      nameGlosses: { ja: '緑城病院', en: 'Green City Hospital', de: 'Krankenhaus Grünstadt' },
+    },
+    personas: { barista: { name: '小李' }, nurse: { name: '王芳' } },
     appearances: {
-      npcs: { barista: 'preset-3' },
+      npcs: { barista: 'preset-3', nurse: 'preset-1' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['red-lantern', 'tea-set'],
@@ -228,9 +239,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: '小さな星カフェ', zh: '小星星咖啡馆', de: 'Café Kleiner Stern' },
       facts: ['Card and cash are both fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
-    personas: { barista: { name: 'Jess' } },
+    hospital: {
+      name: 'St Mary’s Hospital',
+      nameGlosses: { ja: 'セント・メアリー病院', zh: '圣玛丽医院', de: 'St.-Marien-Krankenhaus' },
+    },
+    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' } },
     appearances: {
-      npcs: { barista: 'preset-1' },
+      npcs: { barista: 'preset-1', nurse: 'preset-3' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 2, 'preset-4': 3 },
     },
     props: ['teapot', 'bunting'],
@@ -274,11 +289,23 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: 'カフェ・シュテルン（星）', zh: '星星咖啡馆', en: 'Star Café' },
       facts: ['Card and cash are both fine.', 'The toilet is at the back.', 'There is free Wi-Fi.'],
     },
-    personas: { barista: { name: 'Lena' } },
+    hospital: {
+      name: 'Klinikum am Park',
+      nameGlosses: { ja: '公園前総合病院', zh: '公园医院', en: 'Park Hospital' },
+    },
+    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' } },
     appearances: {
-      npcs: { barista: 'preset-4' },
+      npcs: { barista: 'preset-4', nurse: 'preset-2' },
       customerWeights: { 'preset-1': 2, 'preset-2': 3, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['cake-stand', 'pretzel-basket'],
   },
 };
+
+/** A staffed place by its local name in this pack, as the Journal keeps it: the café, or the hospital. */
+export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
+  const pack = CULTURE_PACKS[packId];
+  if (placeId === 'cafe') return pack.cafe.name;
+  if (placeId === 'clinic') return pack.hospital.name;
+  throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
+}

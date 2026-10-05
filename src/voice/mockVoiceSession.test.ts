@@ -31,10 +31,17 @@ function listen() {
   return { turns, toolCalls, dropped, events };
 }
 
-/** A connected fake barista that has already greeted the Player. */
-async function atTheCounter(packId: LanguageCode = 'ja') {
+function nurseSession(packId: LanguageCode) {
+  return buildNpcSession(INTERACTIONS.wakeInWard, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.nurse, {
+    clock: { day: 2, minuteOfDay: 480 },
+    approach: 'nurseOnWaking',
+  });
+}
+
+/** A connected fake barista that has already greeted the Player, or with `nurse`, the fake nurse on the ward. */
+async function atTheCounter(packId: LanguageCode = 'ja', { nurse = false } = {}) {
   const heard = listen();
-  const session = openMockVoiceSession(npcSession(packId), heard.events);
+  const session = openMockVoiceSession(nurse ? nurseSession(packId) : npcSession(packId), heard.events);
   await session.connect();
   await vi.runAllTimersAsync();
   const say = async (text: string) => {
@@ -221,5 +228,47 @@ describe('mock VoiceSession', () => {
 
     expect(dropped.count).toBe(1);
     expect(turns).toHaveLength(1);
+  });
+});
+
+describe('mock VoiceSession: the nurse on the ward', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('speaks first, as the nurse rather than the barista', async () => {
+    const barista = await atTheCounter('en');
+    const nurse = await atTheCounter('en', { nurse: true });
+
+    expect(nurse.turns).toHaveLength(1);
+    expect(nurse.turns[0]).not.toBe(barista.turns[0]);
+  });
+
+  it('lets the patient go home once they say how they feel, then says goodbye', async () => {
+    const { turns, toolCalls, say, answer } = await atTheCounter('en', { nurse: true });
+
+    await say("I'm fine, thanks");
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'discharge_patient', args: { feeling: 'well' } }]);
+
+    await answer({ result: 'done' });
+    expect(turns).toHaveLength(2);
+  });
+
+  it('hears a patient who still feels unwell', async () => {
+    const { toolCalls, say } = await atTheCounter('de', { nurse: true });
+
+    await say('Mir geht es nicht gut');
+
+    expect(toolCalls.map((call) => call.args)).toEqual([{ feeling: 'unwell' }]);
+  });
+
+  it('asks again for a line that isn’t about how the patient feels, and calls not_understood for gibberish', async () => {
+    const { turns, toolCalls, say } = await atTheCounter('ja', { nurse: true });
+
+    await say('はい');
+    expect(turns).toHaveLength(2);
+    expect(toolCalls).toEqual([]);
+
+    await say('xqzt');
+    expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
   });
 });

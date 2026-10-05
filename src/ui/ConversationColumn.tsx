@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CULTURE_PACKS, formatLocalMoney, type NamedNpcId } from '../content/index.ts';
+import { formatLocalMoney, localPlaceName, type NamedNpcId } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
@@ -346,8 +346,7 @@ export function ConversationColumn() {
           <span>{t(`roles.${npcId}.name`)}</span>
         </div>
         <div className="chat-meta">
-          {/* The café is the only staffed place until the whole town lands (ticket 13). */}
-          {CULTURE_PACKS[packId].cafe.name} · {formatClock(minute)}
+          {localPlaceName(conversation.interaction.placeId, packId)} · {formatClock(minute)}
         </div>
         <div className="chat-tabs">
           <div role="tablist" aria-label={t('chat.tabs')}>

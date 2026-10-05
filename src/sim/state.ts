@@ -94,6 +94,8 @@ export type GameState = {
   rent: { dueDay: number; owedInShifts: number };
   debts: Debt[];
   paymentPlans: PaymentPlan[];
+  /** The day the Character last woke in the ward after Fainting, or null if they never have fainted. Each Fainting wakes on a new day. */
+  wokeInWardOnDay: number | null;
   /** The current step, read from the hidden score with a buffer at boundaries. */
   proficiencyStep: ProficiencyStep;
   progression: {
@@ -148,6 +150,7 @@ export function createSave(setup: NewGameSetup): GameState {
     rent: { dueDay: FIRST_MORNING.rentDueDay, owedInShifts: 0 },
     debts: [],
     paymentPlans: [],
+    wokeInWardOnDay: null,
     proficiencyStep: setup.startingStep,
     progression: {
       proficiencyScore: PROFICIENCY.stepCentre[setup.startingStep],

@@ -3,10 +3,10 @@ import { SAVE_SCHEMA_VERSION, type Saves } from './saves.ts';
 
 /** Saves for store tests that only remember what they were asked to write, and have nothing to load. */
 export function recordingSaves() {
-  const written: { slotId: string; game: GameState }[] = [];
+  const written: { slotId: string; game: GameState; startsDay: boolean }[] = [];
   const saves: Saves = {
-    write: async (slotId, game) => {
-      written.push({ slotId, game });
+    write: async (slotId, game, { startsDay = false } = {}) => {
+      written.push({ slotId, game, startsDay });
       return { schemaVersion: SAVE_SCHEMA_VERSION, slotId, createdAt: '', lastPlayedAt: '', game };
     },
     load: async () => null,

@@ -134,3 +134,16 @@ test('German strings fit in the dock and the conversation column', async ({ page
   await expect(column.getByRole('article', { name: 'Tagebuchseite' })).toBeVisible();
   expect(await overflowing(column)).toEqual([]);
 });
+
+test('German strings fit on the Fainting screen and the dock with a debt', async ({ page }) => {
+  await startNewGame(page, { path: '/?faint=broke', native: 'de' });
+
+  const fainting = page.getByRole('alertdialog', { name: 'Du bist ohnmächtig geworden' });
+  await expect(fainting).toBeVisible({ timeout: 15_000 });
+  expect(await overflowing(fainting, { vertical: true })).toEqual([]);
+
+  const dock = page.getByRole('region', { name: 'Leiste' });
+  await expect(dock.getByRole('list', { name: 'Schulden' })).toBeVisible();
+  expect(await overflowing(dock, { vertical: true })).toEqual([]);
+  expect(await overlappingRingLabels(dock)).toBe(false);
+});

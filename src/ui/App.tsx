@@ -4,6 +4,7 @@ import { selectConversation, selectNativeLanguage, selectScreen, useGame } from 
 import { Scene } from '../world/index.ts';
 import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
+import { FaintingScreen } from './FaintingScreen.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
@@ -60,6 +61,7 @@ function Hud() {
       <Toast />
       <Journal />
       <VoiceUnavailableScreen />
+      <FaintingScreen />
       <PersistCallout />
     </>
   );

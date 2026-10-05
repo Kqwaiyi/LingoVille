@@ -218,6 +218,11 @@ export const de: UiStrings = {
     money: 'Geld',
     day: 'Tag {{day}} · {{weekday}}',
     saved: 'Gespeichert ✓',
+    debts: 'Schulden',
+    debt: {
+      hospital: 'Krankenhausschulden {{amount}}',
+      rent: 'Mietschulden {{amount}}',
+    },
   },
   placeLine: {
     label: 'Ort',
@@ -342,6 +347,14 @@ export const de: UiStrings = {
     tooEarlyForBed: 'Es ist noch zu früh fürs Bett. Schlafen geht ab {{time}}.',
     npcSteppedAway: '{{who}} musste kurz weg. Nichts ist verloren.',
     nothingToSay: '{{who}} lächelt und nickt. Hier gibt es noch nichts zu besprechen.',
+  },
+  fainting: {
+    title: 'Du bist ohnmächtig geworden',
+    body: 'Du hast zu lange nichts gegessen oder getrunken. Am nächsten Morgen um {{time}} wachst du im Krankenhaus auf.',
+    paid: 'Die Krankenhausrechnung über {{amount}} wurde bezahlt.',
+    debt: 'Du konntest die Krankenhausrechnung über {{amount}} nicht bezahlen und schuldest sie jetzt. Du kannst sie am Empfang begleichen.',
+    moodDown: 'Stimmung ↓',
+    wake: 'Aufwachen',
   },
   voiceUnavailable: {
     title: 'Sprachdienst nicht verfügbar: Prüfe den lokalen Server',

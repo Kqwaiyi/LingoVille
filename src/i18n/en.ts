@@ -221,6 +221,11 @@ export const en = {
     money: 'Money',
     day: 'Day {{day}} · {{weekday}}',
     saved: 'Saved ✓',
+    debts: 'Debts',
+    debt: {
+      hospital: 'Hospital debt {{amount}}',
+      rent: 'Rent debt {{amount}}',
+    },
   },
   placeLine: {
     label: 'Place',
@@ -347,6 +352,14 @@ export const en = {
     tooEarlyForBed: 'It’s too early for bed. You can sleep from {{time}}.',
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
     nothingToSay: '{{who}} smiles and nods. There’s nothing to talk about here yet.',
+  },
+  fainting: {
+    title: 'You fainted',
+    body: 'You went too long without eating or drinking. You wake up in the hospital ward the next morning at {{time}}.',
+    paid: 'The hospital bill of {{amount}} was paid.',
+    debt: 'You couldn’t pay the hospital bill of {{amount}}, so you owe it. You can settle it at reception.',
+    moodDown: 'Mood ↓',
+    wake: 'Wake up',
   },
   voiceUnavailable: {
     title: 'Voice service unavailable: check the local server',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSave, rideTram, TRAM, type GameState, type OpeningHours } from './index.ts';
+import { CLOCK, createSave, rideTram, TRAM, type GameState, type OpeningHours } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
 
 const HOUR = 60;
@@ -49,5 +49,17 @@ describe('rideTram', () => {
   it('goes nowhere when the chosen stop is the one the Character is at', () => {
     const state = atTheStop(MONDAY, 9 * HOUR);
     expect(rideTram(state, 0, TRAMS)).toBe(state);
+  });
+});
+
+describe('rideTram: Fainting on the way', () => {
+  it('wakes the Character in the ward, not at the stop, if Health runs out on the tram', () => {
+    const state = atTheStop(MONDAY, 9 * HOUR);
+    const collapsing = { ...state, character: { ...state.character, health: 0.01, hunger: 0, thirst: 0 } };
+
+    const after = rideTram(collapsing, 2, TRAMS);
+
+    expect(after.placeId).toBe('clinic');
+    expect(after.clock).toEqual({ day: MONDAY + 1, minuteOfDay: CLOCK.faintWakeAt });
   });
 });

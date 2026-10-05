@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildNpcSession, GREETING_SCENE, RESUME_SCENE } from '../ai/index.ts';
+import { buildNpcSession, GREETING_SCENE, RESUME_SCENE, type NpcSession } from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS } from '../content/index.ts';
 import { openLiveSession, type LiveAudio, type LiveDeps, type LiveSocketHandlers, type LiveToken } from './liveSession.ts';
 import type { TokenUsage, ToolCall, TranscriptLine, VoiceSessionEvents } from './voiceSession.ts';
@@ -108,11 +108,16 @@ function listen() {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-async function connected({ resumeFrom, micAllowed, typedOnly }: { resumeFrom?: TranscriptLine[]; micAllowed?: boolean; typedOnly?: boolean } = {}) {
+async function connected({
+  resumeFrom,
+  micAllowed,
+  typedOnly,
+  session: forNpc = npcSession,
+}: { resumeFrom?: TranscriptLine[]; micAllowed?: boolean; typedOnly?: boolean; session?: NpcSession } = {}) {
   const { server, openSocket } = fakeServer();
   const { audio, createAudio } = fakeAudio({ micAllowed });
   const game = listen();
-  const session = openLiveSession(TOKEN, npcSession, game.events, { resumeFrom, typedOnly }, { openSocket, createAudio });
+  const session = openLiveSession(TOKEN, forNpc, game.events, { resumeFrom, typedOnly }, { openSocket, createAudio });
   const connecting = session.connect();
   await flush();
   server.open();
@@ -148,6 +153,19 @@ describe('Live VoiceSession', () => {
     expect(server.conversation).toEqual([
       { clientContent: { turns: [{ role: 'user', parts: [{ text: GREETING_SCENE }] }], turnComplete: true } },
     ]);
+  });
+
+  it('opens with the NPC approaching instead, when the NPC starts the conversation', async () => {
+    const nurse = buildNpcSession(INTERACTIONS.wakeInWard, CULTURE_PACKS.de, 'A1', NAMED_NPCS.nurse, {
+      clock: { day: 2, minuteOfDay: 480 },
+      approach: 'nurseOnWaking',
+    });
+    const { server } = await connected({ session: nurse });
+
+    expect(server.conversation).toEqual([
+      { clientContent: { turns: [{ role: 'user', parts: [{ text: nurse.openingScene }] }], turnComplete: true } },
+    ]);
+    expect(nurse.openingScene).not.toBe(GREETING_SCENE);
   });
 
   it('only finishes connecting once the setup is complete', async () => {

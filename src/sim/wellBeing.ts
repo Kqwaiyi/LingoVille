@@ -1,4 +1,5 @@
 import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
+import { faint } from './faint.ts';
 import { clampMeter } from './meters.ts';
 import type { GameState, PlaceId } from './state.ts';
 import { CLOCK, METER_MAX, MINUTES_PER_HOUR, MOOD, WELL_BEING } from './tuning.ts';
@@ -19,18 +20,32 @@ function lateNightMinutes(minuteOfDay: number, dtGameMinutes: number): number {
   return minutes;
 }
 
+const minutesUntilDeprived = ({ hunger, thirst }: GameState['character']) =>
+  Math.min(hunger / hungerPerMinute, thirst / thirstPerMinute);
+
+/** Game minutes until Health runs out at the current rates: never, while the Character's needs are met. */
+function minutesUntilFainting(character: GameState['character']): number {
+  if (character.health <= 0) return 0;
+  return minutesUntilDeprived(character) + character.health / deprivedHealthPerMinute;
+}
+
 /**
  * Advances the game by `dtGameMinutes`. Hunger and Thirst empty steadily, and
  * Health falls only from the moment one of them reaches 0, so one long tick
  * gives the same result as many short ones. Mood falls while a need is unmet
- * and, faster, while the Character is up late at night.
+ * and, faster, while the Character is up late at night. The moment Health
+ * reaches 0, the Character faints, and the rest of the tick is lost.
  */
 export function tick(state: GameState, dtGameMinutes: number): GameState {
   if (dtGameMinutes <= 0) return state;
-  const { character } = state;
+  const untilFainting = minutesUntilFainting(state.character);
+  if (untilFainting <= dtGameMinutes) return faint(decay(state, untilFainting));
+  return decay(state, dtGameMinutes);
+}
 
-  const minutesUntilDeprived = Math.min(character.hunger / hungerPerMinute, character.thirst / thirstPerMinute);
-  const deprivedMinutes = Math.max(0, dtGameMinutes - minutesUntilDeprived);
+function decay(state: GameState, dtGameMinutes: number): GameState {
+  const { character } = state;
+  const deprivedMinutes = Math.max(0, dtGameMinutes - minutesUntilDeprived(character));
   const moodChange =
     (MOOD.changes.unmetNeedPerGameHour * deprivedMinutes +
       MOOD.changes.lateNightPerGameHour * lateNightMinutes(state.clock.minuteOfDay, dtGameMinutes)) /

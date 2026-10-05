@@ -33,4 +33,22 @@ export const INTERACTIONS = {
     band: 'B',
     effect: { kind: 'serveOrder' },
   }),
+  // Not one the Player starts: the nurse begins it when the Character wakes from Fainting.
+  wakeInWard: defineInteraction({
+    id: 'wake-in-ward',
+    placeId: 'clinic',
+    npcId: 'nurse',
+    goal:
+      'The patient fainted yesterday from not eating or drinking and has slept on your ward. They have just woken up. ' +
+      'Ask how they feel, and once they have told you, let them go home.',
+    facts: ['ward'],
+    items: [],
+    completion: {
+      name: 'discharge_patient',
+      description: 'Let the patient go home, once they have told you how they feel. Answers "done".',
+      args: z.object({ feeling: z.enum(['well', 'unwell']).describe('How the patient said they feel.') }),
+    },
+    band: 'B',
+    effect: { kind: 'none' },
+  }),
 } satisfies Record<string, Interaction>;

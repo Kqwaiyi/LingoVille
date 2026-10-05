@@ -85,6 +85,8 @@ export const WELL_BEING = {
   cafeDrinkThirst: 0.4 * METER_MAX,
   /** Hunger one café pastry gives back. */
   cafeFoodHunger: 0.25 * METER_MAX,
+  /** Where the ward's care leaves Well-being when the Character comes round after Fainting (default). */
+  afterFainting: { health: 0.5 * METER_MAX, hunger: 0.5 * METER_MAX, thirst: 0.5 * METER_MAX },
 } as const;
 
 // --- Economy (prices as ratios of one Shift's base pay) ---------------------

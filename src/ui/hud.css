@@ -149,6 +149,15 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+.dock-debts {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: var(--low);
+  white-space: nowrap;
+}
+
 .prompt {
   position: absolute;
   left: 50%;
@@ -715,6 +724,12 @@ ruby {
   background: rgba(10, 12, 20, 0.55);
 }
 
+/* Fainting: the town goes dark behind it. */
+.fainting-backdrop {
+  background: rgba(6, 8, 14, 0.9);
+}
+
+.fainting,
 .voice-unavailable {
   max-width: 440px;
   padding: 20px 22px;
@@ -723,16 +738,24 @@ ruby {
   color: #1d2433;
 }
 
+.fainting h2,
 .voice-unavailable h2 {
   margin: 0 0 8px;
   font-size: 18px;
 }
 
+.fainting p,
 .voice-unavailable p {
   margin: 0 0 16px;
   line-height: 1.45;
 }
 
+.fainting-mood {
+  color: #a4545a;
+  font-weight: 600;
+}
+
+.fainting .primary,
 .voice-unavailable .primary {
   padding: 9px 18px;
   border: 0;

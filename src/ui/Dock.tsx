@@ -6,6 +6,7 @@ import {
   selectClockMinute,
   selectCulturePackId,
   selectDay,
+  selectDebts,
   selectHealth,
   selectHunger,
   selectMood,
@@ -46,13 +47,24 @@ function RingGauge({ label, icon, value, tone }: { label: string; icon: string; 
   );
 }
 
+/** The money, with anything owed under it. */
 function Money() {
   const { t } = useTranslation();
   const shifts = useGame(selectMoneyInShifts);
+  const debts = useGame(selectDebts);
   const packId = useGame(selectCulturePackId);
   return (
-    <div className="dock-money" aria-label={t('dock.money')}>
-      {formatLocalMoney(shifts, packId)}
+    <div className="dock-wallet">
+      <div className="dock-money" aria-label={t('dock.money')}>
+        {formatLocalMoney(shifts, packId)}
+      </div>
+      {debts.length > 0 && (
+        <ul className="dock-debts" aria-label={t('dock.debts')}>
+          {debts.map(({ kind, amountInShifts }) => (
+            <li key={kind}>{t(`dock.debt.${kind}`, { amount: formatLocalMoney(amountInShifts, packId) })}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

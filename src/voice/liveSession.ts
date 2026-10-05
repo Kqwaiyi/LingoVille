@@ -1,4 +1,4 @@
-import { GREETING_SCENE, RESUME_SCENE, type NpcSession } from '../ai/index.ts';
+import { RESUME_SCENE, type NpcSession } from '../ai/index.ts';
 import { createBrowserAudio, openBrowserSocket } from './browserIo.ts';
 import type { VoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
 
@@ -196,7 +196,7 @@ export function openLiveSession(
             const history = (options.resumeFrom ?? []).map((line) =>
               contentTurn(line.speaker === 'npc' ? 'model' : 'user', line.text),
             );
-            const scene = history.length > 0 ? RESUME_SCENE : GREETING_SCENE;
+            const scene = history.length > 0 ? RESUME_SCENE : session.openingScene;
             send({ clientContent: { turns: [...history, contentTurn('user', scene)], turnComplete: true } });
             resolve();
           },

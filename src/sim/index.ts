@@ -2,6 +2,8 @@
 export { gameMinutesFor, isOpen, weekdayOf, WEEKDAYS, type OpeningHours, type Weekday } from './clock.ts';
 export { weighRecapEvidence, type EvidenceLine, type HelpShown, type RecapEvidence } from './helpEvidence.ts';
 export { applyInteractionOutcome, type InteractionOutcome, type OutcomeResult } from './interactionOutcome.ts';
+export { APPROACH_IDS, approachDue, type ApproachId } from './approaches.ts';
+export { faint, faintedBetween } from './faint.ts';
 export { clampMeter } from './meters.ts';
 export { MOOD_FACES, moodFace, moodModifier, type MoodFace } from './mood.ts';
 export { addToPhrasebook } from './phrasebook.ts';

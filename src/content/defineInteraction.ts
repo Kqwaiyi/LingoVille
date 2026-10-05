@@ -11,7 +11,7 @@ import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.t
 export type Band = 'B' | 'I' | 'A';
 
 /** Which Culture Pack facts the NPC is told, so it can answer side questions. */
-export const FACT_SOURCES = ['openingHours', 'menu', 'placeFacts', 'customs'] as const;
+export const FACT_SOURCES = ['openingHours', 'menu', 'placeFacts', 'customs', 'ward'] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 /** The arguments a `serveOrder` effect reads from its completion function. */

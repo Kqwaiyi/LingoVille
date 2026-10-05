@@ -1,9 +1,11 @@
 // Public interface of the content module. Other modules import from here.
 export { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
+export { approachInteraction, interactionStartedWithE } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {
   CULTURE_PACKS,
   culturePackSchema,
+  localPlaceName,
   PROP_IDS,
   SIGN_WORDS,
   type Currency,

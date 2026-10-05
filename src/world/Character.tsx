@@ -17,12 +17,24 @@ import {
   selectPlaceId,
   selectTramArrival,
   selectTramRunning,
+  selectWardArrival,
   selectWorldKeysOff,
   useGame,
   type Interactable,
 } from '../store/index.ts';
 import type { Control } from './controls.ts';
-import { HOME_BED, HOME_TAP, isWaitingForTram, NPC_SPOTS, placeAt, spawnPoint, tramStopAt, tramStopSpawn, type Vec3 } from './town.ts';
+import {
+  HOME_BED,
+  HOME_TAP,
+  IN_WARD_BED,
+  isWaitingForTram,
+  NPC_SPOTS,
+  placeAt,
+  spawnPoint,
+  tramStopAt,
+  tramStopSpawn,
+  type Vec3,
+} from './town.ts';
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
@@ -108,19 +120,29 @@ export function Character() {
   // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
   const keysOff = useGame(selectWorldKeysOff);
   const tramArrival = useGame(selectTramArrival);
+  const wardArrival = useGame(selectWardArrival);
   const tramRunning = useGame(selectTramRunning);
   // The camera jumps with the Character after a tram ride, instead of sweeping across town.
   const snapCamera = useRef(false);
 
-  // Off the tram: the Character stands on the platform of the stop it rode to.
-  useEffect(() => {
-    if (!tramArrival || !body.current) return;
-    const [x, y, z] = tramStopSpawn(tramArrival.stopId);
+  /** Puts the Character somewhere else at once, with the camera jumping along. */
+  const moveTo = ([x, y, z]: Vec3) => {
+    if (!body.current) return;
     body.current.setTranslation({ x, y, z }, true);
     characterPosition.set(x, y, z);
     fallSpeed.current = 0;
     snapCamera.current = true;
+  };
+
+  // Off the tram: the Character stands on the platform of the stop it rode to.
+  useEffect(() => {
+    if (tramArrival) moveTo(tramStopSpawn(tramArrival.stopId));
   }, [tramArrival]);
+
+  // Fainted: the Character is in the ward bed, beside the nurse, behind the Fainting screen.
+  useEffect(() => {
+    if (wardArrival) moveTo(IN_WARD_BED);
+  }, [wardArrival]);
 
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.

@@ -30,7 +30,8 @@ describe('tick: Hunger and Thirst', () => {
   it('empties a full Hunger over hungerFullToEmptyGameMinutes', () => {
     const state = withCharacter({ hunger: METER_MAX });
     expect(tick(state, WELL_BEING.hungerFullToEmptyGameMinutes / 2).character.hunger).toBeCloseTo(METER_MAX / 2);
-    expect(tick(state, WELL_BEING.hungerFullToEmptyGameMinutes).character.hunger).toBe(0);
+    const halfFull = withCharacter({ hunger: METER_MAX / 2, thirst: METER_MAX });
+    expect(tick(halfFull, WELL_BEING.hungerFullToEmptyGameMinutes / 2).character.hunger).toBe(0);
   });
 
   it('empties a full Thirst over thirstFullToEmptyGameMinutes', () => {
@@ -41,7 +42,7 @@ describe('tick: Hunger and Thirst', () => {
 
   it('never takes Hunger or Thirst below 0', () => {
     const state = withCharacter({ hunger: 1, thirst: 1 });
-    const after = tick(state, WELL_BEING.hungerFullToEmptyGameMinutes);
+    const after = tick(state, 2 * HOUR);
     expect(after.character.hunger).toBe(0);
     expect(after.character.thirst).toBe(0);
   });
@@ -81,11 +82,6 @@ describe('tick: Health', () => {
     expect(stepped.character.health).toBeCloseTo(once.character.health);
     expect(stepped.character.hunger).toBeCloseTo(once.character.hunger);
     expect(stepped.character.thirst).toBeCloseTo(once.character.thirst);
-  });
-
-  it('never falls below 0', () => {
-    const state = withCharacter({ health: 1, hunger: 0, thirst: 0 });
-    expect(tick(state, WELL_BEING.healthFullToEmptyWhileDeprivedGameMinutes).character.health).toBe(0);
   });
 });
 

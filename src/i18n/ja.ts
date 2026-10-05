@@ -218,6 +218,11 @@ export const ja: UiStrings = {
     money: 'お金',
     day: '{{day}}日目 · {{weekday}}',
     saved: '保存しました ✓',
+    debts: '借金',
+    debt: {
+      hospital: '病院の未払い {{amount}}',
+      rent: '家賃の未払い {{amount}}',
+    },
   },
   placeLine: {
     label: '場所',
@@ -342,6 +347,14 @@ export const ja: UiStrings = {
     tooEarlyForBed: '寝るにはまだ早いです。{{time}}から寝られます。',
     npcSteppedAway: '{{who}}は席を外しました。何も失われていません。',
     nothingToSay: '{{who}}はにっこり会釈しました。ここではまだ話すことがありません。',
+  },
+  fainting: {
+    title: '倒れてしまった',
+    body: '食べたり飲んだりしない時間が長すぎました。翌朝 {{time}}、病院のベッドで目を覚まします。',
+    paid: '病院代 {{amount}} を支払いました。',
+    debt: '病院代 {{amount}} を払えなかったので、未払いになりました。受付で精算できます。',
+    moodDown: '気分 ↓',
+    wake: '目を覚ます',
   },
   voiceUnavailable: {
     title: '音声サービスを利用できません: ローカルサーバーを確認してください',

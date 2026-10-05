@@ -87,6 +87,21 @@ describe('defineInteraction', () => {
   });
 });
 
+describe('waking in the ward: the nurse sees the patient home', () => {
+  const { wakeInWard } = INTERACTIONS;
+
+  it('is the nurse’s, at the clinic, and sells nothing', () => {
+    expect(wakeInWard).toMatchObject({ npcId: 'nurse', placeId: 'clinic', items: [], effect: { kind: 'none' } });
+  });
+
+  it('declares discharge_patient with how the patient says they feel', () => {
+    expect(wakeInWard.toolDeclaration.name).toBe('discharge_patient');
+    expect(wakeInWard.parseArgs({ feeling: 'well' }).success).toBe(true);
+    expect(wakeInWard.parseArgs({ feeling: 'unwell' }).success).toBe(true);
+    expect(wakeInWard.parseArgs({ feeling: 'ecstatic' }).success).toBe(false);
+  });
+});
+
 describe('Goal Interaction #1: order a drink', () => {
   const { orderDrink } = INTERACTIONS;
 

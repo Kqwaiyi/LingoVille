@@ -6,8 +6,9 @@ import type { OpenVoiceSession } from './voiceSession.ts';
 /** Roughly how long the real NPC takes to start answering. */
 const REPLY_DELAY_MS = 600;
 
-// The café order is the only completion the fake knows how to script.
+// The completions the fake knows how to script: the café order, and the nurse letting the patient go home.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
+const DISCHARGE_PATIENT = INTERACTIONS.wakeInWard.completion.name;
 
 /**
  * Typed to the fake NPC, this makes its connection drop, so the smoke tests can
@@ -112,6 +113,74 @@ const SCRIPT: Record<LanguageCode, Script> = {
   },
 };
 
+/** The fake nurse on the Fainting ward, who speaks first as the Character wakes. */
+type WardScript = {
+  greeting: string;
+  resume: string;
+  /** Asks how the patient feels, for a line it understood that doesn't say. */
+  ask: string;
+  goodbye: string;
+  notUnderstood: string;
+  outOfPatience: string;
+  /** Unwell is listened for first: "not well" is still unwell. */
+  words: { unwell: string[]; well: string[]; known: string[] };
+};
+
+const WARD_SCRIPT: Record<LanguageCode, WardScript> = {
+  ja: {
+    greeting: 'あ、目が覚めましたね。気分はどうですか？',
+    resume: 'お待たせしました。気分はどうですか？',
+    ask: '気分はどうですか？大丈夫ですか？',
+    goodbye: 'よかったです。もう帰っても大丈夫ですよ。ちゃんと食べてくださいね。',
+    notUnderstood: 'すみません、よくわかりませんでした。',
+    outOfPatience: 'すみません…。もう少し休んでいてくださいね。',
+    words: {
+      unwell: ['痛い', 'いたい', '気分が悪い', 'つらい', 'だるい'],
+      well: ['大丈夫', 'だいじょうぶ', '元気', 'げんき', 'fine', 'ok'],
+      known: ['はい', 'ありがとう', 'すみません', 'こんにちは', 'おはよう', 'hello'],
+    },
+  },
+  zh: {
+    greeting: '你醒了！感觉怎么样？',
+    resume: '不好意思，久等了。你感觉怎么样？',
+    ask: '你现在感觉怎么样？还好吗？',
+    goodbye: '那就好。你可以回家了，要好好吃饭喝水哦。',
+    notUnderstood: '不好意思，我没听懂。',
+    outOfPatience: '不好意思……你先好好休息吧。',
+    words: {
+      unwell: ['不舒服', '疼', '难受', '不好'],
+      well: ['好', '没事', '不错', 'fine', 'ok'],
+      known: ['你好', '谢谢', '是', '对', 'hello'],
+    },
+  },
+  en: {
+    greeting: "Oh, you're awake! How are you feeling?",
+    resume: 'Sorry about that. How are you feeling?',
+    ask: 'How are you feeling now? Any better?',
+    goodbye: 'Good. You can go home now. Make sure you eat and drink properly!',
+    notUnderstood: "Sorry, I didn't catch that.",
+    outOfPatience: "Sorry, I can't quite follow. Just rest a bit longer.",
+    words: {
+      unwell: ['not well', 'not good', 'bad', 'ill', 'sick', 'dizzy', 'unwell', 'poorly'],
+      well: ['fine', 'good', 'better', 'okay', 'ok', 'alright', 'well'],
+      known: ['hello', 'hi', 'yes', 'thanks', 'thank you', 'morning'],
+    },
+  },
+  de: {
+    greeting: 'Ah, Sie sind wach! Wie geht es Ihnen?',
+    resume: 'Entschuldigung! Wie geht es Ihnen?',
+    ask: 'Wie fühlen Sie sich jetzt?',
+    goodbye: 'Schön. Sie dürfen nach Hause gehen. Essen und trinken Sie bitte genug!',
+    notUnderstood: 'Entschuldigung, das habe ich nicht verstanden.',
+    outOfPatience: 'Tut mir leid… Ruhen Sie sich noch etwas aus.',
+    words: {
+      unwell: ['nicht gut', 'schlecht', 'schwindlig', 'krank', 'weh'],
+      well: ['gut', 'besser', 'okay', 'ok', 'prima'],
+      known: ['hallo', 'guten', 'danke', 'ja', 'morgen', 'hello'],
+    },
+  },
+};
+
 const LATIN = /^[\p{Script=Latin}\s']+$/u;
 
 /** Whole words for Latin-script words ("no" isn't in "know"); anywhere in the line otherwise. */
@@ -128,11 +197,13 @@ function mentions(line: string, words: string[]) {
  * order back and calls serve_order only once the Player confirms, and calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
- * but has forgotten any read-back.
+ * but has forgotten any read-back. Given discharge_patient, it is the nurse
+ * on the ward instead, who lets the patient go home once they say how they feel.
  */
 export const openMockVoiceSession: OpenVoiceSession = (session, events, options = {}) => {
   const packId = session.voice.targetLanguage;
   const script = SCRIPT[packId];
+  const ward = session.tools.some((tool) => tool.name === DISCHARGE_PATIENT) ? WARD_SCRIPT[packId] : null;
   const takesOrders = session.tools.some((tool) => tool.name === SERVE_ORDER);
   const pending = new Set<ReturnType<typeof setTimeout>>();
   const awaitingAnswer = new Map<string, (response: ToolResponse) => void>();
@@ -168,7 +239,23 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events, options 
       events.onDisconnect();
     });
 
+  const notUnderstood = (outOfPatience: string, didNotUnderstand: string) =>
+    call(NOT_UNDERSTOOD_TOOL, { reason: 'unintelligible' }, (response) =>
+      say(response.result === 'out_of_patience' ? outOfPatience : didNotUnderstand),
+    );
+
+  const hearOnWard = (ward: WardScript, line: string) => {
+    if (line === OUT_OF_PATIENCE_SCENE) return say(ward.outOfPatience);
+    if (line === MOCK_DROP_LINE) return drop();
+    const { unwell, well, known } = ward.words;
+    const feeling = mentions(line, unwell) ? 'unwell' : mentions(line, well) ? 'well' : null;
+    if (feeling) return call(DISCHARGE_PATIENT, { feeling }, (response) => say(response.result === 'done' ? ward.goodbye : ward.ask));
+    if (mentions(line, known)) return say(ward.ask);
+    notUnderstood(ward.outOfPatience, ward.notUnderstood);
+  };
+
   const hear = (line: string) => {
+    if (ward) return hearOnWard(ward, line);
     if (line === OUT_OF_PATIENCE_SCENE) return say(script.outOfPatience);
     if (line === MOCK_DROP_LINE) return drop();
 
@@ -194,9 +281,7 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events, options 
     const { yes, no, known } = script.words;
     if (mentions(line, [...yes, ...no, ...known])) return say(script.clarify[clarifications++ % script.clarify.length]!);
 
-    call(NOT_UNDERSTOOD_TOOL, { reason: 'unintelligible' }, (response) =>
-      say(response.result === 'out_of_patience' ? script.outOfPatience : script.notUnderstood),
-    );
+    notUnderstood(script.outOfPatience, script.notUnderstood);
   };
 
   const close = () => {
@@ -208,7 +293,8 @@ export const openMockVoiceSession: OpenVoiceSession = (session, events, options 
 
   return {
     connect: async () => {
-      if (!closed) say(options.resumeFrom?.length ? script.resume : script.greeting);
+      const { resume, greeting } = ward ?? script;
+      if (!closed) say(options.resumeFrom?.length ? resume : greeting);
     },
     startTalking: () => {},
     stopTalking: () => {},

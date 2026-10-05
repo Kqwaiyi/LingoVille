@@ -8,7 +8,7 @@ import {
   type NamedNpc,
   type NamedNpcId,
 } from '../content/index.ts';
-import { weekdayOf, type GameState, type LanguageCode, type ProficiencyStep } from '../sim/index.ts';
+import { weekdayOf, type ApproachId, type GameState, type LanguageCode, type PlaceId, type ProficiencyStep } from '../sim/index.ts';
 
 /**
  * Which voice the NPC speaks with. The gateway resolves it to a prebuilt voice,
@@ -20,16 +20,24 @@ export type NpcSession = {
   systemInstruction: string;
   tools: FunctionDeclaration[];
   voice: VoiceRequest;
+  /** The first message of the session, so the NPC speaks first: the customer walking up, or why the NPC approaches. */
+  openingScene: string;
 };
 
 export type NpcSessionContext = {
   clock: GameState['clock'];
+  /** The NPC starts this conversation by approaching the Character, rather than the Player pressing E. */
+  approach?: ApproachId;
 };
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
 
 // What the game answers each tool call with. The system instruction tells the NPC what each answer means.
-export type CompletionResponse = { result: 'served' } | { result: 'cannot_afford' } | { result: 'invalid_arguments'; error: string };
+export type CompletionResponse =
+  | { result: 'served' }
+  | { result: 'done' }
+  | { result: 'cannot_afford' }
+  | { result: 'invalid_arguments'; error: string };
 export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
 export type ToolResponse = CompletionResponse | NotUnderstoodResponse | { result: 'unknown_tool' };
 
@@ -41,8 +49,13 @@ export const OUT_OF_PATIENCE_SCENE =
   "[SCENE: Again you couldn't make sense of anything the customer said, and you have run out of patience. " +
   'Apologise politely and say goodbye: the conversation is over.]';
 
-/** Opens every conversation, so the NPC speaks first. */
+/** Opens every conversation the Player starts with E, so the NPC speaks first. */
 export const GREETING_SCENE = '[SCENE: A customer walks up to you. Greet them first.]';
+
+/** Opens a conversation the NPC starts, saying why they speak to the Character first. */
+const APPROACH_SCENES: Record<ApproachId, string> = {
+  nurseOnWaking: '[SCENE: The patient in the bed beside you has just woken up. Speak to them first.]',
+};
 
 /**
  * Follows the conversation so far when a session replaces one whose connection
@@ -52,51 +65,65 @@ export const RESUME_SCENE =
   '[SCENE: You were interrupted for a moment, and the customer is still with you. ' +
   "Don't greet them again: say sorry for the wait in a few words and carry on from where you left off.]";
 
-const NOT_UNDERSTOOD = toToolDeclaration(
-  NOT_UNDERSTOOD_TOOL,
-  'Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, ' +
-    'or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.',
-  z.object({ reason: z.enum(['unintelligible', 'other_language', 'nothing_heard']) }),
-);
+const notUnderstoodTool = (who: string) =>
+  toToolDeclaration(
+    NOT_UNDERSTOOD_TOOL,
+    `Call this only when you could not make sense of what the ${who} just said at all: gibberish, nothing heard, ` +
+      'or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.',
+    z.object({ reason: z.enum(['unintelligible', 'other_language', 'nothing_heard']) }),
+  );
 
-// Block 4: how the NPC speaks at each Proficiency Step: vocabulary and grammar,
+/** Where each Named NPC works, as their persona introduces it, and what they call the person in front of them. */
+type Workplace = { at: (pack: CulturePack) => string; who: string };
+const WORKPLACES: Partial<Record<PlaceId, Workplace>> = {
+  cafe: { at: (pack) => `${pack.cafe.name}, a café`, who: 'customer' },
+  clinic: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
+};
+
+function workplace(npc: NamedNpc): Workplace {
+  const found = WORKPLACES[npc.placeId];
+  if (!found) throw new Error(`No workplace for ${npc.id} at the ${npc.placeId}`);
+  return found;
+}
+
+// Block 4: how the NPC speaks at each Proficiency Step (the first line follows "The customer" or "The patient"): vocabulary and grammar,
 // how much it says per turn, its speed, whether it offers choices up front, and
 // (at A1–A2) one simpler rephrase the first time the customer seems lost.
 const STEP_ADAPTATION: Record<ProficiencyStep, string[]> = {
   A1: [
-    'The customer is a beginner (CEFR A1). Use only the most common words and the simplest grammar.',
+    'is a beginner (CEFR A1). Use only the most common words and the simplest grammar.',
     'Say one very short sentence per turn.',
     'Speak slowly and clearly.',
     'Offer choices up front (for example "hot or iced?"), so they can answer with a word.',
     'The first time they seem lost, say the same thing once more, more simply. After that, just ask again.',
   ],
   A2: [
-    'The customer is an elementary learner (CEFR A2). Use everyday words and simple grammar.',
+    'is an elementary learner (CEFR A2). Use everyday words and simple grammar.',
     'Say one or two short sentences per turn.',
     'Speak slowly and clearly.',
     'Offer choices up front when it helps.',
     'The first time they seem lost, say the same thing once more, more simply. After that, just ask again.',
   ],
   B1: [
-    'The customer is an intermediate learner (CEFR B1). Use everyday vocabulary and plain grammar.',
+    'is an intermediate learner (CEFR B1). Use everyday vocabulary and plain grammar.',
     'Say one or two sentences per turn.',
     'Speak plainly, a little slower than natural speed.',
     'Ask open questions, and offer choices only if they hesitate.',
   ],
   B2: [
-    'The customer is an upper-intermediate learner (CEFR B2). Use the vocabulary normal in your job.',
+    'is an upper-intermediate learner (CEFR B2). Use the vocabulary normal in your job.',
     'Say as much per turn as you naturally would at work.',
     'Speak at natural speed.',
     'Let them volunteer the details rather than offering choices.',
   ],
   C1: [
-    'The customer is an advanced learner (CEFR C1). Use the idioms and set phrases normal in your job.',
+    'is an advanced learner (CEFR C1). Use the idioms and set phrases normal in your job.',
     'Say as much per turn as you naturally would at work.',
     'Speak at natural speed.',
     'Let them volunteer the details; expect them to.',
   ],
   C2: [
-    'The customer speaks at near-native level (CEFR C2). Speak exactly as you would to a local, with no simplification.',
+    'speaks at near-native level (CEFR C2). Speak exactly as you would to a local, with no simplification.',
     'Say as much per turn as you naturally would at work.',
     'Speak at natural speed.',
     'Let them volunteer the details; expect them to.',
@@ -131,23 +158,23 @@ function block(heading: string, lines: string[]) {
 function personaBlock(npc: NamedNpc, pack: CulturePack) {
   const { name } = pack.personas[npc.id];
   return block('WHO YOU ARE', [
-    `You are ${name}, the ${npc.role} at ${pack.cafe.name}, a café in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
+    `You are ${name}, the ${npc.role} at ${workplace(npc).at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
     `You are ${npc.age}: ${npc.temperament}. Quirks: ${npc.quirks}.`,
     'Talk like a real, friendly person at work.',
   ]);
 }
 
-function youAndThisPersonBlock() {
+function youAndThisPersonBlock(who: string) {
   return block('YOU AND THIS PERSON', [
-    "This customer is a stranger: you have never met. You don't know their name and don't ask for it.",
-    'Speak to them politely, as you would to any customer.',
+    `This ${who} is a stranger: you have never met. You don't know their name and don't ask for it.`,
+    `Speak to them politely, as you would to any ${who}.`,
   ]);
 }
 
-function languageRulesBlock(pack: CulturePack) {
+function languageRulesBlock(pack: CulturePack, who: string) {
   const language = pack.languageName;
   return block('LANGUAGE RULES', [
-    `- Speak only ${language}. Never use any other language, even if the customer does, even to help them.`,
+    `- Speak only ${language}. Never use any other language, even if the ${who} does, even to help them.`,
     `- You understand loanwords and international words (for example "coffee" or "latte"), alone or inside fragmentary ${language}.`,
     '- If you cannot make sense of what they said at all (gibberish, nothing heard, or a whole sentence in another language), ' +
       `first call not_understood, then say briefly in simple ${language} that you didn't understand.`,
@@ -157,8 +184,9 @@ function languageRulesBlock(pack: CulturePack) {
   ]);
 }
 
-function stepBlock(step: ProficiencyStep) {
-  return block('HOW TO SPEAK', STEP_ADAPTATION[step]);
+function stepBlock(step: ProficiencyStep, who: string) {
+  const [first, ...rest] = STEP_ADAPTATION[step];
+  return block('HOW TO SPEAK', [`The ${who} ${first}`, ...rest]);
 }
 
 function factsBlock(interaction: Interaction, pack: CulturePack) {
@@ -168,8 +196,16 @@ function factsBlock(interaction: Interaction, pack: CulturePack) {
   ]);
 }
 
-function goalBlock(interaction: Interaction) {
+function goalBlock(interaction: Interaction, who: string) {
   const { name } = interaction.completion;
+  if (interaction.effect.kind === 'none') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Only once the ${who} has told you what you need, call ${name} with what they told you. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again.`,
+      `- If ${name} answers "done", say goodbye kindly.`,
+    ]);
+  }
   return block('YOUR GOAL', [
     interaction.goal,
     '- Before you act on it, read back what you understood, with the price, and wait for the customer to confirm. If they correct you, read it back again.',
@@ -180,12 +216,14 @@ function goalBlock(interaction: Interaction) {
   ]);
 }
 
-function situationBlock(context: NpcSessionContext) {
+function situationBlock(context: NpcSessionContext, who: string) {
   const { day, minuteOfDay } = context.clock;
+  const first = context.approach
+    ? 'The first one tells you why you are speaking to them: you speak first.'
+    : `The first one means a ${who} has just walked up to you: greet them first.`;
   return block('THE SITUATION', [
     `It is ${formatTime(minuteOfDay)} on a ${capitalise(weekdayOf(day))} ${dayPart(minuteOfDay)}.`,
-    'A "[SCENE: ...]" message tells you what is happening; it is not the customer speaking. ' +
-      'The first one means a customer has just walked up to you: greet them first.',
+    `A "[SCENE: ...]" message tells you what is happening; it is not the ${who} speaking. ${first}`,
   ]);
 }
 
@@ -201,19 +239,21 @@ export function buildNpcSession(
   npc: NamedNpc,
   context: NpcSessionContext,
 ): NpcSession {
+  const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    youAndThisPersonBlock(),
-    languageRulesBlock(culturePack),
-    stepBlock(proficiencyStep),
+    youAndThisPersonBlock(who),
+    languageRulesBlock(culturePack, who),
+    stepBlock(proficiencyStep, who),
     factsBlock(interaction, culturePack),
-    goalBlock(interaction),
-    situationBlock(context),
+    goalBlock(interaction, who),
+    situationBlock(context, who),
   ].join('\n\n');
 
   return {
     systemInstruction,
-    tools: [interaction.toolDeclaration, NOT_UNDERSTOOD],
+    tools: [interaction.toolDeclaration, notUnderstoodTool(who)],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
+    openingScene: context.approach ? APPROACH_SCENES[context.approach] : GREETING_SCENE,
   };
 }
