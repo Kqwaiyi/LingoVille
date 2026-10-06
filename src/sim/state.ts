@@ -58,14 +58,37 @@ export type NpcMemory = {
 export type ShiftOrderLine = { itemId: ItemId; quantity: number; modifiers?: DrinkModifiers };
 export type ShiftOrder = readonly ShiftOrderLine[];
 
+/**
+ * What a customer at the supermarket till wants besides their items rung up. The Player has to hear all of it.
+ * Money is in local money: the customer hands over an amount the Culture Pack's coins and notes make.
+ */
+export type Checkout = {
+  bag: boolean;
+  pointsCard: boolean;
+  /** The item they ask for from behind the counter (it's in the order too, with their shopping), or null. */
+  fromBehindTheCounter: ItemId | null;
+  /** The cash they hand over, or null when they pay by card. */
+  cashHanded: number | null;
+  /** What they're owed back: the cash less the total, or null when they pay by card. */
+  changeDue: number | null;
+};
+
+/** What the Player did at the till for a customer: the bag and points card toggles, and the change counted out. */
+export type TillWork = { bag: boolean; pointsCard: boolean; change: number };
+
 /** A Shift Customer at the counter: anonymous, with no memory, and a hidden order the Player has to work out. */
 export type ShiftCustomer = {
   /** The Shift Customer template they were drawn from. */
   templateId: string;
-  /** What they want in the end, which what the Player serves is checked against exactly. Never shown. */
+  /**
+   * What they want in the end, which what the Player serves is checked against exactly. Never shown. At the till,
+   * everything to ring up: the shopping they put on the counter (which the Player sees) and what they ask for from behind it.
+   */
   order: ShiftOrder;
   /** What they ask for first, before they change their mind halfway, or null if they don't. */
   changedFrom: ShiftOrder | null;
+  /** At the supermarket till: the bag, the points card, anything from behind the counter and their cash. Null elsewhere. */
+  checkout: Checkout | null;
   /** Picks their voice: the gateway turns it into one of its Shift Customer voices. */
   voiceSeed: number;
 };

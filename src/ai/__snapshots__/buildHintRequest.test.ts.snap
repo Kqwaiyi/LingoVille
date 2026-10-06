@@ -159,6 +159,76 @@ Write the sentences only in Japanese, and the translations only in British Engli
 }
 `;
 
+exports[`buildHintRequest at a Shift > builds a cashier’s hints at the till: about the bag, the points card and the change, never the customer’s wishes 1`] = `
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "THE CONVERSATION
+The conversation so far:
+1. NPC: こんにちは。",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "properties": {
+        "hints": {
+          "items": {
+            "properties": {
+              "text": {
+                "description": "A full sentence the learner could say next, in the Target Language.",
+                "type": "STRING",
+              },
+              "translation": {
+                "description": "The sentence, translated into the Native Language.",
+                "type": "STRING",
+              },
+            },
+            "required": [
+              "text",
+              "translation",
+            ],
+            "type": "OBJECT",
+          },
+          "maxItems": 3,
+          "minItems": 2,
+          "type": "ARRAY",
+        },
+      },
+      "required": [
+        "hints",
+      ],
+      "type": "OBJECT",
+    },
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "WHO YOU ARE
+You help a learner who speaks British English and is learning Japanese by living in a small town in Japan. Their level is about CEFR B1.
+They are working a Shift as the cashier at スーパーまるやま, serving a customer at the counter, and they have asked for help with what to say next.
+
+THE SITUATION
+The customer has an order the learner has to work out by listening. That is the learner's job, so never do it for them.
+
+WHAT TO WRITE
+- hints: 2 or 3 different things the learner could say next, each a full sentence in Japanese that moves the conversation on from where it is now. Write them as the learner, the cashier, would say them: never the customer's lines.
+- Good hints greet the customer, ask whether they need a bag or have a points card, ask them to say it again or more slowly, ask how they would like to pay, tell them the total, or hand over their change.
+- Never say, repeat back, guess or translate what the customer wants, beyond words the learner has already said themselves.
+- Keep each sentence natural, polite and short enough to say aloud at their level.
+- translation: each sentence in natural British English.
+Write the sentences only in Japanese, and the translations only in British English.",
+      },
+    ],
+  },
+}
+`;
+
 exports[`buildHintRequest at a Shift > builds hints for the Player’s own lines as the staff member 1`] = `
 {
   "contents": [

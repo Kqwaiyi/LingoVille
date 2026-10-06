@@ -31,7 +31,7 @@ import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
-import { MenuGrid } from './ShiftPanel.tsx';
+import { MenuGrid, Till } from './ShiftPanel.tsx';
 
 /** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
 function NpcLineHelp({ index, text }: { index: number; text: string }) {
@@ -406,7 +406,7 @@ export function ConversationColumn() {
               )}
             </div>
           )}
-          {conversation.shiftCustomer && <MenuGrid />}
+          {conversation.shiftCustomer && (shift?.jobId === 'cashier' ? <Till key={conversation.id} /> : <MenuGrid />)}
           {closingCard ? <ClosingCardPanel card={closingCard} who={who} /> : <InputBar />}
         </>
       )}

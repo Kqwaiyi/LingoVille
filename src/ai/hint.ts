@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CULTURE_PACKS, interactionFacts, JOB_PLACES, localPlaceName, NAMED_NPCS, toGeminiSchema } from '../content/index.ts';
-import { JOB_IDS } from '../sim/index.ts';
+import { JOB_IDS, type JobId } from '../sim/index.ts';
 import {
   block,
   InteractionIdSchema,
@@ -108,6 +108,15 @@ function goalInstruction(request: Extract<HintRequest, { interactionId: string }
   ].join('\n\n');
 }
 
+/** What a staff member's hints can do at each Job, after greeting the customer. */
+const GOOD_SHIFT_HINTS: Record<JobId, string> = {
+  barista: 'ask what they would like, ask them to say it again or more slowly, ask which size, or hot or iced, or say that the order is coming.',
+  cashier:
+    'ask whether they need a bag or have a points card, ask them to say it again or more slowly, ask how they would like to pay, ' +
+    'tell them the total, or hand over their change.',
+  server: 'ask what they would like to eat and drink, ask them to say it again or more slowly, ask about allergies or dietary needs, or say that the order is coming.',
+};
+
 /**
  * Hints at a Shift: the learner's own lines as the staff member. Working out the customer's order by ear is the
  * point of the Shift, so the hints never say, repeat back, guess or translate it.
@@ -128,8 +137,7 @@ function shiftInstruction(request: Extract<HintRequest, { jobId: string }>) {
     block('WHAT TO WRITE', [
       `- hints: 2 or 3 different things the learner could say next, each a full sentence in ${target} that moves the conversation on ` +
         `from where it is now. Write them as the learner, the ${jobId}, would say them: never the customer's lines.`,
-      '- Good hints greet the customer, ask what they would like, ask them to say it again or more slowly, ask which size, ' +
-        'or hot or iced, or say that the order is coming.',
+      `- Good hints greet the customer, ${GOOD_SHIFT_HINTS[jobId]}`,
       '- Never say, repeat back, guess or translate what the customer wants, beyond words the learner has already said themselves.',
       `- Keep each sentence natural, polite and short enough to say aloud at their level.`,
       `- translation: each sentence in natural ${native}.`,

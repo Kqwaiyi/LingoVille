@@ -10,13 +10,13 @@ import {
 } from '@react-three/rapier';
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Vector3, type Group } from 'three';
-import { GROCERIES_SOLD, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
+import { GROCERIES_SOLD, jobAt, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
 import {
   selectArrival,
   selectHeldStill,
   selectPlaceId,
-  selectShiftUnderway,
+  selectShift,
   selectTramArrival,
   selectTramRunning,
   selectWardArrival,
@@ -26,8 +26,6 @@ import {
 } from '../store/index.ts';
 import type { Control } from './controls.ts';
 import {
-  BEHIND_THE_COUNTER,
-  CAFE_STAFF_DOOR,
   HOME_BED,
   HOME_STOVE,
   HOME_TAP,
@@ -40,6 +38,7 @@ import {
   tramStopAt,
   tramStopSpawn,
   type Vec3,
+  WORKPLACES,
 } from './town.ts';
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
@@ -56,7 +55,7 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: the tap, the stove or the bed, the café's staff door, the nearest
+ * What the Character standing here could use with E: the tap, the stove or the bed, a workplace's staff door, the nearest
  * person in talking range, the nearest supermarket shelf, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
@@ -65,7 +64,9 @@ function interactableAt(x: number, z: number, tramRunning: boolean): Interactabl
   if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
   if (placeId === 'home' && distanceTo(x, z, HOME_STOVE) <= MOVEMENT.interactRangeMetres) return 'stove';
   if (placeId === 'home' && distanceTo(x, z, HOME_BED) <= MOVEMENT.interactRangeMetres) return 'bed';
-  if (placeId === 'cafe' && distanceTo(x, z, CAFE_STAFF_DOOR.usedFrom) <= MOVEMENT.interactRangeMetres) return 'staff-door';
+  const job = placeId && jobAt(placeId);
+  const workplace = job ? WORKPLACES[job] : undefined;
+  if (workplace && distanceTo(x, z, workplace.usedFrom) <= MOVEMENT.interactRangeMetres) return 'staff-door';
   let nearest: Interactable | null = null;
   let nearestDistance: number = MOVEMENT.talkRangeMetres;
   for (const npcId of TOWN_NPC_IDS) {
@@ -142,7 +143,7 @@ export function Character() {
   const wardArrival = useGame(selectWardArrival);
   const tramRunning = useGame(selectTramRunning);
   // At work: from the staff door to the end of the Shift, the Character stands behind the counter.
-  const atWork = useGame(selectShiftUnderway);
+  const atWork = useGame((s) => selectShift(s)?.jobId ?? null);
   // The camera jumps with the Character after a tram ride, instead of sweeping across town.
   const snapCamera = useRef(false);
 
@@ -161,7 +162,8 @@ export function Character() {
   }, [tramArrival]);
 
   useEffect(() => {
-    if (atWork) moveTo(BEHIND_THE_COUNTER);
+    const workplace = atWork && WORKPLACES[atWork];
+    if (workplace) moveTo(workplace.behindTheCounter);
   }, [atWork]);
 
   // Fainted: the Character is in the ward bed, beside the nurse, behind the Fainting screen.

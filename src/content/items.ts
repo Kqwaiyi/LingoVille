@@ -5,7 +5,7 @@ import { WELL_BEING } from '../sim/index.ts';
 // costs are authored once, here; each Culture Pack gives it a local name and
 // glosses (culturePacks.ts) and converts its price to local money (currency.ts).
 
-export const ITEM_IDS = ['latte', 'coffee', 'tea', 'pastry', 'snack', 'bento', 'vegetables', 'eggs', 'noodles'] as const;
+export const ITEM_IDS = ['latte', 'coffee', 'tea', 'pastry', 'snack', 'bento', 'vegetables', 'eggs', 'noodles', 'batteries', 'stamps', 'gift-card'] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 
 /** What the café serves, in every pack. Its menu board and its order interaction both read this. */
@@ -44,6 +44,9 @@ export const CONVENIENCE_MENU = ['snack', 'bento'] as const satisfies readonly I
 export const GROCERIES_SOLD = ['vegetables', 'eggs', 'noodles'] as const satisfies readonly ItemId[];
 export type GroceryId = (typeof GROCERIES_SOLD)[number];
 
+/** What the supermarket keeps behind its till, in every pack: a customer has to ask the cashier for it. */
+export const BEHIND_THE_COUNTER = ['batteries', 'stamps', 'gift-card'] as const satisfies readonly ItemId[];
+
 /** What consuming an item gives back to the Character's Well-being. */
 export type Restores = { hunger?: number; thirst?: number };
 
@@ -66,4 +69,7 @@ export const ITEMS: Record<ItemId, Item> = {
   vegetables: { priceInShifts: 0.06, restores: {}, meals: 1 },
   eggs: { priceInShifts: 0.06, restores: {}, meals: 1 },
   noodles: { priceInShifts: 0.06, restores: {}, meals: 1 },
+  batteries: { priceInShifts: 0.07, restores: {} },
+  stamps: { priceInShifts: 0.02, restores: {} },
+  'gift-card': { priceInShifts: 0.5, restores: {} },
 };

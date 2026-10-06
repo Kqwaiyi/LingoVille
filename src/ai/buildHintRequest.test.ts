@@ -105,4 +105,16 @@ describe('buildHintRequest at a Shift', () => {
   it('is the same at every step, apart from the level it names', () => {
     expect(text({ ...MID_SHIFT, step: 'C2' }).replaceAll('CEFR C2', 'CEFR B1')).toBe(text(MID_SHIFT));
   });
+
+  it('builds a cashier’s hints at the till: about the bag, the points card and the change, never the customer’s wishes', () => {
+    const atTheTill: HintRequest = { ...MID_SHIFT, jobId: 'cashier', transcript: [{ speaker: 'npc', text: 'こんにちは。' }] };
+    const prompt = text(atTheTill);
+
+    expect(buildHintRequest(atTheTill)).toMatchSnapshot();
+    expect(prompt).toMatch(/working a Shift as the cashier at スーパーまるやま/);
+    expect(prompt).toMatch(/bag/);
+    expect(prompt).toMatch(/points card/);
+    expect(prompt).not.toMatch(/hot or iced/);
+    expect(prompt).toMatch(/never say, repeat back, guess or translate what the customer wants/i);
+  });
 });

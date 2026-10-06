@@ -1,9 +1,22 @@
-import { CULTURE_PACKS, DRINK_EXTRAS, DRINK_SIZES, DRINK_TEMPERATURES, formatLocalMoney, type DrinkOptionId } from '../content/index.ts';
+import { useState } from 'react';
+import {
+  BEHIND_THE_COUNTER,
+  CULTURE_PACKS,
+  DRINK_EXTRAS,
+  DRINK_SIZES,
+  DRINK_TEMPERATURES,
+  formatLocalAmount,
+  formatLocalMoney,
+  tillFor,
+  type DrinkOptionId,
+} from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { ShiftOrderLine } from '../sim/index.ts';
 import {
   selectCanRedoTray,
   selectCanServe,
+  selectCanSuggestChange,
+  selectCheckoutCounter,
   selectCanTapMenu,
   selectCanUndoTray,
   selectCulturePackId,
@@ -11,6 +24,8 @@ import {
   selectNativeLanguage,
   selectShiftEnd,
   selectShiftMenu,
+  selectSuggestsChange,
+  selectTill,
   selectTray,
   useGame,
 } from '../store/index.ts';
@@ -91,6 +106,127 @@ export function MenuGrid() {
         </button>
         <button type="button" className="primary" onClick={serveTray} disabled={!canServe}>
           {t('shift.serve')}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The cashier's till, between the chat and the input bar while a customer is at the till: scan the shopping on the
+ * counter, fetch what they ask for from behind it, set the bag and points card, key in the cash they hand over and
+ * count their change out of the coin tray, then Finish. All of it is checked exactly against what they wanted. The
+ * Cashier skill suggests the coins for the change due on the cash keyed in. Keyed by the conversation, so each customer
+ * starts with an empty cash field.
+ */
+export function Till() {
+  const { t } = useTranslation();
+  const counter = useGame(selectCheckoutCounter);
+  const tray = useGame(selectTray);
+  const till = useGame(selectTill);
+  const canServe = useGame(selectCanServe);
+  const canTap = useGame(selectCanTapMenu);
+  const canUndo = useGame(selectCanUndoTray);
+  const canRedo = useGame(selectCanRedoTray);
+  const suggests = useGame(selectSuggestsChange);
+  const canSuggest = useGame(selectCanSuggestChange);
+  const packId = useGame(selectCulturePackId);
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const tapMenuItem = useGame((s) => s.tapMenuItem);
+  const toggleBag = useGame((s) => s.toggleBag);
+  const togglePointsCard = useGame((s) => s.togglePointsCard);
+  const setCashReceived = useGame((s) => s.setCashReceived);
+  const addChangeCoin = useGame((s) => s.addChangeCoin);
+  const clearChange = useGame((s) => s.clearChange);
+  const suggestChange = useGame((s) => s.suggestChange);
+  const clearTray = useGame((s) => s.clearTray);
+  const undoTray = useGame((s) => s.undoTray);
+  const redoTray = useGame((s) => s.redoTray);
+  const serveTray = useGame((s) => s.serveTray);
+  // What's typed in the cash field, kept as typed (a German "2,50" included) until it reads as an amount.
+  const [cashTyped, setCashTyped] = useState('');
+  const money = (amount: number) => formatLocalAmount(amount, packId);
+  const label = (itemId: Parameters<typeof itemLabel>[0]) => itemLabel(itemId, packId, nativeLanguage);
+
+  const keyInCash = (typed: string) => {
+    setCashTyped(typed);
+    const amount = Number(typed.replace(',', '.'));
+    setCashReceived(typed.trim() === '' || !Number.isFinite(amount) ? null : amount);
+  };
+  return (
+    <section className="menu-grid till" aria-label={t('till.label')}>
+      <div className="menu-grid-items" role="group" aria-label={t('till.counter')}>
+        <h3 className="menu-grid-group">{t('till.counter')}</h3>
+        {counter.map(({ itemId, quantity }) => (
+          <button key={itemId} type="button" onClick={() => tapMenuItem(itemId)} disabled={!canTap}>
+            {`${label(itemId)} ×${quantity}`}
+          </button>
+        ))}
+      </div>
+      <div className="menu-grid-items" role="group" aria-label={t('till.behind')}>
+        <h3 className="menu-grid-group">{t('till.behind')}</h3>
+        {BEHIND_THE_COUNTER.map((itemId) => (
+          <button key={itemId} type="button" onClick={() => tapMenuItem(itemId)} disabled={!canTap}>
+            {label(itemId)}
+          </button>
+        ))}
+      </div>
+      <div className="menu-grid-tray">
+        <p role="status" aria-label={t('till.rungUp')}>
+          {tray.length === 0 ? t('till.rungUpEmpty') : tray.map(({ itemId, quantity }) => `${label(itemId)} ×${quantity}`).join(', ')}
+        </p>
+        <p className="till-total">{t('till.total', { amount: money(till.total) })}</p>
+      </div>
+      <div className="till-cash">
+        <div className="menu-grid-options" role="group" aria-label={t('till.options')}>
+          <button type="button" aria-pressed={till.bag} onClick={toggleBag} disabled={!canTap}>
+            {t('till.bag')}
+          </button>
+          <button type="button" aria-pressed={till.pointsCard} onClick={togglePointsCard} disabled={!canTap}>
+            {t('till.pointsCard')}
+          </button>
+        </div>
+        <label>
+          {t('till.received')}
+          <input type="text" inputMode="decimal" value={cashTyped} onChange={(e) => keyInCash(e.target.value)} disabled={!canTap} />
+        </label>
+        {till.changeDue !== null && <span>{t('till.changeDue', { amount: money(till.changeDue) })}</span>}
+      </div>
+      <div className="menu-grid-options till-coins" role="group" aria-label={t('till.coins')}>
+        <div>
+          {tillFor(packId).denominations.map((coin) => (
+            <button key={coin} type="button" onClick={() => addChangeCoin(coin)} disabled={!canTap}>
+              {money(coin)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="menu-grid-tray">
+        <p role="status" aria-label={t('till.change')}>
+          {till.change.length === 0 ? t('till.changeEmpty') : t('till.changeGiven', { amount: money(till.changeGiven), coins: till.change.map(money).join(' + ') })}
+        </p>
+        {suggests && (
+          <button type="button" onClick={suggestChange} disabled={!canSuggest}>
+            {t('till.suggest')}
+          </button>
+        )}
+        <button type="button" onClick={clearChange} disabled={!canTap || till.change.length === 0}>
+          {t('till.clearChange')}
+        </button>
+      </div>
+      <div className="menu-grid-tray">
+        <span className="till-spacer" />
+        <button type="button" onClick={undoTray} disabled={!canUndo}>
+          {t('shift.undo')}
+        </button>
+        <button type="button" onClick={redoTray} disabled={!canRedo}>
+          {t('shift.redo')}
+        </button>
+        <button type="button" onClick={clearTray} disabled={!canTap || tray.length === 0}>
+          {t('shift.clear')}
+        </button>
+        <button type="button" className="primary" onClick={serveTray} disabled={!canServe}>
+          {t('till.finish')}
         </button>
       </div>
     </section>

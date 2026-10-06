@@ -828,6 +828,71 @@ ruby {
   cursor: not-allowed;
 }
 
+/* The cashier's till: the same parts as the menu grid, plus the cash keyed in and the coin tray, packed tighter to leave the chat room. */
+.till {
+  padding-top: 6px;
+  padding-bottom: 8px;
+}
+
+.till button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.till .menu-grid-items {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.till .menu-grid-items + .menu-grid-items {
+  margin-top: 4px;
+}
+
+.till .menu-grid-tray {
+  margin-top: 6px;
+}
+
+.till .menu-grid-options {
+  margin: 0;
+  gap: 4px;
+}
+
+.till-coins {
+  margin-top: 6px !important;
+}
+
+.till-total {
+  flex: 0 0 auto !important;
+  font-weight: 600;
+}
+
+.till-cash {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.till-cash label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.till-cash input {
+  width: 7em;
+  padding: 4px 6px;
+  border: 1px solid #d8cfbf;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.till-spacer {
+  flex: 1;
+}
+
 /* What the Shift paid, over the town until it's closed. */
 .shift-end {
   position: absolute;

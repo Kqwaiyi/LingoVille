@@ -76,6 +76,21 @@ export const INTERACTIONS = {
     band: 'B',
     effect: { kind: 'hire', jobId: 'barista' },
   }),
+  // #27. Asking the cashier for work. Until the Character is hired, F at the cashier asks (when not paying for shopping).
+  askCashierForWork: defineInteraction({
+    id: 'ask-cashier-for-work',
+    placeId: 'supermarket',
+    npcId: 'cashier',
+    goal:
+      'This person has come to the till to ask for work as a cashier, and the supermarket is hiring. ' +
+      'Greet them as you would anyone and let them ask. Then interview them briefly: ask their name and when they can start. ' +
+      'There is no rota: once hired, they come in by the staff door any day the supermarket is open and work a shift on the till.',
+    facts: ['openingHours', 'placeFacts'],
+    items: [],
+    completion: hireApplicant,
+    band: 'B',
+    effect: { kind: 'hire', jobId: 'cashier' },
+  }),
   // #4. The cashier rings up whatever the Character brought to the till.
   payForGroceries: defineInteraction({
     id: 'pay-for-groceries',

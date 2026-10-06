@@ -32,13 +32,14 @@ export function interactionStartedWithE(npcId: NamedNpcId, { shopping }: Bringin
  * The second conversation F starts with this Named NPC, or null when E is the only one.
  * With shopping, E at the cashier pays, so F asks where something else is. E at the
  * landlord pays the rent, and F asks for more time. Staff who are hiring take an
- * application on F until the Character has that Job.
+ * application on F until the Character has that Job (the cashier, when not paying for shopping).
  */
 export function interactionStartedWithF(npcId: NamedNpcId, { shopping, jobsHired = [] }: Bringing = { shopping: false }): Interaction | null {
   if (npcId === 'landlord') return INTERACTIONS.askForMoreTime;
+  if (npcId === 'cashier' && shopping) return INTERACTIONS.findAnItem;
   for (const interaction of Object.values(INTERACTIONS)) {
     const { effect } = interaction;
     if (interaction.npcId === npcId && effect.kind === 'hire') return jobsHired.includes(effect.jobId) ? null : interaction;
   }
-  return npcId === 'cashier' && shopping ? INTERACTIONS.findAnItem : null;
+  return null;
 }

@@ -1,6 +1,6 @@
-import { ECONOMY, type LanguageCode } from '../sim/index.ts';
+import { ECONOMY, type LanguageCode, type Till } from '../sim/index.ts';
 import { CULTURE_PACKS, type Currency } from './culturePacks.ts';
-import { ITEMS, type ItemId } from './items.ts';
+import { ITEM_IDS, ITEMS, type ItemId } from './items.ts';
 
 // Prices are authored as ratios of one Shift's base pay. Each pack converts
 // them by its anchor and rounds them to local price points, so ¥380, 15元,
@@ -39,8 +39,22 @@ export function priceProblem(ratio: number, currency: Currency): string | null {
 
 /** An amount of money held in Shifts, written as the pack writes it: ¥450, 18元, 4,50 € or £4.50. */
 export function formatLocalMoney(shifts: number, packId: LanguageCode): string {
-  const { code, locale, suffix, perShift } = CULTURE_PACKS[packId].currency;
-  const amount = shifts * perShift;
+  return formatLocalAmount(shifts * CULTURE_PACKS[packId].currency.perShift, packId);
+}
+
+/** An amount in local money, written as the pack writes it: ¥450, 0.5元, 0,20 € or £0.05. */
+export function formatLocalAmount(amount: number, packId: LanguageCode): string {
+  const { code, locale, suffix } = CULTURE_PACKS[packId].currency;
   if (suffix) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(amount)}${suffix}`;
   return new Intl.NumberFormat(locale, { style: 'currency', currency: code, trailingZeroDisplay: 'stripIfInteger' }).format(amount);
+}
+
+const TILLS = new Map<LanguageCode, Till>();
+/** The pack's money at the supermarket till: every item at its local price, and the coins and notes in the drawer. */
+export function tillFor(packId: LanguageCode): Till {
+  if (!TILLS.has(packId)) {
+    const prices = Object.fromEntries(ITEM_IDS.map((itemId) => [itemId, localPrice(ITEMS[itemId].priceInShifts, packId)])) as Till['prices'];
+    TILLS.set(packId, { prices, denominations: CULTURE_PACKS[packId].currency.denominations });
+  }
+  return TILLS.get(packId)!;
 }

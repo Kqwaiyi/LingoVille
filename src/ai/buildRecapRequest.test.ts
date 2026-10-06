@@ -104,6 +104,41 @@ describe('buildRecapRequest', () => {
     );
   });
 
+  it('tells the coach, for each customer at the till, what they wanted and what the cashier did', () => {
+    const prompt = text({
+      ...shift,
+      jobId: 'cashier',
+      customers: [
+        {
+          order: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'stamps', quantity: 1 }],
+          checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 2000, changeDue: 1160 },
+          result: 'served',
+          served: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'stamps', quantity: 1 }],
+          atTheTill: { bag: true, pointsCard: false, change: 1160 },
+          transcript: SHIFT_LINES,
+          helpLog: [],
+        },
+        {
+          order: [{ itemId: 'noodles', quantity: 1 }],
+          checkout: { bag: false, pointsCard: true, fromBehindTheCounter: null, cashHanded: null, changeDue: null },
+          result: 'wrongOrder',
+          served: [{ itemId: 'noodles', quantity: 1 }],
+          atTheTill: { bag: true, pointsCard: false, change: 0 },
+          transcript: SHIFT_LINES,
+          helpLog: [],
+        },
+      ],
+    });
+
+    expect(prompt).toMatch(/learner was the cashier/);
+    expect(prompt).toContain(
+      'CUSTOMER 1\nThey brought 2 × 卵 to the till, asked for 1 × 切手 from behind the counter, wanted a bag, had no points card, and paid ¥2,000 in cash, so ¥1,160 change was due. The cashier got it all right.',
+    );
+    expect(prompt).toContain(
+      'CUSTOMER 2\nThey brought 1 × うどん to the till, wanted no bag, had a points card, and paid by card. The cashier rang up 1 × うどん, gave a bag, scanned no points card and gave no change instead.',
+    );
+  });
+
   it('asks for at most three corrections across the whole Shift', () => {
     expect(buildRecapRequest(shift).generationConfig.responseSchema.properties!.corrections!.maxItems).toBe(3);
   });

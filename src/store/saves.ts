@@ -30,7 +30,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 10;
+export const SAVE_SCHEMA_VERSION = 11;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -60,6 +60,15 @@ const shiftOrder = z
     orderLine.extend({ modifiers: drinkModifiersSchema.optional() }),
   )
   .readonly();
+
+/** What a customer at the supermarket till wants besides their shopping rung up. */
+const checkout = z.object({
+  bag: z.boolean(),
+  pointsCard: z.boolean(),
+  fromBehindTheCounter: z.enum(ITEM_IDS).nullable(),
+  cashHanded: z.number().positive().nullable(),
+  changeDue: z.number().min(0).nullable(),
+});
 
 const SHIFT_TEMPLATE_IDS = Object.values(SHIFT_TEMPLATES).flatMap((templates) => templates.map(({ id }) => id)) as [string, ...string[]];
 
@@ -118,7 +127,13 @@ const GameStateSchema = z.object({
         failed: z.int().min(0),
         translated: z.int().min(0),
         customer: z
-          .object({ templateId: z.enum(SHIFT_TEMPLATE_IDS), order: shiftOrder, changedFrom: shiftOrder.nullable(), voiceSeed: z.int().min(0) })
+          .object({
+            templateId: z.enum(SHIFT_TEMPLATE_IDS),
+            order: shiftOrder,
+            changedFrom: shiftOrder.nullable(),
+            checkout: checkout.nullable(),
+            voiceSeed: z.int().min(0),
+          })
           .nullable(),
       })
       .nullable(),
@@ -227,6 +242,17 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
         progression: { ...progression, shiftDays: progression.lastShiftDay === null ? [] : [progression.lastShiftDay] },
         possessions: { ...possessions, shift: possessions.shift && { ...possessions.shift, translated: 0 } },
       },
+    };
+  },
+  // 10 → 11: the cashier's till. Only barista Shifts could be worked, so a customer at the counter has no checkout.
+  (save) => {
+    const possessions = save.game.possessions as { shift: { customer: object | null } | null };
+    const { shift } = possessions;
+    const customer = shift?.customer && { ...shift.customer, checkout: null };
+    return {
+      ...save,
+      schemaVersion: 11,
+      game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
     };
   },
 ];

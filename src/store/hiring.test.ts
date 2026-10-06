@@ -97,6 +97,26 @@ describe('asking the barista for work', () => {
     expect(selectConversation(store.getState())).toMatchObject({ interaction: { id: 'ask-barista-for-work' } });
   });
 
+  it('hires a cashier the same way: F at the cashier with no shopping, the name check, and a retry after failing', () => {
+    const { store, npc, written } = atTheCounter();
+    store.setState({ game: { ...store.getState().game, placeId: 'supermarket' } });
+    store.getState().setInteractable('cashier');
+
+    store.getState().talk('F');
+    expect(selectConversation(store.getState())).toMatchObject({ interaction: { id: 'ask-cashier-for-work' } });
+    npc.calls('hire_applicant', { ...APPLICATION, name: 'Pam' });
+    expect(npc.answers).toEqual([{ result: 'wrong_name' }]);
+    npc.calls('hire_applicant', APPLICATION);
+    npc.says('採用です！');
+
+    expect(npc.answers.at(-1)).toEqual({ result: 'done' });
+    expect(written.at(-1)?.game.possessions.jobsHired).toEqual(['cashier']);
+    expect(selectClosingCard(store.getState())).toMatchObject({ kind: 'success', hired: 'cashier' });
+    store.getState().leaveConversation();
+    store.getState().skipRecap();
+    expect(selectTalkWithF(store.getState())).toBeNull();
+  });
+
   it('offers nothing more on F once the Character is hired', () => {
     const { store, npc } = atTheCounter();
     store.getState().talk('F');

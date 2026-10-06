@@ -3,8 +3,10 @@ import {
   OUT_OF_PATIENCE_SCENE,
   readChangedOrder,
   readChangeScene,
+  readCheckout,
   readServedScene,
   readShiftOrder,
+  type CheckoutSaid,
   type NpcSession,
   type ToolResponse,
 } from '../ai/index.ts';
@@ -60,6 +62,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['キャベツ', 'きゃべつ', '野菜', 'やさい'],
     eggs: ['卵', 'たまご', '玉子', 'egg'],
     noodles: ['うどん', 'udon'],
+    batteries: ['電池', 'でんち', 'battery'],
+    stamps: ['切手', 'きって'],
+    'gift-card': ['ギフトカード', 'ぎふとかーど'],
   },
   zh: {
     latte: ['拿铁', 'latte'],
@@ -71,6 +76,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['青菜', '蔬菜'],
     eggs: ['鸡蛋'],
     noodles: ['挂面', '面条'],
+    batteries: ['电池'],
+    stamps: ['邮票'],
+    'gift-card': ['购物卡', '礼品卡'],
   },
   en: {
     latte: ['latte'],
@@ -82,6 +90,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['carrots', 'carrot', 'vegetables'],
     eggs: ['eggs', 'egg'],
     noodles: ['spaghetti', 'pasta'],
+    batteries: ['batteries', 'battery'],
+    stamps: ['stamps', 'stamp'],
+    'gift-card': ['gift card'],
   },
   de: {
     latte: ['latte', 'milchkaffee'],
@@ -93,6 +104,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['kartoffeln', 'kartoffel'],
     eggs: ['eier', 'ei'],
     noodles: ['spätzle', 'nudeln'],
+    batteries: ['batterien', 'batterie'],
+    stamps: ['briefmarken', 'briefmarke'],
+    'gift-card': ['geschenkkarte', 'gutschein'],
   },
 };
 
@@ -882,6 +896,90 @@ const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
   },
 };
 
+/** The fake Shift Customer at the till: says everything the cashier needs to hear at once, and again when asked. */
+type TillCustomerScript = {
+  /** What goes between sentences: nothing in ja and zh. */
+  between: string;
+  hello: string;
+  bag: { yes: string; no: string };
+  pointsCard: { yes: string; no: string };
+  behind: (item: string) => string;
+  cash: (amount: string) => string;
+  byCard: string;
+  thanks: string;
+  wrong: string;
+};
+
+const TILL_CUSTOMER_SCRIPT: Record<LanguageCode, TillCustomerScript> = {
+  ja: {
+    between: '',
+    hello: 'こんにちは。',
+    bag: { yes: '袋をお願いします。', no: '袋はいりません。' },
+    pointsCard: { yes: 'ポイントカードあります。', no: 'ポイントカードはないです。' },
+    behind: (item) => `あと、${item}をひとつください。`,
+    cash: (amount) => `${amount}でお願いします。`,
+    byCard: 'カードで払います。',
+    thanks: 'どうも、ありがとうございます！',
+    wrong: 'あの、ちょっと違うみたいです…。まあ、いいです。',
+  },
+  zh: {
+    between: '',
+    hello: '你好！',
+    bag: { yes: '要一个袋子。', no: '不要袋子。' },
+    pointsCard: { yes: '我有积分卡。', no: '我没有积分卡。' },
+    behind: (item) => `还要一份${item}。`,
+    cash: (amount) => `给你${amount}。`,
+    byCard: '我刷卡。',
+    thanks: '谢谢！',
+    wrong: '好像不太对……算了，再见。',
+  },
+  en: {
+    between: ' ',
+    hello: 'Hi there!',
+    bag: { yes: "I'd like a bag, please.", no: 'No bag, thanks.' },
+    pointsCard: { yes: "Here's my points card.", no: "I haven't got a points card." },
+    behind: (item) => `And could I have ${item} from behind the counter?`,
+    cash: (amount) => `Here's ${amount}.`,
+    byCard: "I'll pay by card.",
+    thanks: 'Lovely, thanks!',
+    wrong: "Hmm, that's not quite right… never mind. Bye.",
+  },
+  de: {
+    between: ' ',
+    hello: 'Hallo!',
+    bag: { yes: 'Eine Tüte, bitte.', no: 'Keine Tüte, danke.' },
+    pointsCard: { yes: 'Hier ist meine Punktekarte.', no: 'Ich habe keine Punktekarte.' },
+    behind: (item) => `Und dazu ${item} von hinten, bitte.`,
+    cash: (amount) => `Hier sind ${amount}.`,
+    byCard: 'Ich zahle mit Karte.',
+    thanks: 'Danke schön!',
+    wrong: 'Das stimmt nicht ganz… na ja, tschüss.',
+  },
+};
+
+/** A Shift Customer at the till: says whether they want a bag, have a points card, anything from behind the counter and how they pay. */
+function tillCustomerNpc(script: TillCustomerScript, common: OrderScript, repeat: string[], wants: CheckoutSaid, act: Act): Npc {
+  const all = [
+    script.hello,
+    wants.bag ? script.bag.yes : script.bag.no,
+    wants.pointsCard ? script.pointsCard.yes : script.pointsCard.no,
+    ...(wants.fromBehindTheCounter ? [script.behind(wants.fromBehindTheCounter)] : []),
+    wants.cashHanded ? script.cash(wants.cashHanded) : script.byCard,
+  ].join(script.between);
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: all,
+    resume: all,
+    hear: (line) => {
+      const servedRight = readServedScene(line);
+      if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrong);
+      if (mentions(line, [...repeat, ...yes, ...no, ...known])) return act.say(all);
+      act.notUnderstood();
+    },
+  };
+}
+
 /**
  * A Shift Customer, ordering what the instruction holds by the items' local names ("1 × ラテ" is said as "ラテ"). One
  * who changes their mind wants what the instruction says instead once the barista has started on it.
@@ -914,7 +1012,11 @@ function customerNpc(script: CustomerScript, common: OrderScript, systemInstruct
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
   const offers = (name: string) => session.tools.some((tool) => tool.name === name);
-  if ('shiftCustomerVoice' in session.voice) return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
+  if ('shiftCustomerVoice' in session.voice) {
+    const atTheTill = readCheckout(session.systemInstruction);
+    if (atTheTill) return tillCustomerNpc(TILL_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTill, act);
+    return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
+  }
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
   const { words } = SCRIPT[packId];
   if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
@@ -940,7 +1042,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * new rent; the barista asked for work takes a name and a start, reads them
  * back and hires on a yes, asking the name again if the sim says it's wrong; a Shift Customer orders
  * the drink in its instruction, says it again when asked, and thanks the barista or says it's the wrong
- * one when a scene says what it was handed. Each calls
+ * one when a scene says what it was handed; one at the till says all the cashier needs to hear at once
+ * (bag, points card, anything from behind the counter, the cash it hands over). Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.

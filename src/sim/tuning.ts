@@ -114,6 +114,8 @@ export const ECONOMY = {
   jobLifeSkillPayRaisePerLevel: 0.06,
   /** A Shift Customer served correctly after the Player translated their lines is docked this share of a failed one's dock. */
   translatedCustomerDockShare: 0.5,
+  /** A customer at the supermarket till: how many kinds of shopping they bring, the most of each, and how often they want a bag or have a points card. */
+  checkout: { basketLines: { min: 1, max: 3 }, maxQuantity: 2, wantsBag: 0.5, hasPointsCard: 0.5 },
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
   /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
@@ -239,8 +241,9 @@ export const LIFE_SKILLS = {
   /**
    * The level of a Job's Life Skill that unlocks each of its aids. They only ever help with the mechanics, never with
    * understanding the customer. Barista: the menu grid grouped by kind, and the size toggle remembering the last size made.
+   * Cashier: the coins for the change suggested, once the Player has keyed in the cash they were handed.
    */
-  jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: {}, server: {} },
+  jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: { suggestedChange: 1 }, server: {} },
   /** Illness chance reduction at max Fitness, scaled linearly by level. */
   fitnessIllnessReductionAtMax: 0.4,
   /** Health drain while deprived is multiplied by this at max Fitness. */

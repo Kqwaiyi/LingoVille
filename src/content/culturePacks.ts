@@ -29,6 +29,8 @@ export type Currency = {
   perShift: number;
   /** Local price points, from the smallest prices up. */
   priceSteps: PriceStep[];
+  /** The coins and notes in a till, smallest first: what a cashier gives change in. */
+  denominations: number[];
 };
 
 /** Prop ids the world knows how to draw. Each pack picks the small set dressing it shows. */
@@ -112,6 +114,10 @@ export function culturePackSchema(packId: LanguageCode) {
       suffix: text.optional(),
       perShift: z.number().positive(),
       priceSteps,
+      denominations: z
+        .array(z.number().positive())
+        .min(1)
+        .refine((money) => money.every((d, i) => i === 0 || d > money[i - 1]!), 'Denominations go up.'),
     }),
     customs: z.array(text),
     hours: z.partialRecord(z.enum(HOURS_IDS), openingHours),
@@ -144,6 +150,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       locale: 'en-JP',
       perShift: 6000,
       priceSteps: [{ below: 1000, step: 10 }, { step: 100 }],
+      denominations: [1, 5, 10, 50, 100, 500, 1000, 5000, 10000],
     },
     customs: [
       'Tipping is not done, and staff will politely turn a tip down.',
@@ -161,6 +168,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'キャベツ', glosses: { zh: '卷心菜', en: 'Cabbage', de: 'Weißkohl' } },
       eggs: { name: '卵', glosses: { zh: '鸡蛋', en: 'Eggs', de: 'Eier' } },
       noodles: { name: 'うどん', glosses: { zh: '乌冬面', en: 'Udon noodles', de: 'Udon-Nudeln' } },
+      batteries: { name: '単三電池', glosses: { zh: '五号电池', en: 'AA batteries', de: 'AA-Batterien' } },
+      stamps: { name: '切手', glosses: { zh: '邮票', en: 'Stamps', de: 'Briefmarken' } },
+      'gift-card': { name: 'ギフトカード', glosses: { zh: '礼品卡', en: 'Gift card', de: 'Geschenkkarte' } },
     },
     drinkOptions: {
       small: { name: 'Sサイズ', glosses: { zh: '小杯', en: 'Small', de: 'Klein' } },
@@ -222,6 +232,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       suffix: '元',
       perShift: 240,
       priceSteps: [{ below: 100, step: 1 }, { step: 5 }],
+      denominations: [0.1, 0.5, 1, 5, 10, 20, 50, 100],
     },
     customs: ['Tipping is not expected.', 'Most people pay by scanning a QR code with WeChat or Alipay.'],
     hours: {},
@@ -236,6 +247,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: '青菜', glosses: { ja: 'チンゲン菜', en: 'Bok choy', de: 'Pak Choi' } },
       eggs: { name: '鸡蛋', glosses: { ja: '卵', en: 'Eggs', de: 'Eier' } },
       noodles: { name: '挂面', glosses: { ja: '乾麺', en: 'Dried noodles', de: 'Getrocknete Nudeln' } },
+      batteries: { name: '五号电池', glosses: { ja: '単三電池', en: 'AA batteries', de: 'AA-Batterien' } },
+      stamps: { name: '邮票', glosses: { ja: '切手', en: 'Stamps', de: 'Briefmarken' } },
+      'gift-card': { name: '购物卡', glosses: { ja: 'ギフトカード', en: 'Gift card', de: 'Geschenkkarte' } },
     },
     drinkOptions: {
       small: { name: '小杯', glosses: { ja: 'Sサイズ', en: 'Small', de: 'Klein' } },
@@ -296,6 +310,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       locale: 'en-GB',
       perShift: 60,
       priceSteps: [{ below: 10, step: 0.05 }, { below: 100, step: 0.5 }, { step: 1 }],
+      denominations: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50],
     },
     customs: [
       'Customers order and pay at the counter; there is no table service.',
@@ -313,6 +328,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'Carrots', glosses: { ja: 'にんじん', zh: '胡萝卜', de: 'Karotten' } },
       eggs: { name: 'Eggs', glosses: { ja: '卵', zh: '鸡蛋', de: 'Eier' } },
       noodles: { name: 'Spaghetti', glosses: { ja: 'スパゲッティ', zh: '意大利面', de: 'Spaghetti' } },
+      batteries: { name: 'AA batteries', glosses: { ja: '単三電池', zh: '五号电池', de: 'AA-Batterien' } },
+      stamps: { name: 'Stamps', glosses: { ja: '切手', zh: '邮票', de: 'Briefmarken' } },
+      'gift-card': { name: 'Gift card', glosses: { ja: 'ギフトカード', zh: '礼品卡', de: 'Geschenkkarte' } },
     },
     drinkOptions: {
       small: { name: 'Small', glosses: { ja: 'スモール', zh: '小杯', de: 'Klein' } },
@@ -373,6 +391,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       locale: 'de-DE',
       perShift: 60,
       priceSteps: [{ below: 10, step: 0.1 }, { below: 100, step: 0.5 }, { step: 1 }],
+      denominations: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50],
     },
     customs: [
       'At the counter tipping is optional; people often round up.',
@@ -398,6 +417,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'Kartoffeln', glosses: { ja: 'じゃがいも', zh: '土豆', en: 'Potatoes' } },
       eggs: { name: 'Eier', glosses: { ja: '卵', zh: '鸡蛋', en: 'Eggs' } },
       noodles: { name: 'Spätzle', glosses: { ja: 'シュペッツレ（卵の麺）', zh: '德式鸡蛋面', en: 'Spätzle (egg noodles)' } },
+      batteries: { name: 'AA-Batterien', glosses: { ja: '単三電池', zh: '五号电池', en: 'AA batteries' } },
+      stamps: { name: 'Briefmarken', glosses: { ja: '切手', zh: '邮票', en: 'Stamps' } },
+      'gift-card': { name: 'Geschenkkarte', glosses: { ja: 'ギフトカード', zh: '礼品卡', en: 'Gift card' } },
     },
     drinkOptions: {
       small: { name: 'Klein', glosses: { ja: 'スモール', zh: '小杯', en: 'Small' } },

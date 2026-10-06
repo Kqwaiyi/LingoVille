@@ -42,6 +42,7 @@ import {
   placePhrasebook,
   SHIFT_MENUS,
   shiftTemplates,
+  tillFor,
   worldSign,
   type AppearancePresetId,
   type DrinkExtra,
@@ -111,7 +112,13 @@ import {
   type ShiftOrder,
   addToTray,
   clearTray,
+  changeOwed,
+  coinsTotal,
   EMPTY_TRAY,
+  suggestChange,
+  tillTotal,
+  type Checkout,
+  type TillWork,
   redoTray,
   undoTray,
   type TrayHistory,
@@ -343,18 +350,38 @@ export type ShiftCustomerOutcome = { kind: ShiftRecapCustomer['result'] };
 /**
  * The Shift Customer at the counter, as the conversation shows them: what the Player has put on the tray to serve
  * (and can undo and redo), how the modifier toggles say the next drink is made, and whether a customer who changes
- * their mind has been told the Player has started on their order.
+ * their mind has been told the Player has started on their order. At the till, the tray is what's been scanned and
+ * fetched, and the rest is the till: the bag and points card toggles, the cash the Player keyed in as handed over
+ * (null until they do), and the coins and notes counted out as change.
  */
-export type ShiftCustomerView = TrayHistory & { making: DrinkModifiers; startedOn: boolean };
+export type ShiftCustomerView = TrayHistory & {
+  making: DrinkModifiers;
+  startedOn: boolean;
+  bag: boolean;
+  pointsCard: boolean;
+  received: number | null;
+  change: readonly number[];
+};
 
-/** A Shift Customer walks up to an empty tray, with the toggles set to make the default drink. */
-const NEW_SHIFT_CUSTOMER: ShiftCustomerView = { ...EMPTY_TRAY, making: DEFAULT_DRINK, startedOn: false };
+/** A Shift Customer walks up to an empty tray, with the toggles set to make the default drink, and an empty till. */
+const NEW_SHIFT_CUSTOMER: ShiftCustomerView = {
+  ...EMPTY_TRAY,
+  making: DEFAULT_DRINK,
+  startedOn: false,
+  bag: false,
+  pointsCard: false,
+  received: null,
+  change: [],
+};
 
 /** A Shift Customer the Player dealt with, kept for the Shift's Recap: their order, how it went, and their conversation once they've gone. */
 type ShiftLogEntry = {
   conversationId: number;
   order: ShiftOrder;
   changedFrom: ShiftOrder | null;
+  /** At the till: what else they wanted, and what the Player did about it. */
+  checkout: Checkout | null;
+  atTheTill: TillWork | null;
   result: ShiftCustomerOutcome['kind'];
   served: ShiftOrder;
   conversation: Conversation | null;
@@ -678,7 +705,17 @@ export type GameStore = {
   /** Takes back the last change to the tray, or puts back the last one taken back. */
   undoTray: () => void;
   redoTray: () => void;
-  /** Hands the Shift Customer what is on the tray. It is checked exactly against their order. */
+  /** At the till: the bag and points card toggles for the customer at the till. */
+  toggleBag: () => void;
+  togglePointsCard: () => void;
+  /** Keys in the cash the customer handed over, in local money (null clears it), so the till works out the change due. */
+  setCashReceived: (amount: number | null) => void;
+  /** One more of the pack's coins or notes onto the change counted out. */
+  addChangeCoin: (coin: number) => void;
+  clearChange: () => void;
+  /** The Cashier skill's aid: counts out the change due for the cash keyed in, with the fewest coins. */
+  suggestChange: () => void;
+  /** Hands the Shift Customer what is on the tray (at the till: finishes the sale). It is checked exactly against their order. */
   serveTray: () => void;
   /** Closes the pay shown at the end of a Shift. */
   closeShiftEnd: () => void;
@@ -1275,16 +1312,25 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     /**
      * The Shift Customer at the counter is dealt with: served what is on the tray, or gone unserved (null). The sim
      * checks it exactly, and it's saved. One the Player had translated a line of is docked a share even if served right.
-     * The customer says goodbye next, then leaves. Returns whether it was their order.
+     * The customer says goodbye next, then leaves. At the till, `atTheTill` is what was done there. Returns whether it was their order.
      */
-    const settleShiftCustomer = (served: ShiftOrder | null) => {
+    const settleShiftCustomer = (served: ShiftOrder | null, atTheTill?: TillWork) => {
       const { game, conversation } = get();
       const customer = game.possessions.shift?.customer;
-      const { state, correct } = applyShiftCustomer(game, served, { translated: (conversation?.translated.length ?? 0) > 0 });
+      const { state, correct } = applyShiftCustomer(game, served, { translated: (conversation?.translated.length ?? 0) > 0, atTheTill });
       const result = correct ? 'served' : served ? 'wrongOrder' : 'walkedOut';
       if (customer && conversation) {
-        const { order, changedFrom } = customer;
-        shiftLog.push({ conversationId: conversation.id, order, changedFrom, result, served: served ?? [], conversation: null });
+        const { order, changedFrom, checkout } = customer;
+        shiftLog.push({
+          conversationId: conversation.id,
+          order,
+          changedFrom,
+          checkout,
+          atTheTill: atTheTill ?? null,
+          result,
+          served: served ?? [],
+          conversation: null,
+        });
       }
       set({ game: state });
       updateConversation({ outcome: { kind: result } });
@@ -1349,11 +1395,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const { game, nativeLanguage } = get();
       const { culturePackId, targetLanguage } = game.identity;
       const listenedAt = game.proficiencyStep;
-      const dealtWith: ShiftRecapCustomer[] = log.map(({ order, changedFrom, result, served: handed, conversation }) => ({
+      const dealtWith: ShiftRecapCustomer[] = log.map(({ order, changedFrom, checkout, atTheTill, result, served: handed, conversation }) => ({
         order,
         ...(changedFrom && { changedFrom }),
+        ...(checkout && { checkout }),
         result,
         served: handed,
+        ...(atTheTill && { atTheTill }),
         transcript: transcriptOf(conversation?.lines ?? []),
         helpLog: conversation?.helpLog ?? [],
       }));
@@ -1427,7 +1475,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (!shift) return;
       const templates = shiftTemplates(shift.jobId);
       if (templates.length === 0 || shift.served + shift.failed >= shift.customers) return finishShift();
-      const after = nextShiftCustomer(game, templates);
+      const after = nextShiftCustomer(game, templates, tillFor(game.identity.culturePackId));
       set({ game: after });
       const customer = after.possessions.shift!.customer!;
       const pack = CULTURE_PACKS[after.identity.culturePackId];
@@ -1964,12 +2012,27 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       clearTray: () => changeShiftCustomer((view) => ({ ...view, ...clearTray(view) })),
       undoTray: () => changeShiftCustomer((view) => ({ ...view, ...undoTray(view) })),
       redoTray: () => changeShiftCustomer((view) => ({ ...view, ...redoTray(view) })),
+      toggleBag: () => changeShiftCustomer((view) => ({ ...view, bag: !view.bag })),
+      togglePointsCard: () => changeShiftCustomer((view) => ({ ...view, pointsCard: !view.pointsCard })),
+      setCashReceived: (amount) =>
+        changeShiftCustomer((view) => ({ ...view, received: amount !== null && Number.isFinite(amount) && amount >= 0 ? amount : null })),
+      addChangeCoin: (coin) => {
+        if (!tillFor(get().game.identity.culturePackId).denominations.includes(coin)) return;
+        changeShiftCustomer((view) => ({ ...view, change: [...view.change, coin] }));
+      },
+      clearChange: () => changeShiftCustomer((view) => ({ ...view, change: [] })),
+      suggestChange: () => {
+        if (!selectCanSuggestChange(get())) return;
+        const { denominations } = tillFor(get().game.identity.culturePackId);
+        changeShiftCustomer((view) => ({ ...view, change: suggestChange(selectTill(get()).changeDue!, denominations) }));
+      },
       serveTray: () => {
         const conversation = get().conversation;
         if (!conversation?.shiftCustomer || !canTakeTurn(conversation) || !voice || conversation.shiftCustomer.tray.length === 0) return;
-        const { tray } = conversation.shiftCustomer;
-        const correct = settleShiftCustomer(tray);
-        voice.sendText(shiftCustomerServedScene(tray, correct, CULTURE_PACKS[get().game.identity.culturePackId]));
+        const { tray, bag, pointsCard, change } = conversation.shiftCustomer;
+        const atTheTill = get().game.possessions.shift?.customer?.checkout ? { bag, pointsCard, change: coinsTotal(change) } : undefined;
+        const correct = settleShiftCustomer(tray, atTheTill);
+        voice.sendText(shiftCustomerServedScene(tray, correct, CULTURE_PACKS[get().game.identity.culturePackId], atTheTill));
       },
       closeShiftEnd: () => {
         // Closed before its Recap was there to read: it still goes to the Journal.
@@ -2341,8 +2404,6 @@ export const selectShift = (s: GameStore): ShiftView | null => {
   }
   return view;
 };
-/** A Shift is under way: the world holds the Character behind the counter until it ends. */
-export const selectShiftUnderway = (s: GameStore) => s.game.possessions.shift !== null;
 /** What the Shift that just ended paid, until the Player closes it. */
 export const selectShiftEnd = (s: GameStore) => s.shiftEnd;
 /** Each staff door view, made once, so the selector hands back the same object while nothing changes. */
@@ -2394,6 +2455,59 @@ export const selectCanServe = (s: GameStore) => {
   const { conversation } = s;
   if (!conversation?.shiftCustomer || conversation.outcome || conversation.reconnecting || conversation.listening) return false;
   return conversation.tab === 'chat' && conversation.shiftCustomer.tray.length > 0;
+};
+const NOTHING_ON_THE_COUNTER: ShiftOrder = [];
+const COUNTERS = new WeakMap<ShiftOrder, ShiftOrder>();
+/** The shopping the customer at the till has put on the counter, which the Player can see; not what they want from behind it. */
+export const selectCheckoutCounter = (s: GameStore): ShiftOrder => {
+  const customer = s.conversation?.shiftCustomer ? s.game.possessions.shift?.customer : null;
+  if (!customer?.checkout) return NOTHING_ON_THE_COUNTER;
+  if (!COUNTERS.has(customer.order)) {
+    const behind = customer.checkout.fromBehindTheCounter;
+    COUNTERS.set(customer.order, customer.order.filter(({ itemId }) => itemId !== behind));
+  }
+  return COUNTERS.get(customer.order)!;
+};
+
+/**
+ * The till, as the Player sees it, in local money: what's been rung up comes to `total`; the bag and points card
+ * toggles; the cash keyed in as handed over and the change due from it (null until keyed in); and the coins and
+ * notes counted out as change, which come to `changeGiven`.
+ */
+export type TillView = {
+  total: number;
+  bag: boolean;
+  pointsCard: boolean;
+  received: number | null;
+  changeDue: number | null;
+  change: readonly number[];
+  changeGiven: number;
+};
+const EMPTY_TILL: TillView = { total: 0, bag: false, pointsCard: false, received: null, changeDue: null, change: [], changeGiven: 0 };
+const TILLS = new WeakMap<ShiftCustomerView, TillView>();
+/** The till for the customer at the counter. The same object until it changes. */
+export const selectTill = (s: GameStore): TillView => {
+  const view = s.conversation?.shiftCustomer;
+  if (!view) return EMPTY_TILL;
+  if (!TILLS.has(view)) {
+    const { tray, bag, pointsCard, received, change } = view;
+    const total = tillTotal(tray, tillFor(s.game.identity.culturePackId));
+    const changeDue = received === null ? null : changeOwed(received, total);
+    TILLS.set(view, { total, bag, pointsCard, received, changeDue, change, changeGiven: coinsTotal(change) });
+  }
+  return TILLS.get(view)!;
+};
+/** The Cashier skill has unlocked coin suggestions for the Shift under way. */
+export const selectSuggestsChange = (s: GameStore) => {
+  const { shift } = s.game.possessions;
+  return shift !== null && jobAids(s.game, shift.jobId).includes('suggestedChange');
+};
+/** The Cashier skill can count out the change: it's unlocked, and the cash keyed in covers what's been rung up. */
+export const selectCanSuggestChange = (s: GameStore) => {
+  const { shift } = s.game.possessions;
+  if (!shift || !selectCanTapMenu(s) || !jobAids(s.game, shift.jobId).includes('suggestedChange')) return false;
+  const { changeDue } = selectTill(s);
+  return changeDue !== null && changeDue >= 0;
 };
 /** A Shift Customer is at the counter, and partway through saying a line: for the "speaking…" indicator over them. */
 export const selectShiftCustomerSpeaking = (s: GameStore) =>

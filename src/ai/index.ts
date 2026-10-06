@@ -4,10 +4,12 @@ export {
   buildShiftCustomerSession,
   readChangedOrder,
   readChangeScene,
+  readCheckout,
   readServedScene,
   readShiftOrder,
   shiftCustomerChangeScene,
   shiftCustomerServedScene,
+  type CheckoutSaid,
   type ShiftCustomerContext,
 } from './shiftCustomerSession.ts';
 export {

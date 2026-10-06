@@ -18,7 +18,7 @@ export {
   type Shop,
   type SignWord,
 } from './culturePacks.ts';
-export { chargeInShifts, formatLocalMoney, localPrice, menuPrice, priceProblem } from './currency.ts';
+export { chargeInShifts, formatLocalAmount, formatLocalMoney, localPrice, menuPrice, priceProblem, tillFor } from './currency.ts';
 export {
   defineInteraction,
   FACT_SOURCES,
@@ -36,8 +36,21 @@ export {
 } from './defineInteraction.ts';
 export { basketFacts, interactionFacts, readBasketTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
 export { INTERACTIONS, START_WHEN } from './interactions.ts';
-export { DEFAULT_DRINK, isDrink, jobAt, JOB_PLACES, SHIFT_MENUS, SHIFT_TEMPLATES, shiftTemplates, type ShiftTemplate } from './shifts.ts';
 export {
+  DEFAULT_DRINK,
+  isCheckout,
+  isDrink,
+  jobAt,
+  JOB_PLACES,
+  SHIFT_MENUS,
+  SHIFT_TEMPLATES,
+  shiftTemplates,
+  type CheckoutTemplate,
+  type DrinkTemplate,
+  type ShiftTemplate,
+} from './shifts.ts';
+export {
+  BEHIND_THE_COUNTER,
   CAFE_MENU,
   CONVENIENCE_MENU,
   DRINK_EXTRAS,

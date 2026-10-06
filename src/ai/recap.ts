@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   CULTURE_PACKS,
   drinkModifiersSchema,
+  formatLocalAmount,
   ITEM_IDS,
   localPlaceName,
   NAMED_NPCS,
@@ -49,16 +50,31 @@ const ShiftOrderLineSchema = z.object({
   modifiers: drinkModifiersSchema.optional(),
 });
 
+/** What a customer at the supermarket till wanted besides their shopping rung up, in local money. */
+const CheckoutSchema = z.object({
+  bag: z.boolean(),
+  pointsCard: z.boolean(),
+  fromBehindTheCounter: z.enum(ITEM_IDS).nullable(),
+  cashHanded: z.number().positive().nullable(),
+  changeDue: z.number().min(0).nullable(),
+});
+
+/** What the learner did at the till: the bag and points card, and the change counted out, in local money. */
+const TillWorkSchema = z.object({ bag: z.boolean(), pointsCard: z.boolean(), change: z.number().min(0) });
+
 /**
  * One Shift Customer as the Recap reads them: what they ordered, how the game's exact check found the learner served
- * them (`served` is what was handed over, empty if nothing), and what was said.
+ * them (`served` is what was handed over, empty if nothing), and what was said. At the till, `order` is everything to
+ * ring up, `checkout` what else they wanted, and `atTheTill` what the learner did about it.
  */
 const ShiftRecapCustomerSchema = z.object({
   order: z.array(ShiftOrderLineSchema).min(1).readonly(),
   /** What they first asked for, before changing their mind halfway. */
   changedFrom: z.array(ShiftOrderLineSchema).min(1).readonly().optional(),
+  checkout: CheckoutSchema.optional(),
   result: z.enum(['served', 'wrongOrder', 'walkedOut']),
   served: z.array(ShiftOrderLineSchema).readonly(),
+  atTheTill: TillWorkSchema.optional(),
   transcript: z.array(RecapLineSchema),
   helpLog: z.array(HelpLogEntrySchema),
 });
@@ -156,8 +172,43 @@ function conversationBlock(heading: string, conversation: RecapConversation, pac
   ]);
 }
 
+/** "a, b and c". */
+const listed = (parts: string[]) => parts.join(', ').replace(/, ([^,]+)$/, ' and $1');
+
+/** What a customer at the till wanted, and whether the learner got it all right, did something else, or never served them. */
+function tillLine(customer: ShiftRecapCustomer, checkout: NonNullable<ShiftRecapCustomer['checkout']>, staff: string, pack: CulturePack) {
+  const { bag, pointsCard, fromBehindTheCounter, cashHanded, changeDue } = checkout;
+  const money = (amount: number) => formatLocalAmount(amount, pack.id);
+  const shopping = customer.order.filter(({ itemId }) => itemId !== fromBehindTheCounter);
+  const wanted = [
+    `They brought ${orderSaid(shopping, pack)} to the till`,
+    ...(fromBehindTheCounter ? [`asked for ${orderSaid([{ itemId: fromBehindTheCounter, quantity: 1 }], pack)} from behind the counter`] : []),
+    bag ? 'wanted a bag' : 'wanted no bag',
+    pointsCard ? 'had a points card' : 'had no points card',
+    cashHanded !== null ? `and paid ${money(cashHanded)} in cash, so ${money(changeDue ?? 0)} change was due` : 'and paid by card',
+  ].join(', ');
+  switch (customer.result) {
+    case 'served':
+      return `${wanted}. The ${staff} got it all right.`;
+    case 'wrongOrder': {
+      const done = customer.atTheTill ?? { bag: false, pointsCard: false, change: 0 };
+      const did = listed([
+        `rang up ${customer.served.length > 0 ? orderSaid(customer.served, pack) : 'nothing'}`,
+        done.bag ? 'gave a bag' : 'gave no bag',
+        done.pointsCard ? 'scanned a points card' : 'scanned no points card',
+        done.change > 0 ? `gave ${money(done.change)} change` : 'gave no change',
+      ]);
+      return `${wanted}. The ${staff} ${did} instead.`;
+    }
+    case 'walkedOut':
+      return `${wanted}. The ${staff} never finished serving them, and they left.`;
+  }
+}
+
 /** What the customer ordered, and whether the learner (the `staff`) served it right, served something else, or never served them. */
-function servedLine({ order, changedFrom, result, served }: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+function servedLine(customer: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+  if (customer.checkout) return tillLine(customer, customer.checkout, staff, pack);
+  const { order, changedFrom, result, served } = customer;
   const changed = changedFrom ? `They first ordered ${orderSaid(changedFrom, pack)}, then changed their mind halfway. ` : '';
   const ordered = `${changed}They ordered: ${orderSaid(order, pack)}.`;
   switch (result) {

@@ -1,5 +1,5 @@
 import { TOWN_NPCS, TRAM_LINE, type GroceryId, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
-import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
+import { PLACE_IDS, type JobId, type PlaceId } from '../sim/index.ts';
 import type { Arrival } from '../store/index.ts';
 
 // Greybox layout: one long street along the x axis, with a tram line down its
@@ -133,12 +133,15 @@ export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
 /** The stove at home, along the back wall to the right of the tap. */
 export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
 
-/** The café's staff door, in its west wall level with the counter, and where the Character stands to use it. */
-export const CAFE_STAFF_DOOR = { door: [7.22, 1.1, -2.2] as Vec3, usedFrom: [7.7, 1, -2.2] as Vec3 } as const;
-/** Where the Character works a Shift: behind the café counter, beside the barista. */
-export const BEHIND_THE_COUNTER: Vec3 = [13.4, 1, -4];
-/** Where a Shift Customer stands: across the counter from the Character. */
-export const SHIFT_CUSTOMER_SPOT: Vec3 = [13.4, 1, -1.8];
+/**
+ * Where each Job is worked: its staff door, set in its place's west wall (and where the Character stands to use it);
+ * where the Character stands through a Shift, behind the counter beside its staff; and where a Shift Customer stands,
+ * across the counter. The café's is level with its counter; the supermarket's, with the customers' side of its till.
+ */
+export const WORKPLACES: Partial<Record<JobId, { door: Vec3; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3 }>> = {
+  barista: { door: [7.22, 1.1, -2.2], usedFrom: [7.7, 1, -2.2], behindTheCounter: [13.4, 1, -4], customerSpot: [13.4, 1, -1.8] },
+  cashier: { door: [20.22, 1.1, 1], usedFrom: [20.7, 1, 1], behindTheCounter: [25, 1, -0.6], customerSpot: [25, 1, 1.6] },
+};
 
 /** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */
 export const SIGNS: Record<SignId, { position: Vec3; size: readonly [width: number, height: number] }> = {

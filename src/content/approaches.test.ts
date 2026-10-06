@@ -24,9 +24,15 @@ describe('NPCs who start conversations themselves', () => {
     expect(interactionStartedWithE('cashier', { shopping: false })).toBe(INTERACTIONS.findAnItem);
   });
 
-  it('asks the cashier where something is with F, only when E would pay for shopping', () => {
+  it('asks the cashier where something is with F when E would pay for shopping', () => {
     expect(interactionStartedWithF('cashier', { shopping: true })).toBe(INTERACTIONS.findAnItem);
-    expect(interactionStartedWithF('cashier', { shopping: false })).toBeNull();
+    expect(interactionStartedWithF('cashier', { shopping: true, jobsHired: ['cashier'] })).toBe(INTERACTIONS.findAnItem);
+  });
+
+  it('asks the cashier for work with F, without shopping, until the Character is hired as a cashier', () => {
+    expect(interactionStartedWithF('cashier', { shopping: false })).toBe(INTERACTIONS.askCashierForWork);
+    expect(interactionStartedWithF('cashier', { shopping: false, jobsHired: ['barista'] })).toBe(INTERACTIONS.askCashierForWork);
+    expect(interactionStartedWithF('cashier', { shopping: false, jobsHired: ['cashier'] })).toBeNull();
   });
 
   it('asks the barista for work with F until the Character is hired as a barista', () => {

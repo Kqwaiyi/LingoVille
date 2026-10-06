@@ -8,7 +8,7 @@ import {
   shiftCustomerServedScene,
   type ToolResponse,
 } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalAmount, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
 import { LANGUAGE_CODES, type ApproachId, type LanguageCode, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
@@ -535,9 +535,9 @@ describe('mock VoiceSession: asking the barista for work (#26)', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  async function hiring(packId: LanguageCode) {
+  async function hiring(packId: LanguageCode, interaction = INTERACTIONS.askBaristaForWork) {
     const heard = listen();
-    const npcSession = buildNpcSession(INTERACTIONS.askBaristaForWork, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.barista, {
+    const npcSession = buildNpcSession(interaction, CULTURE_PACKS[packId], 'A1', NAMED_NPCS[interaction.npcId], {
       clock: { day: 2, minuteOfDay: 540 },
     });
     const session = openMockVoiceSession(npcSession, heard.events);
@@ -567,6 +567,12 @@ describe('mock VoiceSession: asking the barista for work (#26)', () => {
     expect(toolCalls).toEqual([{ id: expect.any(String), name: 'hire_applicant', args: { name: 'サム', start: 'tomorrow' } }]);
     await answer({ result: 'done' });
     expect(turns).toHaveLength(5);
+  });
+
+  it('hires a cashier at the supermarket the same way', async () => {
+    const { toolCalls, say } = await hiring('ja', INTERACTIONS.askCashierForWork);
+    for (const line of ['仕事はありますか？', 'Samです。', '今週から', 'はい']) await say(line);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'hire_applicant', args: { name: 'Sam', start: 'this_week' } }]);
   });
 
   it.each([
@@ -603,7 +609,7 @@ describe('mock VoiceSession: a Shift Customer', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, voiceSeed: 7 };
+  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, voiceSeed: 7 };
   const ICED_TEA: ShiftOrder = [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }];
   const HOT_COFFEE: ShiftOrder = [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }];
 
@@ -654,6 +660,46 @@ describe('mock VoiceSession: a Shift Customer', () => {
     const { turns } = await customerAtTheCounter('ja', { ...WANTS_A_LATTE, order: ICED_TEA });
     const { drinkOptions } = CULTURE_PACKS.ja;
     for (const said of [goods.tea.name, drinkOptions.large.name, drinkOptions.iced.name, drinkOptions.lemon.name]) expect(turns[0]).toContain(said);
+  });
+
+  /** At the till: two eggs, a bag but no points card, and stamps from behind the counter, paying in cash. */
+  const PAYS_CASH: ShiftCustomer = {
+    templateId: 'cashier-pays-cash',
+    order: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'stamps', quantity: 1 }],
+    changedFrom: null,
+    checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 1000, changeDue: 160 },
+    voiceSeed: 7,
+  };
+  const PAYS_BY_CARD: ShiftCustomer = {
+    ...PAYS_CASH,
+    templateId: 'cashier-pays',
+    order: [{ itemId: 'eggs', quantity: 2 }],
+    checkout: { bag: false, pointsCard: true, fromBehindTheCounter: null, cashHanded: null, changeDue: null },
+  };
+
+  it.each(LANGUAGE_CODES)('says at the till, in the %s pack, whether they want a bag and have a points card, what they want from behind the counter, and the cash they hand over', async (packId) => {
+    const pack = CULTURE_PACKS[packId];
+    const cash = await customerAtTheCounter(packId, PAYS_CASH);
+    expect(cash.turns).toHaveLength(1);
+    expect(cash.turns[0]).toContain(pack.goods.stamps.name);
+    expect(cash.turns[0]).toContain(formatLocalAmount(1000, packId));
+
+    const card = await customerAtTheCounter(packId, PAYS_BY_CARD);
+    expect(card.turns[0]).not.toContain(pack.goods.stamps.name);
+    // Wanting a bag and not, a points card and not: each is said differently.
+    expect(card.turns[0]).not.toBe(cash.turns[0]);
+  });
+
+  it('says it all again when asked, and reacts to what the cashier did', async () => {
+    const { turns, say } = await customerAtTheCounter('ja', PAYS_CASH);
+    await say('すみません、もう一度お願いします');
+    expect(turns.at(-1)).toBe(turns[0]);
+
+    await say(shiftCustomerServedScene(PAYS_CASH.order, true, CULTURE_PACKS.ja, { bag: true, pointsCard: false, change: 160 }));
+    const thanks = turns.at(-1);
+    const wrong = await customerAtTheCounter('ja', PAYS_CASH);
+    await wrong.say(shiftCustomerServedScene(PAYS_CASH.order, false, CULTURE_PACKS.ja, { bag: false, pointsCard: false, change: 160 }));
+    expect(wrong.turns.at(-1)).not.toBe(thanks);
   });
 
   it('changes their mind once the barista has started on it, and says the new order when asked again', async () => {

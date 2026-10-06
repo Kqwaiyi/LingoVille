@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { createStore, get, keys, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
-import { createSave, weeklyRent, type GameState } from '../sim/index.ts';
+import { createSave, weeklyRent, type GameState, type ShiftCustomer } from '../sim/index.ts';
 import { createSaves, DEV_SETUP, SAVE_SCHEMA_VERSION, SLOT_IDS } from './index.ts';
 
 let databases = 0;
@@ -54,6 +54,7 @@ function lived(): GameState {
           templateId: 'barista-change-of-mind',
           order: [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }],
           changedFrom: [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }],
+          checkout: null,
           voiceSeed: 4242,
         },
       },
@@ -90,12 +91,20 @@ function beforeShifts() {
   return { ...game, progression, possessions: { ...game.possessions, shift: null } };
 }
 
+/** The game before the cashier's till: version 10. A Shift Customer had no checkout. */
+function beforeTill() {
+  const game = lived();
+  const customer: Partial<ShiftCustomer> = { ...game.possessions.shift!.customer! };
+  delete customer.checkout;
+  return { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } } };
+}
+
 /** The game before translated Shift Customers were docked and overwork cost Mood: version 9. */
 function beforeOverwork() {
-  const game = lived();
+  const game = beforeTill();
   const progression: Partial<GameState['progression']> = { ...game.progression };
   delete progression.shiftDays;
-  const shift: Partial<NonNullable<GameState['possessions']['shift']>> = { ...game.possessions.shift! };
+  const shift: Partial<typeof game.possessions.shift> = { ...game.possessions.shift };
   delete shift.translated;
   return { ...game, progression, possessions: { ...game.possessions, shift } };
 }
@@ -299,6 +308,7 @@ describe('saves', () => {
       templateId: 'barista-single-drink',
       order: [{ itemId: 'latte', quantity: 1 }],
       changedFrom: null,
+      checkout: null,
       voiceSeed: 4242,
     });
   });
@@ -313,6 +323,29 @@ describe('saves', () => {
       progression: { ...game.progression, shiftDays: [3] },
       possessions: { ...game.possessions, shift: { ...game.possessions.shift!, translated: 0 } },
     });
+  });
+
+  it('upgrades a save from before the till with no checkout for the Shift Customer at the counter', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 10, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeTill() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('keeps a customer at the till as they were: their shopping, bag, points card, item from behind the counter and cash', async () => {
+    const { saves } = freshSaves();
+    const game = lived();
+    const customer = {
+      templateId: 'cashier-pays-cash',
+      order: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'stamps', quantity: 1 }],
+      changedFrom: null,
+      checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 5, changeDue: 0.6 },
+      voiceSeed: 7,
+    } as const;
+    const atTheTill = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'cashier' as const, customer } } };
+    await saves.write('slot-1', atTheTill);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(atTheTill);
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {

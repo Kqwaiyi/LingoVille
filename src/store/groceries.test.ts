@@ -291,10 +291,14 @@ describe('asking where an item is (#5)', () => {
     expect(selectBasket(s())).toEqual([{ itemId: 'eggs', quantity: 1 }]);
   });
 
-  it('with nothing in the basket, F does nothing more than E', () => {
-    const { s } = inTheSupermarket();
+  it('with nothing in the basket, F asks for work until the Character is a cashier, then does nothing more than E', () => {
+    const { s, store } = inTheSupermarket();
     s().setInteractable('cashier');
     expect(selectTalkWithE(s())?.id).toBe('find-an-item');
+    expect(selectTalkWithF(s())?.id).toBe('ask-cashier-for-work');
+
+    const { game } = s();
+    store.setState({ game: { ...game, possessions: { ...game.possessions, jobsHired: ['cashier'] } } });
     expect(selectTalkWithF(s())).toBeNull();
     s().talk('F');
     expect(selectConversation(s())).toBeNull();
