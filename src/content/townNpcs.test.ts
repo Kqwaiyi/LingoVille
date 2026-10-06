@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
-import { NAMED_NPCS, stopsBetween, TOWN_NPCS, TRAM_LINE, type RoleId } from './index.ts';
+import { NAMED_NPCS, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId } from './index.ts';
 
 /** The NPCs column of the spec's places table. */
 const STAFF_BY_PLACE: Record<PlaceId, RoleId[]> = {
@@ -30,6 +30,12 @@ describe('town NPCs', () => {
     for (const npc of Object.values(NAMED_NPCS)) {
       expect(TOWN_NPCS[npc.id]).toMatchObject({ placeId: npc.placeId, role: npc.role });
     }
+  });
+
+  it('makes everyone but the people waiting for the tram a Named NPC: the staff, the park regulars and the landlord', () => {
+    const named = TOWN_NPC_IDS.filter((npcId) => npcId in NAMED_NPCS);
+    expect(named).toEqual(TOWN_NPC_IDS.filter((npcId) => TOWN_NPCS[npcId].role !== 'passer-by'));
+    expect(named).toEqual(expect.arrayContaining(['park-regular-1', 'park-regular-2', 'park-regular-3']));
   });
 
   it("works the landlord's hours at home, not the home's", () => {

@@ -166,7 +166,8 @@ describe('the nurse, when the Character wakes from Fainting', () => {
     store.getState().leaveConversation();
 
     expect(selectConversation(store.getState())).toBeNull();
-    expect(store.getState().game).toBe(game);
+    // Leaving costs nothing; the NPC only remembers meeting the Character.
+    expect({ ...store.getState().game, people: game.people }).toEqual(game);
     expect(npc.closed).toBe(true);
   });
 

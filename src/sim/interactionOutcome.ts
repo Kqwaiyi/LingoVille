@@ -3,6 +3,7 @@ import type { Basket } from './basket.ts';
 import { stockInventory } from './inventory.ts';
 import { hire, namesMatch } from './jobs.ts';
 import { clampMeter } from './meters.ts';
+import { metNpc } from './npcMemory.ts';
 import { grantExtension, payRent } from './rent.ts';
 import type { GameState, JobId } from './state.ts';
 import { MOOD } from './tuning.ts';
@@ -81,13 +82,22 @@ function applyJobApplication(state: GameState, { jobId, name }: JobApplication):
  * Applies the end of a Goal Interaction. Success validates the completion
  * arguments and checks the Character can afford them (money is never in the
  * prompt), then pays, applies the effect and lifts Mood. Failure dips Mood a
- * little and charges nothing. Abandoning costs nothing.
+ * little and charges nothing. Abandoning costs nothing. A finished conversation,
+ * however it ended, counts as meeting the NPC once more.
  */
 export function applyInteractionOutcome(
   state: GameState,
   interaction: Interaction,
   outcome: InteractionOutcome,
 ): { state: GameState; result: OutcomeResult } {
+  const applied = applyOutcome(state, interaction, outcome);
+  // Success, failure and abandon finish the conversation; anything else lets it go on.
+  const { kind } = applied.result;
+  const finished = kind === 'success' || kind === 'failure' || kind === 'abandon';
+  return finished ? { ...applied, state: metNpc(applied.state, interaction.npcId) } : applied;
+}
+
+function applyOutcome(state: GameState, interaction: Interaction, outcome: InteractionOutcome): { state: GameState; result: OutcomeResult } {
   switch (outcome.kind) {
     case 'abandon':
       return { state, result: { kind: 'abandon' } };

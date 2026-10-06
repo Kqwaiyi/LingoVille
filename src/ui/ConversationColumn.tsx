@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { formatLocalMoney, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { JobId, LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
@@ -361,9 +361,11 @@ export function ConversationColumn() {
   // A Shift Customer is anonymous: just "Customer", and how far into the Shift they come. One already dealt with
   // counts as done while they say goodbye, so they keep their own number until they leave.
   const who = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.subject`) : t('shift.customerSubject');
+  // A Named NPC goes by their local name, with their role beside it.
   const name = npcId
-    ? t(`roles.${TOWN_NPCS[npcId].role}.name`)
+    ? CULTURE_PACKS[packId].personas[npcId].name
     : t('shift.customer', { number: (shift?.done ?? 0) + (conversation.outcome ? 0 : 1), count: shift?.customers ?? 1 });
+  const role = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.name`) : null;
 
   return (
     <aside className="chat-column" aria-label={t('chat.label')}>
@@ -371,6 +373,7 @@ export function ConversationColumn() {
         <div className="chat-who">
           <NpcFace who={who} />
           <span>{name}</span>
+          {role && <span className="chat-role">{role}</span>}
         </div>
         <div className="chat-meta">
           {localPlaceName(conversation.interaction?.placeId ?? placeId, packId)} · {formatClock(minute)}

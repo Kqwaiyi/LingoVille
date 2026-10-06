@@ -44,6 +44,17 @@ describe('buildNpcSession', () => {
     expect(tools[0]).toEqual(INTERACTIONS.orderDrink.toolDeclaration);
   });
 
+  it('plays the persona as the pack localises it: the local name and the local favourite gift', () => {
+    const de = nurseSession('de').systemInstruction;
+    const ja = nurseSession('ja').systemInstruction;
+
+    expect(de).toContain('You are Petra, the nurse');
+    expect(de).toContain('a tin of herbal tea');
+    expect(ja).toContain('You are 高橋, the nurse');
+    expect(ja).toContain('a tin of green tea');
+    expect(ja).not.toContain('herbal');
+  });
+
   it('is pure: the same inputs give the same session', () => {
     expect(baristaSession('de')).toEqual(baristaSession('de'));
   });

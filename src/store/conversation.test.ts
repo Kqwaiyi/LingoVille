@@ -136,7 +136,8 @@ describe('talking to an NPC', () => {
     expect(selectConversation(store.getState())).toBeNull();
     expect(selectTyping(store.getState())).toBe(false);
     expect(fake.closed).toBe(true);
-    expect(store.getState().game).toBe(game);
+    // Leaving costs nothing; the NPC only remembers meeting the Character.
+    expect({ ...store.getState().game, people: game.people }).toEqual(game);
     expect(selectTimeScale(store.getState())).toBe(CLOCK.timeScale.normal);
   });
 
@@ -148,6 +149,7 @@ describe('talking to an NPC', () => {
 
     expect(selectConversation(store.getState())).toBeNull();
     expect(fake.closed).toBe(true);
-    expect(store.getState().game).toBe(game);
+    // Leaving costs nothing; the NPC only remembers meeting the Character.
+    expect({ ...store.getState().game, people: game.people }).toEqual(game);
   });
 });

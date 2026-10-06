@@ -125,7 +125,8 @@ describe('applyInteractionOutcome', () => {
 
     const { state: after, result } = applyInteractionOutcome(state, orderDrink, { kind: 'abandon' });
 
-    expect(after).toBe(state);
+    // Only the NPC remembers it: they have still met the Character.
+    expect({ ...after, people: state.people }).toEqual(state);
     expect(result).toEqual({ kind: 'abandon' });
   });
 });

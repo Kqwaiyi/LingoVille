@@ -190,10 +190,11 @@ function block(heading: string, lines: string[]) {
 }
 
 function personaBlock(npc: NamedNpc, pack: CulturePack) {
-  const { name } = pack.personas[npc.id];
+  const { name, favouriteGift } = pack.personas[npc.id];
   return block('WHO YOU ARE', [
     `You are ${name}, the ${npc.role} at ${workplace(npc).at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
     `You are ${npc.age}: ${npc.temperament}. Quirks: ${npc.quirks}.`,
+    `The gift you would love most is ${favouriteGift}. Don't bring it up yourself.`,
     'Talk like a real, friendly person at work.',
   ]);
 }

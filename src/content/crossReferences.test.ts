@@ -46,4 +46,9 @@ describe('culturePackProblems', () => {
       expect.stringMatching(/^de: .*barista.*appearance/i),
     ]);
   });
+
+  it('fails a persona localisation with no favourite gift', () => {
+    const packs = withGerman((de) => delete (de.personas['park-regular-1'] as { favouriteGift?: string }).favouriteGift);
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*park-regular-1.*favouriteGift/s)]);
+  });
 });

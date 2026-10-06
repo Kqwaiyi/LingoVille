@@ -7,6 +7,8 @@ const READ_BACK = 'ホットラテですね。450円です。よろしいです�
 test('pressing E near the barista opens the chat column, and the barista speaks first', async ({ page }) => {
   await talkToTheBarista(page);
 
+  // The barista goes by their local name in the ja pack, with the role beside it.
+  await expect(column(page).getByText('佐藤', { exact: true })).toBeVisible();
   await expect(column(page).getByText('Barista', { exact: true })).toBeVisible();
   await expect(column(page).getByText(/ほしコーヒー · \d\d:\d\d/)).toBeVisible();
   await expect(column(page).getByRole('tab', { name: 'Chat', selected: true })).toBeVisible();

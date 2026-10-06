@@ -257,7 +257,8 @@ describe('Patience', () => {
 
     store.getState().leaveConversation();
 
-    expect(store.getState().game).toBe(game);
+    // Leaving costs nothing; the NPC only remembers meeting the Character.
+    expect({ ...store.getState().game, people: game.people }).toEqual(game);
     expect(selectClosingCard(store.getState())).toBeNull();
     store.getState().talk();
     expect(selectNpcExpression(store.getState())).toBe('relaxed');
