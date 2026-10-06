@@ -206,15 +206,15 @@ describe('the ward conversation in the Journal', () => {
 });
 
 describe('E on the nurse', () => {
-  it('has nothing to say: only waking from Fainting starts the ward conversation', () => {
+  it('only chats: waking from Fainting is what starts the ward conversation', () => {
     const { store } = starving({ health: METER_MAX, hunger: METER_MAX, thirst: METER_MAX });
     store.getState().enterPlace('clinic');
     store.getState().setInteractable('nurse');
 
     store.getState().talk();
 
-    expect(selectConversation(store.getState())).toBeNull();
-    expect(selectToast(store.getState())).toEqual({ kind: 'nothingToSay', npcId: 'nurse' });
+    expect(selectConversation(store.getState())).toMatchObject({ npcId: 'nurse', interaction: null });
+    expect(selectToast(store.getState())).toBeNull();
   });
 });
 

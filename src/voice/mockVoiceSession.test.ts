@@ -3,14 +3,16 @@ import {
   basketChangedScene,
   buildNpcSession,
   buildShiftCustomerSession,
+  buildSmallTalkSession,
   OUT_OF_PATIENCE_SCENE,
   shiftCustomerChangeScene,
   shiftCustomerServedScene,
   tableServedScene,
+  WRAP_UP_SCENE,
   type ToolResponse,
 } from '../ai/index.ts';
 import { CULTURE_PACKS, formatLocalAmount, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
-import { LANGUAGE_CODES, type ApproachId, type LanguageCode, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
+import { LANGUAGE_CODES, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
@@ -601,6 +603,88 @@ describe('mock VoiceSession: asking the barista for work (#26)', () => {
 
   it('calls not_understood for gibberish', async () => {
     const { toolCalls, say } = await hiring('de');
+    await say('xqzt');
+    expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
+  });
+});
+
+const STRANGER: NpcMemory = {
+  familiarity: 0,
+  todaysGain: { day: 2, amount: 0 },
+  timesMet: 0,
+  knowsName: false,
+  usualOrder: null,
+  lastTopic: null,
+  favouriteKnown: false,
+  lastGiftDay: null,
+  registerOffered: false,
+};
+
+describe('mock VoiceSession: Small Talk', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  async function chatting(packId: LanguageCode) {
+    const heard = listen();
+    const npcSession = buildSmallTalkSession(CULTURE_PACKS[packId], 'A1', NAMED_NPCS['park-regular-1'], {
+      clock: { day: 2, minuteOfDay: 600 },
+      relationship: { memory: STRANGER, characterName: 'Sam' },
+    });
+    const session = openMockVoiceSession(npcSession, heard.events);
+    await session.connect();
+    await vi.runAllTimersAsync();
+    const say = async (text: string) => {
+      session.sendText(text);
+      await vi.runAllTimersAsync();
+    };
+    const answer = async (response: ToolResponse) => {
+      session.sendToolResponse(heard.toolCalls.at(-1)!.id, response);
+      await vi.runAllTimersAsync();
+    };
+    return { ...heard, say, answer };
+  }
+
+  it.each(LANGUAGE_CODES)('greets first and chats back about anything it understands in the %s pack', async (packId) => {
+    const { turns, toolCalls, say } = await chatting(packId);
+    const line = { ja: 'いい天気ですね', zh: '今天天气很好', en: 'Yes, lovely weather', de: 'Ja, schönes Wetter' }[packId];
+
+    await say(line);
+    await say(line);
+
+    expect(turns).toHaveLength(3);
+    expect(turns[1]).not.toBe(turns[2]);
+    expect(toolCalls).toEqual([]);
+  });
+
+  it('calls learn_name with the name it heard, and greets them by it once it is right', async () => {
+    const { turns, toolCalls, say, answer } = await chatting('en');
+
+    await say('My name is Sam.');
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'learn_name', args: { name: 'Sam' } }]);
+    await answer({ result: 'learned' });
+
+    expect(turns.at(-1)).toContain('Sam');
+  });
+
+  it('asks the name again when the sim says it was misheard', async () => {
+    const { turns, say, answer } = await chatting('ja');
+
+    await say('私の名前はパムです');
+    await answer({ result: 'wrong_name' });
+
+    expect(turns.at(-1)).toMatch(/名前/);
+  });
+
+  it('says goodbye when a scene tells it to wrap up', async () => {
+    const { turns, say } = await chatting('de');
+
+    await say(WRAP_UP_SCENE);
+
+    expect(turns.at(-1)).toMatch(/tschüss/i);
+  });
+
+  it('calls not_understood for gibberish', async () => {
+    const { toolCalls, say } = await chatting('zh');
     await say('xqzt');
     expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
   });

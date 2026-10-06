@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FAMILIARITY,
   isOutOfPatience,
   isUnreadableTranscript,
   losePatience,
@@ -25,6 +26,14 @@ describe('Patience', () => {
 
     expect(isOutOfPatience(afterUnintelligibleTurns(start, startingPatience - 1))).toBe(false);
     expect(isOutOfPatience(afterUnintelligibleTurns(start, startingPatience))).toBe(true);
+  });
+
+  it('has one more for a friend, and the same as anyone for an acquaintance', () => {
+    const { startingPatience } = PROFICIENCY_STEP_TABLE.B1;
+
+    expect(startPatience('B1', 'friend').left).toBe(startingPatience + FAMILIARITY.friendPatienceBonus);
+    expect(startPatience('B1', 'acquaintance').left).toBe(startingPatience);
+    expect(npcExpression(startPatience('B1', 'friend'))).toBe('relaxed');
   });
 
   it('costs at most one per player turn, however many times that turn is not understood', () => {

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
-import { CLOCK, LANGUAGE_CODES, PROFICIENCY_STEPS, type ApproachId, type LanguageCode, type ProficiencyStep, type RentStatement } from '../sim/index.ts';
-import { buildNpcSession, GREETING_SCENE } from './index.ts';
+import {
+  CLOCK,
+  FAMILIARITY,
+  LANGUAGE_CODES,
+  PROFICIENCY_STEPS,
+  type ApproachId,
+  type LanguageCode,
+  type NpcMemory,
+  type ProficiencyStep,
+  type RentStatement,
+} from '../sim/index.ts';
+import { buildNpcSession, buildSmallTalkSession, GREETING_SCENE, LEARN_NAME_TOOL, WRAP_UP_SCENE } from './index.ts';
 
 const FIRST_MORNING_CLOCK = { day: 1, minuteOfDay: CLOCK.wakeAt + 12 };
 
@@ -40,7 +50,7 @@ describe('buildNpcSession', () => {
   it("offers the interaction's completion function and not_understood as tools", () => {
     const { tools } = baristaSession('en');
 
-    expect(tools.map((tool) => tool.name)).toEqual(['serve_order', 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['serve_order', LEARN_NAME_TOOL, 'not_understood']);
     expect(tools[0]).toEqual(INTERACTIONS.orderDrink.toolDeclaration);
   });
 
@@ -81,8 +91,8 @@ describe('buildNpcSession: an NPC who starts the conversation', () => {
     expect(systemInstruction).toContain('patient');
   });
 
-  it('offers discharge_patient and not_understood as tools', () => {
-    expect(nurseSession('zh').tools.map((tool) => tool.name)).toEqual(['discharge_patient', 'not_understood']);
+  it('offers discharge_patient, learn_name and not_understood as tools', () => {
+    expect(nurseSession('zh').tools.map((tool) => tool.name)).toEqual(['discharge_patient', LEARN_NAME_TOOL, 'not_understood']);
   });
 });
 
@@ -116,7 +126,7 @@ describe('buildNpcSession: the supermarket and convenience store', () => {
   it('has the cashier read back the total, the bag and the points card before taking payment', () => {
     const { systemInstruction, tools } = tillSession('en');
     expect(systemInstruction).toMatch(/read back the total.*bag.*points card/i);
-    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', LEARN_NAME_TOOL, 'not_understood']);
   });
 
   it('works at Brooks Supermarket and the corner shop, by their local names', () => {
@@ -129,7 +139,7 @@ describe('buildNpcSession: the supermarket and convenience store', () => {
     const { systemInstruction, tools } = shelvesSession('de');
     expect(systemInstruction).toContain('Eier (shelf id "eggs")');
     expect(systemInstruction).toMatch(/check.*which item/i);
-    expect(tools.map((tool) => tool.name)).toEqual(['point_to', 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['point_to', LEARN_NAME_TOOL, 'not_understood']);
   });
 
   it('says the convenience store never closes', () => {
@@ -170,8 +180,8 @@ describe('buildNpcSession: the landlord', () => {
   });
 
   it('offers accept_rent, or grant_extension for more time', () => {
-    expect(landlordSession(INTERACTIONS.payRent, 'de').tools.map((tool) => tool.name)).toEqual(['accept_rent', 'not_understood']);
-    expect(landlordSession(INTERACTIONS.askForMoreTime, 'de').tools.map((tool) => tool.name)).toEqual(['grant_extension', 'not_understood']);
+    expect(landlordSession(INTERACTIONS.payRent, 'de').tools.map((tool) => tool.name)).toEqual(['accept_rent', LEARN_NAME_TOOL, 'not_understood']);
+    expect(landlordSession(INTERACTIONS.askForMoreTime, 'de').tools.map((tool) => tool.name)).toEqual(['grant_extension', LEARN_NAME_TOOL, 'not_understood']);
   });
 
   it('catches the tenant in the hallway, speaking first, when rent is due', () => {
@@ -231,5 +241,131 @@ describe('buildNpcSession: the restaurant', () => {
     expect(systemInstruction).toContain(`${CULTURE_PACKS.ja.restaurant.name}, a restaurant`);
     expect(systemInstruction).toMatch(/ask for work as a server/);
     expect(tools.map((tool) => tool.name)).toEqual(['hire_applicant', 'not_understood']);
+  });
+});
+
+const STRANGER: NpcMemory = {
+  familiarity: 0,
+  todaysGain: { day: 1, amount: 0 },
+  timesMet: 0,
+  knowsName: false,
+  usualOrder: null,
+  lastTopic: null,
+  favouriteKnown: false,
+  lastGiftDay: null,
+  registerOffered: false,
+};
+const FRIEND: NpcMemory = {
+  ...STRANGER,
+  familiarity: FAMILIARITY.tierThresholds.friend,
+  timesMet: 14,
+  knowsName: true,
+  lastTopic: 'their trip to the seaside',
+  favouriteKnown: true,
+};
+
+function youAndThisPerson(systemInstruction: string) {
+  return systemInstruction.slice(systemInstruction.indexOf('YOU AND THIS PERSON'), systemInstruction.indexOf('LANGUAGE RULES'));
+}
+
+function baristaWho(memory: NpcMemory) {
+  return buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS.en, 'B1', NAMED_NPCS.barista, {
+    clock: FIRST_MORNING_CLOCK,
+    relationship: { memory, characterName: 'Sam' },
+  }).systemInstruction;
+}
+
+describe('buildNpcSession: you and this person', () => {
+  it('treats a stranger as one', () => {
+    expect(youAndThisPerson(baristaWho(STRANGER))).toMatchSnapshot();
+  });
+
+  it('treats a friend as one, by name, following up on the last topic', () => {
+    expect(youAndThisPerson(baristaWho(FRIEND))).toMatchSnapshot();
+  });
+
+  it('is the stranger default with no NPC Memory', () => {
+    const none = buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS.en, 'B1', NAMED_NPCS.barista, { clock: FIRST_MORNING_CLOCK });
+
+    expect(youAndThisPerson(none.systemInstruction)).toBe(youAndThisPerson(baristaWho(STRANGER)));
+  });
+
+  it('greets the Character by name from acquaintance up, once the name is known', () => {
+    const acquaintance = { ...STRANGER, familiarity: FAMILIARITY.tierThresholds.acquaintance };
+
+    expect(youAndThisPerson(baristaWho({ ...acquaintance, knowsName: true }))).toMatch(/by name: Sam/);
+    expect(youAndThisPerson(baristaWho(acquaintance))).not.toContain('Sam');
+    expect(youAndThisPerson(baristaWho({ ...STRANGER, knowsName: true }))).not.toMatch(/by name/);
+  });
+
+  it('follows up on the last topic only from acquaintance up', () => {
+    const topic = { ...STRANGER, lastTopic: 'the rain' };
+
+    expect(baristaWho({ ...topic, familiarity: FAMILIARITY.tierThresholds.acquaintance })).toContain('the rain');
+    expect(baristaWho(topic)).not.toContain('the rain');
+  });
+
+  it('asks the NPC to call learn_name when they are told the name they did not know', () => {
+    expect(youAndThisPerson(baristaWho(STRANGER))).toContain(LEARN_NAME_TOOL);
+    expect(youAndThisPerson(baristaWho(FRIEND))).not.toContain(LEARN_NAME_TOOL);
+  });
+
+  it("has someone the NPC knows ask their name when hiring, with no learn_name to call", () => {
+    const acquaintance = { ...STRANGER, familiarity: FAMILIARITY.tierThresholds.acquaintance };
+    const { systemInstruction } = buildNpcSession(INTERACTIONS.askBaristaForWork, CULTURE_PACKS.en, 'A1', NAMED_NPCS.barista, {
+      clock: FIRST_MORNING_CLOCK,
+      relationship: { memory: acquaintance, characterName: 'Sam' },
+    });
+
+    expect(youAndThisPerson(systemInstruction)).toContain('asking for it is part of hiring them');
+    expect(systemInstruction).not.toContain(LEARN_NAME_TOOL);
+  });
+
+  it("doesn't offer learn_name when hiring, which takes the name itself", () => {
+    const { tools } = buildNpcSession(INTERACTIONS.askBaristaForWork, CULTURE_PACKS.en, 'A1', NAMED_NPCS.barista, {
+      clock: FIRST_MORNING_CLOCK,
+    });
+
+    expect(tools.map((tool) => tool.name)).not.toContain(LEARN_NAME_TOOL);
+  });
+});
+
+function smallTalk(npcId: keyof typeof NAMED_NPCS, memory: NpcMemory = STRANGER, packId: LanguageCode = 'en') {
+  return buildSmallTalkSession(CULTURE_PACKS[packId], 'A2', NAMED_NPCS[npcId], {
+    clock: FIRST_MORNING_CLOCK,
+    relationship: { memory, characterName: 'Sam' },
+  });
+}
+
+describe('buildSmallTalkSession', () => {
+  it('builds Small Talk with a park regular who is a stranger', () => {
+    expect(smallTalk('park-regular-1')).toMatchSnapshot();
+  });
+
+  it('builds Small Talk with a barista who is a friend', () => {
+    expect(smallTalk('barista', FRIEND, 'ja')).toMatchSnapshot();
+  });
+
+  it('has no completion function: only learn_name and not_understood', () => {
+    expect(smallTalk('barista').tools.map((tool) => tool.name)).toEqual([LEARN_NAME_TOOL, 'not_understood']);
+  });
+
+  it('points a stated goal to the counter instead of switching to it', () => {
+    expect(smallTalk('barista').systemInstruction).toMatch(/come to the counter/);
+  });
+
+  it('wraps up only when a scene says so', () => {
+    expect(smallTalk('park-regular-2').systemInstruction).toMatch(/Don't end the chat yourself/);
+    expect(WRAP_UP_SCENE).toMatch(/^\[SCENE: .*goodbye.*\]$/);
+  });
+
+  it('meets every Named NPC where they are, by its local name', () => {
+    for (const npcId of Object.keys(NAMED_NPCS) as (keyof typeof NAMED_NPCS)[]) expect(() => smallTalk(npcId)).not.toThrow();
+    expect(smallTalk('park-regular-1').systemInstruction).toContain('one of the regulars at Victoria Park');
+    expect(smallTalk('doctor').systemInstruction).not.toContain('ward');
+  });
+
+  it('opens with the Character walking up, so the NPC speaks first', () => {
+    expect(smallTalk('shopkeeper').openingScene).toMatch(/^\[SCENE: /);
   });
 });

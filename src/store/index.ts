@@ -45,6 +45,7 @@ export {
   selectReadingAids,
   selectReconnecting,
   selectRecap,
+  selectSmallTalkKey,
   selectSavedCount,
   selectScreen,
   selectSetup,

@@ -243,6 +243,10 @@ export const de: UiStrings = {
     cook: '<kbd>E</kbd> drücken, um eine Mahlzeit zu kochen',
     sleep: '<kbd>E</kbd> drücken, um ins Bett zu gehen',
     talk: '<kbd>E</kbd> drücken, um zu sprechen — {{role}}',
+    /** Small Talk with someone who has no other conversation. */
+    chat: '<kbd>E</kbd> drücken, um zu plaudern — {{role}}',
+    /** Small Talk with staff, beside their E. */
+    chatWithT: '<kbd>T</kbd> drücken, um zu plaudern',
     tram: '<kbd>E</kbd> drücken, um die Straßenbahn zu nehmen',
     noTram: 'Keine Straßenbahn fährt · Straßenbahnen fahren {{opens}}–{{closes}}',
     take: '<kbd>E</kbd> drücken, um {{item}} zu nehmen · {{price}}',
@@ -371,6 +375,8 @@ export const de: UiStrings = {
   closing: {
     label: 'Gespräch beendet',
     success: 'Geschafft!',
+    /** Small Talk is over. It can't fail. */
+    smallTalk: 'Nettes Gespräch!',
     notUnderstood: '{{who}} hat dich nicht verstanden',
     noCharge: 'Nichts bezahlt',
     pointedTo: '{{item}}: im Regal markiert',
@@ -416,6 +422,7 @@ export const de: UiStrings = {
     label: 'Tagebuchseite',
     customer: 'Kunde {{number}}',
     shift: 'Schicht — {{job}}',
+    smallTalk: 'Plauderei — {{who}}',
     when: 'Tag {{day}} · {{time}}',
     noHelpNeeded: 'Ohne Hilfe',
     corrections: 'Korrekturen',

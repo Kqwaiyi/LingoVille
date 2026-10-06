@@ -1,4 +1,5 @@
-import { PATIENCE, PROFICIENCY_STEP_TABLE, type ProficiencyStep } from './tuning.ts';
+import type { FamiliarityTier } from './familiarity.ts';
+import { FAMILIARITY, PATIENCE, PROFICIENCY_STEP_TABLE, type ProficiencyStep } from './tuning.ts';
 
 /**
  * An NPC's hidden Patience in one Goal Interaction: how many more turns it will
@@ -17,8 +18,9 @@ export type Patience = {
 /** A placeholder for the NPC's face, the only way Patience shows. Real faces come in ticket 30. */
 export type NpcExpression = 'relaxed' | 'puzzled' | 'strained';
 
-export function startPatience(step: ProficiencyStep): Patience {
-  const starting = PROFICIENCY_STEP_TABLE[step].startingPatience;
+/** Patience at the start of a conversation: from the step table, and one more with a friend. */
+export function startPatience(step: ProficiencyStep, tier: FamiliarityTier = 'stranger'): Patience {
+  const starting = PROFICIENCY_STEP_TABLE[step].startingPatience + (tier === 'friend' ? FAMILIARITY.friendPatienceBonus : 0);
   return { left: starting, starting, spentThisTurn: false, turnsNotUnderstood: 0 };
 }
 

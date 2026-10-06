@@ -71,6 +71,8 @@ export type CulturePack = {
   hospital: { name: string; nameGlosses: Glosses };
   /** The apartment block the Character lives in, by its local name: where the landlord is. */
   apartments: { name: string; nameGlosses: Glosses };
+  /** The other places Named NPCs are found, by their local names. */
+  townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses }>;
   /** Persona localisations: each Named NPC's local name, and their favourite gift as a local would give it (in English, as the prompt reads it). */
   personas: Record<NamedNpcId, { name: string; favouriteGift: string }>;
   appearances: {
@@ -135,6 +137,7 @@ export function culturePackSchema(packId: LanguageCode) {
     restaurant: shop,
     hospital: z.object({ name: text, nameGlosses: glosses }),
     apartments: z.object({ name: text, nameGlosses: glosses }),
+    townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses })),
     personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
     appearances: z.object({
       npcs: z.record(z.string(), z.enum(APPEARANCE_PRESET_IDS)),
@@ -240,6 +243,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { zh: '绿树综合医院', en: 'Midori General Hospital', de: 'Allgemeines Krankenhaus Midori' },
     },
     apartments: { name: 'さくら荘', nameGlosses: { zh: '樱花庄', en: 'Sakura House', de: 'Haus Sakura' } },
+    townPlaces: {
+      park: { name: '桜ヶ丘公園', nameGlosses: { zh: '樱丘公园', en: 'Sakuragaoka Park', de: 'Sakuragaoka-Park' } },
+      bookshop: { name: 'ひだまり書店', nameGlosses: { zh: '向阳书店', en: 'Hidamari Books', de: 'Buchhandlung Hidamari' } },
+      bathhouse: { name: '松の湯', nameGlosses: { zh: '松之汤', en: 'Matsu-no-yu Bathhouse', de: 'Badehaus Matsu-no-yu' } },
+      'town-office': { name: '南町役場', nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' } },
+    },
     personas: {
       landlord: { name: '山本', favouriteGift: 'a box of seasonal wagashi from the old sweet shop' },
       barista: { name: '佐藤', favouriteGift: 'a bag of single-origin coffee beans' },
@@ -371,6 +380,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: '緑城病院', en: 'Green City Hospital', de: 'Krankenhaus Grünstadt' },
     },
     apartments: { name: '幸福公寓', nameGlosses: { ja: '幸福アパート', en: 'Happiness Apartments', de: 'Wohnhaus Glück' } },
+    townPlaces: {
+      park: { name: '人民公园', nameGlosses: { ja: '人民公園', en: 'People’s Park', de: 'Volkspark' } },
+      bookshop: { name: '书香书店', nameGlosses: { ja: '書香書店', en: 'Book Fragrance Bookshop', de: 'Buchhandlung Bücherduft' } },
+      bathhouse: { name: '清泉浴池', nameGlosses: { ja: '清泉浴場', en: 'Clear Spring Bathhouse', de: 'Badehaus Klarquelle' } },
+      'town-office': { name: '街道办事处', nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' } },
+    },
     personas: {
       landlord: { name: '刘阿姨', favouriteGift: 'a jar of good honey' },
       barista: { name: '小李', favouriteGift: 'a bag of Yunnan coffee beans' },
@@ -504,6 +519,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: 'セント・メアリー病院', zh: '圣玛丽医院', de: 'St.-Marien-Krankenhaus' },
     },
     apartments: { name: 'Rosewood House', nameGlosses: { ja: 'ローズウッド・ハウス', zh: '玫瑰木公寓', de: 'Rosewood House' } },
+    townPlaces: {
+      park: { name: 'Victoria Park', nameGlosses: { ja: 'ヴィクトリア公園', zh: '维多利亚公园', de: 'Victoria Park' } },
+      bookshop: { name: 'The Book Nook', nameGlosses: { ja: 'ブック・ヌック', zh: '书角书店', de: 'Bücherecke' } },
+      bathhouse: { name: 'Riverside Baths', nameGlosses: { ja: 'リバーサイド浴場', zh: '河畔浴场', de: 'Flussbad' } },
+      'town-office': { name: 'Town Hall', nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' } },
+    },
     personas: {
       landlord: { name: 'Mrs Hughes', favouriteGift: 'a packet of seeds for the hallway plants' },
       barista: { name: 'Jess', favouriteGift: 'a bag of single-origin coffee beans' },
@@ -645,6 +666,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: '公園前総合病院', zh: '公园医院', en: 'Park Hospital' },
     },
     apartments: { name: 'Haus Lindenhof', nameGlosses: { ja: 'リンデンホーフ荘', zh: '椴树庭公寓', en: 'Lindenhof House' } },
+    townPlaces: {
+      park: { name: 'Stadtpark', nameGlosses: { ja: '市立公園', zh: '城市公园', en: 'City Park' } },
+      bookshop: { name: 'Buchhandlung Seitenweise', nameGlosses: { ja: 'ザイテンヴァイゼ書店', zh: '页页书店', en: 'Seitenweise Bookshop' } },
+      bathhouse: { name: 'Stadtbad', nameGlosses: { ja: '市営浴場', zh: '市立浴场', en: 'Town Baths' } },
+      'town-office': { name: 'Bürgeramt', nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' } },
+    },
     personas: {
       landlord: { name: 'Frau Becker', favouriteGift: 'a potted geranium for the window box' },
       barista: { name: 'Lena', favouriteGift: 'a bag of single-origin coffee beans' },
@@ -696,10 +723,16 @@ export function localShop(placeId: PlaceId, packId: LanguageCode): Shop | null {
   return null;
 }
 
-/** A staffed place by its local name in this pack, as the Journal keeps it: a shop, the hospital, or the apartment block. */
+/** The places Named NPCs are found that are neither a shop, the hospital nor the apartment block. */
+export const TOWN_PLACE_IDS = ['park', 'bookshop', 'bathhouse', 'town-office'] as const satisfies readonly PlaceId[];
+export type TownPlaceId = (typeof TOWN_PLACE_IDS)[number];
+const isTownPlace = (placeId: PlaceId): placeId is TownPlaceId => (TOWN_PLACE_IDS as readonly PlaceId[]).includes(placeId);
+
+/** A staffed place by its local name in this pack, as the Journal keeps it: a shop, the hospital, the apartment block, or another place Named NPCs are found. */
 export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
   if (placeId === 'clinic') return CULTURE_PACKS[packId].hospital.name;
   if (placeId === 'home') return CULTURE_PACKS[packId].apartments.name;
+  if (isTownPlace(placeId)) return CULTURE_PACKS[packId].townPlaces[placeId].name;
   const shop = localShop(placeId, packId);
   if (shop) return shop.name;
   throw new Error(`The ${placeId} has no local name in the ${packId} pack`);

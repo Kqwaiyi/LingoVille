@@ -2,6 +2,7 @@ import type { Interaction, JobApplication, OrderLine, RentChange, ServedItem } f
 import type { Basket } from './basket.ts';
 import { stockInventory } from './inventory.ts';
 import { hire, namesMatch } from './jobs.ts';
+import { goalInteractionFamiliarity } from './familiarity.ts';
 import { clampMeter } from './meters.ts';
 import { metNpc } from './npcMemory.ts';
 import { grantExtension, payRent } from './rent.ts';
@@ -83,7 +84,8 @@ function applyJobApplication(state: GameState, { jobId, name }: JobApplication):
  * arguments and checks the Character can afford them (money is never in the
  * prompt), then pays, applies the effect and lifts Mood. Failure dips Mood a
  * little and charges nothing. Abandoning costs nothing. A finished conversation,
- * however it ended, counts as meeting the NPC once more.
+ * however it ended, counts as meeting the NPC once more, and a success makes them
+ * a little more familiar.
  */
 export function applyInteractionOutcome(
   state: GameState,
@@ -94,7 +96,9 @@ export function applyInteractionOutcome(
   // Success, failure and abandon finish the conversation; anything else lets it go on.
   const { kind } = applied.result;
   const finished = kind === 'success' || kind === 'failure' || kind === 'abandon';
-  return finished ? { ...applied, state: metNpc(applied.state, interaction.npcId) } : applied;
+  if (!finished) return applied;
+  const met = metNpc(applied.state, interaction.npcId);
+  return { ...applied, state: kind === 'success' ? goalInteractionFamiliarity(met, interaction.npcId) : met };
 }
 
 function applyOutcome(state: GameState, interaction: Interaction, outcome: InteractionOutcome): { state: GameState; result: OutcomeResult } {

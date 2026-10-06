@@ -208,7 +208,8 @@ export const MOOD = {
     goalInteractionSuccess: 4,
     /** Always a smaller dip than the success boost, so trying is worth it. */
     goalInteractionFailure: -2,
-    smallTalkExchange: 2,
+    /** Per understood Small Talk exchange, by Familiarity tier: more the better the NPC knows the Character. */
+    smallTalkExchange: { stranger: 2, acquaintance: 3, friend: 4 },
     sleep: 5,
     bathhouse: 8,
     gymSession: 4,
@@ -270,6 +271,13 @@ export const FAMILIARITY = {
   giftCooldownDays: 7,
   usualOrderAfterIdenticalOrders: 3,
   friendPatienceBonus: 1,
+} as const;
+
+// --- Small Talk -------------------------------------------------------------
+
+export const SMALL_TALK = {
+  /** The NPC wraps up after this many player turns, drawn from the save's RNG when the chat starts. */
+  exchanges: { min: 6, max: 8 },
 } as const;
 
 // --- Illness and food (default: open question 5) ----------------------------

@@ -7,6 +7,7 @@ import {
   selectInteractable,
   selectNativeLanguage,
   selectShelf,
+  selectSmallTalkKey,
   selectStaffDoor,
   selectTalkWithE,
   selectTalkWithF,
@@ -27,7 +28,10 @@ const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askFor
   hire: 'prompt.askForWork',
 };
 
-/** "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second conversation on F. */
+/**
+ * "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second
+ * conversation on F. A Named NPC with nothing else to talk about chats on E; staff chat on T.
+ */
 export function InteractionPrompt() {
   const { t } = useTranslation();
   const interactable = useGame(selectInteractable);
@@ -38,6 +42,7 @@ export function InteractionPrompt() {
   const staffDoor = useGame(selectStaffDoor);
   const talkWithE = useGame(selectTalkWithE);
   const talkWithF = useGame(selectTalkWithF);
+  const smallTalkKey = useGame(selectSmallTalkKey);
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
   const talking = useGame(selectConversation) !== null;
@@ -59,6 +64,7 @@ export function InteractionPrompt() {
       if (e.repeat) return;
       // Ctrl+F stays the browser's find.
       if (e.code === 'KeyF' && talkWithF && !e.ctrlKey && !e.metaKey) return talk('F');
+      if (e.code === 'KeyT' && smallTalkKey === 'T' && !e.ctrlKey && !e.metaKey) return talk('T');
       if (e.code !== 'KeyE') return;
       if (interactable === 'tap') drinkWater();
       else if (interactable === 'stove') cook();
@@ -70,7 +76,7 @@ export function InteractionPrompt() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, drinkWater, cook, sleep, openTram, takeFromShelf, startShift, talk]);
+  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, smallTalkKey, drinkWater, cook, sleep, openTram, takeFromShelf, startShift, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -109,7 +115,7 @@ export function InteractionPrompt() {
       ) : (
         <>
           <Trans
-            i18nKey={talkWithE?.effect.kind === 'purchase' ? 'prompt.pay' : 'prompt.talk'}
+            i18nKey={talkWithE?.effect.kind === 'purchase' ? 'prompt.pay' : smallTalkKey === 'E' ? 'prompt.chat' : 'prompt.talk'}
             values={{ role: t(`roles.${TOWN_NPCS[interactable as TownNpcId].role}.name`) }}
             components={{ kbd: <kbd /> }}
           />
@@ -117,6 +123,12 @@ export function InteractionPrompt() {
             <>
               {' · '}
               <Trans i18nKey={F_PROMPTS[talkWithF.effect.kind] ?? 'prompt.ask'} components={{ kbd: <kbd /> }} />
+            </>
+          )}
+          {smallTalkKey === 'T' && (
+            <>
+              {' · '}
+              <Trans i18nKey="prompt.chatWithT" components={{ kbd: <kbd /> }} />
             </>
           )}
         </>

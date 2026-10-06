@@ -243,6 +243,10 @@ export const ja: UiStrings = {
     cook: '<kbd>E</kbd> で料理する',
     sleep: '<kbd>E</kbd> で寝る',
     talk: '<kbd>E</kbd> で話しかける — {{role}}',
+    /** Small Talk with someone who has no other conversation. */
+    chat: '<kbd>E</kbd> で世間話をする — {{role}}',
+    /** Small Talk with staff, beside their E. */
+    chatWithT: '<kbd>T</kbd> で世間話をする',
     tram: '<kbd>E</kbd> で路面電車に乗る',
     noTram: '路面電車は運行していません · 運行時間 {{opens}}–{{closes}}',
     take: '<kbd>E</kbd> で{{item}}を取る · {{price}}',
@@ -371,6 +375,8 @@ export const ja: UiStrings = {
   closing: {
     label: '会話終了',
     success: 'できた！',
+    /** Small Talk is over. It can't fail. */
+    smallTalk: '楽しくおしゃべりしました！',
     notUnderstood: '{{who}}に伝わりませんでした',
     noCharge: '支払いなし',
     pointedTo: '{{item}}：棚に印をつけました',
@@ -416,6 +422,7 @@ export const ja: UiStrings = {
     label: '日記のページ',
     customer: 'お客さん {{number}}',
     shift: 'シフト — {{job}}',
+    smallTalk: '世間話 — {{who}}',
     when: '{{day}}日目 · {{time}}',
     noHelpNeeded: 'ヘルプなし',
     corrections: '直し',

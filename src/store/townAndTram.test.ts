@@ -53,12 +53,12 @@ describe('walking around town', () => {
     expect(selectInteractable(store.getState())).toBeNull();
   });
 
-  it('says so when staff have nothing to talk about yet, and opens no conversation', () => {
+  it('chats with staff who have nothing else to talk about yet', () => {
     const store = playingAt(BOOKSHOP.opensAt, 'bookshop');
     store.getState().setInteractable('shopkeeper');
     store.getState().talk();
-    expect(selectToast(store.getState())).toEqual({ kind: 'nothingToSay', npcId: 'shopkeeper' });
-    expect(store.getState().conversation).toBeNull();
+    expect(selectToast(store.getState())).toBeNull();
+    expect(store.getState().conversation).toMatchObject({ npcId: 'shopkeeper', interaction: null });
   });
 });
 

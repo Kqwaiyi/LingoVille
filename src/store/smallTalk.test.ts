@@ -1,0 +1,346 @@
+import 'fake-indexeddb/auto';
+import { createStore } from 'idb-keyval';
+import { describe, expect, it } from 'vitest';
+import { LEARN_NAME_TOOL, WRAP_UP_SCENE, type NpcSession, type Recap, type RecapRequest, type ToolResponse } from '../ai/index.ts';
+import { INTERACTIONS, placeHours, type TownNpcId } from '../content/index.ts';
+import { createSave, FAMILIARITY, memoryOf, MOOD, type GameState, type NpcMemory } from '../sim/index.ts';
+import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
+import {
+  createGameStore,
+  createJournal,
+  DEV_SETUP,
+  selectClosingCard,
+  selectConversation,
+  selectSmallTalkKey,
+  selectToast,
+  type GameStoreDeps,
+} from './index.ts';
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+let databases = 0;
+
+/** A store whose NPC the test speaks for, recording what the store sends it and answers its tool calls with. */
+function town(game: GameState = createSave(DEV_SETUP)) {
+  const npc = {
+    session: null as NpcSession | null,
+    events: null as VoiceSessionEvents | null,
+    sent: [] as string[],
+    answers: [] as ToolResponse[],
+    says(text: string) {
+      npc.events!.onOutputTranscript(text);
+      npc.events!.onTurnComplete();
+    },
+    calls(name: string, args: unknown) {
+      npc.events!.onToolCall({ id: `call-${npc.answers.length}`, name, args });
+    },
+  };
+  const openVoiceSession: OpenVoiceSession = (session, events) => {
+    npc.session = session;
+    npc.events = events;
+    return {
+      connect: async () => {},
+      startTalking: () => {},
+      stopTalking: () => {},
+      sendText: (text) => npc.sent.push(text),
+      sendToolResponse: (_, response) => npc.answers.push(response),
+      close: () => {},
+    };
+  };
+  const recaps: { request: RecapRequest; arrives: (recap: Recap) => Promise<void> }[] = [];
+  const requestRecap: GameStoreDeps['requestRecap'] = (request) =>
+    new Promise((resolve) => {
+      recaps.push({
+        request,
+        arrives: async (recap) => {
+          resolve(recap);
+          await flush();
+          await flush();
+        },
+      });
+    });
+  const journal = createJournal(() => createStore(`small-talk-test-${++databases}`, 'entries'));
+  const store = createGameStore(game, { openVoiceSession, requestRecap, journal });
+  return { store, npc, recaps, journal };
+}
+
+function nextTo(npcId: TownNpcId, placeId: GameState['placeId'], game?: GameState) {
+  const setup = town(game);
+  setup.store.getState().enterPlace(placeId);
+  setup.store.getState().setInteractable(npcId);
+  return setup;
+}
+
+describe('starting Small Talk', () => {
+  it('starts with E on a Named NPC who has nothing else to talk about', () => {
+    const { store, npc } = nextTo('park-regular-1', 'park');
+
+    expect(selectSmallTalkKey(store.getState())).toBe('E');
+    store.getState().talk('E');
+
+    expect(selectConversation(store.getState())).toMatchObject({ npcId: 'park-regular-1', interaction: null });
+    expect(npc.session?.tools.map((tool) => tool.name)).toEqual([LEARN_NAME_TOOL, 'not_understood']);
+  });
+
+  it('starts with T on staff, whose E is still their Goal Interaction', () => {
+    const { store, npc } = nextTo('barista', 'cafe');
+
+    expect(selectSmallTalkKey(store.getState())).toBe('T');
+    store.getState().talk('T');
+
+    expect(selectConversation(store.getState())).toMatchObject({ npcId: 'barista', interaction: null });
+    expect(npc.session?.systemInstruction).toContain('This is Small Talk');
+  });
+
+  it('still orders with E at the barista', () => {
+    const { store } = nextTo('barista', 'cafe');
+
+    store.getState().talk('E');
+
+    expect(selectConversation(store.getState())?.interaction).toBe(INTERACTIONS.orderDrink);
+  });
+
+  it("doesn't chat with the cashier while the Character is carrying shopping: E pays", () => {
+    const opening = createSave(DEV_SETUP);
+    const { opensAt } = placeHours('supermarket', DEV_SETUP.culturePackId)!;
+    const { store } = nextTo('cashier', 'supermarket', { ...opening, clock: { ...opening.clock, minuteOfDay: opensAt + 60 } });
+    expect(selectSmallTalkKey(store.getState())).toBe('T');
+    store.getState().setInteractable('eggs');
+    store.getState().takeFromShelf();
+    store.getState().setInteractable('cashier');
+
+    expect(store.getState().basket).not.toEqual([]);
+    expect(selectSmallTalkKey(store.getState())).toBeNull();
+  });
+
+  it('has nothing to say to someone who is not a Named NPC', () => {
+    const { store } = nextTo('passer-by-1', 'tram-stop');
+
+    expect(selectSmallTalkKey(store.getState())).toBeNull();
+    store.getState().talk('E');
+
+    expect(selectConversation(store.getState())).toBeNull();
+    expect(selectToast(store.getState())).toEqual({ kind: 'nothingToSay', npcId: 'passer-by-1' });
+  });
+});
+
+/** Small Talk with a park regular, who has greeted the Character. */
+function chattingInThePark(game?: GameState) {
+  const setup = nextTo('park-regular-1', 'park', game);
+  setup.store.getState().talk('E');
+  setup.npc.says('こんにちは！いい天気ですね。');
+  return setup;
+}
+
+/** The Player says something, and the NPC answers: understood, or not (calling not_understood first). */
+function exchange({ store, npc }: Pick<ReturnType<typeof town>, 'store' | 'npc'>, understood = true) {
+  store.getState().sendTypedLine('はい、いい天気です');
+  if (!understood) npc.calls('not_understood', { reason: 'unintelligible' });
+  npc.says(understood ? 'そうですね。' : 'すみません、もう一度？');
+}
+
+const smallTalkOf = (store: ReturnType<typeof town>['store']) => selectConversation(store.getState())?.smallTalk;
+
+describe('Small Talk under way', () => {
+  it('lifts Mood with each exchange the NPC understood, and not with one they did not', () => {
+    const setup = chattingInThePark();
+    const mood = () => setup.store.getState().game.character.mood;
+    const before = mood();
+
+    exchange(setup);
+    const afterOne = mood();
+    exchange(setup, false);
+
+    expect(afterOne).toBe(before + MOOD.changes.smallTalkExchange.stranger);
+    expect(mood()).toBe(afterOne);
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').familiarity).toBe(FAMILIARITY.smallTalkExchange);
+  });
+
+  it("can't fail, however little the NPC understands", () => {
+    const setup = chattingInThePark();
+
+    for (let i = 0; i < 5; i++) {
+      setup.store.getState().sendTypedLine('???');
+      setup.npc.calls('not_understood', { reason: 'unintelligible' });
+    }
+
+    expect(setup.npc.answers.every((answer) => answer.result === 'noted')).toBe(true);
+    expect(selectConversation(setup.store.getState())?.outcome).toBeNull();
+  });
+
+  it("counts a turn the NPC didn't understand as not understood even with Help open, and never answers out_of_patience", () => {
+    const setup = chattingInThePark();
+    const mood = setup.store.getState().game.character.mood;
+
+    setup.store.getState().sendTypedLine('xqzt');
+    setup.store.getState().toggleHelp();
+    expect(selectConversation(setup.store.getState())?.tab).toBe('help');
+    setup.npc.calls('not_understood', { reason: 'unintelligible' });
+    setup.store.getState().toggleHelp();
+    setup.npc.says('すみません、もう一度？');
+
+    expect(setup.store.getState().game.character.mood).toBe(mood);
+    expect(setup.npc.answers).toEqual([{ result: 'noted' }]);
+  });
+
+  it('has the NPC wrap up once the chat has gone on for its 6–8 exchanges, then shows the closing card', () => {
+    const setup = chattingInThePark();
+    const { exchanges } = smallTalkOf(setup.store)!;
+    const met = memoryOf(setup.store.getState().game, 'park-regular-1').timesMet;
+
+    for (let i = 0; i < exchanges - 1; i++) exchange(setup);
+    expect(setup.npc.sent).not.toContain(WRAP_UP_SCENE);
+    exchange(setup);
+
+    expect(setup.npc.sent.at(-1)).toBe(WRAP_UP_SCENE);
+    setup.npc.says('じゃあ、またね！');
+    const card = selectClosingCard(setup.store.getState());
+    expect(card?.kind).toBe('smallTalk');
+    // The cap allows only some of the exchanges to lift Mood.
+    expect(card?.moodChange).toBe(MOOD.changes.smallTalkExchange.stranger * (FAMILIARITY.dailyCapPerNpc / FAMILIARITY.smallTalkExchange));
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').timesMet).toBe(met + 1);
+  });
+
+  it('has the NPC wrap up when they become busy: their place has closed', () => {
+    const { store, npc } = nextTo('barista', 'cafe');
+    store.getState().talk('T');
+    npc.says('こんにちは！');
+    // The café closes while they chat.
+    const game = store.getState().game;
+    const { closesAt } = placeHours('cafe', DEV_SETUP.culturePackId)!;
+    store.setState({ game: { ...game, clock: { ...game.clock, minuteOfDay: closesAt } } });
+
+    exchange({ store, npc });
+
+    expect(npc.sent.at(-1)).toBe(WRAP_UP_SCENE);
+  });
+
+  it('counts as meeting the NPC when the Player leaves early, keeping the Mood it lifted, with no Recap', () => {
+    const setup = chattingInThePark();
+    exchange(setup);
+    const mood = setup.store.getState().game.character.mood;
+
+    setup.store.getState().leaveConversation();
+
+    expect(selectConversation(setup.store.getState())).toBeNull();
+    expect(setup.store.getState().game.character.mood).toBe(mood);
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').timesMet).toBe(1);
+    expect(setup.recaps).toHaveLength(0);
+  });
+
+  it('counts as meeting the NPC when the connection is lost for good', () => {
+    const setup = chattingInThePark();
+    setup.npc.events!.onDisconnect();
+    setup.npc.events!.onDisconnect();
+
+    expect(selectConversation(setup.store.getState())).toBeNull();
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').timesMet).toBe(1);
+  });
+});
+
+describe('learn_name', () => {
+  it("lets the NPC know the Character's name when it's the one from setup", () => {
+    const setup = chattingInThePark();
+
+    setup.npc.calls(LEARN_NAME_TOOL, { name: DEV_SETUP.characterName });
+
+    expect(setup.npc.answers).toEqual([{ result: 'learned' }]);
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').knowsName).toBe(true);
+  });
+
+  it('tells the NPC they misheard any other name', () => {
+    const setup = chattingInThePark();
+
+    setup.npc.calls(LEARN_NAME_TOOL, { name: 'Pam' });
+
+    expect(setup.npc.answers).toEqual([{ result: 'wrong_name' }]);
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').knowsName).toBe(false);
+  });
+
+  it('works in a Goal Interaction too', () => {
+    const { store, npc } = nextTo('barista', 'cafe');
+    store.getState().talk('E');
+
+    npc.calls(LEARN_NAME_TOOL, { name: DEV_SETUP.characterName });
+
+    expect(memoryOf(store.getState().game, 'barista').knowsName).toBe(true);
+  });
+});
+
+const CHAT_RECAP: Recap = {
+  outcome: 'A nice chat about the weather.',
+  corrections: [],
+  newWords: [{ base: '天気', reading: 'てんき', gloss: 'weather' }],
+  cefrEstimate: 'A1',
+  lastTopic: 'the sunny weather',
+};
+
+/** Chats until the NPC wraps up and says goodbye, so the closing card shows. */
+function chatToTheEnd(setup: ReturnType<typeof chattingInThePark>) {
+  const { exchanges } = smallTalkOf(setup.store)!;
+  for (let i = 0; i < exchanges; i++) exchange(setup);
+  setup.npc.says('じゃあ、またね！');
+}
+
+describe("Small Talk's Recap", () => {
+  it('asks for the lighter Small Talk Recap, with the NPC and the transcript', () => {
+    const setup = chattingInThePark();
+
+    chatToTheEnd(setup);
+
+    expect(setup.recaps).toHaveLength(1);
+    expect(setup.recaps[0]!.request).toMatchObject({ kind: 'smallTalk', npcId: 'park-regular-1', culturePackId: DEV_SETUP.culturePackId });
+    expect(setup.recaps[0]!.request.kind === 'smallTalk' && setup.recaps[0]!.request.transcript[0]).toEqual({
+      speaker: 'npc',
+      text: 'こんにちは！いい天気ですね。',
+    });
+  });
+
+  it("remembers the Recap's topic as what the NPC talked about last, in place of the one before", async () => {
+    const before = createSave(DEV_SETUP);
+    const known: NpcMemory = { ...memoryOf(before, 'park-regular-1'), lastTopic: 'the rain' };
+    const setup = chattingInThePark({ ...before, people: { 'park-regular-1': known } });
+
+    chatToTheEnd(setup);
+    await setup.recaps[0]!.arrives(CHAT_RECAP);
+
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').lastTopic).toBe('the sunny weather');
+  });
+
+  it('keeps it in the Journal as a Small Talk page', async () => {
+    const setup = chattingInThePark();
+
+    chatToTheEnd(setup);
+    await setup.recaps[0]!.arrives(CHAT_RECAP);
+
+    const [entry] = await setup.journal.list(setup.store.getState().slotId);
+    expect(entry).toMatchObject({ kind: 'smallTalk', npcId: 'park-regular-1', npcName: null, placeName: '桜ヶ丘公園' });
+  });
+});
+
+describe('what the NPC remembers, in the session', () => {
+  const friendOf = (npcId: 'barista' | 'park-regular-1'): GameState => {
+    const game = createSave(DEV_SETUP);
+    const friend: NpcMemory = { ...memoryOf(game, npcId), familiarity: FAMILIARITY.tierThresholds.friend, knowsName: true };
+    return { ...game, people: { [npcId]: friend } };
+  };
+
+  it('greets a friend by name, in Small Talk and in a Goal Interaction', () => {
+    const chat = chattingInThePark(friendOf('park-regular-1'));
+    const { store, npc } = nextTo('barista', 'cafe', friendOf('barista'));
+    store.getState().talk('E');
+
+    expect(chat.npc.session?.systemInstruction).toContain(`Greet them by name: ${DEV_SETUP.characterName}.`);
+    expect(npc.session?.systemInstruction).toContain(`Greet them by name: ${DEV_SETUP.characterName}.`);
+  });
+
+  it('gives a friend one more Patience', () => {
+    const stranger = nextTo('barista', 'cafe');
+    const friend = nextTo('barista', 'cafe', friendOf('barista'));
+    stranger.store.getState().talk('E');
+    friend.store.getState().talk('E');
+
+    const patience = (s: typeof stranger) => selectConversation(s.store.getState())!.patience.starting;
+    expect(patience(friend)).toBe(patience(stranger) + FAMILIARITY.friendPatienceBonus);
+  });
+});

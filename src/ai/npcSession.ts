@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   basketFacts,
   interactionFacts,
+  localPlaceName,
   toToolDeclaration,
   type CulturePack,
   type FunctionDeclaration,
@@ -10,11 +11,14 @@ import {
   type NamedNpcId,
 } from '../content/index.ts';
 import {
+  familiarityTier,
+  isFamiliarAtLeast,
   weekdayOf,
   type ApproachId,
   type Basket,
   type GameState,
   type LanguageCode,
+  type NpcMemory,
   type PlaceId,
   type ProficiencyStep,
   type RentStatement,
@@ -42,9 +46,17 @@ export type NpcSessionContext = {
   basket?: Basket;
   /** For the landlord: what the Character owes in rent. */
   rent?: RentStatement;
+  /** What the NPC remembers of the Character, and the Character's name for when they know it. With none, they are strangers. */
+  relationship?: Relationship;
 };
 
+export type Relationship = { memory: NpcMemory; characterName: string };
+
+/** What the context of a Small Talk session holds: no goal, so no basket, rent or approach, and always what the NPC remembers. */
+export type SmallTalkContext = Pick<NpcSessionContext, 'clock'> & { relationship: Relationship };
+
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
+export const LEARN_NAME_TOOL = 'learn_name';
 
 // What the game answers each tool call with. The system instruction tells the NPC what each answer means.
 export type CompletionResponse =
@@ -54,7 +66,9 @@ export type CompletionResponse =
   | { result: 'invalid_arguments'; error: string }
   | { result: 'wrong_name' };
 export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
-export type ToolResponse = CompletionResponse | NotUnderstoodResponse | { result: 'unknown_tool' };
+/** `wrong_name`: the name heard isn't the Character's, so the NPC misheard it. */
+export type LearnNameResponse = { result: 'learned' } | { result: 'wrong_name' };
+export type ToolResponse = CompletionResponse | NotUnderstoodResponse | LearnNameResponse | { result: 'unknown_tool' };
 
 /**
  * Sent instead of the player's turn when an unreadable transcript uses up the
@@ -87,6 +101,10 @@ export function basketChangedScene(basket: Basket, packId: LanguageCode): string
   ].join('\n');
 }
 
+/** Sent when Small Talk has gone on long enough, or the NPC has become busy, so they wrap it up. */
+export const WRAP_UP_SCENE =
+  '[SCENE: You need to get on with your day now. Wrap up the chat warmly in a sentence or two, and say goodbye.]';
+
 /**
  * Follows the conversation so far when a session replaces one whose connection
  * dropped, so the NPC carries on instead of greeting again.
@@ -94,6 +112,12 @@ export function basketChangedScene(basket: Basket, packId: LanguageCode): string
 export const RESUME_SCENE =
   '[SCENE: You were interrupted for a moment, and the customer is still with you. ' +
   "Don't greet them again: say sorry for the wait in a few words and carry on from where you left off.]";
+
+/** What `learn_name` takes. The game checks a call's arguments against it too. */
+export const LearnNameArgsSchema = z.object({ name: z.string().describe('Their name, as they said it.') });
+
+export const learnNameTool = (who: string) =>
+  toToolDeclaration(LEARN_NAME_TOOL, `Call this when the ${who} tells you their name, with the name as they said it.`, LearnNameArgsSchema);
 
 export const notUnderstoodTool = (who: string) =>
   toToolDeclaration(
@@ -103,19 +127,32 @@ export const notUnderstoodTool = (who: string) =>
     z.object({ reason: z.enum(['unintelligible', 'other_language', 'nothing_heard']) }),
   );
 
-/** Where each Named NPC works, as their persona introduces it, and what they call the person in front of them. */
-type Workplace = { at: (pack: CulturePack) => string; who: string };
-const WORKPLACES: Partial<Record<PlaceId, Workplace>> = {
+/**
+ * Where each Named NPC is found, as their persona introduces it, and what they call the person in front of them.
+ * `as` is how they are there, if not as "the <role> at", and `offDuty` that they aren't working there.
+ */
+type Workplace = { at: (pack: CulturePack) => string; who: string; as?: string; offDuty?: true };
+const WORKPLACES: Record<PlaceId, Workplace | null> = {
   cafe: { at: (pack) => `${pack.cafe.name}, a café`, who: 'customer' },
   supermarket: { at: (pack) => `${pack.supermarket.name}, a supermarket`, who: 'customer' },
   'convenience-store': { at: (pack) => `${pack.convenienceStore.name}, a convenience store`, who: 'customer' },
   restaurant: { at: (pack) => `${pack.restaurant.name}, a restaurant`, who: 'customer' },
-  clinic: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
+  clinic: { at: (pack) => `${pack.hospital.name}, the town hospital,`, who: 'patient' },
   home: { at: (pack) => `${pack.apartments.name}, the apartment block where you live and let flats,`, who: 'tenant' },
+  park: { at: (pack) => `${localPlaceName('park', pack.id)}, the town park,`, who: 'person', as: 'one of the regulars at', offDuty: true },
+  bookshop: { at: (pack) => `${localPlaceName('bookshop', pack.id)}, a bookshop`, who: 'customer' },
+  bathhouse: { at: (pack) => `${localPlaceName('bathhouse', pack.id)}, the town bathhouse and gym,`, who: 'customer' },
+  'town-office': { at: (pack) => `${localPlaceName('town-office', pack.id)}, the town office,`, who: 'resident' },
+  'tram-stop': null,
+};
+
+/** The nurse works on the ward where people who faint are looked after; the rest of the hospital's staff don't. */
+const NPC_WORKPLACES: Partial<Record<NamedNpcId, Workplace>> = {
+  nurse: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
 };
 
 function workplace(npc: NamedNpc): Workplace {
-  const found = WORKPLACES[npc.placeId];
+  const found = NPC_WORKPLACES[npc.id] ?? WORKPLACES[npc.placeId];
   if (!found) throw new Error(`No workplace for ${npc.id} at the ${npc.placeId}`);
   return found;
 }
@@ -191,16 +228,49 @@ function block(heading: string, lines: string[]) {
 
 function personaBlock(npc: NamedNpc, pack: CulturePack) {
   const { name, favouriteGift } = pack.personas[npc.id];
+  const place = workplace(npc);
   return block('WHO YOU ARE', [
-    `You are ${name}, the ${npc.role} at ${workplace(npc).at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
+    `You are ${name}, ${place.as ?? `the ${npc.role} at`} ${place.at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
     `You are ${npc.age}: ${npc.temperament}. Quirks: ${npc.quirks}.`,
     `The gift you would love most is ${favouriteGift}. Don't bring it up yourself.`,
-    'Talk like a real, friendly person at work.',
+    place.offDuty ? 'Talk like a real, friendly person.' : 'Talk like a real, friendly person at work.',
   ]);
 }
 
-function youAndThisPersonBlock(interaction: Interaction, who: string) {
-  if (interaction.effect.kind === 'hire') {
+/** How the NPC learns the Character's name, while they don't know it. */
+const learnNameLine = (who: string) =>
+  `If the ${who} tells you their name, call ${LEARN_NAME_TOOL} with it as they said it. ` +
+  'If it answers "wrong_name", you misheard: apologise and ask them to say it again.';
+
+const KNOWN_NAME_UNUSED = "They have told you their name, but you don't know them well enough to use it yet.";
+
+/** What the NPC remembers of the Character from NPC Memory: how well they know them, by what name, and what they talked about last. */
+function rememberedLines({ memory, characterName }: Relationship, who: string, unknownName = learnNameLine(who)): string[] {
+  const tier = familiarityTier(memory);
+  const lines =
+    tier === 'friend'
+      ? [`This ${who} is a friend: you have talked many times, and you are always glad to see them.`, 'Speak to them warmly, as to a friend, but still politely.']
+      : tier === 'acquaintance'
+        ? [`You know this ${who} a little: they have come by a good few times.`, 'Speak to them in a friendly way, as to a familiar face.']
+        : [`This ${who} is a stranger: you don't really know them yet.`, `Speak to them politely, as you would to any ${who}.`];
+  if (memory.knowsName && tier !== 'stranger') lines.push(`Greet them by name: ${characterName}.`);
+  else lines.push(memory.knowsName ? KNOWN_NAME_UNUSED : unknownName);
+  if (memory.lastTopic && isFamiliarAtLeast(memory, 'acquaintance')) {
+    lines.push(`Last time you talked about ${memory.lastTopic}. Follow up on it once, naturally, early on.`);
+  }
+  if (memory.favouriteKnown) lines.push('You have already told them which gift you would love most.');
+  return lines;
+}
+
+function youAndThisPersonBlock(interaction: Interaction, who: string, relationship: Relationship | undefined) {
+  // Someone the NPC has got to know is met as such, whatever the conversation.
+  // Hiring asks for the name itself, so there's no learn_name to call.
+  const hiring = interaction.effect.kind === 'hire';
+  if (relationship && familiarityTier(relationship.memory) !== 'stranger') {
+    const unknownName = hiring ? "You don't know their name yet; asking for it is part of hiring them." : learnNameLine(who);
+    return block('YOU AND THIS PERSON', rememberedLines(relationship, who, unknownName));
+  }
+  if (hiring) {
     return block('YOU AND THIS PERSON', [
       `This ${who} is a stranger: you have never met. You don't know their name yet; asking for it is part of hiring them.`,
       'Speak to them politely, as you would to anyone asking for a job.',
@@ -215,6 +285,7 @@ function youAndThisPersonBlock(interaction: Interaction, who: string) {
   return block('YOU AND THIS PERSON', [
     `This ${who} is a stranger: you have never met. You don't know their name and don't ask for it.`,
     `Speak to them politely, as you would to any ${who}.`,
+    relationship?.memory.knowsName ? KNOWN_NAME_UNUSED : learnNameLine(who),
   ]);
 }
 
@@ -336,7 +407,7 @@ export function buildNpcSession(
   const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    youAndThisPersonBlock(interaction, who),
+    youAndThisPersonBlock(interaction, who, context.relationship),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
     factsBlock(interaction, culturePack, context),
@@ -346,8 +417,47 @@ export function buildNpcSession(
 
   return {
     systemInstruction,
-    tools: [interaction.toolDeclaration, notUnderstoodTool(who)],
+    // Hiring takes the applicant's name in its own completion, so learn_name would only get in the way.
+    tools: [interaction.toolDeclaration, ...(interaction.effect.kind === 'hire' ? [] : [learnNameTool(who)]), notUnderstoodTool(who)],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
     openingScene: context.approach ? APPROACH_SCENES[context.approach] : greetingScene(who),
+  };
+}
+
+/** The places where a stated goal would be met at a counter, so a Small Talk partner there points the way. */
+const COUNTER_ROLES = new Set(['barista', 'cashier', 'clerk', 'server', 'receptionist', 'pharmacist', 'shopkeeper', 'attendant']);
+
+function smallTalkGoalBlock(npc: NamedNpc, who: string) {
+  const goal = COUNTER_ROLES.has(npc.role)
+    ? `- If they ask for something you would do for them at work (ordering, buying, paying, asking for help), say kindly that they can come to the counter for that, and carry on chatting. Don't do it now.`
+    : `- If they ask you to do something for them, say kindly that you can't help with that here, and carry on chatting.`;
+  return block('YOUR GOAL', [
+    `This is Small Talk: a friendly, casual chat with no goal, which cannot go wrong.`,
+    `- Chat about everyday things: the weather, the town, your day, what the ${who} has been up to. Ask them questions, answer theirs, and keep it light.`,
+    goal,
+    "- Don't end the chat yourself: keep chatting until a scene tells you to wrap up.",
+  ]);
+}
+
+/**
+ * Everything a Live session needs to play this Named NPC in Small Talk: no goal, no completion function and
+ * no facts, only the NPC, what they remember of the Character, and how to speak. Pure.
+ */
+export function buildSmallTalkSession(culturePack: CulturePack, proficiencyStep: ProficiencyStep, npc: NamedNpc, context: SmallTalkContext): NpcSession {
+  const { who } = workplace(npc);
+  const systemInstruction = [
+    personaBlock(npc, culturePack),
+    block('YOU AND THIS PERSON', rememberedLines(context.relationship, who)),
+    languageRulesBlock(culturePack, who),
+    stepBlock(proficiencyStep, who),
+    smallTalkGoalBlock(npc, who),
+    situationBlock(context, who),
+  ].join('\n\n');
+
+  return {
+    systemInstruction,
+    tools: [learnNameTool(who), notUnderstoodTool(who)],
+    voice: { targetLanguage: culturePack.id, npcId: npc.id },
+    openingScene: `[SCENE: A ${who} you might chat with comes up to you. Greet them first.]`,
   };
 }

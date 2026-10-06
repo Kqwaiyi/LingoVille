@@ -1,4 +1,5 @@
 import {
+  LEARN_NAME_TOOL,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
   readChangedOrder,
@@ -7,6 +8,7 @@ import {
   readServedScene,
   readShiftOrder,
   readTable,
+  WRAP_UP_SCENE,
   type CheckoutSaid,
   type DinerSaid,
   type NpcSession,
@@ -874,6 +876,91 @@ function hiringNpc(script: HiringScript, common: OrderScript, act: Act): Npc {
   };
 }
 
+/** The fake NPC in Small Talk: chats back about anything it understands, learns a name it's told, and says goodbye when told to wrap up. */
+type SmallTalkScript = {
+  greeting: string;
+  resume: string;
+  /** Said in turn to each line it understood. */
+  replies: string[];
+  goodbye: string;
+  niceToMeet: (name: string) => string;
+  nameAgain: string;
+  notUnderstood: string;
+  outOfPatience: string;
+  /** Said before a name ("my name is"): only a line with one of these gives a name. */
+  naming: string[];
+  /** Words it understands. A line with none of them is gibberish to it. */
+  words: string[];
+};
+
+const SMALL_TALK_SCRIPT: Record<LanguageCode, SmallTalkScript> = {
+  ja: {
+    greeting: 'こんにちは！今日はいい天気ですね。',
+    resume: 'ごめんなさい、お待たせしました。',
+    replies: ['そうなんですね！', 'いいですね。最近どうですか？', 'へえ、それは楽しそう！'],
+    goodbye: 'あ、そろそろ行かないと。じゃあ、またね！',
+    niceToMeet: (name) => `${name}さん、よろしくお願いします！`,
+    nameAgain: 'ごめんなさい、お名前をもう一度お願いします。',
+    notUnderstood: 'すみません、よくわかりませんでした。',
+    outOfPatience: 'ごめんなさい、そろそろ行かないと。またね！',
+    naming: ['私の名前は', 'わたしのなまえは', '名前は', 'なまえは'],
+    words: ['天気', 'てんき', 'はい', 'いいえ', 'こんにちは', '元気', 'げんき', '好き', 'すき', '今日', 'きょう', '公園', 'いい', 'そう', '名前'],
+  },
+  zh: {
+    greeting: '你好！今天天气真不错啊。',
+    resume: '不好意思，让你久等了。',
+    replies: ['是吗！', '真好。你最近怎么样？', '哇，听起来很有意思！'],
+    goodbye: '哎呀，我得走了。下次再聊，再见！',
+    niceToMeet: (name) => `${name}，很高兴认识你！`,
+    nameAgain: '不好意思，请再说一遍你的名字。',
+    notUnderstood: '不好意思，我没听懂。',
+    outOfPatience: '不好意思，我得走了。再见！',
+    naming: ['我叫', '我的名字是', '我的名字叫'],
+    words: ['天气', '你好', '是', '对', '好', '喜欢', '今天', '公园', '最近', '名字'],
+  },
+  en: {
+    greeting: "Hello there! Lovely weather today, isn't it?",
+    resume: 'Sorry about that! Where were we?',
+    replies: ['Oh, really?', 'How nice. How have you been lately?', 'That sounds lovely!'],
+    goodbye: "Oh, look at the time. I'd better get going. See you soon!",
+    niceToMeet: (name) => `Nice to meet you, ${name}!`,
+    nameAgain: 'Sorry, what was your name again?',
+    notUnderstood: "Sorry, I didn't quite catch that.",
+    outOfPatience: "Sorry, I'd better be off. Bye!",
+    naming: ['my name is', "my name's", 'call me'],
+    words: ['yes', 'no', 'hello', 'hi', 'weather', 'nice', 'good', 'fine', 'like', 'today', 'park', 'name', 'lovely', 'sunny'],
+  },
+  de: {
+    greeting: 'Hallo! Schönes Wetter heute, oder?',
+    resume: 'Entschuldigung! Wo waren wir?',
+    replies: ['Ach, wirklich?', 'Schön. Wie geht es dir so?', 'Das klingt toll!'],
+    goodbye: 'Oh, ich muss jetzt weiter. Bis bald, tschüss!',
+    niceToMeet: (name) => `Freut mich, ${name}!`,
+    nameAgain: 'Entschuldigung, wie war dein Name noch mal?',
+    notUnderstood: 'Entschuldigung, das habe ich nicht verstanden.',
+    outOfPatience: 'Entschuldigung, ich muss los. Tschüss!',
+    naming: ['ich heiße', 'mein name ist'],
+    words: ['ja', 'nein', 'hallo', 'wetter', 'schön', 'gut', 'gern', 'heute', 'park', 'name', 'danke'],
+  },
+};
+
+/** Small Talk: a reply to each line it understands, in turn; a name it's told goes to learn_name. */
+function smallTalkNpc(script: SmallTalkScript, introductions: readonly string[], act: Act): Npc {
+  let replies = 0;
+  return {
+    ...script,
+    hear: (line) => {
+      if (line === WRAP_UP_SCENE) return act.say(script.goodbye);
+      if (mentions(line, script.naming)) {
+        const name = nameIn(line, [...script.naming, ...introductions]);
+        if (name) return act.call(LEARN_NAME_TOOL, { name }, (response) => act.say(response.result === 'learned' ? script.niceToMeet(name) : script.nameAgain));
+      }
+      if (mentions(line, script.words)) return act.say(script.replies[replies++ % script.replies.length]!);
+      act.notUnderstood();
+    },
+  };
+}
+
 /** The fake Shift Customer: orders their drink, says it again when asked, and reacts to what they are handed. */
 type CustomerScript = {
   order: (items: string) => string;
@@ -1106,6 +1193,10 @@ function castNpc(session: NpcSession, act: Act): Npc {
     if (atTheTable) return tableCustomerNpc(TABLE_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTable, act);
     return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   }
+  // Small Talk has no completion function: only learn_name and not_understood.
+  if (session.tools.every((tool) => tool.name === LEARN_NAME_TOOL || tool.name === NOT_UNDERSTOOD_TOOL)) {
+    return smallTalkNpc(SMALL_TALK_SCRIPT[packId], HIRING_SCRIPT[packId].introductions, act);
+  }
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
   const { words } = SCRIPT[packId];
   if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
@@ -1133,7 +1224,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * the drink in its instruction, says it again when asked, and thanks the barista or says it's the wrong
  * one when a scene says what it was handed; one at the till says all the cashier needs to hear at once
  * (bag, points card, anything from behind the counter, the cash it hands over); one at a restaurant table orders
- * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. Each calls
+ * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. In Small Talk it
+ * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.

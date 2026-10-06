@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
-import { NAMED_NPCS, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId } from './index.ts';
+import { CULTURE_PACKS, localPlaceName, NAMED_NPCS, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId } from './index.ts';
 
 /** The NPCs column of the spec's places table. */
 const STAFF_BY_PLACE: Record<PlaceId, RoleId[]> = {
@@ -36,6 +36,13 @@ describe('town NPCs', () => {
     const named = TOWN_NPC_IDS.filter((npcId) => npcId in NAMED_NPCS);
     expect(named).toEqual(TOWN_NPC_IDS.filter((npcId) => TOWN_NPCS[npcId].role !== 'passer-by'));
     expect(named).toEqual(expect.arrayContaining(['park-regular-1', 'park-regular-2', 'park-regular-3']));
+  });
+
+  it('names the place of every Named NPC locally in every pack, for the chat header and the Journal', () => {
+    for (const packId of Object.keys(CULTURE_PACKS) as (keyof typeof CULTURE_PACKS)[]) {
+      for (const npc of Object.values(NAMED_NPCS)) expect(localPlaceName(npc.placeId, packId)).not.toBe('');
+    }
+    expect(localPlaceName('park', 'ja')).toBe('桜ヶ丘公園');
   });
 
   it("works the landlord's hours at home, not the home's", () => {

@@ -9,7 +9,7 @@ import { JOB_IDS } from '../sim/index.ts';
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
-export const JOURNAL_SCHEMA_VERSION = 4;
+export const JOURNAL_SCHEMA_VERSION = 5;
 
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
@@ -62,6 +62,14 @@ const JournalEntrySchema = z.discriminatedUnion('kind', [
     interactionId: z.enum(INTERACTION_IDS),
     outcome: z.enum(['success', 'failure']),
   }),
+  /** Small Talk's lighter Recap. It can't fail, so it has no outcome. */
+  z.object({
+    ...shared,
+    kind: z.literal('smallTalk'),
+    npcId: z.enum(NPC_IDS),
+    /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
+    npcName: z.string().nullable(),
+  }),
   /** A whole Shift's one combined Recap, with every customer's lines in order. */
   z.object({
     ...shared,
@@ -100,6 +108,8 @@ const MIGRATIONS: readonly ((entry: StoredEntry) => StoredEntry)[] = [
   (entry) => ({ ...entry, schemaVersion: 3 }),
   // 3 → 4: a Shift gets its own kind of entry. Older ones are all Goal Interactions'.
   (entry) => ({ ...entry, schemaVersion: 4 }),
+  // 4 → 5: Small Talk gets its own kind of entry. Older ones are all Goal Interactions' or Shifts'.
+  (entry) => ({ ...entry, schemaVersion: 5 }),
 ];
 
 /** Reads one stored entry as an entry of today's version, through the migrations. Throws, saying why, if it can't. */

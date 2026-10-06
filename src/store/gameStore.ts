@@ -4,14 +4,18 @@ import {
   basketChangedScene,
   buildNpcSession,
   buildShiftCustomerSession,
+  buildSmallTalkSession,
   shiftCustomerChangeScene,
   checkReadings,
   hasReadingAids,
+  LEARN_NAME_TOOL,
+  LearnNameArgsSchema,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
   shiftCustomerServedScene,
   tableServedScene,
   wordReading,
+  WRAP_UP_SCENE,
   type AnnotateRequest,
   type Annotation,
   type HelpLogEntry,
@@ -21,6 +25,7 @@ import {
   type NpcSession,
   type Recap,
   type RecapRequest,
+  type Relationship,
   type Segment,
   type ShiftRecapCustomer,
   type ToolResponse,
@@ -80,6 +85,8 @@ import {
   createSave,
   drinkWater,
   ECONOMY,
+  endSmallTalk,
+  familiarityTier,
   faintedBetween,
   endShift,
   enterPlace,
@@ -92,7 +99,9 @@ import {
   LANGUAGE_CODES,
   isUnreadableTranscript,
   jobAids,
+  learnName,
   lifeSkillLevels,
+  memoryOf,
   MIC_CHECK,
   losePatience,
   moodFace,
@@ -100,13 +109,16 @@ import {
   nextShiftCustomer,
   npcExpression,
   putBackFromBasket,
+  rememberTopic,
   rentStatement,
   rideTram,
   SAVE,
   shiftRefusal,
   sleep,
+  smallTalkExchange,
   startPatience,
   startShift,
+  startSmallTalk,
   tick,
   tramTripMinutes,
   weekdayOf,
@@ -203,6 +215,9 @@ export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
 /** Which screen shows: the title, New game setup, or the game itself. */
 export type Screen = 'title' | 'setup' | 'playing';
+
+/** The keys that start a conversation: E and F a Goal Interaction, and T Small Talk with staff. */
+export type TalkKey = 'E' | 'F' | 'T';
 
 /** New game setup's screens, in order. A browser that has passed the mic check skips it. */
 export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance', 'micCheck'] as const;
@@ -355,7 +370,16 @@ export type SignTooltip = {
 export type NewWord = Recap['newWords'][number];
 
 /** How a Goal Interaction ended, and its effects, for the closing card. */
-export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }>;
+export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }> | SmallTalkEnd;
+
+/** Small Talk is over: it can't fail, so all there is to show is the Mood it lifted. */
+export type SmallTalkEnd = { kind: 'smallTalk'; moodChange: number };
+
+/**
+ * Small Talk under way: how many player turns it lasts before the NPC wraps up, how many there have been, how many
+ * lines had been counted when the NPC last finished a turn, and the Mood the understood ones have lifted so far.
+ */
+export type SmallTalk = { exchanges: number; turns: number; countedLines: number; moodChange: number };
 
 /** How a Shift Customer was dealt with: served what they ordered, served something else, or gone unserved. */
 export type ShiftCustomerOutcome = { kind: ShiftRecapCustomer['result'] };
@@ -405,10 +429,11 @@ type ShiftLogEntry = {
   conversation: Conversation | null;
 };
 
-/** Who the conversation is with: a Named NPC in a Goal Interaction, or an anonymous Shift Customer. */
+/** Who the conversation is with: a Named NPC in a Goal Interaction or in Small Talk, or an anonymous Shift Customer. */
 type Partner =
-  | { npcId: NamedNpcId; interaction: Interaction; shiftCustomer: null }
-  | { npcId: null; interaction: null; shiftCustomer: ShiftCustomerView };
+  | { npcId: NamedNpcId; interaction: Interaction; shiftCustomer: null; smallTalk: null }
+  | { npcId: NamedNpcId; interaction: null; shiftCustomer: null; smallTalk: SmallTalk }
+  | { npcId: null; interaction: null; shiftCustomer: ShiftCustomerView; smallTalk: null };
 
 /**
  * A conversation under way. It lives only here. A Goal Interaction is never saved in progress,
@@ -416,7 +441,7 @@ type Partner =
  */
 export type Conversation = ConversationState & Partner;
 
-/** A conversation with a Named NPC, which ends with a closing card and a Recap. */
+/** A conversation with a Named NPC, a Goal Interaction or Small Talk, which ends with a closing card and a Recap. */
 type NpcConversation = Extract<Conversation, { shiftCustomer: null }>;
 
 type ConversationState = {
@@ -747,7 +772,8 @@ export type GameStore = {
   /** Closes the pay shown at the end of a Shift. */
   closeShiftEnd: () => void;
   /** E near an NPC (or F, for their second conversation if they have one): opens a conversation, and the NPC speaks first. */
-  talk: (key?: 'E' | 'F') => void;
+  /** Starts a conversation with the NPC in reach: E and F their Goal Interactions, and Small Talk on the key `selectSmallTalkKey` gives. */
+  talk: (key?: TalkKey) => void;
   sendTypedLine: (text: string) => void;
   /** Space or the mic button pressed: interrupts the NPC and listens. */
   startTalking: () => void;
@@ -785,6 +811,9 @@ export type GameStore = {
 const isTownNpc = (interactable: Interactable | null): interactable is TownNpcId =>
   interactable !== null && interactable in TOWN_NPCS;
 
+/** Someone with a name and a memory of the Character: anyone in town but the passers-by. */
+const isNamedNpc = (interactable: Interactable | null): interactable is NamedNpcId => isTownNpc(interactable) && interactable in NAMED_NPCS;
+
 const isTramStop = (interactable: Interactable | null): interactable is TramStopId =>
   (TRAM_LINE as readonly (Interactable | null)[]).includes(interactable);
 
@@ -803,7 +832,14 @@ const staffDoorRefusal = (jobId: JobId, game: GameState) =>
   shiftRefusal(game, jobId, placeHours(JOB_PLACES[jobId], game.identity.culturePackId));
 
 /** A Goal Interaction's outcome, which its closing card shows, rather than a Shift Customer's. */
-const isClosingCard = (outcome: Conversation['outcome']): outcome is ClosingCard => outcome?.kind === 'success' || outcome?.kind === 'failure';
+const isClosingCard = (outcome: Conversation['outcome']): outcome is ClosingCard =>
+  outcome?.kind === 'success' || outcome?.kind === 'failure' || outcome?.kind === 'smallTalk';
+
+/** What a Named NPC remembers of the Character, for their session. */
+const relationshipWith = (game: GameState, npcId: NamedNpcId): Relationship => ({
+  memory: memoryOf(game, npcId),
+  characterName: game.identity.characterName,
+});
 
 /** Staff can be talked to only while their place is open. Closing time stops new conversations, never one under way. */
 const isAtWork = (npcId: TownNpcId, game: GameState) =>
@@ -1094,14 +1130,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       save();
     };
 
-    const applyProficiencyEvidence = (conversation: NpcConversation, recap: Recap) => {
+    /** A Recap's evidence moves Proficiency, and what the conversation was about, if anything, is what the NPC remembers talking about last. */
+    const applyRecap = (conversation: NpcConversation, recap: Recap) => {
       const evidence: ConversationEvidence = {
         cefrEstimate: recap.cefrEstimate,
         lines: conversation.lines.map(({ speaker, text }) => ({ speaker, text })),
         helpLog: conversation.helpLog,
         notUnderstoodTurns: conversation.patience.turnsNotUnderstood,
       };
-      applyEvidence((game) => applyRecapEvidence(game, evidence));
+      applyEvidence((game) => rememberTopic(applyRecapEvidence(game, evidence), conversation.npcId, recap.lastTopic));
     };
 
     /** A Recap as the Journal keeps it: each new word with its reading if that passes the checks, or with the library's. */
@@ -1124,38 +1161,44 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const writeRecap = (conversation: NpcConversation, outcome: ClosingCard) => {
       const { game, nativeLanguage } = get();
       const { culturePackId, targetLanguage } = game.identity;
+      const { npcId, interaction, helpLog } = conversation;
       const transcript = transcriptOf(conversation.lines);
-      const request: RecapRequest = {
-        kind: 'goal',
-        culturePackId,
-        step: game.proficiencyStep,
-        nativeLanguage,
-        conversation: { interactionId: conversation.interaction.id, outcome: outcome.kind, transcript, helpLog: conversation.helpLog },
+      const step = game.proficiencyStep;
+      // A Goal Interaction's Recap reads it against its goal; Small Talk gets a lighter one.
+      const goal = interaction && outcome.kind !== 'smallTalk' ? { interaction, outcome: outcome.kind } : null;
+      const request: RecapRequest = goal
+        ? {
+            kind: 'goal',
+            culturePackId,
+            step,
+            nativeLanguage,
+            conversation: { interactionId: goal.interaction.id, outcome: goal.outcome, transcript, helpLog },
+          }
+        : { kind: 'smallTalk', culturePackId, step, nativeLanguage, npcId, transcript, helpLog };
+      const entry = (recap: Recap | null): NewJournalEntry => {
+        const page = {
+          npcId,
+          npcName: game.people[npcId]?.knowsName ? CULTURE_PACKS[culturePackId].personas[npcId].name : null,
+          placeName: localPlaceName(interaction?.placeId ?? NAMED_NPCS[npcId].placeId, culturePackId),
+          day: game.clock.day,
+          minuteOfDay: game.clock.minuteOfDay,
+          targetLanguage,
+          nativeLanguage,
+          recap: recap && journalRecap(recap, targetLanguage),
+          lines: transcript.map((line, i) => {
+            const reading = (lineReadings.get(conversation.id)?.readings ?? conversation.readings)[i];
+            return reading && line.speaker === 'npc' ? { ...line, reading: reading.segments } : line;
+          }),
+          helpLog,
+        };
+        return goal ? { ...page, kind: 'goal', interactionId: goal.interaction.id, outcome: goal.outcome } : { ...page, kind: 'smallTalk' };
       };
-      const entry = (recap: Recap | null): NewJournalEntry => ({
-        kind: 'goal',
-        npcId: conversation.npcId,
-        npcName: game.people[conversation.npcId]?.knowsName ? CULTURE_PACKS[culturePackId].personas[conversation.npcId].name : null,
-        interactionId: conversation.interaction.id,
-        placeName: localPlaceName(conversation.interaction.placeId, culturePackId),
-        day: game.clock.day,
-        minuteOfDay: game.clock.minuteOfDay,
-        targetLanguage,
-        nativeLanguage,
-        outcome: outcome.kind,
-        recap: recap && journalRecap(recap, targetLanguage),
-        lines: transcript.map((line, i) => {
-          const reading = (lineReadings.get(conversation.id)?.readings ?? conversation.readings)[i];
-          return reading && line.speaker === 'npc' ? { ...line, reading: reading.segments } : line;
-        }),
-        helpLog: conversation.helpLog,
-      });
       updateConversation({ recap: { status: 'writing' } });
       deps
         .requestRecap(request)
         .then(
           (recap) => {
-            applyProficiencyEvidence(conversation, recap);
+            applyRecap(conversation, recap);
             updateRecap(conversation.id, { status: 'ready', entry: journalPage(entry(recap)) });
             return recap;
           },
@@ -1179,6 +1222,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * the interaction. Returns whether the NPC is now out of Patience.
      */
     const notUnderstood = (conversation: Conversation) => {
+      // Small Talk can't fail: the turn just doesn't count as understood, Help open or not.
+      if (conversation.smallTalk) {
+        if (!conversation.outcome) updateConversation({ patience: losePatience(conversation.patience) });
+        return false;
+      }
       // Patience is frozen while Help is open.
       if (conversation.outcome || conversation.tab === 'help') return isOutOfPatience(conversation.patience);
       const patience = losePatience(conversation.patience);
@@ -1196,6 +1244,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     const answerToolCall = (conversation: Conversation, { name, args }: ToolCall): ToolResponse => {
       if (name === NOT_UNDERSTOOD_TOOL) return { result: notUnderstood(conversation) ? 'out_of_patience' : 'noted' };
+      if (name === LEARN_NAME_TOOL && conversation.npcId) return learnTheName(conversation.npcId, args);
       // A Shift Customer has no completion: what they're served is checked by the game.
       if (!conversation.interaction || name !== conversation.interaction.completion.name || conversation.outcome) return { result: 'unknown_tool' };
 
@@ -1218,6 +1267,44 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         default:
           throw new Error(`A completion can't end as ${result.kind}`);
       }
+    };
+
+    /** A Named NPC heard the Character's name (`learn_name`). The sim checks it, and only the right one is remembered. */
+    const learnTheName = (npcId: NamedNpcId, args: unknown): ToolResponse => {
+      const parsed = LearnNameArgsSchema.safeParse(args);
+      const { state, learned } = learnName(get().game, npcId, parsed.success ? parsed.data.name : '');
+      set({ game: state });
+      return { result: learned ? 'learned' : 'wrong_name' };
+    };
+
+    /**
+     * The NPC has finished a turn of Small Talk. If the Player took a turn since the last one, it counts, and lifts Mood
+     * and Familiarity if the NPC understood it. Once the chat has gone on long enough, or the NPC is busy, they wrap up.
+     */
+    const smallTalkTurnDone = () => {
+      const conversation = get().conversation;
+      if (!conversation?.smallTalk || conversation.outcome) return;
+      const { smallTalk, npcId, lines, patience } = conversation;
+      const tookTurn = lines.slice(smallTalk.countedLines).some((line) => line.speaker === 'player');
+      const counted: SmallTalk = { ...smallTalk, countedLines: lines.length };
+      if (tookTurn) {
+        counted.turns++;
+        if (!patience.spentThisTurn) {
+          const exchange = smallTalkExchange(get().game, npcId);
+          set({ game: exchange.state });
+          counted.moodChange += exchange.moodChange;
+        }
+      }
+      set({ conversation: { ...conversation, smallTalk: counted } });
+      if (counted.turns >= counted.exchanges || !isAtWork(npcId, get().game)) wrapUpSmallTalk();
+    };
+
+    /** The NPC wraps up Small Talk: they say goodbye next, and then the closing card shows. Ending it counts as meeting them. */
+    const wrapUpSmallTalk = () => {
+      const conversation = get().conversation;
+      if (!conversation?.smallTalk || conversation.outcome || !voice) return;
+      voice.sendText(WRAP_UP_SCENE);
+      settleOutcome(endSmallTalk(get().game, conversation.npcId), { kind: 'smallTalk', moodChange: conversation.smallTalk.moodChange });
     };
 
     /** Adds Help to the log, placed after the lines so far. Help already logged at this moment isn't logged twice. */
@@ -1514,7 +1601,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const pack = CULTURE_PACKS[after.identity.culturePackId];
       const remembered = sizeLastSet && jobAids(after, shift.jobId).includes('rememberedSize') ? sizeLastSet : null;
       const shiftCustomer = remembered ? { ...NEW_SHIFT_CUSTOMER, making: { ...DEFAULT_DRINK, size: remembered } } : NEW_SHIFT_CUSTOMER;
-      openConversation({ npcId: null, interaction: null, shiftCustomer }, () =>
+      openConversation({ npcId: null, interaction: null, shiftCustomer, smallTalk: null }, () =>
         buildShiftCustomerSession(customer, pack, after.proficiencyStep, { clock: after.clock }),
       );
     };
@@ -1548,8 +1635,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!conversation.outcome) settleShiftCustomer(null);
         return shiftCustomerLeft();
       }
-      // Abandoning before the outcome is decided costs nothing.
-      if (conversation && !conversation.outcome) {
+      // Abandoning before the outcome is decided costs nothing. Small Talk left early keeps the Mood it lifted.
+      if (conversation?.smallTalk && !conversation.outcome) {
+        set({ game: endSmallTalk(get().game, conversation.npcId) });
+        // Nothing else saves what the chat lifted until the next autosave.
+        dropConversation();
+        return save();
+      }
+      if (conversation?.interaction && !conversation.outcome) {
         set({ game: applyInteractionOutcome(get().game, conversation.interaction, { kind: 'abandon' }).state });
       }
       dropConversation();
@@ -1597,8 +1690,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             // Asked first, so the Journal entry the goodbye starts waits for its reading too.
             if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
             // Once the outcome is decided, the turn that just ended was the goodbye.
-            if (current.outcome) showClosingCard();
-            else updateConversation({ npcLine: null });
+            if (current.outcome) return showClosingCard();
+            updateConversation({ npcLine: null });
+            smallTalkTurnDone();
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
           onMicLevel: live((current, level: number) => {
@@ -1644,6 +1738,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           set({ toast: { kind: 'npcSteppedAway', npcId: null } });
           return shiftCustomerLeft();
         }
+        // Small Talk lost to the network still counts as meeting the NPC, and keeps the Mood it lifted.
+        if (conversation.smallTalk) set({ game: endSmallTalk(get().game, conversation.npcId) });
         return dropConversation({ toast: { kind: 'npcSteppedAway', npcId: conversation.npcId } });
       }
       set({
@@ -1686,11 +1782,30 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           ...(approach && { approach }),
           ...(onCounter.length > 0 && { basket: onCounter }),
           ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
+          relationship: relationshipWith(game, npc.id),
         });
       // An NPC who comes up to the Character stops them where they are.
       if (approach) set({ heldStill: true });
       // At the till, the cashier rings up the basket as it is now.
-      openConversation({ npcId: npc.id, interaction, shiftCustomer: null }, sessionFor, interaction.effect.kind === 'purchase' ? get().basket : []);
+      openConversation(
+        { npcId: npc.id, interaction, shiftCustomer: null, smallTalk: null },
+        sessionFor,
+        interaction.effect.kind === 'purchase' ? get().basket : [],
+      );
+    };
+
+    /** Opens Small Talk with a Named NPC, who greets the Character first. How long it goes on is drawn now. */
+    const startSmallTalkWith = (npcId: NamedNpcId) => {
+      const started = startSmallTalk(get().game);
+      const game = started.state;
+      set({ game });
+      const sessionFor: SessionFor = () =>
+        buildSmallTalkSession(CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, NAMED_NPCS[npcId], {
+          clock: game.clock,
+          relationship: relationshipWith(game, npcId),
+        });
+      const smallTalk: SmallTalk = { exchanges: started.exchanges, turns: 0, countedLines: 0, moodChange: 0 };
+      openConversation({ npcId, interaction: null, shiftCustomer: null, smallTalk }, sessionFor);
     };
 
     /** Opens a conversation with `partner`, whose session `sessionFor` builds for the shopping on the counter (`basket`). They speak first. */
@@ -1710,7 +1825,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           reconnecting: false,
           retried: false,
           usage: NO_USAGE,
-          patience: startPatience(get().game.proficiencyStep),
+          // A friend has more Patience.
+          patience: startPatience(get().game.proficiencyStep, partner.npcId ? familiarityTier(memoryOf(get().game, partner.npcId)) : 'stranger'),
           basket,
           outcome: null,
           closed: false,
@@ -2092,6 +2208,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
+        if (isNamedNpc(interactable) && key === selectSmallTalkKey(get())) return startSmallTalkWith(interactable);
+        if (key === 'T') return;
         const interaction = key === 'E' ? selectTalkWithE(get()) : selectTalkWithF(get());
         // F is only a second choice: with none, it does nothing.
         if (!interaction) return key === 'E' ? set({ toast: { kind: 'nothingToSay', npcId: interactable } }) : undefined;
@@ -2311,8 +2429,18 @@ export const selectShelf = (s: GameStore) => {
 /** The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring and the Jobs they have, or null. */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
-  if (!isTownNpc(npcId) || !(npcId in NAMED_NPCS)) return null;
-  return startedWith(npcId as NamedNpcId, { shopping: s.basket.length > 0, jobsHired: s.game.possessions.jobsHired });
+  if (!isNamedNpc(npcId)) return null;
+  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: s.game.possessions.jobsHired });
+};
+/**
+ * The key that starts Small Talk with the Named NPC the Character is next to: E with someone who has no other
+ * conversation, T with staff (whose E is their Goal Interaction), or null with no Named NPC in reach. A cashier
+ * isn't idle while the Character has shopping to pay for.
+ */
+export const selectSmallTalkKey = (s: GameStore): TalkKey | null => {
+  if (!isNamedNpc(selectInteractable(s))) return null;
+  if (selectTalkWithE(s)?.effect.kind === 'purchase') return null;
+  return selectTalkWithE(s) ? 'T' : 'E';
 };
 /** The conversation E starts with the Named NPC the Character is next to, or null. */
 export const selectTalkWithE = (s: GameStore) => talkWith(s, interactionStartedWithE);

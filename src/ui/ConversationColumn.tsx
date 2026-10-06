@@ -131,21 +131,25 @@ function ClosingCardPanel({ card, who }: { card: ClosingCard; who: string }) {
   // A meter already at its limit doesn't move, so there's nothing to show.
   const mood = card.moodChange === 0 ? [] : [card.moodChange > 0 ? t('closing.moodUp') : t('closing.moodDown')];
   const outcome =
-    card.kind === 'failure'
-      ? [t('closing.noCharge'), ...mood]
-      : [
-          // Only what happened: nothing served or paid for (the nurse letting the patient go) shows no line for it.
-          ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
-          ...(card.pointedTo ? [t('closing.pointedTo', { item: servedLine([card.pointedTo], nativeLanguage) })] : []),
-          ...(card.extendedDays ? [t('closing.moreTime', { days: card.extendedDays })] : []),
-          ...(card.hired ? [t('closing.hired', { job: t(`skills.names.${card.hired}`) })] : []),
-          ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
-          ...mood,
-        ];
+    card.kind === 'smallTalk'
+      ? mood
+      : card.kind === 'failure'
+        ? [t('closing.noCharge'), ...mood]
+        : [
+            // Only what happened: nothing served or paid for (the nurse letting the patient go) shows no line for it.
+            ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
+            ...(card.pointedTo ? [t('closing.pointedTo', { item: servedLine([card.pointedTo], nativeLanguage) })] : []),
+            ...(card.extendedDays ? [t('closing.moreTime', { days: card.extendedDays })] : []),
+            ...(card.hired ? [t('closing.hired', { job: t(`skills.names.${card.hired}`) })] : []),
+            ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
+            ...mood,
+          ];
+
+  const heading = { success: t('closing.success'), failure: t('closing.notUnderstood', { who }), smallTalk: t('closing.smallTalk') }[card.kind];
 
   return (
     <section className="closing-card" aria-label={t('closing.label')} data-outcome={card.kind}>
-      <h2>{card.kind === 'success' ? t('closing.success') : t('closing.notUnderstood', { who })}</h2>
+      <h2>{heading}</h2>
       <p>{outcome.join(' · ')}</p>
       <div className="closing-card-actions">
         <button type="button" onClick={skipRecap} autoFocus>

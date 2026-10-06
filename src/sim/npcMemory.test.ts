@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INTERACTIONS } from '../content/index.ts';
-import { applyInteractionOutcome, createSave, memoryOf, type GameState } from './index.ts';
+import { applyInteractionOutcome, createSave, FAMILIARITY, memoryOf, type GameState } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
 
 const { orderDrink } = INTERACTIONS;
@@ -28,7 +28,7 @@ describe('NPC Memory', () => {
   it('counts a first finished conversation as meeting the NPC once', () => {
     const { state } = applyInteractionOutcome(atTheCafe(), orderDrink, { kind: 'success', args: LATTE });
 
-    expect(state.people.barista).toMatchObject({ timesMet: 1, familiarity: 0, knowsName: false });
+    expect(state.people.barista).toMatchObject({ timesMet: 1, familiarity: FAMILIARITY.goalInteractionSuccess, knowsName: false });
     expect(state.people.nurse).toBeUndefined();
   });
 

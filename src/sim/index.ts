@@ -17,6 +17,17 @@ export { clampMeter } from './meters.ts';
 export { MOOD_FACES, moodFace, moodModifier, type MoodFace } from './mood.ts';
 export { announceNewcomerDiscount, newcomerDiscountStepDownDue } from './newcomerDiscount.ts';
 export { addToPhrasebook } from './phrasebook.ts';
+export {
+  endSmallTalk,
+  familiarityTier,
+  FAMILIARITY_TIERS,
+  isFamiliarAtLeast,
+  learnName,
+  rememberTopic,
+  smallTalkExchange,
+  startSmallTalk,
+  type FamiliarityTier,
+} from './familiarity.ts';
 export { memoryOf } from './npcMemory.ts';
 export {
   isOutOfPatience,

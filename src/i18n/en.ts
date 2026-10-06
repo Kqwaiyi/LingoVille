@@ -246,6 +246,10 @@ export const en = {
     cook: 'Press <kbd>E</kbd> to cook a meal',
     sleep: 'Press <kbd>E</kbd> to go to bed',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
+    /** Small Talk with someone who has no other conversation. */
+    chat: 'Press <kbd>E</kbd> to chat — {{role}}',
+    /** Small Talk with staff, beside their E. */
+    chatWithT: 'Press <kbd>T</kbd> to chat',
     tram: 'Press <kbd>E</kbd> to take the tram',
     noTram: 'No tram is running · Trams run {{opens}}–{{closes}}',
     take: 'Press <kbd>E</kbd> to take {{item}} · {{price}}',
@@ -375,6 +379,8 @@ export const en = {
   closing: {
     label: 'Conversation over',
     success: 'Done!',
+    /** Small Talk is over. It can't fail. */
+    smallTalk: 'Nice chat!',
     notUnderstood: '{{who}} couldn’t understand you',
     noCharge: 'No charge',
     pointedTo: '{{item}}: marked on the shelf',
@@ -423,6 +429,7 @@ export const en = {
     label: 'Journal page',
     customer: 'Customer {{number}}',
     shift: 'Shift — {{job}}',
+    smallTalk: 'Small Talk — {{who}}',
     when: 'Day {{day}} · {{time}}',
     noHelpNeeded: 'No Help needed',
     corrections: 'Corrections',

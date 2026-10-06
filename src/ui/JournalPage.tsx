@@ -69,7 +69,7 @@ function usePageTranslation(page: Pick<JournalPage, 'nativeLanguage'>) {
   return useTranslation(undefined, { lng: page.nativeLanguage });
 }
 
-/** A Goal Interaction page's NPC, by the name the Character knew them by then, or by their role. Null on a Shift's page. */
+/** A Goal Interaction or Small Talk page's NPC, by the name the Character knew them by then, or by their role. Null on a Shift's page. */
 function useNpcName(page: JournalPage) {
   const { t } = usePageTranslation(page);
   return page.kind === 'shift' ? null : (page.npcName ?? t(`roles.${TOWN_NPCS[page.npcId].role}.name`));
@@ -79,7 +79,12 @@ function useNpcName(page: JournalPage) {
 export function usePageHeading(page: JournalPage) {
   const { t } = usePageTranslation(page);
   const npc = useNpcName(page);
-  const who = page.kind === 'shift' ? t('page.shift', { job: t(`skills.names.${page.jobId}`) }) : npc;
+  const who =
+    page.kind === 'shift'
+      ? t('page.shift', { job: t(`skills.names.${page.jobId}`) })
+      : page.kind === 'smallTalk'
+        ? t('page.smallTalk', { who: npc })
+        : npc;
   return {
     title: `${who} · ${page.placeName}`,
     when: t('page.when', { day: page.day, time: formatClock(Math.floor(page.minuteOfDay)) }),

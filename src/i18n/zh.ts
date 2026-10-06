@@ -243,6 +243,10 @@ export const zh: UiStrings = {
     cook: '按 <kbd>E</kbd> 做饭',
     sleep: '按 <kbd>E</kbd> 上床睡觉',
     talk: '按 <kbd>E</kbd> 交谈 — {{role}}',
+    /** Small Talk with someone who has no other conversation. */
+    chat: '按 <kbd>E</kbd> 闲聊 — {{role}}',
+    /** Small Talk with staff, beside their E. */
+    chatWithT: '按 <kbd>T</kbd> 闲聊',
     tram: '按 <kbd>E</kbd> 乘坐电车',
     noTram: '电车已停运 · 运营时间 {{opens}}–{{closes}}',
     take: '按 <kbd>E</kbd> 拿取{{item}} · {{price}}',
@@ -371,6 +375,8 @@ export const zh: UiStrings = {
   closing: {
     label: '对话结束',
     success: '完成！',
+    /** Small Talk is over. It can't fail. */
+    smallTalk: '聊得很开心！',
     notUnderstood: '{{who}}没听懂你的话',
     noCharge: '未收费',
     pointedTo: '{{item}}：已在货架上标出',
@@ -416,6 +422,7 @@ export const zh: UiStrings = {
     label: '日记页',
     customer: '顾客 {{number}}',
     shift: '班次 — {{job}}',
+    smallTalk: '闲聊 — {{who}}',
     when: '第 {{day}} 天 · {{time}}',
     noHelpNeeded: '无需帮助',
     corrections: '纠正',

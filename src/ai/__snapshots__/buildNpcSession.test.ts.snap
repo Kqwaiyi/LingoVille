@@ -12,6 +12,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -89,6 +90,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -133,6 +150,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -210,6 +228,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -254,6 +288,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -330,6 +365,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -374,6 +425,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -450,6 +502,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -494,6 +562,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -570,6 +639,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -614,6 +699,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -695,6 +781,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -734,6 +836,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -811,6 +914,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -855,6 +974,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -932,6 +1052,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -976,6 +1112,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -1052,6 +1189,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -1096,6 +1249,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -1172,6 +1326,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -1216,6 +1386,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -1292,6 +1463,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -1336,6 +1523,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -1417,6 +1605,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -1456,6 +1660,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -1533,6 +1738,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "items",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -1577,6 +1798,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -1659,6 +1881,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -1698,6 +1936,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -1779,6 +2018,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -1818,6 +2073,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -1899,6 +2155,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -1938,6 +2210,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -2019,6 +2292,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2058,6 +2347,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -2139,6 +2429,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2178,6 +2484,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -2260,6 +2567,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2299,6 +2622,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -2381,6 +2705,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2420,6 +2760,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -2501,6 +2842,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2540,6 +2897,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -2621,6 +2979,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2660,6 +3034,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -2741,6 +3116,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2780,6 +3171,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -2861,6 +3253,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2900,6 +3308,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This patient is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any patient.
+If the patient tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the patient does, even to help them.
@@ -2954,6 +3363,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when the patient tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2993,6 +3418,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This patient is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any patient.
+If the patient tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the patient does, even to help them.
@@ -3047,6 +3473,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when the patient tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3086,6 +3528,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This patient is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any patient.
+If the patient tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the patient does, even to help them.
@@ -3140,6 +3583,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when the patient tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3179,6 +3638,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This patient is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any patient.
+If the patient tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the patient does, even to help them.
@@ -3228,6 +3688,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
         },
         "required": [
           "feeling",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the patient tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -3725,6 +4201,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3808,6 +4300,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
         },
         "required": [
           "understood",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -3901,6 +4409,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3984,6 +4508,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
         },
         "required": [
           "understood",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -4080,6 +4620,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4166,6 +4722,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
         },
         "required": [
           "amount",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -4262,6 +4834,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4348,6 +4936,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
         },
         "required": [
           "amount",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when the tenant tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
         ],
         "type": "OBJECT",
       },
@@ -4796,6 +5400,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -4859,6 +5464,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4898,6 +5519,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -4958,6 +5580,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4997,6 +5635,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only German. Never use any other language, even if the customer does, even to help them.
@@ -5075,6 +5714,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5114,6 +5769,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -5177,6 +5833,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5216,6 +5888,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -5276,6 +5949,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5315,6 +6004,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only British English. Never use any other language, even if the customer does, even to help them.
@@ -5393,6 +6083,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5432,6 +6138,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -5495,6 +6202,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5534,6 +6257,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -5594,6 +6318,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5633,6 +6373,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Japanese. Never use any other language, even if the customer does, even to help them.
@@ -5711,6 +6452,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5750,6 +6507,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -5813,6 +6571,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5852,6 +6626,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -5912,6 +6687,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5951,6 +6742,7 @@ Talk like a real, friendly person at work.
 YOU AND THIS PERSON
 This customer is a stranger: you have never met. You don't know their name and don't ask for it.
 Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
 
 LANGUAGE RULES
 - Speak only Mandarin Chinese. Never use any other language, even if the customer does, even to help them.
@@ -6029,6 +6821,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6052,6 +6860,194 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
   "voice": {
     "npcId": "convenience-clerk",
     "targetLanguage": "zh",
+  },
+}
+`;
+
+exports[`buildNpcSession: you and this person > treats a friend as one, by name, following up on the last topic 1`] = `
+"YOU AND THIS PERSON
+This customer is a friend: you have talked many times, and you are always glad to see them.
+Speak to them warmly, as to a friend, but still politely.
+Greet them by name: Sam.
+Last time you talked about their trip to the seaside. Follow up on it once, naturally, early on.
+You have already told them which gift you would love most.
+
+"
+`;
+
+exports[`buildNpcSession: you and this person > treats a stranger as one 1`] = `
+"YOU AND THIS PERSON
+This customer is a stranger: you have never met. You don't know their name and don't ask for it.
+Speak to them politely, as you would to any customer.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
+
+"
+`;
+
+exports[`buildSmallTalkSession > builds Small Talk with a barista who is a friend 1`] = `
+{
+  "openingScene": "[SCENE: A customer you might chat with comes up to you. Greet them first.]",
+  "systemInstruction": "WHO YOU ARE
+You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
+You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
+The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+Talk like a real, friendly person at work.
+
+YOU AND THIS PERSON
+This customer is a friend: you have talked many times, and you are always glad to see them.
+Speak to them warmly, as to a friend, but still politely.
+Greet them by name: Sam.
+Last time you talked about their trip to the seaside. Follow up on it once, naturally, early on.
+You have already told them which gift you would love most.
+
+LANGUAGE RULES
+- Speak only Japanese. Never use any other language, even if the customer does, even to help them.
+- You understand loanwords and international words (for example "coffee" or "latte"), alone or inside fragmentary Japanese.
+- If you cannot make sense of what they said at all (gibberish, nothing heard, or a whole sentence in another language), first call not_understood, then say briefly in simple Japanese that you didn't understand.
+- If you understood their meaning, even with mistakes, do not call not_understood. If you need a detail, just ask: clarifying is normal and costs nothing.
+- If not_understood answers "out_of_patience", apologise politely in Japanese and say goodbye: the conversation is over.
+- Never mention tools, functions, patience or that this is a game.
+
+HOW TO SPEAK
+The customer is an elementary learner (CEFR A2). Use everyday words and simple grammar.
+Say one or two short sentences per turn.
+Speak slowly and clearly.
+Offer choices up front when it helps.
+The first time they seem lost, say the same thing once more, more simply. After that, just ask again.
+
+YOUR GOAL
+This is Small Talk: a friendly, casual chat with no goal, which cannot go wrong.
+- Chat about everyday things: the weather, the town, your day, what the customer has been up to. Ask them questions, answer theirs, and keep it light.
+- If they ask for something you would do for them at work (ordering, buying, paying, asking for help), say kindly that they can come to the counter for that, and carry on chatting. Don't do it now.
+- Don't end the chat yourself: keep chatting until a scene tells you to wrap up.
+
+THE SITUATION
+It is 07:12 on a Monday morning.
+A "[SCENE: ...]" message tells you what is happening; it is not the customer speaking. The first one means a customer has just walked up to you: greet them first.",
+  "tools": [
+    {
+      "description": "Call this when the customer tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
+      "name": "not_understood",
+      "parameters": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "unintelligible",
+              "other_language",
+              "nothing_heard",
+            ],
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "reason",
+        ],
+        "type": "OBJECT",
+      },
+    },
+  ],
+  "voice": {
+    "npcId": "barista",
+    "targetLanguage": "ja",
+  },
+}
+`;
+
+exports[`buildSmallTalkSession > builds Small Talk with a park regular who is a stranger 1`] = `
+{
+  "openingScene": "[SCENE: A person you might chat with comes up to you. Greet them first.]",
+  "systemInstruction": "WHO YOU ARE
+You are Arthur, one of the regulars at Victoria Park, the town park, in a small town in the UK, where everyone speaks British English.
+You are 74: cheerful and talkative, a retiree with all the time in the world. Quirks: feeds the pigeons from a paper bag and knows the weather forecast for the whole week.
+The gift you would love most is a bag of birdseed. Don't bring it up yourself.
+Talk like a real, friendly person.
+
+YOU AND THIS PERSON
+This person is a stranger: you don't really know them yet.
+Speak to them politely, as you would to any person.
+If the person tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
+
+LANGUAGE RULES
+- Speak only British English. Never use any other language, even if the person does, even to help them.
+- You understand loanwords and international words (for example "coffee" or "latte"), alone or inside fragmentary British English.
+- If you cannot make sense of what they said at all (gibberish, nothing heard, or a whole sentence in another language), first call not_understood, then say briefly in simple British English that you didn't understand.
+- If you understood their meaning, even with mistakes, do not call not_understood. If you need a detail, just ask: clarifying is normal and costs nothing.
+- If not_understood answers "out_of_patience", apologise politely in British English and say goodbye: the conversation is over.
+- Never mention tools, functions, patience or that this is a game.
+
+HOW TO SPEAK
+The person is an elementary learner (CEFR A2). Use everyday words and simple grammar.
+Say one or two short sentences per turn.
+Speak slowly and clearly.
+Offer choices up front when it helps.
+The first time they seem lost, say the same thing once more, more simply. After that, just ask again.
+
+YOUR GOAL
+This is Small Talk: a friendly, casual chat with no goal, which cannot go wrong.
+- Chat about everyday things: the weather, the town, your day, what the person has been up to. Ask them questions, answer theirs, and keep it light.
+- If they ask you to do something for them, say kindly that you can't help with that here, and carry on chatting.
+- Don't end the chat yourself: keep chatting until a scene tells you to wrap up.
+
+THE SITUATION
+It is 07:12 on a Monday morning.
+A "[SCENE: ...]" message tells you what is happening; it is not the person speaking. The first one means a person has just walked up to you: greet them first.",
+  "tools": [
+    {
+      "description": "Call this when the person tells you their name, with the name as they said it.",
+      "name": "learn_name",
+      "parameters": {
+        "properties": {
+          "name": {
+            "description": "Their name, as they said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this only when you could not make sense of what the person just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
+      "name": "not_understood",
+      "parameters": {
+        "properties": {
+          "reason": {
+            "enum": [
+              "unintelligible",
+              "other_language",
+              "nothing_heard",
+            ],
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "reason",
+        ],
+        "type": "OBJECT",
+      },
+    },
+  ],
+  "voice": {
+    "npcId": "park-regular-1",
+    "targetLanguage": "en",
   },
 }
 `;
