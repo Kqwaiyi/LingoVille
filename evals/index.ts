@@ -1,8 +1,10 @@
 // Entry point of the eval harness (`npm run eval`). Never imported by app or gateway code.
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
+import { openBrowserSocket } from '../src/voice/browserIo.ts';
 import { CASES } from './cases/index.ts';
 import { runEval } from './runEval.ts';
 
@@ -34,6 +36,16 @@ const outcome = await runEval({
   reportsDir: join(import.meta.dirname, 'reports'),
   baselinePath: join(import.meta.dirname, 'baseline.json'),
   log: (line) => console.log(line),
+  // Node's WebSocket is the browser's, so the game's own socket edge works here too.
+  openLiveSocket: openBrowserSocket,
+  readRecording: async (file) => {
+    try {
+      return await readFile(join(import.meta.dirname, 'recordings', file));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  },
 });
 
 process.exitCode = outcome.ran && !outcome.passed ? 1 : 0;

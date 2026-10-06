@@ -100,33 +100,41 @@ function requestedVoice(body: unknown): string | undefined {
   return SHIFT_CUSTOMER_VOICES[seed % SHIFT_CUSTOMER_VOICES.length];
 }
 
+/** Where and how a Live session with this prebuilt voice opens. */
+export const liveSessionTarget = (voiceName: string) => ({
+  model: MODELS.live,
+  voiceName,
+  url: `${GEMINI_LIVE_WS_BASE}${ENDPOINT_VERSIONS.live}.${LIVE_ENDPOINT}`,
+});
+
+/** Mints a one-use ephemeral token for one Live session. Throws with Gemini's answer when it can't. */
+export async function mintLiveToken(apiKey: string, deps: GatewayDeps): Promise<string> {
+  const now = deps.now();
+  const upstream = await deps.fetch(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.authTokens}/auth_tokens`, {
+    method: 'POST',
+    headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      uses: 1,
+      expireTime: new Date(now + TOKEN_LIFETIME_MS).toISOString(),
+      newSessionExpireTime: new Date(now + NEW_SESSION_WITHIN_MS).toISOString(),
+    }),
+  });
+  const body = (await upstream.json()) as { name?: unknown };
+  if (!upstream.ok || typeof body.name !== 'string') throw new Error(`auth_tokens ${upstream.status}: ${JSON.stringify(body)}`);
+  return body.name;
+}
+
 /** POST /api/token: a one-use ephemeral token for one Live session, with everything the browser needs to open it. */
 async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
   const voiceName = requestedVoice(await readJson(req));
   if (!voiceName) return sendJson(res, 400, { error: 'bad_request' });
 
-  const session = {
-    model: MODELS.live,
-    voiceName,
-    url: `${GEMINI_LIVE_WS_BASE}${ENDPOINT_VERSIONS.live}.${LIVE_ENDPOINT}`,
-  };
+  const session = liveSessionTarget(voiceName);
   if (env.mock) return sendJson(res, 200, { mock: true, token: MOCK_TOKEN, ...session });
   if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
 
-  const now = deps.now();
   try {
-    const upstream = await deps.fetch(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.authTokens}/auth_tokens`, {
-      method: 'POST',
-      headers: { 'x-goog-api-key': env.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uses: 1,
-        expireTime: new Date(now + TOKEN_LIFETIME_MS).toISOString(),
-        newSessionExpireTime: new Date(now + NEW_SESSION_WITHIN_MS).toISOString(),
-      }),
-    });
-    const body = (await upstream.json()) as { name?: unknown };
-    if (!upstream.ok || typeof body.name !== 'string') throw new Error(`auth_tokens ${upstream.status}: ${JSON.stringify(body)}`);
-    return sendJson(res, 200, { mock: false, token: body.name, ...session });
+    return sendJson(res, 200, { mock: false, token: await mintLiveToken(env.apiKey, deps), ...session });
   } catch (error) {
     // Gemini's answer stays in the gateway log; the browser only learns that voice is unavailable.
     console.warn('[gateway] could not mint a Live token:', error instanceof Error ? error.message : error);

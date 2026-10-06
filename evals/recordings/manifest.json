@@ -1,0 +1,12 @@
+{
+  "recordings": [
+    { "file": "zh-order-latte.wav", "language": "zh", "intended": "我要一杯热拿铁", "note": "Say 一杯 as yī bǎi, the way it came out in the voice prototype." },
+    { "file": "zh-order-two-teas.wav", "language": "zh", "intended": "我要两杯红茶", "note": "Hesitate before 红茶." },
+    { "file": "zh-confirm-dui.wav", "language": "zh", "intended": "对", "note": "Short, a little quiet." },
+    { "file": "ja-order-latte.wav", "language": "ja", "intended": "ホットラテをひとつください", "note": "Say ラテ as ラッテ." },
+    { "file": "ja-order-melon-bread.wav", "language": "ja", "intended": "メロンパンをひとつください", "note": "Drop the を." },
+    { "file": "ja-confirm-hai.wav", "language": "ja", "intended": "はい", "note": "Short, a little quiet." },
+    { "file": "en-order-latte.wav", "language": "en", "intended": "One latte, please", "note": "Say latte as lah-tay." },
+    { "file": "de-order-latte.wav", "language": "de", "intended": "Einen Latte macchiato, bitte", "note": "Say Einen as Ein." }
+  ]
+}
