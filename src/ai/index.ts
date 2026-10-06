@@ -2,8 +2,11 @@
 export type { FunctionDeclaration } from '../content/index.ts';
 export {
   buildShiftCustomerSession,
+  readChangedOrder,
+  readChangeScene,
   readServedScene,
   readShiftOrder,
+  shiftCustomerChangeScene,
   shiftCustomerServedScene,
   type ShiftCustomerContext,
 } from './shiftCustomerSession.ts';

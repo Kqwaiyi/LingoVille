@@ -5,6 +5,8 @@
 // Sections marked "default" are the spec's open questions 4 (Mood) and 5 (other
 // tuning numbers): starting guesses, to be adjusted in playtesting.
 
+import type { Band } from '../content/index.ts';
+
 export const MINUTES_PER_HOUR = 60;
 
 // --- Meters -----------------------------------------------------------------
@@ -107,6 +109,8 @@ export const ECONOMY = {
   /** Money is held in Shifts, so one Shift's base pay is 1 by definition. Every price is a ratio of it. */
   shiftBasePayInShifts: 1,
   shiftCustomers: { min: 5, max: 8 },
+  /** How Shift Customers are mixed: the share from the Player's own band, the one below and the one above. */
+  shiftCustomerMix: { ownBand: 0.6, bandBelow: 0.3, bandAbove: 0.1 },
   jobLifeSkillPayRaisePerLevel: 0.06,
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
@@ -116,6 +120,9 @@ export const ECONOMY = {
 
 export const PROFICIENCY_STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 export type ProficiencyStep = (typeof PROFICIENCY_STEPS)[number];
+
+/** The band of Shift Customers at each Proficiency Step: B = A1–A2, I = B1–B2, A = C1–C2. */
+export const STEP_BANDS: Record<ProficiencyStep, Band> = { A1: 'B', A2: 'B', B1: 'I', B2: 'I', C1: 'A', C2: 'A' };
 
 /** The steps the self-assessment in New game setup can start the Character at. */
 export const STARTING_STEPS = ['A1', 'A2', 'B1', 'B2'] as const satisfies readonly ProficiencyStep[];

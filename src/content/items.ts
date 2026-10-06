@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { WELL_BEING } from '../sim/index.ts';
 
 // The shared catalogue of things the town sells. What an item does and what it
@@ -9,6 +10,32 @@ export type ItemId = (typeof ITEM_IDS)[number];
 
 /** What the café serves, in every pack. Its menu board and its order interaction both read this. */
 export const CAFE_MENU = ['latte', 'coffee', 'tea', 'pastry'] as const satisfies readonly ItemId[];
+
+/** The sizes a café drink is made in. */
+export const DRINK_SIZES = ['small', 'medium', 'large'] as const;
+export type DrinkSize = (typeof DRINK_SIZES)[number];
+
+/** A café drink is made hot or iced. */
+export const DRINK_TEMPERATURES = ['hot', 'iced'] as const;
+export type DrinkTemperature = (typeof DRINK_TEMPERATURES)[number];
+
+/** What can be added to a café drink. */
+export const DRINK_EXTRAS = ['milk', 'sugar', 'extra-shot', 'lemon'] as const;
+export type DrinkExtra = (typeof DRINK_EXTRAS)[number];
+
+/** Every way a café drink can be made, which each Culture Pack names. */
+export const DRINK_OPTIONS = [...DRINK_SIZES, ...DRINK_TEMPERATURES, ...DRINK_EXTRAS] as const;
+export type DrinkOptionId = (typeof DRINK_OPTIONS)[number];
+
+/** How one café drink is made: a size, hot or iced, and any extras. */
+export type DrinkModifiers = { size: DrinkSize; temperature: DrinkTemperature; extras: readonly DrinkExtra[] };
+
+/** The schema of how a café drink is made, for anything that stores or sends one. */
+export const drinkModifiersSchema = z.object({
+  size: z.enum(DRINK_SIZES),
+  temperature: z.enum(DRINK_TEMPERATURES),
+  extras: z.array(z.enum(DRINK_EXTRAS)).readonly(),
+}) satisfies z.ZodType<DrinkModifiers>;
 
 /** What the convenience store sells over the counter, in every pack: a hot snack, and a bento it heats up. */
 export const CONVENIENCE_MENU = ['snack', 'bento'] as const satisfies readonly ItemId[];

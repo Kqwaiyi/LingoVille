@@ -4,6 +4,7 @@ import {
   basketChangedScene,
   buildNpcSession,
   buildShiftCustomerSession,
+  shiftCustomerChangeScene,
   checkReadings,
   hasReadingAids,
   NOT_UNDERSTOOD_TOOL,
@@ -27,8 +28,10 @@ import {
   APPEARANCE_PRESET_IDS,
   approachInteraction,
   CULTURE_PACKS,
+  DEFAULT_DRINK,
   GROCERIES_SOLD,
   interactionStartedWithE,
+  isDrink,
   interactionStartedWithF,
   jobAt,
   JOB_PLACES,
@@ -38,9 +41,13 @@ import {
   placeHours,
   placePhrasebook,
   SHIFT_MENUS,
-  shiftTemplate,
+  shiftTemplates,
   worldSign,
   type AppearancePresetId,
+  type DrinkExtra,
+  type DrinkModifiers,
+  type DrinkSize,
+  type DrinkTemperature,
   type GroceryId,
   type Interaction,
   type ItemId,
@@ -100,6 +107,13 @@ import {
   weekdayOf,
   type ApproachId,
   type Basket,
+  type ShiftOrder,
+  addToTray,
+  clearTray,
+  EMPTY_TRAY,
+  redoTray,
+  undoTray,
+  type TrayHistory,
   type ConversationEvidence,
   type GameState,
   type InventoryItem,
@@ -325,15 +339,23 @@ export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }
 /** How a Shift Customer was dealt with: served what they ordered, served something else, or gone unserved. */
 export type ShiftCustomerOutcome = { kind: ShiftRecapCustomer['result'] };
 
-/** The Shift Customer at the counter, as the conversation shows them: what the Player has put on the tray to serve. */
-export type ShiftCustomerView = { tray: Basket };
+/**
+ * The Shift Customer at the counter, as the conversation shows them: what the Player has put on the tray to serve
+ * (and can undo and redo), how the modifier toggles say the next drink is made, and whether a customer who changes
+ * their mind has been told the Player has started on their order.
+ */
+export type ShiftCustomerView = TrayHistory & { making: DrinkModifiers; startedOn: boolean };
+
+/** A Shift Customer walks up to an empty tray, with the toggles set to make the default drink. */
+const NEW_SHIFT_CUSTOMER: ShiftCustomerView = { ...EMPTY_TRAY, making: DEFAULT_DRINK, startedOn: false };
 
 /** A Shift Customer the Player dealt with, kept for the Shift's Recap: their order, how it went, and their conversation once they've gone. */
 type ShiftLogEntry = {
   conversationId: number;
-  order: Basket;
+  order: ShiftOrder;
+  changedFrom: ShiftOrder | null;
   result: ShiftCustomerOutcome['kind'];
-  served: Basket;
+  served: ShiftOrder;
   conversation: Conversation | null;
 };
 
@@ -645,9 +667,16 @@ export type GameStore = {
   sleep: () => void;
   /** E at a staff door during opening hours, once hired there: starts the day's Shift, and the first Shift Customer walks up. */
   startShift: () => void;
-  /** Taps a drink on the menu grid: one more of it onto the tray for the Shift Customer. */
+  /** Taps the menu grid: one more of the item onto the tray for the Shift Customer, a drink made as the toggles say. */
   tapMenuItem: (itemId: ItemId) => void;
+  /** The modifier toggles: how the next drink tapped is made. */
+  setDrinkSize: (size: DrinkSize) => void;
+  setDrinkTemperature: (temperature: DrinkTemperature) => void;
+  toggleDrinkExtra: (extra: DrinkExtra) => void;
   clearTray: () => void;
+  /** Takes back the last change to the tray, or puts back the last one taken back. */
+  undoTray: () => void;
+  redoTray: () => void;
   /** Hands the Shift Customer what is on the tray. It is checked exactly against their order. */
   serveTray: () => void;
   /** Closes the pay shown at the end of a Shift. */
@@ -1243,16 +1272,39 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * The Shift Customer at the counter is dealt with: served what is on the tray, or gone unserved (null). The sim
      * checks it exactly, and it's saved. The customer says goodbye next, then leaves. Returns whether it was their order.
      */
-    const settleShiftCustomer = (served: Basket | null) => {
+    const settleShiftCustomer = (served: ShiftOrder | null) => {
       const { game, conversation } = get();
       const customer = game.possessions.shift?.customer;
       const { state, correct } = applyShiftCustomer(game, served);
       const result = correct ? 'served' : served ? 'wrongOrder' : 'walkedOut';
-      if (customer && conversation) shiftLog.push({ conversationId: conversation.id, order: customer.order, result, served: served ?? [], conversation: null });
+      if (customer && conversation) {
+        const { order, changedFrom } = customer;
+        shiftLog.push({ conversationId: conversation.id, order, changedFrom, result, served: served ?? [], conversation: null });
+      }
       set({ game: state });
       updateConversation({ outcome: { kind: result } });
       save();
       return correct;
+    };
+
+    /** Changes the Shift Customer at the counter as the conversation shows them (the tray, the toggles), while they can still be served. */
+    const changeShiftCustomer = (change: (view: ShiftCustomerView) => ShiftCustomerView) => {
+      const conversation = get().conversation;
+      if (!conversation?.shiftCustomer || conversation.outcome) return;
+      set({ conversation: { ...conversation, shiftCustomer: change(conversation.shiftCustomer) } });
+    };
+
+    /**
+     * Once the Player has started on their order (something is on the tray), a Shift Customer who changes their mind
+     * is told, once, as soon as they can hear it: at once, or when a dropped connection is back.
+     */
+    const tellStartedOn = () => {
+      const conversation = get().conversation;
+      const view = conversation?.shiftCustomer;
+      if (!view || view.startedOn || view.tray.length === 0 || !get().game.possessions.shift?.customer?.changedFrom) return;
+      if (!canTakeTurn(conversation) || !voice) return;
+      changeShiftCustomer((before) => ({ ...before, startedOn: true }));
+      voice.sendText(shiftCustomerChangeScene());
     };
 
     /**
@@ -1292,8 +1344,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const { game, nativeLanguage } = get();
       const { culturePackId, targetLanguage } = game.identity;
       const listenedAt = game.proficiencyStep;
-      const dealtWith: ShiftRecapCustomer[] = log.map(({ order, result, served: handed, conversation }) => ({
+      const dealtWith: ShiftRecapCustomer[] = log.map(({ order, changedFrom, result, served: handed, conversation }) => ({
         order,
+        ...(changedFrom && { changedFrom }),
         result,
         served: handed,
         transcript: transcriptOf(conversation?.lines ?? []),
@@ -1367,13 +1420,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const { game } = get();
       const { shift } = game.possessions;
       if (!shift) return;
-      const template = shiftTemplate(shift.jobId);
-      if (!template || shift.served + shift.failed >= shift.customers) return finishShift();
-      const after = nextShiftCustomer(game, template.drinks);
+      const templates = shiftTemplates(shift.jobId);
+      if (templates.length === 0 || shift.served + shift.failed >= shift.customers) return finishShift();
+      const after = nextShiftCustomer(game, templates);
       set({ game: after });
       const customer = after.possessions.shift!.customer!;
       const pack = CULTURE_PACKS[after.identity.culturePackId];
-      openConversation({ npcId: null, interaction: null, shiftCustomer: { tray: [] } }, () =>
+      openConversation({ npcId: null, interaction: null, shiftCustomer: NEW_SHIFT_CUSTOMER }, () =>
         buildShiftCustomerSession(customer, pack, after.proficiencyStep, { clock: after.clock }),
       );
     };
@@ -1470,7 +1523,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       );
       voice = session;
       session.connect().then(
-        live(() => updateConversation({ reconnecting: false })),
+        live(() => {
+          updateConversation({ reconnecting: false });
+          tellStartedOn();
+        }),
         live((current, error: unknown) => connectionFailed(current, sessionFor, error)),
       );
     };
@@ -1880,16 +1936,22 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         nextShiftCustomerOrEnd();
       },
       tapMenuItem: (itemId) => {
-        const conversation = get().conversation;
         const { shift } = get().game.possessions;
-        if (!conversation?.shiftCustomer || conversation.outcome || !shift || !SHIFT_MENUS[shift.jobId]?.includes(itemId)) return;
-        set({ conversation: { ...conversation, shiftCustomer: { tray: addToBasket(conversation.shiftCustomer.tray, itemId) } } });
+        if (!shift || !SHIFT_MENUS[shift.jobId]?.includes(itemId)) return;
+        changeShiftCustomer((view) => ({ ...view, ...addToTray(view, itemId, isDrink(itemId) ? view.making : null) }));
+        tellStartedOn();
       },
-      clearTray: () => {
-        const conversation = get().conversation;
-        if (!conversation?.shiftCustomer || conversation.outcome) return;
-        set({ conversation: { ...conversation, shiftCustomer: { tray: [] } } });
-      },
+      setDrinkSize: (size) => changeShiftCustomer((view) => ({ ...view, making: { ...view.making, size } })),
+      setDrinkTemperature: (temperature) => changeShiftCustomer((view) => ({ ...view, making: { ...view.making, temperature } })),
+      toggleDrinkExtra: (extra) =>
+        changeShiftCustomer((view) => {
+          const { extras } = view.making;
+          const toggled = extras.includes(extra) ? extras.filter((e) => e !== extra) : [...extras, extra];
+          return { ...view, making: { ...view.making, extras: toggled } };
+        }),
+      clearTray: () => changeShiftCustomer((view) => ({ ...view, ...clearTray(view) })),
+      undoTray: () => changeShiftCustomer((view) => ({ ...view, ...undoTray(view) })),
+      redoTray: () => changeShiftCustomer((view) => ({ ...view, ...redoTray(view) })),
       serveTray: () => {
         const conversation = get().conversation;
         if (!conversation?.shiftCustomer || !canTakeTurn(conversation) || !voice || conversation.shiftCustomer.tray.length === 0) return;
@@ -2287,11 +2349,16 @@ export const selectShiftMenu = (s: GameStore): readonly ItemId[] => {
   const { shift } = s.game.possessions;
   return (shift && SHIFT_MENUS[shift.jobId]) || NO_ITEMS;
 };
-const EMPTY_TRAY: Basket = [];
+const NOTHING_ON_THE_TRAY: ShiftOrder = [];
 /** The Shift Customer at the counter can still be served: the grid takes taps until they've been dealt with. */
 export const selectCanTapMenu = (s: GameStore) => s.conversation?.shiftCustomer != null && !s.conversation.outcome;
 /** What is on the tray for the Shift Customer at the counter. */
-export const selectTray = (s: GameStore): Basket => s.conversation?.shiftCustomer?.tray ?? EMPTY_TRAY;
+export const selectTray = (s: GameStore): ShiftOrder => s.conversation?.shiftCustomer?.tray ?? NOTHING_ON_THE_TRAY;
+/** How the modifier toggles say the next drink tapped is made. */
+export const selectDrinkModifiers = (s: GameStore): DrinkModifiers => s.conversation?.shiftCustomer?.making ?? DEFAULT_DRINK;
+/** There's a change to the tray to take back, or one taken back to put back, while the customer can still be served. */
+export const selectCanUndoTray = (s: GameStore) => selectCanTapMenu(s) && s.conversation!.shiftCustomer!.undo.length > 0;
+export const selectCanRedoTray = (s: GameStore) => selectCanTapMenu(s) && s.conversation!.shiftCustomer!.redo.length > 0;
 /** Serve can be pressed: something is on the tray, and the customer is listening (not while the Player talks, Help is open or the connection is coming back). */
 export const selectCanServe = (s: GameStore) => {
   const { conversation } = s;

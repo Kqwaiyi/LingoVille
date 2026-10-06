@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { NpcSession, Recap, RecapRequest, ToolResponse } from '../ai/index.ts';
-import { SHIFT_TEMPLATES, type ItemId } from '../content/index.ts';
-import { createSave, ECONOMY, hire, PROFICIENCY_STEP_TABLE, type GameState } from '../sim/index.ts';
+import { DRINK_EXTRAS, SHIFT_TEMPLATES, type DrinkModifiers, type ItemId } from '../content/index.ts';
+import { createSave, ECONOMY, hire, PROFICIENCY_STEP_TABLE, type GameState, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { VoiceServiceUnavailableError, type OpenVoiceSession, type VoiceSessionEvents } from '../voice/index.ts';
 import {
   createGameStore,
@@ -11,8 +11,11 @@ import {
   SAVE_SCHEMA_VERSION,
   type Journal,
   type NewJournalEntry,
+  selectCanRedoTray,
+  selectCanUndoTray,
   selectClosingCard,
   selectConversation,
+  selectDrinkModifiers,
   selectShift,
   selectShiftEnd,
   selectStaffDoor,
@@ -91,14 +94,42 @@ function atTheStaffDoor(change: (game: GameState) => GameState = (game) => game)
 /** The hidden order of the customer at the counter, as the sim holds it. */
 const orderNow = (store: ReturnType<typeof createGameStore>) => store.getState().game.possessions.shift!.customer!.order;
 
+/** Sets the modifier toggles to make a drink this way. */
+function makeAs(store: ReturnType<typeof createGameStore>, { size, temperature, extras }: DrinkModifiers) {
+  store.getState().setDrinkSize(size);
+  store.getState().setDrinkTemperature(temperature);
+  for (const extra of DRINK_EXTRAS) if (selectDrinkModifiers(store.getState()).extras.includes(extra) !== extras.includes(extra)) store.getState().toggleDrinkExtra(extra);
+}
+
+/** Taps the order onto the tray, each drink made as it was ordered. */
+function tapOrder(store: ReturnType<typeof createGameStore>, items: ShiftOrder) {
+  for (const { itemId, quantity, modifiers } of items) {
+    if (modifiers) makeAs(store, modifiers);
+    for (let i = 0; i < quantity; i++) store.getState().tapMenuItem(itemId);
+  }
+}
+
 /** Taps the menu grid for the order, serves it, and lets the customer say goodbye. */
-function serve(store: ReturnType<typeof createGameStore>, customers: ReturnType<typeof fakeCustomers>, items: readonly { itemId: ItemId; quantity: number }[]) {
-  for (const { itemId, quantity } of items) for (let i = 0; i < quantity; i++) store.getState().tapMenuItem(itemId);
+function serve(store: ReturnType<typeof createGameStore>, customers: ReturnType<typeof fakeCustomers>, items: ShiftOrder) {
+  tapOrder(store, items);
   store.getState().serveTray();
   customers.says('ありがとう！');
 }
 
-const wrongDrinkFor = (itemId: ItemId) => SHIFT_TEMPLATES.barista.drinks.find((drink) => drink !== itemId)!;
+/** What is on the tray, ignoring how each drink is made: all a single-drink customer cares about. */
+const trayItems = (store: ReturnType<typeof createGameStore>) => selectTray(store.getState()).map(({ itemId, quantity }) => ({ itemId, quantity }));
+
+const wrongDrinkFor = (itemId: ItemId) => SHIFT_TEMPLATES.barista[0].drinks.find((drink) => drink !== itemId)!;
+
+/** The customer at the counter is this one instead, as if they'd been drawn. */
+function customerIs(store: ReturnType<typeof createGameStore>, customer: Partial<ShiftCustomer>) {
+  const { game } = store.getState();
+  const shift = game.possessions.shift!;
+  store.setState({ game: { ...game, possessions: { ...game.possessions, shift: { ...shift, customer: { ...shift.customer!, ...customer } } } } });
+}
+
+const ICED_TEA: ShiftOrder = [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }];
+const HOT_COFFEE: ShiftOrder = [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }];
 
 describe('the staff door', () => {
   it('starts a Shift with E during opening hours: a Shift Customer walks up and speaks first', () => {
@@ -146,7 +177,7 @@ describe('serving Shift Customers', () => {
     store.getState().startShift();
     const order = orderNow(store);
     for (const { itemId } of order) store.getState().tapMenuItem(itemId);
-    expect(selectTray(store.getState())).toEqual(order);
+    expect(trayItems(store)).toEqual(order);
 
     store.getState().serveTray();
 
@@ -176,6 +207,78 @@ describe('serving Shift Customers', () => {
     store.getState().tapMenuItem(wrongDrinkFor(orderNow(store)[0]!.itemId));
     store.getState().clearTray();
     expect(selectTray(store.getState())).toEqual([]);
+  });
+
+  it('makes each drink as the modifier toggles are set, starting each customer at a medium hot drink with nothing added', () => {
+    const { store, customers } = atTheStaffDoor();
+    store.getState().startShift();
+    expect(selectDrinkModifiers(store.getState())).toEqual({ size: 'medium', temperature: 'hot', extras: [] });
+
+    makeAs(store, ICED_TEA[0]!.modifiers!);
+    store.getState().tapMenuItem('tea');
+    store.getState().tapMenuItem('pastry');
+
+    expect(selectTray(store.getState())).toEqual([...ICED_TEA, { itemId: 'pastry', quantity: 1 }]);
+    store.getState().serveTray();
+    customers.says('ありがとう！');
+    expect(selectDrinkModifiers(store.getState())).toEqual({ size: 'medium', temperature: 'hot', extras: [] });
+  });
+
+  it('serves a customer who ordered a drink made to order only when it is made exactly so', () => {
+    const { store, customers } = atTheStaffDoor();
+    store.getState().startShift();
+    customerIs(store, { templateId: 'barista-made-to-order', order: ICED_TEA });
+    serve(store, customers, [{ ...ICED_TEA[0]!, modifiers: { ...ICED_TEA[0]!.modifiers!, temperature: 'hot' } }]);
+    expect(customers.opened[0]!.sent.at(-1)).toMatch(/That is not what you ordered/);
+
+    customerIs(store, { templateId: 'barista-made-to-order', order: ICED_TEA });
+    serve(store, customers, ICED_TEA);
+    expect(customers.opened[1]!.sent.at(-1)).toMatch(/That is what you ordered/);
+    expect(selectShift(store.getState())).toMatchObject({ done: 2, served: 1 });
+  });
+
+  it('undoes and redoes changes to the tray, clearing included', () => {
+    const { store } = atTheStaffDoor();
+    store.getState().startShift();
+    expect(selectCanUndoTray(store.getState())).toBe(false);
+    tapOrder(store, [...HOT_COFFEE, ...ICED_TEA]);
+    store.getState().clearTray();
+
+    store.getState().undoTray();
+    expect(selectTray(store.getState())).toEqual([...HOT_COFFEE, ...ICED_TEA]);
+    store.getState().undoTray();
+    expect(selectTray(store.getState())).toEqual(HOT_COFFEE);
+    expect(selectCanRedoTray(store.getState())).toBe(true);
+    store.getState().redoTray();
+    expect(selectTray(store.getState())).toEqual([...HOT_COFFEE, ...ICED_TEA]);
+    expect(selectCanUndoTray(store.getState())).toBe(true);
+  });
+
+  it('tells a customer who changes their mind the Player has started on it, once, at the first tap; their final order is what counts', () => {
+    const { store, customers } = atTheStaffDoor();
+    store.getState().startShift();
+    customerIs(store, { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE });
+    const sentBefore = customers.current().sent.length;
+
+    tapOrder(store, HOT_COFFEE);
+    expect(customers.current().sent.slice(sentBefore)).toEqual([expect.stringMatching(/has started on your order/)]);
+    customers.says('あ、やっぱりアイスティーにします。');
+
+    store.getState().undoTray();
+    tapOrder(store, ICED_TEA);
+    expect(customers.current().sent.slice(sentBefore)).toHaveLength(1);
+    store.getState().serveTray();
+
+    expect(customers.current().sent.at(-1)).toMatch(/That is what you ordered/);
+    expect(selectShift(store.getState())).toMatchObject({ done: 1, served: 1 });
+  });
+
+  it('never tells a customer who keeps to their order that the Player has started on it', () => {
+    const { store, customers } = atTheStaffDoor();
+    store.getState().startShift();
+    customerIs(store, { templateId: 'barista-made-to-order', order: ICED_TEA, changedFrom: null });
+    tapOrder(store, ICED_TEA);
+    expect(customers.current().sent.some((text) => /has started on your order/.test(text))).toBe(false);
   });
 
   it('lets the Player ask a customer to repeat or clarify, with Patience as usual: running out fails them', () => {
@@ -268,6 +371,22 @@ describe('a Shift and the connection', () => {
     expect(selectConversation(store.getState())).toMatchObject({ shiftCustomer: { tray: [] }, retried: false });
     expect(store.getState().toast).toEqual({ kind: 'npcSteppedAway', npcId: null });
   });
+
+  it('tells a customer who changes their mind the Player has started on it once the connection is back, if the first tap came while it was down', async () => {
+    const { store, customers } = atTheStaffDoor();
+    store.getState().startShift();
+    customerIs(store, { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE });
+    customers.current().events.onDisconnect();
+    expect(selectConversation(store.getState())).toMatchObject({ reconnecting: true });
+
+    tapOrder(store, HOT_COFFEE);
+    const told = () => customers.opened.flatMap(({ sent }) => sent).filter((text) => /has started on your order/.test(text));
+    expect(told()).toEqual([]);
+
+    await vi.waitFor(() => expect(selectConversation(store.getState())).toMatchObject({ reconnecting: false }));
+    expect(customers.current().sent.filter((text) => /has started on your order/.test(text))).toHaveLength(1);
+    expect(told()).toHaveLength(1);
+  });
 });
 
 describe('the Shift Recap', () => {
@@ -311,7 +430,7 @@ describe('the Shift Recap', () => {
     expect(request.customers[0]).toEqual({
       order: firstOrder,
       result: 'served',
-      served: firstOrder,
+      served: firstOrder.map((line) => ({ ...line, modifiers: { size: 'medium', temperature: 'hot', extras: [] } })),
       transcript: [
         { speaker: 'npc', text: 'ラテをください。' },
         { speaker: 'player', text: 'はい', typed: true },
@@ -326,6 +445,19 @@ describe('the Shift Recap', () => {
       transcript: [{ speaker: 'npc', text: '紅茶をひとつ。' }],
       helpLog: [],
     });
+  });
+
+  it('tells the Recap what a customer who changed their mind first asked for', () => {
+    const { store, customers, recaps } = atTheStaffDoor();
+    store.getState().startShift();
+    const count = store.getState().game.possessions.shift!.customers;
+    customerIs(store, { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE });
+    serve(store, customers, ICED_TEA);
+    for (let i = 1; i < count; i++) serve(store, customers, orderNow(store));
+
+    if (recaps[0]!.request.kind !== 'shift') throw new Error('not a Shift Recap');
+    expect(recaps[0]!.request.customers[0]).toMatchObject({ changedFrom: HOT_COFFEE, order: ICED_TEA, result: 'served' });
+    expect(recaps[0]!.request.customers[1]).not.toHaveProperty('changedFrom');
   });
 
   it('opens the combined Recap with the pay, and keeps it as one Journal entry', async () => {

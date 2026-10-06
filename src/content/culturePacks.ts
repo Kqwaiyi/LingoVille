@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
-import { ITEM_IDS, type ItemId } from './items.ts';
+import { DRINK_OPTIONS, ITEM_IDS, type DrinkOptionId, type ItemId } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
 import { hours, HOURS_IDS, type HoursId } from './places.ts';
 
@@ -56,6 +56,8 @@ export type CulturePack = {
   /** Ambient one-shot sound ids, played now and then around the town (ticket 32). */
   ambient: string[];
   goods: Record<ItemId, Good>;
+  /** How a café drink can be made (size, hot or iced, extras), as the menu grid and Shift Customers say it. */
+  drinkOptions: Record<DrinkOptionId, Good>;
   signs: Record<SignWord, { text: string; glosses: Glosses }>;
   cafe: Shop;
   supermarket: Shop;
@@ -115,6 +117,7 @@ export function culturePackSchema(packId: LanguageCode) {
     hours: z.partialRecord(z.enum(HOURS_IDS), openingHours),
     ambient: z.array(kebab),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
+    drinkOptions: z.record(z.enum(DRINK_OPTIONS), z.object({ name: text, glosses })),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
     cafe: shop,
     supermarket: shop,
@@ -158,6 +161,17 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'キャベツ', glosses: { zh: '卷心菜', en: 'Cabbage', de: 'Weißkohl' } },
       eggs: { name: '卵', glosses: { zh: '鸡蛋', en: 'Eggs', de: 'Eier' } },
       noodles: { name: 'うどん', glosses: { zh: '乌冬面', en: 'Udon noodles', de: 'Udon-Nudeln' } },
+    },
+    drinkOptions: {
+      small: { name: 'Sサイズ', glosses: { zh: '小杯', en: 'Small', de: 'Klein' } },
+      medium: { name: 'Mサイズ', glosses: { zh: '中杯', en: 'Medium', de: 'Mittel' } },
+      large: { name: 'Lサイズ', glosses: { zh: '大杯', en: 'Large', de: 'Groß' } },
+      hot: { name: 'ホット', glosses: { zh: '热的', en: 'Hot', de: 'Heiß' } },
+      iced: { name: 'アイス', glosses: { zh: '冰的', en: 'Iced', de: 'Mit Eis' } },
+      milk: { name: 'ミルク', glosses: { zh: '加奶', en: 'Milk', de: 'Milch' } },
+      sugar: { name: '砂糖', glosses: { zh: '加糖', en: 'Sugar', de: 'Zucker' } },
+      'extra-shot': { name: 'ショット追加', glosses: { zh: '加一份浓缩', en: 'Extra shot', de: 'Extra Shot' } },
+      lemon: { name: 'レモン', glosses: { zh: '加柠檬', en: 'Lemon', de: 'Zitrone' } },
     },
     signs: {
       openingHours: { text: '営業時間', glosses: { zh: '营业时间', en: 'Opening hours', de: 'Öffnungszeiten' } },
@@ -222,6 +236,17 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: '青菜', glosses: { ja: 'チンゲン菜', en: 'Bok choy', de: 'Pak Choi' } },
       eggs: { name: '鸡蛋', glosses: { ja: '卵', en: 'Eggs', de: 'Eier' } },
       noodles: { name: '挂面', glosses: { ja: '乾麺', en: 'Dried noodles', de: 'Getrocknete Nudeln' } },
+    },
+    drinkOptions: {
+      small: { name: '小杯', glosses: { ja: 'Sサイズ', en: 'Small', de: 'Klein' } },
+      medium: { name: '中杯', glosses: { ja: 'Mサイズ', en: 'Medium', de: 'Mittel' } },
+      large: { name: '大杯', glosses: { ja: 'Lサイズ', en: 'Large', de: 'Groß' } },
+      hot: { name: '热的', glosses: { ja: 'ホット', en: 'Hot', de: 'Heiß' } },
+      iced: { name: '冰的', glosses: { ja: 'アイス', en: 'Iced', de: 'Mit Eis' } },
+      milk: { name: '加奶', glosses: { ja: 'ミルク', en: 'Milk', de: 'Milch' } },
+      sugar: { name: '加糖', glosses: { ja: '砂糖', en: 'Sugar', de: 'Zucker' } },
+      'extra-shot': { name: '加一份浓缩', glosses: { ja: 'ショット追加', en: 'Extra shot', de: 'Extra Shot' } },
+      lemon: { name: '加柠檬', glosses: { ja: 'レモン', en: 'Lemon', de: 'Zitrone' } },
     },
     signs: {
       openingHours: { text: '营业时间', glosses: { ja: '営業時間', en: 'Opening hours', de: 'Öffnungszeiten' } },
@@ -288,6 +313,17 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'Carrots', glosses: { ja: 'にんじん', zh: '胡萝卜', de: 'Karotten' } },
       eggs: { name: 'Eggs', glosses: { ja: '卵', zh: '鸡蛋', de: 'Eier' } },
       noodles: { name: 'Spaghetti', glosses: { ja: 'スパゲッティ', zh: '意大利面', de: 'Spaghetti' } },
+    },
+    drinkOptions: {
+      small: { name: 'Small', glosses: { ja: 'スモール', zh: '小杯', de: 'Klein' } },
+      medium: { name: 'Regular', glosses: { ja: 'レギュラー', zh: '中杯', de: 'Mittel' } },
+      large: { name: 'Large', glosses: { ja: 'ラージ', zh: '大杯', de: 'Groß' } },
+      hot: { name: 'Hot', glosses: { ja: 'ホット', zh: '热的', de: 'Heiß' } },
+      iced: { name: 'Iced', glosses: { ja: 'アイス', zh: '冰的', de: 'Mit Eis' } },
+      milk: { name: 'Milk', glosses: { ja: 'ミルク', zh: '加奶', de: 'Milch' } },
+      sugar: { name: 'Sugar', glosses: { ja: '砂糖', zh: '加糖', de: 'Zucker' } },
+      'extra-shot': { name: 'Extra shot', glosses: { ja: 'ショット追加', zh: '加一份浓缩', de: 'Extra Shot' } },
+      lemon: { name: 'Lemon', glosses: { ja: 'レモン', zh: '加柠檬', de: 'Zitrone' } },
     },
     signs: {
       openingHours: { text: 'Opening hours', glosses: { ja: '営業時間', zh: '营业时间', de: 'Öffnungszeiten' } },
@@ -362,6 +398,17 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'Kartoffeln', glosses: { ja: 'じゃがいも', zh: '土豆', en: 'Potatoes' } },
       eggs: { name: 'Eier', glosses: { ja: '卵', zh: '鸡蛋', en: 'Eggs' } },
       noodles: { name: 'Spätzle', glosses: { ja: 'シュペッツレ（卵の麺）', zh: '德式鸡蛋面', en: 'Spätzle (egg noodles)' } },
+    },
+    drinkOptions: {
+      small: { name: 'Klein', glosses: { ja: 'スモール', zh: '小杯', en: 'Small' } },
+      medium: { name: 'Mittel', glosses: { ja: 'ミディアム', zh: '中杯', en: 'Medium' } },
+      large: { name: 'Groß', glosses: { ja: 'ラージ', zh: '大杯', en: 'Large' } },
+      hot: { name: 'Heiß', glosses: { ja: 'ホット', zh: '热的', en: 'Hot' } },
+      iced: { name: 'Mit Eis', glosses: { ja: 'アイス', zh: '冰的', en: 'Iced' } },
+      milk: { name: 'Milch', glosses: { ja: 'ミルク', zh: '加奶', en: 'Milk' } },
+      sugar: { name: 'Zucker', glosses: { ja: '砂糖', zh: '加糖', en: 'Sugar' } },
+      'extra-shot': { name: 'Extra Shot', glosses: { ja: 'ショット追加', zh: '加一份浓缩', en: 'Extra shot' } },
+      lemon: { name: 'Zitrone', glosses: { ja: 'レモン', zh: '加柠檬', en: 'Lemon' } },
     },
     signs: {
       openingHours: { text: 'Öffnungszeiten', glosses: { ja: '営業時間', zh: '营业时间', en: 'Opening hours' } },

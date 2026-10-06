@@ -43,7 +43,18 @@ function lived(): GameState {
       gymMembershipUntilDay: 33,
       addressRegistered: true,
       jobsHired: ['barista'],
-      shift: { jobId: 'barista', customers: 6, served: 2, failed: 1, customer: { order: [{ itemId: 'latte', quantity: 1 }], voiceSeed: 4242 } },
+      shift: {
+        jobId: 'barista',
+        customers: 6,
+        served: 2,
+        failed: 1,
+        customer: {
+          templateId: 'barista-change-of-mind',
+          order: [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }],
+          changedFrom: [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }],
+          voiceSeed: 4242,
+        },
+      },
     },
     phrasebook: [{ text: 'ラテ', reading: 'らて', gloss: 'latte', glossLanguage: 'en', dayAdded: 1 }],
     onboarding: { firstMorningStepsDone: 2, firstMorningSkipped: false },
@@ -263,6 +274,20 @@ describe('saves', () => {
     await set('slot-1', { schemaVersion: 7, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeShifts() }, raw);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(withNoShiftYet());
+  });
+
+  it('upgrades a save with a Shift Customer at the counter from before harder customers as a single-drink customer', async () => {
+    const { saves, raw } = freshSaves();
+    const game = lived();
+    const shift = { ...game.possessions.shift!, customer: { order: [{ itemId: 'latte', quantity: 1 }], voiceSeed: 4242 } };
+    await set('slot-1', { schemaVersion: 8, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: { ...game, possessions: { ...game.possessions, shift } } }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game.possessions.shift?.customer).toEqual({
+      templateId: 'barista-single-drink',
+      order: [{ itemId: 'latte', quantity: 1 }],
+      changedFrom: null,
+      voiceSeed: 4242,
+    });
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {

@@ -36,13 +36,23 @@ export {
 } from './defineInteraction.ts';
 export { basketFacts, interactionFacts, readBasketTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
 export { INTERACTIONS, START_WHEN } from './interactions.ts';
-export { jobAt, JOB_PLACES, SHIFT_MENUS, SHIFT_TEMPLATES, shiftTemplate, type ShiftTemplate } from './shifts.ts';
+export { DEFAULT_DRINK, isDrink, jobAt, JOB_PLACES, SHIFT_MENUS, SHIFT_TEMPLATES, shiftTemplates, type ShiftTemplate } from './shifts.ts';
 export {
   CAFE_MENU,
   CONVENIENCE_MENU,
+  DRINK_EXTRAS,
+  DRINK_OPTIONS,
+  DRINK_SIZES,
+  DRINK_TEMPERATURES,
+  drinkModifiersSchema,
   GROCERIES_SOLD,
   ITEM_IDS,
   ITEMS,
+  type DrinkExtra,
+  type DrinkModifiers,
+  type DrinkOptionId,
+  type DrinkSize,
+  type DrinkTemperature,
   type GroceryId,
   type Item,
   type ItemId,

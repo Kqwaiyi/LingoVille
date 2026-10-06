@@ -1,6 +1,15 @@
 import { createStore, delMany, entries, get, promisifyRequest, set, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
-import { APPEARANCE_PRESET_IDS, ITEM_IDS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import {
+  APPEARANCE_PRESET_IDS,
+  CULTURE_PACKS,
+  drinkModifiersSchema,
+  INTERACTIONS,
+  ITEM_IDS,
+  NAMED_NPCS,
+  SHIFT_TEMPLATES,
+  type NamedNpcId,
+} from '../content/index.ts';
 import {
   DEBT_KINDS,
   ECONOMY,
@@ -21,7 +30,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 8;
+export const SAVE_SCHEMA_VERSION = 9;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -42,8 +51,17 @@ const NpcMemorySchema = z.object({
   registerOffered: z.boolean(),
 });
 
-/** One line of items: in the inventory, or a Shift Customer's order. */
+/** One line of items in the inventory. */
 const orderLine = z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1) });
+
+/** One line of a Shift Customer's order: a café drink made to order says how it's made. */
+const shiftOrder = z
+  .array(
+    orderLine.extend({ modifiers: drinkModifiersSchema.optional() }),
+  )
+  .readonly();
+
+const SHIFT_TEMPLATE_IDS = Object.values(SHIFT_TEMPLATES).flatMap((templates) => templates.map(({ id }) => id)) as [string, ...string[]];
 
 const GameStateSchema = z.object({
   rngState: z.int().min(0),
@@ -97,7 +115,9 @@ const GameStateSchema = z.object({
         customers: z.int().min(1),
         served: z.int().min(0),
         failed: z.int().min(0),
-        customer: z.object({ order: z.array(orderLine).readonly(), voiceSeed: z.int().min(0) }).nullable(),
+        customer: z
+          .object({ templateId: z.enum(SHIFT_TEMPLATE_IDS), order: shiftOrder, changedFrom: shiftOrder.nullable(), voiceSeed: z.int().min(0) })
+          .nullable(),
       })
       .nullable(),
   }),
@@ -181,6 +201,17 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       possessions: { ...(save.game.possessions as object), shift: null },
     },
   }),
+  // 8 → 9: Shift Customers come from templates, and some change their mind. Every one so far ordered a single drink.
+  (save) => {
+    const possessions = save.game.possessions as { shift: { customer: object | null } | null };
+    const { shift } = possessions;
+    const customer = shift?.customer && { templateId: 'barista-single-drink', ...shift.customer, changedFrom: null };
+    return {
+      ...save,
+      schemaVersion: 9,
+      game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
+    };
+  },
 ];
 
 /** A loose look at a stored field, for bytes that may not be a readable save. */

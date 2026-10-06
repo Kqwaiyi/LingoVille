@@ -1,8 +1,18 @@
 import { z } from 'zod';
-import { CULTURE_PACKS, ITEM_IDS, localPlaceName, NAMED_NPCS, toGeminiSchema, type CulturePack, type NamedNpcId } from '../content/index.ts';
-import { JOB_IDS, type Basket } from '../sim/index.ts';
+import {
+  CULTURE_PACKS,
+  drinkModifiersSchema,
+  ITEM_IDS,
+  localPlaceName,
+  NAMED_NPCS,
+  toGeminiSchema,
+  type CulturePack,
+  type NamedNpcId,
+} from '../content/index.ts';
+import { JOB_IDS } from '../sim/index.ts';
 import {
   block,
+  orderSaid,
   InteractionIdSchema,
   interactionById,
   LanguageSchema,
@@ -32,16 +42,23 @@ const RecapConversationSchema = z.object({
   helpLog: z.array(HelpLogEntrySchema),
 });
 
-const BasketLineSchema = z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1) });
+/** A line of a Shift Customer's order, or of what they were handed: a café drink made to order says how it was made. */
+const ShiftOrderLineSchema = z.object({
+  itemId: z.enum(ITEM_IDS),
+  quantity: z.int().min(1),
+  modifiers: drinkModifiersSchema.optional(),
+});
 
 /**
  * One Shift Customer as the Recap reads them: what they ordered, how the game's exact check found the learner served
  * them (`served` is what was handed over, empty if nothing), and what was said.
  */
 const ShiftRecapCustomerSchema = z.object({
-  order: z.array(BasketLineSchema).min(1).readonly(),
+  order: z.array(ShiftOrderLineSchema).min(1).readonly(),
+  /** What they first asked for, before changing their mind halfway. */
+  changedFrom: z.array(ShiftOrderLineSchema).min(1).readonly().optional(),
   result: z.enum(['served', 'wrongOrder', 'walkedOut']),
-  served: z.array(BasketLineSchema).readonly(),
+  served: z.array(ShiftOrderLineSchema).readonly(),
   transcript: z.array(RecapLineSchema),
   helpLog: z.array(HelpLogEntrySchema),
 });
@@ -139,19 +156,15 @@ function conversationBlock(heading: string, conversation: RecapConversation, pac
   ]);
 }
 
-/** The items as they're named in this pack: "1 × ラテ". */
-function itemsSaid(items: Basket, pack: CulturePack) {
-  return items.map(({ itemId, quantity }) => `${quantity} × ${pack.goods[itemId]!.name}`).join(', ');
-}
-
 /** What the customer ordered, and whether the learner (the `staff`) served it right, served something else, or never served them. */
-function servedLine({ order, result, served }: ShiftRecapCustomer, staff: string, pack: CulturePack) {
-  const ordered = `They ordered: ${itemsSaid(order, pack)}.`;
+function servedLine({ order, changedFrom, result, served }: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+  const changed = changedFrom ? `They first ordered ${orderSaid(changedFrom, pack)}, then changed their mind halfway. ` : '';
+  const ordered = `${changed}They ordered: ${orderSaid(order, pack)}.`;
   switch (result) {
     case 'served':
       return `${ordered} The ${staff} served it right.`;
     case 'wrongOrder':
-      return `${ordered} The ${staff} served ${served.length > 0 ? itemsSaid(served, pack) : 'nothing'} instead.`;
+      return `${ordered} The ${staff} served ${served.length > 0 ? orderSaid(served, pack) : 'nothing'} instead.`;
     case 'walkedOut':
       return `${ordered} The ${staff} never served them, and they left.`;
   }

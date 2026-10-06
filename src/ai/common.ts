@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { INTERACTIONS, type Interaction, type ToolSchema } from '../content/index.ts';
-import { LANGUAGE_CODES, PROFICIENCY_STEPS } from '../sim/index.ts';
+import { INTERACTIONS, type CulturePack, type Interaction, type ToolSchema } from '../content/index.ts';
+import { LANGUAGE_CODES, PROFICIENCY_STEPS, type ShiftOrder } from '../sim/index.ts';
 
 // What the prompted endpoints (Recap, hint, annotate) share.
 
@@ -12,6 +12,17 @@ export const InteractionIdSchema = z.enum(INTERACTION_IDS);
 
 export function interactionById(id: string): Interaction {
   return Object.values(INTERACTIONS).find((interaction) => interaction.id === id)!;
+}
+
+/** The items as they're named in this pack, with how a drink made to order is made: "1 × 紅茶 (Lサイズ, アイス, レモン)". */
+export function orderSaid(order: ShiftOrder, pack: CulturePack) {
+  return order
+    .map(({ itemId, quantity, modifiers }) => {
+      const options = modifiers ? [modifiers.size, modifiers.temperature, ...modifiers.extras] : [];
+      const made = options.map((option) => pack.drinkOptions[option].name).join(', ');
+      return `${quantity} × ${pack.goods[itemId].name}${made ? ` (${made})` : ''}`;
+    })
+    .join(', ');
 }
 
 /** One line of a conversation as a prompt reads it. A player line is what the NPC heard, unless it was typed. */

@@ -4,11 +4,12 @@ import {
   buildNpcSession,
   buildShiftCustomerSession,
   OUT_OF_PATIENCE_SCENE,
+  shiftCustomerChangeScene,
   shiftCustomerServedScene,
   type ToolResponse,
 } from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
-import { LANGUAGE_CODES, type ApproachId, type LanguageCode } from '../sim/index.ts';
+import { LANGUAGE_CODES, type ApproachId, type LanguageCode, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
@@ -602,10 +603,13 @@ describe('mock VoiceSession: a Shift Customer', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  /** A connected fake customer who has walked up and ordered a latte. */
-  async function customerAtTheCounter(packId: LanguageCode = 'ja') {
+  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, voiceSeed: 7 };
+  const ICED_TEA: ShiftOrder = [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }];
+  const HOT_COFFEE: ShiftOrder = [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }];
+
+  /** A connected fake customer who has walked up and ordered (a latte, unless they're another customer). */
+  async function customerAtTheCounter(packId: LanguageCode = 'ja', customer: ShiftCustomer = WANTS_A_LATTE) {
     const heard = listen();
-    const customer = { order: [{ itemId: 'latte' as const, quantity: 1 }], voiceSeed: 7 };
     const session = openMockVoiceSession(
       buildShiftCustomerSession(customer, CULTURE_PACKS[packId], 'A1', { clock: { day: 3, minuteOfDay: 600 } }),
       heard.events,
@@ -644,5 +648,23 @@ describe('mock VoiceSession: a Shift Customer', () => {
     expect(wrong.turns.at(-1)).toBeTruthy();
     expect(right.turns.at(-1)).not.toBe(wrong.turns.at(-1));
     expect(right.toolCalls).toEqual([]);
+  });
+
+  it('says how a drink made to order is made', async () => {
+    const { turns } = await customerAtTheCounter('ja', { ...WANTS_A_LATTE, order: ICED_TEA });
+    const { drinkOptions } = CULTURE_PACKS.ja;
+    for (const said of [goods.tea.name, drinkOptions.large.name, drinkOptions.iced.name, drinkOptions.lemon.name]) expect(turns[0]).toContain(said);
+  });
+
+  it('changes their mind once the barista has started on it, and says the new order when asked again', async () => {
+    const { turns, say } = await customerAtTheCounter('ja', { ...WANTS_A_LATTE, order: ICED_TEA, changedFrom: HOT_COFFEE });
+    expect(turns[0]).toContain(goods.coffee.name);
+
+    await say(shiftCustomerChangeScene());
+    expect(turns.at(-1)).toContain(goods.tea.name);
+    expect(turns.at(-1)).toContain(CULTURE_PACKS.ja.drinkOptions.iced.name);
+
+    await say('すみません、もう一度お願いします');
+    expect(turns.at(-1)).toContain(goods.tea.name);
   });
 });

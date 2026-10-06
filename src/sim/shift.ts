@@ -1,10 +1,10 @@
-import type { ItemId } from '../content/index.ts';
-import type { Basket } from './basket.ts';
+import type { Band, DrinkModifiers, ShiftTemplate } from '../content/index.ts';
 import { isOpen, type OpeningHours } from './clock.ts';
-import { randomInt } from './rng.ts';
-import type { GameState, JobId } from './state.ts';
+import { nextRandom, randomInt } from './rng.ts';
+import type { GameState, JobId, ShiftOrder } from './state.ts';
 import { moodModifier } from './mood.ts';
-import { ECONOMY, PROFICIENCY_STEP_TABLE } from './tuning.ts';
+import { lineKey } from './tray.ts';
+import { ECONOMY, PROFICIENCY_STEP_TABLE, STEP_BANDS, type ProficiencyStep } from './tuning.ts';
 
 /** Why E at the staff door can't start a Shift now. */
 export type ShiftRefusal = 'notHired' | 'closed' | 'workedToday' | 'underway';
@@ -37,38 +37,97 @@ export function startShift(state: GameState, jobId: JobId, hours: OpeningHours):
 /** The most a voice seed can be: the gateway picks a voice from it, however many it has. */
 const VOICE_SEEDS = 2 ** 16;
 
+/** The Shift Customer bands, easiest first. */
+const BANDS: readonly Band[] = ['B', 'I', 'A'];
+
+/** One of `options`, drawn from the RNG. */
+function pick<T>(rngState: number, options: readonly T[]): { value: T; rngState: number } {
+  const draw = randomInt(rngState, 0, options.length - 1);
+  return { value: options[draw.value]!, rngState: draw.rngState };
+}
+
 /**
- * The next Shift Customer walks up to the counter, wanting one of `drinks` (the template's): their order
- * and their voice come from the seeded RNG. Nothing changes with no Shift under way.
+ * The template the next Shift Customer comes from: the Player's own band (by the current step), the one below or the
+ * one above, in the tuned shares. A band the Job lacks falls back to the nearest one it has, the easier on a tie.
  */
-export function nextShiftCustomer(state: GameState, drinks: readonly ItemId[]): GameState {
+function drawTemplate(rngState: number, step: ProficiencyStep, templates: readonly ShiftTemplate[]) {
+  const { ownBand, bandBelow, bandAbove } = ECONOMY.shiftCustomerMix;
+  const roll = nextRandom(rngState);
+  const share = roll.value * (bandBelow + ownBand + bandAbove);
+  const own = BANDS.indexOf(STEP_BANDS[step]);
+  const wanted = share < bandBelow ? own - 1 : share < bandBelow + ownBand ? own : own + 1;
+  // The nearest band the Job has, and of two as near, the easier.
+  const bandsHad = [...new Set(templates.map((template) => BANDS.indexOf(template.band)))];
+  const nearestFirst = bandsHad.sort((a, b) => Math.abs(a - wanted) - Math.abs(b - wanted) || a - b);
+  return pick(roll.rngState, templates.filter((template) => BANDS.indexOf(template.band) === nearestFirst[0]));
+}
+
+/** One drink from the template: alone, or made in one of its sizes, hot or iced, with one of the extras that drink takes. */
+function drawOrder(rngState: number, { drinks, modifiers }: ShiftTemplate): { value: ShiftOrder; rngState: number } {
+  const drink = pick(rngState, drinks);
+  if (!modifiers) return { value: [{ itemId: drink.value, quantity: 1 }], rngState: drink.rngState };
+  const size = pick(drink.rngState, modifiers.sizes);
+  const temperature = pick(size.rngState, modifiers.temperatures);
+  const taken = modifiers.extras[drink.value] ?? [];
+  const extra = taken.length > 0 ? pick(temperature.rngState, taken) : null;
+  const made: DrinkModifiers = { size: size.value, temperature: temperature.value, extras: extra ? [extra.value] : [] };
+  return { value: [{ itemId: drink.value, quantity: 1, modifiers: made }], rngState: extra?.rngState ?? temperature.rngState };
+}
+
+/** What a customer who changes their mind wants instead: another drawn order, never the same as the first. */
+function drawChangeOfMind(rngState: number, template: ShiftTemplate, first: ShiftOrder) {
+  const then = drawOrder(rngState, template);
+  if (!sameOrder(then.value, first)) return then;
+  // The same again: they want it the other temperature instead.
+  const flipped = then.value.map((line) =>
+    line.modifiers ? { ...line, modifiers: { ...line.modifiers, temperature: line.modifiers.temperature === 'hot' ? 'iced' : 'hot' } } : line,
+  ) as ShiftOrder;
+  return { value: flipped, rngState: then.rngState };
+}
+
+/**
+ * The next Shift Customer walks up to the counter, drawn from the Job's `templates` by the customer mix: their order,
+ * any change of mind and their voice all come from the seeded RNG. Nothing changes with no Shift under way or no templates.
+ */
+export function nextShiftCustomer(state: GameState, templates: readonly ShiftTemplate[]): GameState {
   const { shift } = state.possessions;
-  if (!shift) return state;
-  const drink = randomInt(state.rngState, 0, drinks.length - 1);
-  const voice = randomInt(drink.rngState, 0, VOICE_SEEDS - 1);
-  const customer = { order: [{ itemId: drinks[drink.value]!, quantity: 1 }], voiceSeed: voice.value };
+  if (!shift || templates.length === 0) return state;
+  const template = drawTemplate(state.rngState, state.proficiencyStep, templates);
+  const first = drawOrder(template.rngState, template.value);
+  const changed = template.value.changesMind ? drawChangeOfMind(first.rngState, template.value, first.value) : null;
+  const voice = randomInt(changed?.rngState ?? first.rngState, 0, VOICE_SEEDS - 1);
+  const customer = {
+    templateId: template.value.id,
+    order: changed?.value ?? first.value,
+    changedFrom: changed ? first.value : null,
+    voiceSeed: voice.value,
+  };
   return { ...state, rngState: voice.rngState, possessions: { ...state.possessions, shift: { ...shift, customer } } };
 }
 
-/** The same items in the same numbers, whatever order the lines are in. */
-function sameItems(a: Basket, b: Basket): boolean {
-  const counts = (basket: Basket) => {
-    const totals = new Map<ItemId, number>();
-    for (const { itemId, quantity } of basket) totals.set(itemId, (totals.get(itemId) ?? 0) + quantity);
+/**
+ * What was served is exactly what was ordered: the same items in the same numbers, whatever order the lines are in.
+ * A drink ordered made a certain way (size, hot or iced, extras) must be made just so; one ordered alone may be made any way.
+ */
+function sameOrder(served: ShiftOrder, order: ShiftOrder): boolean {
+  const withModifiers = order.some((line) => line.modifiers);
+  const counts = (lines: ShiftOrder) => {
+    const totals = new Map<string, number>();
+    for (const line of lines) totals.set(lineKey(line, withModifiers), (totals.get(lineKey(line, withModifiers)) ?? 0) + line.quantity);
     return totals;
   };
-  const [countsA, countsB] = [counts(a), counts(b)];
-  return countsA.size === countsB.size && [...countsA].every(([itemId, quantity]) => countsB.get(itemId) === quantity);
+  const [servedCounts, orderCounts] = [counts(served), counts(order)];
+  return servedCounts.size === orderCounts.size && [...servedCounts].every(([key, quantity]) => orderCounts.get(key) === quantity);
 }
 
 /**
  * The customer at the counter is done with: `served` is what the Player handed over, checked exactly
  * against the hidden order with no model judgement, or null if they gave up unserved (out of Patience).
  */
-export function applyShiftCustomer(state: GameState, served: Basket | null): { state: GameState; correct: boolean } {
+export function applyShiftCustomer(state: GameState, served: ShiftOrder | null): { state: GameState; correct: boolean } {
   const { shift } = state.possessions;
   if (!shift?.customer) return { state, correct: false };
-  const correct = served !== null && sameItems(served, shift.customer.order);
+  const correct = served !== null && sameOrder(served, shift.customer.order);
   const after = {
     ...shift,
     served: shift.served + (correct ? 1 : 0),

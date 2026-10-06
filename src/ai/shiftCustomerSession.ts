@@ -1,6 +1,6 @@
 import type { CulturePack } from '../content/index.ts';
-import { weekdayOf, type Basket, type GameState, type ProficiencyStep, type ShiftCustomer } from '../sim/index.ts';
-import { block } from './common.ts';
+import { weekdayOf, type GameState, type ProficiencyStep, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
+import { block, orderSaid } from './common.ts';
 import { capitalise, dayPart, formatTime, languageRulesBlock, notUnderstoodTool, type NpcSession } from './npcSession.ts';
 
 /** What a Shift Customer's session is built from besides the customer: the time of day. */
@@ -49,16 +49,29 @@ const STEP_ADAPTATION: Record<ProficiencyStep, string[]> = {
   ],
 };
 
-/** The items as they're named in this pack: "1 × ラテ". */
-function itemsSaid(items: Basket, pack: CulturePack) {
-  return items.map(({ itemId, quantity }) => `${quantity} × ${pack.goods[itemId].name}`).join(', ');
-}
-
 const ORDER_LINE = /^- You want exactly this, and nothing else: (.+)\.$/m;
+const CHANGED_ORDER_LINE = /^- Then you change your mind\. .* you want this instead: (.+)\. From then on/m;
 
-/** The hidden order a Shift Customer's instruction carries, as its items are named there, or null. */
+/** The hidden order a Shift Customer's instruction carries (the first, for one who changes their mind), as its items are named there, or null. */
 export function readShiftOrder(systemInstruction: string): string | null {
   return ORDER_LINE.exec(systemInstruction)?.[1] ?? null;
+}
+
+/** What a Shift Customer who changes their mind wants instead, as their instruction names it, or null for one who doesn't. */
+export function readChangedOrder(systemInstruction: string): string | null {
+  return CHANGED_ORDER_LINE.exec(systemInstruction)?.[1] ?? null;
+}
+
+const STARTED_ON_IT = 'has started on your order.';
+
+/** Tells a Shift Customer who changes their mind that the Player has started on their order: now is when they change it. */
+export function shiftCustomerChangeScene(): string {
+  return `[SCENE: The ${WHO} ${STARTED_ON_IT} Change your mind now, as YOUR ORDER says.]`;
+}
+
+/** Whether this text is the scene `shiftCustomerChangeScene` writes. */
+export function readChangeScene(text: string): boolean {
+  return text.includes(STARTED_ON_IT);
 }
 
 const RIGHT_ORDER = 'That is what you ordered.';
@@ -68,8 +81,8 @@ const WRONG_ORDER = 'That is not what you ordered.';
  * Tells the Shift Customer what the barista has handed them, and whether it is what they ordered: the game
  * has already checked it exactly, so the customer only reacts, and leaves.
  */
-export function shiftCustomerServedScene(served: Basket, correct: boolean, pack: CulturePack): string {
-  const handed = served.length > 0 ? itemsSaid(served, pack) : 'nothing at all';
+export function shiftCustomerServedScene(served: ShiftOrder, correct: boolean, pack: CulturePack): string {
+  const handed = served.length > 0 ? orderSaid(served, pack) : 'nothing at all';
   return correct
     ? `[SCENE: The ${WHO} hands you: ${handed}. ${RIGHT_ORDER} Thank them briefly and say goodbye.]`
     : `[SCENE: The ${WHO} hands you: ${handed}. ${WRONG_ORDER} Tell them politely in a few words, then say goodbye and leave.]`;
@@ -105,10 +118,20 @@ export function buildShiftCustomerSession(
     languageRulesBlock(pack, WHO),
     block('HOW TO SPEAK', [`The ${WHO} ${first}`, ...rest]),
     block('YOUR ORDER', [
-      `- You want exactly this, and nothing else: ${itemsSaid(customer.order, pack)}.`,
+      `- You want exactly this, and nothing else: ${orderSaid(customer.changedFrom ?? customer.order, pack)}.`,
+      ...(customer.changedFrom
+        ? [
+            `- Then you change your mind. When a "[SCENE: ...]" message says the ${WHO} ${STARTED_ON_IT.slice(0, -1)}, tell them in your own words that you've changed your mind and you want this instead: ${orderSaid(customer.order, pack)}. From then on you want exactly that, and nothing else.`,
+          ]
+        : []),
       `- The ${WHO} cannot see your order: they have to work it out from what you say. Greet them and order it in your own words, as a local would.`,
+      ...(customer.order.some((line) => line.modifiers)
+        ? [`- Say every part of it: the size, hot or iced, and what goes in it. You may say them in any order, as a local would.`]
+        : []),
       `- If the ${WHO} asks you to repeat it, or asks what you would like, say it again. That is normal and costs nothing.`,
-      `- If they ask anything else, answer briefly and naturally. Never change your order, never add to it, and never talk about the price.`,
+      customer.changedFrom
+        ? `- If they ask anything else, answer briefly and naturally. Change your order only as above: never add to it, and never talk about the price.`
+        : `- If they ask anything else, answer briefly and naturally. Never change your order, never add to it, and never talk about the price.`,
       `- Don't say goodbye until a "[SCENE: ...]" message says what the ${WHO} has handed you. Then do what it says.`,
     ]),
     block('THE SITUATION', [

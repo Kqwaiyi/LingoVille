@@ -1,5 +1,4 @@
-import type { AppearancePresetId, ItemId, NamedNpcId } from '../content/index.ts';
-import type { Basket } from './basket.ts';
+import type { AppearancePresetId, DrinkModifiers, ItemId, NamedNpcId } from '../content/index.ts';
 import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
@@ -55,10 +54,18 @@ export type NpcMemory = {
   registerOffered: boolean;
 };
 
+/** A line of a Shift Customer's order, or of what the Player hands them. A café drink made to order says how it's made. */
+export type ShiftOrderLine = { itemId: ItemId; quantity: number; modifiers?: DrinkModifiers };
+export type ShiftOrder = readonly ShiftOrderLine[];
+
 /** A Shift Customer at the counter: anonymous, with no memory, and a hidden order the Player has to work out. */
 export type ShiftCustomer = {
-  /** What they want, which what the Player serves is checked against exactly. Never shown. */
-  order: Basket;
+  /** The Shift Customer template they were drawn from. */
+  templateId: string;
+  /** What they want in the end, which what the Player serves is checked against exactly. Never shown. */
+  order: ShiftOrder;
+  /** What they ask for first, before they change their mind halfway, or null if they don't. */
+  changedFrom: ShiftOrder | null;
   /** Picks their voice: the gateway turns it into one of its Shift Customer voices. */
   voiceSeed: number;
 };

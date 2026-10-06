@@ -1,4 +1,13 @@
-import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, readServedScene, readShiftOrder, type NpcSession, type ToolResponse } from '../ai/index.ts';
+import {
+  NOT_UNDERSTOOD_TOOL,
+  OUT_OF_PATIENCE_SCENE,
+  readChangedOrder,
+  readChangeScene,
+  readServedScene,
+  readShiftOrder,
+  type NpcSession,
+  type ToolResponse,
+} from '../ai/index.ts';
 import {
   CULTURE_PACKS,
   INTERACTIONS,
@@ -830,6 +839,8 @@ type CustomerScript = {
   order: (items: string) => string;
   /** Says the order again, for a line it understood. */
   again: (items: string) => string;
+  /** Changes their mind: they want this instead. */
+  change: (items: string) => string;
   thanks: string;
   wrongOrder: string;
   /** Words that ask the customer to repeat or clarify. */
@@ -840,6 +851,7 @@ const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
   ja: {
     order: (items) => `こんにちは。${items}をひとつください。`,
     again: (items) => `${items}をひとつお願いします。`,
+    change: (items) => `あ、すみません！やっぱり${items}にしてください。`,
     thanks: 'ありがとうございます！',
     wrongOrder: 'あの、これは注文したものと違います…。じゃあ、いいです。',
     repeat: ['もう一度', 'もういちど', 'なん', '何', 'えっ', 'え？'],
@@ -847,6 +859,7 @@ const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
   zh: {
     order: (items) => `你好，我要一杯${items}。`,
     again: (items) => `一杯${items}，谢谢。`,
+    change: (items) => `啊，不好意思！我改成${items}吧。`,
     thanks: '谢谢！',
     wrongOrder: '这不是我点的……算了，再见。',
     repeat: ['再说一遍', '什么', '请再说'],
@@ -854,6 +867,7 @@ const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
   en: {
     order: (items) => `Hi! Could I get a ${items}, please?`,
     again: (items) => `A ${items}, please.`,
+    change: (items) => `Oh, sorry! Actually, could I have a ${items} instead?`,
     thanks: 'Lovely, thanks!',
     wrongOrder: "Sorry, that's not what I ordered… never mind. Bye.",
     repeat: ['sorry', 'again', 'pardon', 'what'],
@@ -861,23 +875,35 @@ const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
   de: {
     order: (items) => `Hallo! Einen ${items}, bitte.`,
     again: (items) => `Einen ${items}, bitte.`,
+    change: (items) => `Ach, Entschuldigung! Doch lieber einen ${items}.`,
     thanks: 'Danke schön!',
     wrongOrder: 'Das habe ich nicht bestellt… na ja, tschüss.',
     repeat: ['nochmal', 'noch mal', 'wie bitte', 'was'],
   },
 };
 
-/** A Shift Customer, ordering what the instruction holds by the items' local names ("1 × ラテ" is said as "ラテ"). */
+/**
+ * A Shift Customer, ordering what the instruction holds by the items' local names ("1 × ラテ" is said as "ラテ"). One
+ * who changes their mind wants what the instruction says instead once the barista has started on it.
+ */
 function customerNpc(script: CustomerScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
-  const items = (readShiftOrder(systemInstruction) ?? '').replace(/\d+ × /g, '');
+  const said = (order: string | null) => (order ?? '').replace(/\d+ × /g, '');
+  let items = said(readShiftOrder(systemInstruction));
+  const changedTo = readChangedOrder(systemInstruction);
   const { yes, no, known } = common.words;
   return {
     ...common,
     greeting: script.order(items),
-    resume: script.again(items),
+    get resume() {
+      return script.again(items);
+    },
     hear: (line) => {
       const servedRight = readServedScene(line);
       if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrongOrder);
+      if (readChangeScene(line) && changedTo) {
+        items = said(changedTo);
+        return act.say(script.change(items));
+      }
       if (mentions(line, [...script.repeat, ...yes, ...no, ...known])) return act.say(script.again(items));
       act.notUnderstood();
     },

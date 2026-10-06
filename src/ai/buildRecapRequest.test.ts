@@ -83,6 +83,27 @@ describe('buildRecapRequest', () => {
     expect(prompt).toContain('2. PLAYER (heard as, may be misheard): ラテ…ですか？');
   });
 
+  it('tells the coach how a drink made to order was made, and what a customer first asked for before changing their mind', () => {
+    const made = (size: 'small' | 'large', temperature: 'hot' | 'iced', extra: 'milk' | 'lemon') => ({ size, temperature, extras: [extra] });
+    const prompt = text({
+      ...shift,
+      customers: [
+        {
+          changedFrom: [{ itemId: 'coffee', quantity: 1, modifiers: made('small', 'hot', 'milk') }],
+          order: [{ itemId: 'tea', quantity: 1, modifiers: made('large', 'iced', 'lemon') }],
+          result: 'wrongOrder',
+          served: [{ itemId: 'tea', quantity: 1, modifiers: made('large', 'hot', 'lemon') }],
+          transcript: SHIFT_LINES,
+          helpLog: [],
+        },
+      ],
+    });
+
+    expect(prompt).toContain(
+      'CUSTOMER 1\nThey first ordered 1 × ブレンドコーヒー (Sサイズ, ホット, ミルク), then changed their mind halfway. They ordered: 1 × 紅茶 (Lサイズ, アイス, レモン). The barista served 1 × 紅茶 (Lサイズ, ホット, レモン) instead.',
+    );
+  });
+
   it('asks for at most three corrections across the whole Shift', () => {
     expect(buildRecapRequest(shift).generationConfig.responseSchema.properties!.corrections!.maxItems).toBe(3);
   });

@@ -757,6 +757,30 @@ ruby {
   background: #fff;
 }
 
+.menu-grid-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.menu-grid-options > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.menu-grid-options button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.menu-grid-options button[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
 .menu-grid-items {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
