@@ -1,4 +1,4 @@
-import type { AppearancePresetId, DrinkModifiers, ItemId, NamedNpcId } from '../content/index.ts';
+import type { AppearancePresetId, DietaryNoteId, DrinkModifiers, ItemId, NamedNpcId } from '../content/index.ts';
 import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
@@ -76,6 +76,12 @@ export type Checkout = {
 /** What the Player did at the till for a customer: the bag and points card toggles, and the change counted out. */
 export type TillWork = { bag: boolean; pointsCard: boolean; change: number };
 
+/** One diner at a restaurant table: the dish and drink they want, and any dietary need they tell the server. */
+export type Diner = { dish: ItemId; drink: ItemId; note: DietaryNoteId | null };
+
+/** One diner as the server wrote them on the order pad: what's been written so far, which may be nothing. */
+export type PadDiner = { dish: ItemId | null; drink: ItemId | null; note: DietaryNoteId | null };
+
 /** A Shift Customer at the counter: anonymous, with no memory, and a hidden order the Player has to work out. */
 export type ShiftCustomer = {
   /** The Shift Customer template they were drawn from. */
@@ -89,6 +95,11 @@ export type ShiftCustomer = {
   changedFrom: ShiftOrder | null;
   /** At the supermarket till: the bag, the points card, anything from behind the counter and their cash. Null elsewhere. */
   checkout: Checkout | null;
+  /**
+   * At the restaurant: everyone at the table, one diner or a few, with what each wants and any dietary need. Their
+   * `order` is all of it together, for the kitchen. Null elsewhere. One Shift Customer speaks for the whole table.
+   */
+  table: readonly Diner[] | null;
   /** Picks their voice: the gateway turns it into one of its Shift Customer voices. */
   voiceSeed: number;
 };

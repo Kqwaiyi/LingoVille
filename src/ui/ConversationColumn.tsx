@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { formatLocalMoney, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import type { LanguageCode, NpcExpression } from '../sim/index.ts';
+import type { JobId, LanguageCode, NpcExpression } from '../sim/index.ts';
 import {
   selectChatLines,
   selectClockMinute,
@@ -31,7 +31,14 @@ import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
-import { MenuGrid, Till } from './ShiftPanel.tsx';
+import { MenuGrid, OrderPad, Till } from './ShiftPanel.tsx';
+
+/** The Job action UI for the Shift Customer at the counter: the barista's menu grid, the cashier's till or the server's order pad. */
+function JobPanel({ jobId, conversationId }: { jobId: JobId | undefined; conversationId: number }) {
+  if (jobId === 'cashier') return <Till key={conversationId} />;
+  if (jobId === 'server') return <OrderPad />;
+  return <MenuGrid />;
+}
 
 /** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
 function NpcLineHelp({ index, text }: { index: number; text: string }) {
@@ -406,7 +413,7 @@ export function ConversationColumn() {
               )}
             </div>
           )}
-          {conversation.shiftCustomer && (shift?.jobId === 'cashier' ? <Till key={conversation.id} /> : <MenuGrid />)}
+          {conversation.shiftCustomer && <JobPanel jobId={shift?.jobId} conversationId={conversation.id} />}
           {closingCard ? <ClosingCardPanel card={closingCard} who={who} /> : <InputBar />}
         </>
       )}

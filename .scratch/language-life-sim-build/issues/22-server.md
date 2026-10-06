@@ -6,11 +6,21 @@
 
 **Spec:** [spec.md](../spec.md): Jobs and Shifts; Goal Interactions (#28); Life Skills
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Hiring interaction #28, with the same name check and retry rules as the barista.
-- [ ] Server template B (single dish + drink).
-- [ ] Server template A (a table of 2–3 with a dietary request).
-- [ ] Order pad UI, with per-diner orders and dietary notes.
-- [ ] The exact check covers the dish and the drink, and for tables every diner's order and note (Vitest).
-- [ ] The Server skill earns XP per table, and its mechanics aid is quick-pick dietary notes.
+- [x] Hiring interaction #28, with the same name check and retry rules as the barista. `INTERACTIONS.askServerForWork`, on F at the server, who is now a Named NPC (`NAMED_NPCS.server`, with a local name and Appearance Preset in each pack).
+- [x] Server template B (single dish + drink). `server-single-order`: one diner, one of `RESTAURANT_DISHES` and one of `RESTAURANT_DRINKS`, no dietary need.
+- [x] Server template A (a table of 2–3 with a dietary request). `server-table-dietary`: `ECONOMY.tableDiners` diners, each with a dish and a drink. One diner (drawn) has one of `DIETARY_NOTE_IDS` (vegetarian, no pork, no seafood) and orders a dish that keeps to it.
+- [x] Order pad UI, with per-diner orders and dietary notes. `OrderPad` (`src/ui/ShiftPanel.tsx`): diner tabs, + Diner and Remove diner, tap a dish and a drink onto the line being written, a dietary note, Clear and Send order.
+- [x] The exact check covers the dish and the drink, and for tables every diner's order and note (Vitest). `applyShiftCustomer(state, served, { atTheTable })` (`src/sim/table.test.ts`): every diner's dish, drink and note must be on the pad, one line each, in any order.
+- [x] The Server skill earns XP per table, and its mechanics aid is quick-pick dietary notes. XP is the shared per-customer rule, and a table is one Shift Customer. At Server 0 the note is picked from a drop-down list. From Server 1 (`quickPickNotes`), each need is a one-tap button.
+
+## Comments
+
+- **Restaurant content arrives early:** #25 needs the restaurant menu with dietary facts, and this Job needed it first. Four dishes and two drinks are now catalogue items (`pork-dish`, `chicken-dish`, `fish-dish`, `veggie-dish`, `juice`, `cola`). A dish plus a drink costs 0.25 Shift. Each dish's dietary facts (`Item.contains`: meat, pork, seafood) are authored once. Each pack picks a local dish that keeps to them, for example ポークソテー, 糖醋里脊, Sausage and mash and Schweineschnitzel for `pork-dish`. Review swapped out dishes whose real recipes broke their facts: 野菜カレー (curry roux has meat extract), Mushroom risotto (chicken stock), and the 定食 set meals with miso soup (fish stock) for anything not tagged seafood. `dishFits(dish, need)` is the rule #25's "rejects an order that breaks the restriction" can reuse. Each pack also has a `restaurant` Shop (name, glosses, facts) and `dietaryNotes`. Dishes and drinks restore Hunger and Thirst (`WELL_BEING.restaurantDishHunger`, `restaurantDrinkThirst`), but nothing serves them to the Character yet: that's #25.
+- **How the check matches diners:** the Player can't see who sits where, so a pad matches when each of its lines is exactly one diner's (dish, drink, note), with the same number of lines. Swapping two diners' drinks fails, even though the same items are on the pad. A note on a diner who asked for none fails too.
+- **Customer data:** a Shift Customer has a `table` (diners, each with a dish, a drink and a note or null), and their `order` is everything for the kitchen (`kitchenOrder`). One Shift Customer voice speaks for the whole table. Save v12 adds `table: null` to a customer at the counter. The pad itself lives only in the conversation (`OrderPad` in `src/sim/orderPad.ts`), like the tray.
+- **Prompts changed: needs a passing `npm run eval` before merging.** These are new: the restaurant Shift Customer's prompt (`YOUR TABLE`: one line per diner, say who has what, mention the dietary need, never prices), the table served scene, the Shift Recap's table line, the server hiring session (a new `restaurant` workplace in `npcSession.ts`), and the Shift hint's "serving a table". In the barista and cashier customer prompts, the last SITUATION line now comes from a per-counter `arrived` phrase. That text and the barista and cashier hint snapshots are unchanged. There are no server eval cases yet.
+- **World:** `WORKPLACES.server`: the staff door is in the restaurant's west wall, level with the front door. The Character stands at the west table, which moved 0.8 m back so the way to the staff door is clear. The customer is seated across from them, and the rest of the table (`otherSeats`) sits on either side.
+- **Review tidy-ups not done (judgement calls):** a Shift Customer's kind is still told apart by `checkout` or `table` being set, in several places (ai, sim, store, the UI's `jobId`). A discriminated union of customer kinds, with what the Player did at each, would replace those pairs of nullable fields and every `table: null` fixture. The pad's `'dish' | 'drink'` is worked out in the store from `RESTAURANT_DISHES`. The diner Zod shape exists in both `saves.ts` and `ai/recap.ts`, like the checkout's. At Server 0 the note is a drop-down, and the quick-pick aid only saves taps. The diner tabs are numbered, but who sits where isn't checked.
+- **Not covered:** the Playwright smoke (`e2e/server.spec.ts`, from B1) covers hiring, single orders on the pad and pay. A table only comes 10% of the time at B1–B2, so the table and note path in the browser is covered at the store seam (`src/store/server.test.ts`) and by a one-off screenshot, not the smoke. The Shift-end card still doesn't show XP gained.

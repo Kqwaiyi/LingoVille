@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { INTERACTIONS, type CulturePack, type Interaction, type ToolSchema } from '../content/index.ts';
-import { LANGUAGE_CODES, PROFICIENCY_STEPS, type ShiftOrder } from '../sim/index.ts';
+import { LANGUAGE_CODES, PROFICIENCY_STEPS, type PadDiner, type ShiftOrder } from '../sim/index.ts';
 
 // What the prompted endpoints (Recap, hint, annotate) share.
 
@@ -23,6 +23,11 @@ export function orderSaid(order: ShiftOrder, pack: CulturePack) {
       return `${quantity} × ${pack.goods[itemId].name}${made ? ` (${made})` : ''}`;
     })
     .join(', ');
+}
+
+/** One diner's dish and drink, as the pack names them: "ポークソテー and コーラ", or "no drink" for one left off the order pad. */
+export function mealSaid({ dish, drink }: PadDiner, pack: CulturePack) {
+  return `${dish ? pack.goods[dish].name : 'no dish'} and ${drink ? pack.goods[drink].name : 'no drink'}`;
 }
 
 /** One line of a conversation as a prompt reads it. A player line is what the NPC heard, unless it was typed. */

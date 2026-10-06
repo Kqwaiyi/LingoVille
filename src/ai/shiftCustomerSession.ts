@@ -1,12 +1,22 @@
-import { formatLocalAmount, type CulturePack } from '../content/index.ts';
-import { weekdayOf, type Checkout, type GameState, type ProficiencyStep, type ShiftCustomer, type ShiftOrder, type TillWork } from '../sim/index.ts';
-import { block, orderSaid } from './common.ts';
+import { DIETARY_NOTES, formatLocalAmount, type CulturePack } from '../content/index.ts';
+import {
+  weekdayOf,
+  type Checkout,
+  type Diner,
+  type GameState,
+  type PadDiner,
+  type ProficiencyStep,
+  type ShiftCustomer,
+  type ShiftOrder,
+  type TillWork,
+} from '../sim/index.ts';
+import { block, mealSaid, orderSaid } from './common.ts';
 import { capitalise, dayPart, formatTime, languageRulesBlock, notUnderstoodTool, type NpcSession } from './npcSession.ts';
 
 /** What a Shift Customer's session is built from besides the customer: the time of day. */
 export type ShiftCustomerContext = { clock: GameState['clock'] };
 
-/** Where a Shift Customer is served, and by whom: the Player, behind the café counter or at the supermarket till. */
+/** Where a Shift Customer is served, and by whom: the Player, behind the café counter, at the supermarket till or at a restaurant table. */
 type Counter = {
   /** Who the Player is to the customer. */
   who: string;
@@ -16,8 +26,8 @@ type Counter = {
   doing: string;
   /** The same, as an -ing: "ordering". */
   doingIt: string;
-  /** What the customer walks up to. */
-  walkUpTo: string;
+  /** How the customer has just arrived. */
+  arrived: string;
   /** The shop, as the customer knows it. */
   shop: (pack: CulturePack) => string;
 };
@@ -27,7 +37,7 @@ const CAFE: Counter = {
   at: 'a café counter',
   doing: 'Order',
   doingIt: 'ordering',
-  walkUpTo: 'the counter',
+  arrived: 'walked up to the counter',
   shop: (pack) => `${pack.cafe.name}, a café`,
 };
 
@@ -36,12 +46,21 @@ const TILL: Counter = {
   at: 'a supermarket till',
   doing: 'Pay',
   doingIt: 'paying at the till',
-  walkUpTo: 'the till',
+  arrived: 'walked up to the till',
   shop: (pack) => `${pack.supermarket.name}, a supermarket`,
 };
 
-/** A customer with a checkout is at the supermarket till; any other, at the café counter. */
-const counterFor = (customer: ShiftCustomer): Counter => (customer.checkout ? TILL : CAFE);
+const TABLE: Counter = {
+  who: 'server',
+  at: 'a restaurant table',
+  doing: 'Order',
+  doingIt: 'ordering a meal',
+  arrived: 'sat down at your table',
+  shop: (pack) => `${pack.restaurant.name}, a restaurant`,
+};
+
+/** A customer with a checkout is at the supermarket till; one with a table, at the restaurant; any other, at the café counter. */
+const counterFor = (customer: ShiftCustomer): Counter => (customer.checkout ? TILL : customer.table ? TABLE : CAFE);
 
 /**
  * How a Shift Customer speaks at each Proficiency Step (the first line follows "The barista"): vocabulary
@@ -119,6 +138,17 @@ export function readCheckout(systemInstruction: string): CheckoutSaid | null {
   };
 }
 
+const DINER_LINE = /^- Diner \d+ \(.+?\) — dish: (.+?); drink: (.+?)\.(?: Dietary need: (.+?): this diner .+\.)?$/gm;
+
+/** One diner at a restaurant table, as their instruction says it: their dish, drink and any dietary need, by local names. */
+export type DinerSaid = { dish: string; drink: string; note: string | null };
+
+/** What everyone at a restaurant table wants, read from their instruction, or null if they're not at the restaurant. */
+export function readTable(systemInstruction: string): DinerSaid[] | null {
+  const diners = [...systemInstruction.matchAll(DINER_LINE)].map(([, dish, drink, note]) => ({ dish: dish!, drink: drink!, note: note ?? null }));
+  return diners.length > 0 ? diners : null;
+}
+
 const STARTED_ON_IT = 'has started on your order.';
 
 /** Tells a Shift Customer who changes their mind that the Player has started on their order: now is when they change it. */
@@ -158,6 +188,24 @@ export function shiftCustomerServedScene(served: ShiftOrder, correct: boolean, p
   return correct
     ? `[SCENE: The ${CAFE.who} hands you: ${handed}. ${RIGHT_ORDER} Thank them briefly and say goodbye.]`
     : `[SCENE: The ${CAFE.who} hands you: ${handed}. ${WRONG_ORDER} Tell them politely in a few words, then say goodbye and leave.]`;
+}
+
+/** One diner as the server wrote them on the order pad: "Fish and chips and Orange juice, noted Vegetarian". */
+function padDinerSaid(diner: PadDiner, pack: CulturePack) {
+  const written = mealSaid(diner, pack);
+  return diner.note ? `${written}, noted ${pack.dietaryNotes[diner.note].name}` : written;
+}
+
+/**
+ * Tells a restaurant table what the server wrote on the order pad for each diner, and whether it is all as they wanted:
+ * the game has already checked it exactly, so the table only reacts, and the conversation ends.
+ */
+export function tableServedScene(pad: readonly PadDiner[], correct: boolean, pack: CulturePack): string {
+  const written = pad.length > 0 ? pad.map((diner, i) => `diner ${i + 1}: ${padDinerSaid(diner, pack)}`).join('; ') : 'nothing at all';
+  const done = `The ${TABLE.who} takes your order to the kitchen, having written down: ${written}`;
+  return correct
+    ? `[SCENE: ${done}. ${ALL_RIGHT} Thank them briefly and say a short goodbye: your talk with the ${TABLE.who} is over.]`
+    : `[SCENE: ${done}. ${NOT_ALL_RIGHT} Tell them politely in a few words what is wrong, then say goodbye and leave.]`;
 }
 
 /** Whether a served scene `shiftCustomerServedScene` wrote says it was what the customer wanted, or null if the text isn't one. */
@@ -215,9 +263,61 @@ function checkoutBlock(customer: ShiftCustomer, checkout: Checkout, pack: Cultur
   ]);
 }
 
+/** Who each diner is to the customer speaking for the table: themselves first, then their friends. */
+const dinerWho = (i: number, diners: number) => (i === 0 ? 'you' : diners === 2 ? 'your friend' : `friend ${i}`);
+
+/**
+ * A restaurant customer, speaking for their table: what each diner wants, which the server can't see, and the one
+ * diner's dietary need, if any. One diner alone orders just for themselves.
+ */
+function tableBlock(table: readonly Diner[], pack: CulturePack) {
+  const { who } = TABLE;
+  const alone = table.length === 1;
+  const withNeed = table.findIndex(({ note }) => note !== null);
+  const friends = table.length - 1;
+  const dinerLine = ({ dish, drink, note }: Diner, i: number) =>
+    `- Diner ${i + 1} (${dinerWho(i, table.length)}) — dish: ${pack.goods[dish].name}; drink: ${pack.goods[drink].name}.` +
+    (note ? ` Dietary need: ${pack.dietaryNotes[note].name}: this diner ${DIETARY_NOTES[note].means}.` : '');
+  return block('YOUR TABLE', [
+    alone
+      ? '- You are eating alone. You want exactly this, and nothing else:'
+      : `- You are ordering for your table of ${table.length}: you and ${friends === 1 ? 'a friend' : `${friends} friends`}. Everyone wants exactly this, and nothing else:`,
+    ...table.map(dinerLine),
+    alone
+      ? `- The ${who} cannot see what you want: they have to work it out from what you say. Greet them and order it in your own words, as a local would.`
+      : `- The ${who} cannot see what anyone wants: they have to work it out from what you say. Greet them and order for everyone in your own words, as a local would, saying who has what.`,
+    ...(withNeed >= 0
+      ? [
+          `- When you order, tell the ${who} about ${withNeed === 0 ? 'your' : `${dinerWho(withNeed, table.length)}'s`} dietary need in your own words, as a local would, so it goes on the order.`,
+        ]
+      : []),
+    `- If the ${who} asks you to repeat something, or asks what anyone would like, say it again. That is normal and costs nothing.`,
+    '- If they ask anything else, answer briefly and naturally. Never change the order, never add to it, and never talk about prices.',
+    `- Don't say goodbye until a "[SCENE: ...]" message says what the ${who} has written down. Then do what it says.`,
+  ]);
+}
+
+/** What the customer holds hidden: a café order, what they want at the till, or their table's meals. */
+function wantsBlock(customer: ShiftCustomer, pack: CulturePack) {
+  if (customer.checkout) return checkoutBlock(customer, customer.checkout, pack);
+  if (customer.table) return tableBlock(customer.table, pack);
+  return orderBlock(customer, pack);
+}
+
+/** How the customer arrives: walking up to the counter or the till, or sitting down at a table. */
+function openingScene(customer: ShiftCustomer, who: string) {
+  if (customer.checkout) return `[SCENE: You walk up to the till with your shopping. The ${who} is ready to serve you. Greet them.]`;
+  if (customer.table) {
+    const party = customer.table.length === 1 ? 'You have' : 'You and your friends have';
+    return `[SCENE: ${party} sat down at a table. The ${who} comes over to take your order. Greet them and order.]`;
+  }
+  return `[SCENE: You walk up to the counter. The ${who} is ready to serve you. Greet them and order.]`;
+}
+
 /**
  * Everything a Live session needs to play one Shift Customer: an anonymous local with no memory, who walks up to the
- * café counter or the supermarket till, speaks first and holds a hidden order the Player must work out by listening.
+ * café counter or the supermarket till (or sits at a restaurant table, speaking for it), speaks first and holds a hidden
+ * order the Player must work out by listening.
  * Pure: the same inputs always give the same session.
  */
 export function buildShiftCustomerSession(
@@ -241,10 +341,10 @@ export function buildShiftCustomerSession(
     ]),
     languageRulesBlock(pack, who),
     block('HOW TO SPEAK', [`The ${who} ${first}`, ...rest]),
-    customer.checkout ? checkoutBlock(customer, customer.checkout, pack) : orderBlock(customer, pack),
+    wantsBlock(customer, pack),
     block('THE SITUATION', [
       `It is ${formatTime(minuteOfDay)} on a ${capitalise(weekdayOf(day))} ${dayPart(minuteOfDay)}.`,
-      `A "[SCENE: ...]" message tells you what is happening; it is not the ${who} speaking. The first one means you have just walked up to ${counter.walkUpTo}: you speak first.`,
+      `A "[SCENE: ...]" message tells you what is happening; it is not the ${who} speaking. The first one means you have just ${counter.arrived}: you speak first.`,
     ]),
   ].join('\n\n');
 
@@ -252,8 +352,6 @@ export function buildShiftCustomerSession(
     systemInstruction,
     tools: [notUnderstoodTool(who)],
     voice: { targetLanguage: pack.id, shiftCustomerVoice: customer.voiceSeed },
-    openingScene: customer.checkout
-      ? `[SCENE: You walk up to the till with your shopping. The ${who} is ready to serve you. Greet them.]`
-      : `[SCENE: You walk up to the counter. The ${who} is ready to serve you. Greet them and order.]`,
+    openingScene: openingScene(customer, who),
   };
 }

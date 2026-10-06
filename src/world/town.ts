@@ -90,7 +90,8 @@ export const FURNITURE: readonly { position: Vec3; size: Vec3; colour: string }[
   // Restaurant tables.
   { position: [39.5, 0.4, -3], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
   { position: [44.5, 0.4, -3], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
-  { position: [39.5, 0.4, 0.5], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
+  // The server's table on a Shift, west of the door and clear of the way from the door to the staff door.
+  { position: [39.5, 0.4, -0.3], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
   // Clinic reception and pharmacy counters, and the waiting room bench.
   { position: [-30, 0.55, 13.5], size: [3, 1.1, 0.8], colour: '#9fb4ba' },
   { position: [-21, 0.55, 13.5], size: [3, 1.1, 0.8], colour: '#9fb4ba' },
@@ -137,10 +138,22 @@ export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
  * Where each Job is worked: its staff door, set in its place's west wall (and where the Character stands to use it);
  * where the Character stands through a Shift, behind the counter beside its staff; and where a Shift Customer stands,
  * across the counter. The café's is level with its counter; the supermarket's, with the customers' side of its till.
+ * At the restaurant the staff door is level with the front door; the Character stands at the table by the west wall,
+ * and the customer is seated across it, with the rest of their table (`otherSeats`) on either side.
  */
-export const WORKPLACES: Partial<Record<JobId, { door: Vec3; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3 }>> = {
+export const WORKPLACES: Record<JobId, { door: Vec3; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3; otherSeats?: readonly Vec3[] }> = {
   barista: { door: [7.22, 1.1, -2.2], usedFrom: [7.7, 1, -2.2], behindTheCounter: [13.4, 1, -4], customerSpot: [13.4, 1, -1.8] },
   cashier: { door: [20.22, 1.1, 1], usedFrom: [20.7, 1, 1], behindTheCounter: [25, 1, -0.6], customerSpot: [25, 1, 1.6] },
+  server: {
+    door: [37.22, 1.1, 1.5],
+    usedFrom: [37.7, 1, 1.5],
+    behindTheCounter: [41, 1, -0.3],
+    customerSpot: [38.3, 1, -0.3],
+    otherSeats: [
+      [39.5, 1, -1.35],
+      [39.5, 1, 0.75],
+    ],
+  },
 };
 
 /** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */

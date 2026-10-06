@@ -91,6 +91,21 @@ export const INTERACTIONS = {
     band: 'B',
     effect: { kind: 'hire', jobId: 'cashier' },
   }),
+  // #28. Asking the server for work. Until the Character is hired, F at the server asks.
+  askServerForWork: defineInteraction({
+    id: 'ask-server-for-work',
+    placeId: 'restaurant',
+    npcId: 'server',
+    goal:
+      'This person has come in to ask for work as a server, and the restaurant is hiring. ' +
+      'Greet them as you would anyone and let them ask. Then interview them briefly: ask their name and when they can start. ' +
+      'There is no rota: once hired, they come in by the staff door any day the restaurant is open and work a shift waiting tables.',
+    facts: ['openingHours', 'placeFacts'],
+    items: [],
+    completion: hireApplicant,
+    band: 'B',
+    effect: { kind: 'hire', jobId: 'server' },
+  }),
   // #4. The cashier rings up whatever the Character brought to the till.
   payForGroceries: defineInteraction({
     id: 'pay-for-groceries',

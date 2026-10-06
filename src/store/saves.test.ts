@@ -55,6 +55,7 @@ function lived(): GameState {
           order: [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }],
           changedFrom: [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }],
           checkout: null,
+          table: null,
           voiceSeed: 4242,
         },
       },
@@ -91,9 +92,17 @@ function beforeShifts() {
   return { ...game, progression, possessions: { ...game.possessions, shift: null } };
 }
 
+/** The game before restaurant tables: version 11. A Shift Customer had no table. */
+function beforeTables() {
+  const game = lived();
+  const customer: Partial<ShiftCustomer> = { ...game.possessions.shift!.customer! };
+  delete customer.table;
+  return { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } } };
+}
+
 /** The game before the cashier's till: version 10. A Shift Customer had no checkout. */
 function beforeTill() {
-  const game = lived();
+  const game = beforeTables();
   const customer: Partial<ShiftCustomer> = { ...game.possessions.shift!.customer! };
   delete customer.checkout;
   return { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } } };
@@ -309,6 +318,7 @@ describe('saves', () => {
       order: [{ itemId: 'latte', quantity: 1 }],
       changedFrom: null,
       checkout: null,
+      table: null,
       voiceSeed: 4242,
     });
   });
@@ -340,12 +350,44 @@ describe('saves', () => {
       order: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'stamps', quantity: 1 }],
       changedFrom: null,
       checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 5, changeDue: 0.6 },
+      table: null,
       voiceSeed: 7,
     } as const;
     const atTheTill = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'cashier' as const, customer } } };
     await saves.write('slot-1', atTheTill);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(atTheTill);
+  });
+
+  it('upgrades a save from before restaurant tables with no table for the Shift Customer at the counter', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 11, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeTables() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it("keeps a restaurant table as it was: each diner's dish, drink and dietary need", async () => {
+    const { saves } = freshSaves();
+    const game = lived();
+    const customer = {
+      templateId: 'server-table-dietary',
+      order: [
+        { itemId: 'veggie-dish', quantity: 1 },
+        { itemId: 'juice', quantity: 2 },
+        { itemId: 'pork-dish', quantity: 1 },
+      ],
+      changedFrom: null,
+      checkout: null,
+      table: [
+        { dish: 'veggie-dish', drink: 'juice', note: 'vegetarian' },
+        { dish: 'pork-dish', drink: 'juice', note: null },
+      ],
+      voiceSeed: 9,
+    } as const;
+    const atTheTable = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'server' as const, customer } } };
+    await saves.write('slot-1', atTheTable);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(atTheTable);
   });
 
   it('fails loudly, naming the field, when a save refers to content the game no longer has', async () => {

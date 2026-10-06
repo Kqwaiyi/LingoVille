@@ -5,7 +5,26 @@ import { WELL_BEING } from '../sim/index.ts';
 // costs are authored once, here; each Culture Pack gives it a local name and
 // glosses (culturePacks.ts) and converts its price to local money (currency.ts).
 
-export const ITEM_IDS = ['latte', 'coffee', 'tea', 'pastry', 'snack', 'bento', 'vegetables', 'eggs', 'noodles', 'batteries', 'stamps', 'gift-card'] as const;
+export const ITEM_IDS = [
+  'latte',
+  'coffee',
+  'tea',
+  'pastry',
+  'snack',
+  'bento',
+  'vegetables',
+  'eggs',
+  'noodles',
+  'batteries',
+  'stamps',
+  'gift-card',
+  'pork-dish',
+  'chicken-dish',
+  'fish-dish',
+  'veggie-dish',
+  'juice',
+  'cola',
+] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 
 /** What the café serves, in every pack. Its menu board and its order interaction both read this. */
@@ -47,6 +66,36 @@ export type GroceryId = (typeof GROCERIES_SOLD)[number];
 /** What the supermarket keeps behind its till, in every pack: a customer has to ask the cashier for it. */
 export const BEHIND_THE_COUNTER = ['batteries', 'stamps', 'gift-card'] as const satisfies readonly ItemId[];
 
+/** The restaurant's main dishes, in every pack. Each pack picks a local dish that keeps to the dish's dietary facts (`contains`). */
+export const RESTAURANT_DISHES = ['pork-dish', 'chicken-dish', 'fish-dish', 'veggie-dish'] as const satisfies readonly ItemId[];
+
+/** What the restaurant serves to drink with a meal, in every pack. */
+export const RESTAURANT_DRINKS = ['juice', 'cola'] as const satisfies readonly ItemId[];
+
+/** Everything on the restaurant's menu: a dish and a drink make a meal. */
+export const RESTAURANT_MENU = [...RESTAURANT_DISHES, ...RESTAURANT_DRINKS] as const satisfies readonly ItemId[];
+
+/** What a dish can have in it that some diners don't eat. */
+export const INGREDIENTS = ['meat', 'pork', 'seafood'] as const;
+export type Ingredient = (typeof INGREDIENTS)[number];
+
+/** A dietary need a diner can tell the server, which the server notes on the order pad. */
+export const DIETARY_NOTE_IDS = ['vegetarian', 'no-pork', 'no-seafood'] as const;
+export type DietaryNoteId = (typeof DIETARY_NOTE_IDS)[number];
+
+/** What each dietary need rules out, and what it means, in English, for prompts. */
+export const DIETARY_NOTES: Record<DietaryNoteId, { avoids: readonly Ingredient[]; means: string }> = {
+  vegetarian: { avoids: ['meat', 'pork', 'seafood'], means: 'eats no meat, fish or seafood' },
+  'no-pork': { avoids: ['pork'], means: 'eats no pork' },
+  'no-seafood': { avoids: ['seafood'], means: 'eats no fish or seafood' },
+};
+
+/** The dish keeps to this dietary need: it has nothing in it the need rules out. */
+export function dishFits(itemId: ItemId, noteId: DietaryNoteId): boolean {
+  const contains = ITEMS[itemId].contains ?? [];
+  return !DIETARY_NOTES[noteId].avoids.some((ingredient) => contains.includes(ingredient));
+}
+
 /** What consuming an item gives back to the Character's Well-being. */
 export type Restores = { hunger?: number; thirst?: number };
 
@@ -57,6 +106,8 @@ export type Item = {
   restores: Restores;
   /** Groceries only: how many home meals one cooks. Groceries go into the inventory and go off. */
   meals?: number;
+  /** Restaurant dishes only: their dietary facts, which every pack's local dish keeps to. Nothing listed: none of these. */
+  contains?: readonly Ingredient[];
 };
 
 export const ITEMS: Record<ItemId, Item> = {
@@ -72,4 +123,11 @@ export const ITEMS: Record<ItemId, Item> = {
   batteries: { priceInShifts: 0.07, restores: {} },
   stamps: { priceInShifts: 0.02, restores: {} },
   'gift-card': { priceInShifts: 0.5, restores: {} },
+  // A restaurant meal is a dish and a drink, about 0.25 Shift together.
+  'pork-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['meat', 'pork'] },
+  'chicken-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['meat'] },
+  'fish-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['seafood'] },
+  'veggie-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger } },
+  juice: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.restaurantDrinkThirst } },
+  cola: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.restaurantDrinkThirst } },
 };

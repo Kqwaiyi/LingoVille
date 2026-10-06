@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
-import { DRINK_OPTIONS, ITEM_IDS, type DrinkOptionId, type ItemId } from './items.ts';
+import { DIETARY_NOTE_IDS, DRINK_OPTIONS, ITEM_IDS, type DietaryNoteId, type DrinkOptionId, type ItemId } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
 import { hours, HOURS_IDS, type HoursId } from './places.ts';
 
@@ -60,10 +60,13 @@ export type CulturePack = {
   goods: Record<ItemId, Good>;
   /** How a café drink can be made (size, hot or iced, extras), as the menu grid and Shift Customers say it. */
   drinkOptions: Record<DrinkOptionId, Good>;
+  /** The dietary needs a server notes on the order pad, as the pad and diners say them. */
+  dietaryNotes: Record<DietaryNoteId, Good>;
   signs: Record<SignWord, { text: string; glosses: Glosses }>;
   cafe: Shop;
   supermarket: Shop;
   convenienceStore: Shop;
+  restaurant: Shop;
   /** The clinic and hospital, by its local name: where the Fainting ward is. */
   hospital: { name: string; nameGlosses: Glosses };
   /** The apartment block the Character lives in, by its local name: where the landlord is. */
@@ -124,10 +127,12 @@ export function culturePackSchema(packId: LanguageCode) {
     ambient: z.array(kebab),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     drinkOptions: z.record(z.enum(DRINK_OPTIONS), z.object({ name: text, glosses })),
+    dietaryNotes: z.record(z.enum(DIETARY_NOTE_IDS), z.object({ name: text, glosses })),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
     cafe: shop,
     supermarket: shop,
     convenienceStore: shop,
+    restaurant: shop,
     hospital: z.object({ name: text, nameGlosses: glosses }),
     apartments: z.object({ name: text, nameGlosses: glosses }),
     personas: z.record(z.string(), z.object({ name: text })),
@@ -171,6 +176,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       batteries: { name: '単三電池', glosses: { zh: '五号电池', en: 'AA batteries', de: 'AA-Batterien' } },
       stamps: { name: '切手', glosses: { zh: '邮票', en: 'Stamps', de: 'Briefmarken' } },
       'gift-card': { name: 'ギフトカード', glosses: { zh: '礼品卡', en: 'Gift card', de: 'Geschenkkarte' } },
+      'pork-dish': { name: 'ポークソテー', glosses: { zh: '香煎猪排', en: 'Pan-fried pork', de: 'Gebratenes Schweinesteak' } },
+      'chicken-dish': { name: 'チキン南蛮', glosses: { zh: '南蛮炸鸡', en: 'Fried chicken with tartar sauce', de: 'Frittiertes Hähnchen mit Remoulade' } },
+      'fish-dish': { name: '焼き鮭定食', glosses: { zh: '烤三文鱼套餐', en: 'Grilled salmon set meal', de: 'Menü mit gegrilltem Lachs' } },
+      'veggie-dish': { name: '野菜のトマトパスタ', glosses: { zh: '蔬菜番茄意面', en: 'Vegetable tomato pasta', de: 'Gemüsepasta mit Tomatensoße' } },
+      juice: { name: 'オレンジジュース', glosses: { zh: '橙汁', en: 'Orange juice', de: 'Orangensaft' } },
+      cola: { name: 'コーラ', glosses: { zh: '可乐', en: 'Cola', de: 'Cola' } },
     },
     drinkOptions: {
       small: { name: 'Sサイズ', glosses: { zh: '小杯', en: 'Small', de: 'Klein' } },
@@ -182,6 +193,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: '砂糖', glosses: { zh: '加糖', en: 'Sugar', de: 'Zucker' } },
       'extra-shot': { name: 'ショット追加', glosses: { zh: '加一份浓缩', en: 'Extra shot', de: 'Extra Shot' } },
       lemon: { name: 'レモン', glosses: { zh: '加柠檬', en: 'Lemon', de: 'Zitrone' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: 'ベジタリアン', glosses: { zh: '吃素', en: 'Vegetarian', de: 'Vegetarisch' } },
+      'no-pork': { name: '豚肉抜き', glosses: { zh: '不吃猪肉', en: 'No pork', de: 'Ohne Schweinefleisch' } },
+      'no-seafood': { name: '魚介類抜き', glosses: { zh: '不吃海鲜', en: 'No fish or seafood', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
     signs: {
       openingHours: { text: '営業時間', glosses: { zh: '营业时间', en: 'Opening hours', de: 'Öffnungszeiten' } },
@@ -210,14 +226,23 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         'Cash, card and IC cards are all fine.',
       ],
     },
+    restaurant: {
+      name: 'レストランひまわり',
+      nameGlosses: { zh: '向日葵餐厅', en: 'Sunflower Restaurant', de: 'Restaurant Sonnenblume' },
+      facts: [
+        'Water and a wet towel (oshibori) come free to every table.',
+        'Set meals (teishoku) come with rice, miso soup and pickles. Miso soup is made with fish stock (dashi).',
+        'Customers pay at the till by the door on the way out. Cash and card are both fine.',
+      ],
+    },
     hospital: {
       name: 'みどり総合病院',
       nameGlosses: { zh: '绿树综合医院', en: 'Midori General Hospital', de: 'Allgemeines Krankenhaus Midori' },
     },
     apartments: { name: 'さくら荘', nameGlosses: { zh: '樱花庄', en: 'Sakura House', de: 'Haus Sakura' } },
-    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' }, cashier: { name: '鈴木' }, 'convenience-clerk': { name: '田中' }, landlord: { name: '山本' } },
+    personas: { barista: { name: '佐藤' }, nurse: { name: '高橋' }, cashier: { name: '鈴木' }, 'convenience-clerk': { name: '田中' }, landlord: { name: '山本' }, server: { name: '中村' } },
     appearances: {
-      npcs: { barista: 'preset-2', nurse: 'preset-4', cashier: 'preset-1', 'convenience-clerk': 'preset-3', landlord: 'preset-3' },
+      npcs: { barista: 'preset-2', nurse: 'preset-4', cashier: 'preset-1', 'convenience-clerk': 'preset-3', landlord: 'preset-3', server: 'preset-1' },
       customerWeights: { 'preset-1': 3, 'preset-2': 3, 'preset-3': 2, 'preset-4': 2 },
     },
     props: ['noren', 'lucky-cat'],
@@ -250,6 +275,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       batteries: { name: '五号电池', glosses: { ja: '単三電池', en: 'AA batteries', de: 'AA-Batterien' } },
       stamps: { name: '邮票', glosses: { ja: '切手', en: 'Stamps', de: 'Briefmarken' } },
       'gift-card': { name: '购物卡', glosses: { ja: 'ギフトカード', en: 'Gift card', de: 'Geschenkkarte' } },
+      'pork-dish': { name: '糖醋里脊', glosses: { ja: '豚ヒレ肉の甘酢炒め', en: 'Sweet and sour pork', de: 'Süßsaures Schweinefilet' } },
+      'chicken-dish': { name: '宫保鸡丁', glosses: { ja: '鶏肉とピーナッツの辛味炒め', en: 'Kung pao chicken', de: 'Kung-Pao-Hähnchen' } },
+      'fish-dish': { name: '清蒸鱼', glosses: { ja: '魚の姿蒸し', en: 'Steamed fish', de: 'Gedämpfter Fisch' } },
+      'veggie-dish': { name: '地三鲜', glosses: { ja: 'じゃがいもとナスとピーマンの炒め物', en: 'Stir-fried potato, aubergine and pepper', de: 'Gebratene Kartoffeln, Auberginen und Paprika' } },
+      juice: { name: '橙汁', glosses: { ja: 'オレンジジュース', en: 'Orange juice', de: 'Orangensaft' } },
+      cola: { name: '可乐', glosses: { ja: 'コーラ', en: 'Cola', de: 'Cola' } },
     },
     drinkOptions: {
       small: { name: '小杯', glosses: { ja: 'Sサイズ', en: 'Small', de: 'Klein' } },
@@ -261,6 +292,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: '加糖', glosses: { ja: '砂糖', en: 'Sugar', de: 'Zucker' } },
       'extra-shot': { name: '加一份浓缩', glosses: { ja: 'ショット追加', en: 'Extra shot', de: 'Extra Shot' } },
       lemon: { name: '加柠檬', glosses: { ja: 'レモン', en: 'Lemon', de: 'Zitrone' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: '吃素', glosses: { ja: 'ベジタリアン', en: 'Vegetarian', de: 'Vegetarisch' } },
+      'no-pork': { name: '不吃猪肉', glosses: { ja: '豚肉抜き', en: 'No pork', de: 'Ohne Schweinefleisch' } },
+      'no-seafood': { name: '不吃海鲜', glosses: { ja: '魚介類抜き', en: 'No fish or seafood', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
     signs: {
       openingHours: { text: '营业时间', glosses: { ja: '営業時間', en: 'Opening hours', de: 'Öffnungszeiten' } },
@@ -289,14 +325,23 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         'WeChat Pay, Alipay and cash are all fine.',
       ],
     },
+    restaurant: {
+      name: '老街饭馆',
+      nameGlosses: { ja: '老街食堂', en: 'Old Street Restaurant', de: 'Restaurant Alte Straße' },
+      facts: [
+        'Hot tea comes free to every table.',
+        'Rice is ordered separately, by the bowl.',
+        'Most people pay by scanning a QR code with WeChat or Alipay; cash is fine too.',
+      ],
+    },
     hospital: {
       name: '绿城医院',
       nameGlosses: { ja: '緑城病院', en: 'Green City Hospital', de: 'Krankenhaus Grünstadt' },
     },
     apartments: { name: '幸福公寓', nameGlosses: { ja: '幸福アパート', en: 'Happiness Apartments', de: 'Wohnhaus Glück' } },
-    personas: { barista: { name: '小李' }, nurse: { name: '王芳' }, cashier: { name: '张敏' }, 'convenience-clerk': { name: '小陈' }, landlord: { name: '刘阿姨' } },
+    personas: { barista: { name: '小李' }, nurse: { name: '王芳' }, cashier: { name: '张敏' }, 'convenience-clerk': { name: '小陈' }, landlord: { name: '刘阿姨' }, server: { name: '小赵' } },
     appearances: {
-      npcs: { barista: 'preset-3', nurse: 'preset-1', cashier: 'preset-2', 'convenience-clerk': 'preset-4', landlord: 'preset-4' },
+      npcs: { barista: 'preset-3', nurse: 'preset-1', cashier: 'preset-2', 'convenience-clerk': 'preset-4', landlord: 'preset-4', server: 'preset-1' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['red-lantern', 'tea-set'],
@@ -331,6 +376,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       batteries: { name: 'AA batteries', glosses: { ja: '単三電池', zh: '五号电池', de: 'AA-Batterien' } },
       stamps: { name: 'Stamps', glosses: { ja: '切手', zh: '邮票', de: 'Briefmarken' } },
       'gift-card': { name: 'Gift card', glosses: { ja: 'ギフトカード', zh: '礼品卡', de: 'Geschenkkarte' } },
+      'pork-dish': { name: 'Sausage and mash', glosses: { ja: 'ソーセージとマッシュポテト', zh: '香肠配土豆泥', de: 'Würstchen mit Kartoffelbrei' } },
+      'chicken-dish': { name: 'Chicken pie', glosses: { ja: 'チキンパイ', zh: '鸡肉派', de: 'Hähnchenpastete' } },
+      'fish-dish': { name: 'Fish and chips', glosses: { ja: 'フィッシュ・アンド・チップス', zh: '炸鱼薯条', de: 'Fisch mit Pommes' } },
+      'veggie-dish': { name: 'Veggie burger', glosses: { ja: 'ベジバーガー', zh: '素食汉堡', de: 'Veggie-Burger' } },
+      juice: { name: 'Orange juice', glosses: { ja: 'オレンジジュース', zh: '橙汁', de: 'Orangensaft' } },
+      cola: { name: 'Cola', glosses: { ja: 'コーラ', zh: '可乐', de: 'Cola' } },
     },
     drinkOptions: {
       small: { name: 'Small', glosses: { ja: 'スモール', zh: '小杯', de: 'Klein' } },
@@ -342,6 +393,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: 'Sugar', glosses: { ja: '砂糖', zh: '加糖', de: 'Zucker' } },
       'extra-shot': { name: 'Extra shot', glosses: { ja: 'ショット追加', zh: '加一份浓缩', de: 'Extra Shot' } },
       lemon: { name: 'Lemon', glosses: { ja: 'レモン', zh: '加柠檬', de: 'Zitrone' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: 'Vegetarian', glosses: { ja: 'ベジタリアン', zh: '吃素', de: 'Vegetarisch' } },
+      'no-pork': { name: 'No pork', glosses: { ja: '豚肉抜き', zh: '不吃猪肉', de: 'Ohne Schweinefleisch' } },
+      'no-seafood': { name: 'No fish or seafood', glosses: { ja: '魚介類抜き', zh: '不吃海鲜', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
     signs: {
       openingHours: { text: 'Opening hours', glosses: { ja: '営業時間', zh: '营业时间', de: 'Öffnungszeiten' } },
@@ -370,14 +426,23 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         'Card and cash are both fine.',
       ],
     },
+    restaurant: {
+      name: 'Rosie’s Kitchen',
+      nameGlosses: { ja: 'ロージーズ・キッチン', zh: '罗茜厨房', de: 'Rosies Küche' },
+      facts: [
+        'This is a sit-down restaurant with table service: the server takes the order at the table.',
+        'Tap water is free; customers only have to ask.',
+        'Tipping about 10% is usual for table service. Card and contactless are fine.',
+      ],
+    },
     hospital: {
       name: 'St Mary’s Hospital',
       nameGlosses: { ja: 'セント・メアリー病院', zh: '圣玛丽医院', de: 'St.-Marien-Krankenhaus' },
     },
     apartments: { name: 'Rosewood House', nameGlosses: { ja: 'ローズウッド・ハウス', zh: '玫瑰木公寓', de: 'Rosewood House' } },
-    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' }, cashier: { name: 'Priya' }, 'convenience-clerk': { name: 'Dev' }, landlord: { name: 'Mrs Hughes' } },
+    personas: { barista: { name: 'Jess' }, nurse: { name: 'Bridget' }, cashier: { name: 'Priya' }, 'convenience-clerk': { name: 'Dev' }, landlord: { name: 'Mrs Hughes' }, server: { name: 'Tom' } },
     appearances: {
-      npcs: { barista: 'preset-1', nurse: 'preset-3', cashier: 'preset-4', 'convenience-clerk': 'preset-2', landlord: 'preset-2' },
+      npcs: { barista: 'preset-1', nurse: 'preset-3', cashier: 'preset-4', 'convenience-clerk': 'preset-2', landlord: 'preset-2', server: 'preset-3' },
       customerWeights: { 'preset-1': 3, 'preset-2': 2, 'preset-3': 2, 'preset-4': 3 },
     },
     props: ['teapot', 'bunting'],
@@ -420,6 +485,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       batteries: { name: 'AA-Batterien', glosses: { ja: '単三電池', zh: '五号电池', en: 'AA batteries' } },
       stamps: { name: 'Briefmarken', glosses: { ja: '切手', zh: '邮票', en: 'Stamps' } },
       'gift-card': { name: 'Geschenkkarte', glosses: { ja: 'ギフトカード', zh: '礼品卡', en: 'Gift card' } },
+      'pork-dish': { name: 'Schweineschnitzel', glosses: { ja: 'ポークシュニッツェル', zh: '炸猪排', en: 'Pork schnitzel' } },
+      'chicken-dish': { name: 'Hähnchengeschnetzeltes', glosses: { ja: '鶏肉のクリーム煮', zh: '奶油鸡肉丝', en: 'Sliced chicken in cream sauce' } },
+      'fish-dish': { name: 'Lachsfilet', glosses: { ja: 'サーモンのフィレ', zh: '三文鱼排', en: 'Salmon fillet' } },
+      'veggie-dish': { name: 'Käsespätzle', glosses: { ja: 'チーズシュペッツレ', zh: '奶酪面疙瘩', en: 'Cheese spätzle' } },
+      juice: { name: 'Orangensaft', glosses: { ja: 'オレンジジュース', zh: '橙汁', en: 'Orange juice' } },
+      cola: { name: 'Cola', glosses: { ja: 'コーラ', zh: '可乐', en: 'Cola' } },
     },
     drinkOptions: {
       small: { name: 'Klein', glosses: { ja: 'スモール', zh: '小杯', en: 'Small' } },
@@ -431,6 +502,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: 'Zucker', glosses: { ja: '砂糖', zh: '加糖', en: 'Sugar' } },
       'extra-shot': { name: 'Extra Shot', glosses: { ja: 'ショット追加', zh: '加一份浓缩', en: 'Extra shot' } },
       lemon: { name: 'Zitrone', glosses: { ja: 'レモン', zh: '加柠檬', en: 'Lemon' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: 'Vegetarisch', glosses: { ja: 'ベジタリアン', zh: '吃素', en: 'Vegetarian' } },
+      'no-pork': { name: 'Ohne Schweinefleisch', glosses: { ja: '豚肉抜き', zh: '不吃猪肉', en: 'No pork' } },
+      'no-seafood': { name: 'Ohne Fisch und Meeresfrüchte', glosses: { ja: '魚介類抜き', zh: '不吃海鲜', en: 'No fish or seafood' } },
     },
     signs: {
       openingHours: { text: 'Öffnungszeiten', glosses: { ja: '営業時間', zh: '营业时间', en: 'Opening hours' } },
@@ -459,14 +535,23 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         'Card and cash are both fine.',
       ],
     },
+    restaurant: {
+      name: 'Gasthaus zur Linde',
+      nameGlosses: { ja: 'ガストハウス・ツア・リンデ', zh: '椴树餐馆', en: 'The Linden Tree Inn' },
+      facts: [
+        'Tap water is not usually served; drinks are ordered with the meal.',
+        'Customers usually round the bill up a little as a tip.',
+        'Cash is preferred, but card is fine.',
+      ],
+    },
     hospital: {
       name: 'Klinikum am Park',
       nameGlosses: { ja: '公園前総合病院', zh: '公园医院', en: 'Park Hospital' },
     },
     apartments: { name: 'Haus Lindenhof', nameGlosses: { ja: 'リンデンホーフ荘', zh: '椴树庭公寓', en: 'Lindenhof House' } },
-    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' }, cashier: { name: 'Jonas' }, 'convenience-clerk': { name: 'Murat' }, landlord: { name: 'Frau Becker' } },
+    personas: { barista: { name: 'Lena' }, nurse: { name: 'Petra' }, cashier: { name: 'Jonas' }, 'convenience-clerk': { name: 'Murat' }, landlord: { name: 'Frau Becker' }, server: { name: 'Sabine' } },
     appearances: {
-      npcs: { barista: 'preset-4', nurse: 'preset-2', cashier: 'preset-3', 'convenience-clerk': 'preset-1', landlord: 'preset-1' },
+      npcs: { barista: 'preset-4', nurse: 'preset-2', cashier: 'preset-3', 'convenience-clerk': 'preset-1', landlord: 'preset-1', server: 'preset-2' },
       customerWeights: { 'preset-1': 2, 'preset-2': 3, 'preset-3': 3, 'preset-4': 2 },
     },
     props: ['cake-stand', 'pretzel-basket'],
@@ -479,6 +564,7 @@ export function localShop(placeId: PlaceId, packId: LanguageCode): Shop | null {
   if (placeId === 'cafe') return pack.cafe;
   if (placeId === 'supermarket') return pack.supermarket;
   if (placeId === 'convenience-store') return pack.convenienceStore;
+  if (placeId === 'restaurant') return pack.restaurant;
   return null;
 }
 

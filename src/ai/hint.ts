@@ -108,6 +108,9 @@ function goalInstruction(request: Extract<HintRequest, { interactionId: string }
   ].join('\n\n');
 }
 
+/** Who a staff member serves at each Job. */
+const SERVING: Record<JobId, string> = { barista: 'a customer at the counter', cashier: 'a customer at the counter', server: 'a table' };
+
 /** What a staff member's hints can do at each Job, after greeting the customer. */
 const GOOD_SHIFT_HINTS: Record<JobId, string> = {
   barista: 'ask what they would like, ask them to say it again or more slowly, ask which size, or hot or iced, or say that the order is coming.',
@@ -128,7 +131,7 @@ function shiftInstruction(request: Extract<HintRequest, { jobId: string }>) {
   return [
     block('WHO YOU ARE', [
       intro,
-      `They are working a Shift as the ${jobId} at ${localPlaceName(JOB_PLACES[jobId], pack.id)}, serving a customer at the counter, ` +
+      `They are working a Shift as the ${jobId} at ${localPlaceName(JOB_PLACES[jobId], pack.id)}, serving ${SERVING[jobId]}, ` +
         'and they have asked for help with what to say next.',
     ]),
     block('THE SITUATION', [

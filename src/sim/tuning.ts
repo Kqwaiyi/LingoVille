@@ -91,6 +91,10 @@ export const WELL_BEING = {
   counterSnackHunger: 0.2 * METER_MAX,
   /** Hunger a convenience store bento gives back: a proper meal. */
   bentoHunger: 0.5 * METER_MAX,
+  /** Hunger a restaurant main dish gives back: a big meal. */
+  restaurantDishHunger: 0.7 * METER_MAX,
+  /** Thirst a drink with a restaurant meal gives back. */
+  restaurantDrinkThirst: 0.4 * METER_MAX,
   /** Where the ward's care leaves Well-being when the Character comes round after Fainting (default). */
   afterFainting: { health: 0.5 * METER_MAX, hunger: 0.5 * METER_MAX, thirst: 0.5 * METER_MAX },
 } as const;
@@ -116,6 +120,8 @@ export const ECONOMY = {
   translatedCustomerDockShare: 0.5,
   /** A customer at the supermarket till: how many kinds of shopping they bring, the most of each, and how often they want a bag or have a points card. */
   checkout: { basketLines: { min: 1, max: 3 }, maxQuantity: 2, wantsBag: 0.5, hasPointsCard: 0.5 },
+  /** How many diners sit at a restaurant table that the server takes one order for, dietary request and all. */
+  tableDiners: { min: 2, max: 3 },
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
   /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
@@ -243,7 +249,7 @@ export const LIFE_SKILLS = {
    * understanding the customer. Barista: the menu grid grouped by kind, and the size toggle remembering the last size made.
    * Cashier: the coins for the change suggested, once the Player has keyed in the cash they were handed.
    */
-  jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: { suggestedChange: 1 }, server: {} },
+  jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: { suggestedChange: 1 }, server: { quickPickNotes: 1 } },
   /** Illness chance reduction at max Fitness, scaled linearly by level. */
   fitnessIllnessReductionAtMax: 0.4,
   /** Health drain while deprived is multiplied by this at max Fitness. */

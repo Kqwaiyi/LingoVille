@@ -9,6 +9,7 @@ import {
   selectNpcSpeaking,
   selectShift,
   selectShiftCustomerAtCounter,
+  selectShiftCustomerParty,
   selectShiftCustomerSpeaking,
   selectTramRunning,
   useGame,
@@ -105,21 +106,30 @@ function Npc({ npcId }: { npcId: TownNpcId }) {
 /** Placeholder colour for Shift Customers, until their Appearance Presets arrive (ticket 30b). */
 const SHIFT_CUSTOMER_COLOUR = '#c79a6b';
 
-/** The Shift Customer at the café counter or the supermarket till, from walking up until they leave. */
+/**
+ * The Shift Customer at the café counter or the supermarket till, from walking up until they leave. At the restaurant,
+ * the rest of their table sits with them; the one speaking for the table shows the speaking indicator.
+ */
 function ShiftCustomer() {
   const atCounter = useGame(selectShiftCustomerAtCounter);
+  const party = useGame(selectShiftCustomerParty);
   const speaking = useGame(selectShiftCustomerSpeaking);
   const jobId = useGame((s) => selectShift(s)?.jobId);
   const workplace = jobId && WORKPLACES[jobId];
   if (!atCounter || !workplace) return null;
+  const seats = [workplace.customerSpot, ...(workplace.otherSeats ?? [])].slice(0, party);
   return (
-    <group position={workplace.customerSpot}>
-      <mesh castShadow>
-        <capsuleGeometry args={[0.35, 1, 4, 12]} />
-        <meshStandardMaterial color={SHIFT_CUSTOMER_COLOUR} flatShading />
-      </mesh>
-      <SpeakingIndicator speaking={speaking} />
-    </group>
+    <>
+      {seats.map((seat, i) => (
+        <group key={i} position={seat}>
+          <mesh castShadow>
+            <capsuleGeometry args={[0.35, 1, 4, 12]} />
+            <meshStandardMaterial color={SHIFT_CUSTOMER_COLOUR} flatShading />
+          </mesh>
+          {i === 0 && <SpeakingIndicator speaking={speaking} />}
+        </group>
+      ))}
+    </>
   );
 }
 
@@ -282,7 +292,7 @@ export function Town() {
       <Block position={HOME_STOVE} size={[1.2, 1, 0.6]} colour="#5b6170" />
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={WARD_BED} size={[1.4, 0.5, 2.2]} colour="#f4f6f7" />
-      {/* The staff doors at the café and the supermarket: each a door set flat against the inside of the west wall. */}
+      {/* The staff doors at the café, the supermarket and the restaurant: each a door set flat against the inside of the west wall. */}
       {Object.values(WORKPLACES).map(({ door }) => (
         <mesh key={door.join()} position={door}>
           <boxGeometry args={[0.06, 2.2, 1]} />

@@ -6,7 +6,9 @@ import {
   readCheckout,
   readServedScene,
   readShiftOrder,
+  readTable,
   type CheckoutSaid,
+  type DinerSaid,
   type NpcSession,
   type ToolResponse,
 } from '../ai/index.ts';
@@ -65,6 +67,12 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     batteries: ['電池', 'でんち', 'battery'],
     stamps: ['切手', 'きって'],
     'gift-card': ['ギフトカード', 'ぎふとかーど'],
+    'pork-dish': ['ポークソテー', 'ぽーくそてー', 'ポーク'],
+    'chicken-dish': ['チキン南蛮', 'ちきんなんばん', 'チキン'],
+    'fish-dish': ['焼き鮭', '鮭', 'さけ', 'しゃけ'],
+    'veggie-dish': ['パスタ', 'ぱすた', 'pasta'],
+    juice: ['ジュース', 'じゅーす', 'juice'],
+    cola: ['コーラ', 'こーら', 'cola'],
   },
   zh: {
     latte: ['拿铁', 'latte'],
@@ -79,6 +87,12 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     batteries: ['电池'],
     stamps: ['邮票'],
     'gift-card': ['购物卡', '礼品卡'],
+    'pork-dish': ['糖醋里脊', '里脊'],
+    'chicken-dish': ['宫保鸡丁', '鸡丁'],
+    'fish-dish': ['清蒸鱼', '鱼'],
+    'veggie-dish': ['地三鲜'],
+    juice: ['橙汁', '果汁', 'juice'],
+    cola: ['可乐', 'cola'],
   },
   en: {
     latte: ['latte'],
@@ -93,6 +107,12 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     batteries: ['batteries', 'battery'],
     stamps: ['stamps', 'stamp'],
     'gift-card': ['gift card'],
+    'pork-dish': ['sausage and mash', 'bangers'],
+    'chicken-dish': ['chicken pie'],
+    'fish-dish': ['fish and chips', 'fish'],
+    'veggie-dish': ['veggie burger', 'burger'],
+    juice: ['orange juice', 'juice'],
+    cola: ['cola', 'coke'],
   },
   de: {
     latte: ['latte', 'milchkaffee'],
@@ -107,6 +127,12 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     batteries: ['batterien', 'batterie'],
     stamps: ['briefmarken', 'briefmarke'],
     'gift-card': ['geschenkkarte', 'gutschein'],
+    'pork-dish': ['schnitzel'],
+    'chicken-dish': ['geschnetzeltes', 'hähnchen'],
+    'fish-dish': ['lachs', 'fisch'],
+    'veggie-dish': ['käsespätzle'],
+    juice: ['orangensaft', 'saft'],
+    cola: ['cola'],
   },
 };
 
@@ -980,6 +1006,67 @@ function tillCustomerNpc(script: TillCustomerScript, common: OrderScript, repeat
   };
 }
 
+/** The fake Shift Customer at a restaurant table: orders for everyone at once, saying who has what, and again when asked. */
+type TableCustomerScript = {
+  /** What goes between sentences: nothing in ja and zh. */
+  between: string;
+  hello: string;
+  /** What one diner wants (`i` 0 is the customer speaking), with their dietary need if they have one. */
+  diner: (i: number, dish: string, drink: string, note: string | null) => string;
+  thanks: string;
+  wrong: string;
+};
+
+const TABLE_CUSTOMER_SCRIPT: Record<LanguageCode, TableCustomerScript> = {
+  ja: {
+    between: '',
+    hello: 'すみません、注文お願いします。',
+    diner: (i, dish, drink, note) => `${['私', '友達', 'もう一人の友達'][i] ?? '友達'}は${dish}と${drink}を${note ? `、${note}で` : ''}お願いします。`,
+    thanks: 'はい、それでお願いします。ありがとうございます！',
+    wrong: 'あの、ちょっと違うみたいです…。まあ、いいです。',
+  },
+  zh: {
+    between: '',
+    hello: '服务员，点菜。',
+    diner: (i, dish, drink, note) => `${['我', '我朋友', '另一个朋友'][i] ?? '我朋友'}要${dish}和${drink}${note ? `，${note}` : ''}。`,
+    thanks: '好，就这些，谢谢！',
+    wrong: '好像不太对……算了。',
+  },
+  en: {
+    between: ' ',
+    hello: "Hi, we're ready to order.",
+    diner: (i, dish, drink, note) =>
+      `${['I', 'My friend', 'My other friend'][i] ?? 'My friend'}'ll have the ${dish} and a ${drink}${note ? ` (${note}, please)` : ''}.`,
+    thanks: 'Perfect, thanks!',
+    wrong: "Hmm, that's not quite right… never mind.",
+  },
+  de: {
+    between: ' ',
+    hello: 'Hallo, wir möchten bestellen.',
+    diner: (i, dish, drink, note) =>
+      `${['Ich nehme', 'Meine Freundin nimmt', 'Meine andere Freundin nimmt'][i] ?? 'Meine Freundin nimmt'} ${dish} und ${drink}${note ? ` (${note}, bitte)` : ''}.`,
+    thanks: 'Super, danke!',
+    wrong: 'Das stimmt nicht ganz… na ja.',
+  },
+};
+
+/** A Shift Customer at a restaurant table: orders every diner's dish and drink at once, with the dietary need. */
+function tableCustomerNpc(script: TableCustomerScript, common: OrderScript, repeat: string[], diners: DinerSaid[], act: Act): Npc {
+  const all = [script.hello, ...diners.map(({ dish, drink, note }, i) => script.diner(i, dish, drink, note))].join(script.between);
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: all,
+    resume: all,
+    hear: (line) => {
+      const servedRight = readServedScene(line);
+      if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrong);
+      if (mentions(line, [...repeat, ...yes, ...no, ...known])) return act.say(all);
+      act.notUnderstood();
+    },
+  };
+}
+
 /**
  * A Shift Customer, ordering what the instruction holds by the items' local names ("1 × ラテ" is said as "ラテ"). One
  * who changes their mind wants what the instruction says instead once the barista has started on it.
@@ -1015,6 +1102,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if ('shiftCustomerVoice' in session.voice) {
     const atTheTill = readCheckout(session.systemInstruction);
     if (atTheTill) return tillCustomerNpc(TILL_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTill, act);
+    const atTheTable = readTable(session.systemInstruction);
+    if (atTheTable) return tableCustomerNpc(TABLE_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTable, act);
     return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   }
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
@@ -1043,7 +1132,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * back and hires on a yes, asking the name again if the sim says it's wrong; a Shift Customer orders
  * the drink in its instruction, says it again when asked, and thanks the barista or says it's the wrong
  * one when a scene says what it was handed; one at the till says all the cashier needs to hear at once
- * (bag, points card, anything from behind the counter, the cash it hands over). Each calls
+ * (bag, points card, anything from behind the counter, the cash it hands over); one at a restaurant table orders
+ * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.

@@ -109,6 +109,7 @@ const WORKPLACES: Partial<Record<PlaceId, Workplace>> = {
   cafe: { at: (pack) => `${pack.cafe.name}, a café`, who: 'customer' },
   supermarket: { at: (pack) => `${pack.supermarket.name}, a supermarket`, who: 'customer' },
   'convenience-store': { at: (pack) => `${pack.convenienceStore.name}, a convenience store`, who: 'customer' },
+  restaurant: { at: (pack) => `${pack.restaurant.name}, a restaurant`, who: 'customer' },
   clinic: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
   home: { at: (pack) => `${pack.apartments.name}, the apartment block where you live and let flats,`, who: 'tenant' },
 };

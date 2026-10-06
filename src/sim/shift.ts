@@ -1,11 +1,12 @@
-import type { Band, CheckoutTemplate, DrinkModifiers, DrinkTemplate, ShiftTemplate } from '../content/index.ts';
+import type { Band, CheckoutTemplate, DietaryNoteId, DrinkModifiers, DrinkTemplate, ShiftTemplate, TableTemplate } from '../content/index.ts';
 import { isOpen, type OpeningHours } from './clock.ts';
 import { nextRandom, randomInt } from './rng.ts';
-import type { Checkout, GameState, JobId, ShiftOrder, ShiftOrderLine, TillWork } from './state.ts';
+import type { Checkout, Diner, GameState, JobId, PadDiner, ShiftOrder, ShiftOrderLine, TillWork } from './state.ts';
 import { gainLifeSkillXp, lifeSkillLevel } from './lifeSkills.ts';
 import { clampMeter } from './meters.ts';
 import { moodModifier } from './mood.ts';
 import { hundredths, tillTotal, type Till } from './till.ts';
+import { kitchenOrder } from './orderPad.ts';
 import { lineKey } from './tray.ts';
 import { ECONOMY, LIFE_SKILLS, MOOD, PROFICIENCY_STEP_TABLE, STEP_BANDS, type ProficiencyStep } from './tuning.ts';
 
@@ -129,20 +130,48 @@ function drawCheckout(rngState: number, { basket, behindTheCounter }: CheckoutTe
   };
 }
 
+/**
+ * Who sits at a restaurant table and what each wants: one diner, or a table of the tuned size. At a table with a
+ * dietary need, one diner (drawn) has one of the template's needs and orders a dish that keeps to it.
+ */
+function drawTable(rngState: number, { dishes, drinks, party, dietary }: TableTemplate) {
+  const { min, max } = ECONOMY.tableDiners;
+  const size = party === 'one' ? { value: 1, rngState } : randomInt(rngState, min, max);
+  const needs = dietary ? (Object.keys(dietary) as DietaryNoteId[]) : [];
+  const withNeed = needs.length > 0 ? randomInt(size.rngState, 0, size.value - 1) : { value: -1, rngState: size.rngState };
+  const need = needs.length > 0 ? pick(withNeed.rngState, needs) : { value: null, rngState: withNeed.rngState };
+  let draw = need.rngState;
+  const table: Diner[] = [];
+  for (let i = 0; i < size.value; i++) {
+    const note = i === withNeed.value ? need.value : null;
+    const dish = pick(draw, note ? dietary![note]! : dishes);
+    const drink = pick(dish.rngState, drinks);
+    table.push({ dish: dish.value, drink: drink.value, note });
+    draw = drink.rngState;
+  }
+  return { table, rngState: draw };
+}
+
 /** The template is a checkout at the till. (The sim can't import content's `isCheckout`: content imports the sim.) */
 const isCheckoutTemplate = (template: ShiftTemplate): template is CheckoutTemplate => 'basket' in template;
+/** The template is a restaurant table, as content's `isTable` says. */
+const isTableTemplate = (template: ShiftTemplate): template is TableTemplate => 'party' in template;
 
-/** What a customer from this template wants: a drink (perhaps changing their mind), or a checkout at the till. */
+/** What a customer from this template wants: a drink (perhaps changing their mind), a checkout at the till, or a table's meals. */
 function drawCustomer(rngState: number, template: ShiftTemplate, till: Till | undefined) {
   if (isCheckoutTemplate(template)) {
     if (!till) throw new Error(`A customer at the till (${template.id}) needs the pack's till to draw their total and cash.`);
     const { order, checkout, rngState: after } = drawCheckout(rngState, template, till);
-    return { customer: { order, changedFrom: null, checkout }, rngState: after };
+    return { customer: { order, changedFrom: null, checkout, table: null }, rngState: after };
+  }
+  if (isTableTemplate(template)) {
+    const { table, rngState: after } = drawTable(rngState, template);
+    return { customer: { order: kitchenOrder(table), changedFrom: null, checkout: null, table }, rngState: after };
   }
   const first = drawOrder(rngState, template);
   const changed = template.changesMind ? drawChangeOfMind(first.rngState, template, first.value) : null;
   return {
-    customer: { order: changed?.value ?? first.value, changedFrom: changed ? first.value : null, checkout: null },
+    customer: { order: changed?.value ?? first.value, changedFrom: changed ? first.value : null, checkout: null, table: null },
     rngState: changed?.rngState ?? first.rngState,
   };
 }
@@ -170,6 +199,23 @@ function checkedOutRightly(checkout: Checkout, done: TillWork): boolean {
 const NOTHING_DONE_AT_THE_TILL: TillWork = { bag: false, pointsCard: false, change: 0 };
 
 /**
+ * The order pad says exactly what the table wants: one line per diner, each with their dish, their drink and their
+ * dietary note (or none), whatever order the diners are written in. Who sits where isn't checked.
+ */
+function tableWrittenRightly(table: readonly Diner[], pad: readonly PadDiner[]): boolean {
+  const key = ({ dish, drink, note }: PadDiner) => `${dish}|${drink}|${note}`;
+  const unmatched = table.map(key);
+  for (const diner of pad) {
+    const at = unmatched.indexOf(key(diner));
+    if (at < 0) return false;
+    unmatched.splice(at, 1);
+  }
+  return unmatched.length === 0;
+}
+
+const NOTHING_ON_THE_PAD: readonly PadDiner[] = [];
+
+/**
  * What was served is exactly what was ordered: the same items in the same numbers, whatever order the lines are in.
  * A drink ordered made a certain way (size, hot or iced, extras) must be made just so; one ordered alone may be made any way.
  */
@@ -189,17 +235,26 @@ function sameOrder(served: ShiftOrder, order: ShiftOrder): boolean {
  * against the hidden order with no model judgement, or null if they gave up unserved (out of Patience).
  * `translated`: the Player had translated their lines first. At the till, `served` is everything scanned and fetched,
  * and `atTheTill` the bag and points card toggles and the change counted out, checked exactly too (none of them, if not given).
- * Each customer served correctly earns XP in the Job's Life Skill.
+ * At a restaurant table, `atTheTable` is the order pad, and every diner's dish, drink and dietary note must be on it
+ * (nothing written, if not given). Each customer served correctly earns XP in the Job's Life Skill.
  */
 export function applyShiftCustomer(
   state: GameState,
   served: ShiftOrder | null,
-  { translated = false, atTheTill = NOTHING_DONE_AT_THE_TILL }: { translated?: boolean; atTheTill?: TillWork } = {},
+  {
+    translated = false,
+    atTheTill = NOTHING_DONE_AT_THE_TILL,
+    atTheTable = NOTHING_ON_THE_PAD,
+  }: { translated?: boolean; atTheTill?: TillWork; atTheTable?: readonly PadDiner[] } = {},
 ): { state: GameState; correct: boolean } {
   const { shift } = state.possessions;
   if (!shift?.customer) return { state, correct: false };
-  const { order, checkout } = shift.customer;
-  const correct = served !== null && sameOrder(served, order) && (!checkout || checkedOutRightly(checkout, atTheTill));
+  const { order, checkout, table } = shift.customer;
+  const correct =
+    served !== null &&
+    sameOrder(served, order) &&
+    (!checkout || checkedOutRightly(checkout, atTheTill)) &&
+    (!table || tableWrittenRightly(table, atTheTable));
   const after = {
     ...shift,
     served: shift.served + (correct ? 1 : 0),

@@ -9,22 +9,25 @@ import {
   readCheckout,
   readServedScene,
   readShiftOrder,
+  readTable,
   shiftCustomerChangeScene,
   shiftCustomerServedScene,
+  tableServedScene,
 } from './index.ts';
 
 const MID_MORNING = { day: 3, minuteOfDay: 10 * 60 + 20 };
-const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, voiceSeed: 4242 };
+const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, table: null, voiceSeed: 4242 };
 const ICED_TEA = [{ itemId: 'tea' as const, quantity: 1, modifiers: { size: 'large' as const, temperature: 'iced' as const, extras: ['lemon' as const] } }];
 const HOT_COFFEE = [{ itemId: 'coffee' as const, quantity: 1, modifiers: { size: 'small' as const, temperature: 'hot' as const, extras: ['milk' as const] } }];
-const WANTS_ICED_TEA: ShiftCustomer = { templateId: 'barista-made-to-order', order: ICED_TEA, changedFrom: null, checkout: null, voiceSeed: 7 };
-const CHANGES_MIND: ShiftCustomer = { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE, checkout: null, voiceSeed: 7 };
+const WANTS_ICED_TEA: ShiftCustomer = { templateId: 'barista-made-to-order', order: ICED_TEA, changedFrom: null, checkout: null, table: null, voiceSeed: 7 };
+const CHANGES_MIND: ShiftCustomer = { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE, checkout: null, table: null, voiceSeed: 7 };
 /** At the till: eggs and cabbage, a bag but no points card, paying by card. */
 const PAYS: ShiftCustomer = {
   templateId: 'cashier-pays',
   order: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'vegetables', quantity: 1 }],
   changedFrom: null,
   checkout: { bag: true, pointsCard: false, fromBehindTheCounter: null, cashHanded: null, changeDue: null },
+  table: null,
   voiceSeed: 11,
 };
 /** The same shopping and stamps from behind the counter, no bag but a points card, paying ¥2,000 in cash. */
@@ -33,7 +36,36 @@ const PAYS_CASH: ShiftCustomer = {
   order: [...PAYS.order, { itemId: 'stamps', quantity: 1 }],
   changedFrom: null,
   checkout: { bag: false, pointsCard: true, fromBehindTheCounter: 'stamps', cashHanded: 2000, changeDue: 800 },
+  table: null,
   voiceSeed: 12,
+};
+/** At the restaurant: one diner, wanting fish and a juice. */
+const SINGLE_ORDER: ShiftCustomer = {
+  templateId: 'server-single-order',
+  order: [{ itemId: 'fish-dish', quantity: 1 }, { itemId: 'juice', quantity: 1 }],
+  changedFrom: null,
+  checkout: null,
+  table: [{ dish: 'fish-dish', drink: 'juice', note: null }],
+  voiceSeed: 21,
+};
+/** A table of three: the second diner is vegetarian. */
+const TABLE_OF_THREE: ShiftCustomer = {
+  templateId: 'server-table-dietary',
+  order: [
+    { itemId: 'pork-dish', quantity: 1 },
+    { itemId: 'cola', quantity: 2 },
+    { itemId: 'veggie-dish', quantity: 1 },
+    { itemId: 'chicken-dish', quantity: 1 },
+    { itemId: 'juice', quantity: 1 },
+  ],
+  changedFrom: null,
+  checkout: null,
+  table: [
+    { dish: 'pork-dish', drink: 'cola', note: null },
+    { dish: 'veggie-dish', drink: 'cola', note: 'vegetarian' },
+    { dish: 'chicken-dish', drink: 'juice', note: null },
+  ],
+  voiceSeed: 22,
 };
 
 function customerSession(packId: LanguageCode, step: ProficiencyStep = 'A1', customer = WANTS_A_LATTE) {
@@ -114,6 +146,41 @@ describe('buildShiftCustomerSession', () => {
     expect(systemInstruction).toMatch(/never talk about prices, the total or your change/);
   });
 
+  it.each(LANGUAGE_CODES)('builds a diner ordering alone, and a table of three with a dietary need, in the %s pack', (packId) => {
+    expect(customerSession(packId, 'A2', SINGLE_ORDER).systemInstruction).toMatchSnapshot();
+    expect(customerSession(packId, 'C1', TABLE_OF_THREE).systemInstruction).toMatchSnapshot();
+  });
+
+  it('seats a restaurant customer at a table, talking to the server', () => {
+    const { systemInstruction, openingScene } = customerSession('ja', 'C1', TABLE_OF_THREE);
+    expect(systemInstruction).toContain(CULTURE_PACKS.ja.restaurant.name);
+    expect(systemInstruction).toMatch(/The server serving you/);
+    expect(systemInstruction).not.toMatch(/barista|café|cashier/);
+    expect(openingScene).toMatch(/sat down at a table/);
+  });
+
+  it("carries what everyone at the table wants, by local names, and the one diner's dietary need", () => {
+    const { goods, dietaryNotes } = CULTURE_PACKS.ja;
+    expect(readTable(customerSession('ja', 'C1', TABLE_OF_THREE).systemInstruction)).toEqual([
+      { dish: goods['pork-dish'].name, drink: goods.cola.name, note: null },
+      { dish: goods['veggie-dish'].name, drink: goods.cola.name, note: dietaryNotes.vegetarian.name },
+      { dish: goods['chicken-dish'].name, drink: goods.juice.name, note: null },
+    ]);
+    expect(readTable(customerSession('ja', 'A2', SINGLE_ORDER).systemInstruction)).toEqual([
+      { dish: goods['fish-dish'].name, drink: goods.juice.name, note: null },
+    ]);
+    expect(readTable(customerSession('ja').systemInstruction)).toBeNull();
+    expect(readTable(customerSession('ja', 'A2', PAYS).systemInstruction)).toBeNull();
+  });
+
+  it('tells the table to say who has what and to mention the dietary need, and never to talk about prices', () => {
+    const { systemInstruction } = customerSession('en', 'C1', TABLE_OF_THREE);
+    expect(systemInstruction).toMatch(/who has what/);
+    expect(systemInstruction).toMatch(/eats no meat, fish or seafood/);
+    expect(systemInstruction).toMatch(/never talk about prices/);
+    expect(customerSession('en', 'A2', SINGLE_ORDER).systemInstruction).not.toMatch(/dietary need/i);
+  });
+
   it('is anonymous, with no memory, and the voice its seed picks', () => {
     const { systemInstruction, voice } = customerSession('de');
     expect(systemInstruction).toMatch(/never met/);
@@ -152,6 +219,19 @@ describe('shiftCustomerServedScene', () => {
     expect(wrong).toMatch(/puts your shopping in a bag/);
     expect(wrong).toMatch(/no points card/);
     expect(wrong).toMatch(/no change/);
+    expect(readServedScene(wrong)).toBe(false);
+  });
+
+  it("tells a table what the server wrote on the order pad for each diner, and whether it's all as they wanted", () => {
+    const { goods, dietaryNotes } = CULTURE_PACKS.en;
+    const pad = TABLE_OF_THREE.table!;
+    const right = tableServedScene(pad, true, CULTURE_PACKS.en);
+    expect(right).toContain(`${goods['veggie-dish'].name} and ${goods.cola.name}, noted ${dietaryNotes.vegetarian.name}`);
+    expect(right).toContain(`${goods['chicken-dish'].name} and ${goods.juice.name}`);
+    expect(readServedScene(right)).toBe(true);
+
+    const wrong = tableServedScene([{ dish: 'pork-dish', drink: null, note: null }], false, CULTURE_PACKS.en);
+    expect(wrong).toContain(`${goods['pork-dish'].name} and no drink`);
     expect(readServedScene(wrong)).toBe(false);
   });
 

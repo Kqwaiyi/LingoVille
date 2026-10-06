@@ -139,6 +139,47 @@ describe('buildRecapRequest', () => {
     );
   });
 
+  it('tells the coach, for each restaurant table, what every diner wanted and what the server wrote down', () => {
+    const table = [
+      { dish: 'pork-dish', drink: 'cola', note: null },
+      { dish: 'veggie-dish', drink: 'juice', note: 'vegetarian' },
+    ] as const;
+    const order = [
+      { itemId: 'pork-dish', quantity: 1 },
+      { itemId: 'cola', quantity: 1 },
+      { itemId: 'veggie-dish', quantity: 1 },
+      { itemId: 'juice', quantity: 1 },
+    ] as const;
+    const prompt = text({
+      ...shift,
+      jobId: 'server',
+      customers: [
+        { order, table, result: 'served', served: order, atTheTable: table, transcript: SHIFT_LINES, helpLog: [] },
+        {
+          order,
+          table,
+          result: 'wrongOrder',
+          served: [{ itemId: 'pork-dish', quantity: 1 }, { itemId: 'veggie-dish', quantity: 1 }, { itemId: 'juice', quantity: 1 }],
+          atTheTable: [
+            { dish: 'pork-dish', drink: null, note: null },
+            { dish: 'veggie-dish', drink: 'juice', note: null },
+          ],
+          transcript: SHIFT_LINES,
+          helpLog: [],
+        },
+        { order, table, result: 'walkedOut', served: [], atTheTable: [], transcript: SHIFT_LINES, helpLog: [] },
+      ],
+    });
+
+    expect(prompt).toMatch(/learner was the server/);
+    const wanted = 'At their table, diner 1 wanted ポークソテー and コーラ; diner 2 wanted 野菜のトマトパスタ and オレンジジュース, and is ベジタリアン.';
+    expect(prompt).toContain(`CUSTOMER 1\n${wanted} The server wrote it all down right.`);
+    expect(prompt).toContain(
+      `CUSTOMER 2\n${wanted} The server wrote down instead: diner 1: ポークソテー and no drink; diner 2: 野菜のトマトパスタ and オレンジジュース.`,
+    );
+    expect(prompt).toContain(`CUSTOMER 3\n${wanted} The server never took their order, and they left.`);
+  });
+
   it('asks for at most three corrections across the whole Shift', () => {
     expect(buildRecapRequest(shift).generationConfig.responseSchema.properties!.corrections!.maxItems).toBe(3);
   });

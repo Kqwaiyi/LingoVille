@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   CULTURE_PACKS,
+  DIETARY_NOTE_IDS,
   drinkModifiersSchema,
   formatLocalAmount,
   ITEM_IDS,
@@ -13,6 +14,7 @@ import {
 import { JOB_IDS } from '../sim/index.ts';
 import {
   block,
+  mealSaid,
   orderSaid,
   InteractionIdSchema,
   interactionById,
@@ -62,10 +64,17 @@ const CheckoutSchema = z.object({
 /** What the learner did at the till: the bag and points card, and the change counted out, in local money. */
 const TillWorkSchema = z.object({ bag: z.boolean(), pointsCard: z.boolean(), change: z.number().min(0) });
 
+const dietaryNote = z.enum(DIETARY_NOTE_IDS).nullable();
+/** One diner at a restaurant table: what they wanted, and any dietary need. */
+const DinerSchema = z.object({ dish: z.enum(ITEM_IDS), drink: z.enum(ITEM_IDS), note: dietaryNote });
+/** One diner as the learner wrote them on the order pad, which may be missing their dish or drink. */
+const PadDinerSchema = z.object({ dish: z.enum(ITEM_IDS).nullable(), drink: z.enum(ITEM_IDS).nullable(), note: dietaryNote });
+
 /**
  * One Shift Customer as the Recap reads them: what they ordered, how the game's exact check found the learner served
  * them (`served` is what was handed over, empty if nothing), and what was said. At the till, `order` is everything to
- * ring up, `checkout` what else they wanted, and `atTheTill` what the learner did about it.
+ * ring up, `checkout` what else they wanted, and `atTheTill` what the learner did about it. At a restaurant table,
+ * `table` is what each diner wanted and `atTheTable` the order pad the learner wrote.
  */
 const ShiftRecapCustomerSchema = z.object({
   order: z.array(ShiftOrderLineSchema).min(1).readonly(),
@@ -75,6 +84,8 @@ const ShiftRecapCustomerSchema = z.object({
   result: z.enum(['served', 'wrongOrder', 'walkedOut']),
   served: z.array(ShiftOrderLineSchema).readonly(),
   atTheTill: TillWorkSchema.optional(),
+  table: z.array(DinerSchema).min(1).readonly().optional(),
+  atTheTable: z.array(PadDinerSchema).readonly().optional(),
   transcript: z.array(RecapLineSchema),
   helpLog: z.array(HelpLogEntrySchema),
 });
@@ -205,9 +216,31 @@ function tillLine(customer: ShiftRecapCustomer, checkout: NonNullable<ShiftRecap
   }
 }
 
+/** What each diner at a restaurant table wanted, and whether the learner wrote it all down right, wrote something else, or never took it. */
+function tableLine(customer: ShiftRecapCustomer, table: NonNullable<ShiftRecapCustomer['table']>, staff: string, pack: CulturePack) {
+  const diners = table.map(
+    (diner, i) => `diner ${i + 1} wanted ${mealSaid(diner, pack)}${diner.note ? `, and is ${pack.dietaryNotes[diner.note].name}` : ''}`,
+  );
+  const wanted = `At their table, ${diners.join('; ')}.`;
+  switch (customer.result) {
+    case 'served':
+      return `${wanted} The ${staff} wrote it all down right.`;
+    case 'wrongOrder': {
+      const pad = customer.atTheTable ?? [];
+      const written = pad.map(
+        (diner, i) => `diner ${i + 1}: ${mealSaid(diner, pack)}${diner.note ? `, noted ${pack.dietaryNotes[diner.note].name}` : ''}`,
+      );
+      return `${wanted} The ${staff} wrote down instead: ${written.length > 0 ? written.join('; ') : 'nothing'}.`;
+    }
+    case 'walkedOut':
+      return `${wanted} The ${staff} never took their order, and they left.`;
+  }
+}
+
 /** What the customer ordered, and whether the learner (the `staff`) served it right, served something else, or never served them. */
 function servedLine(customer: ShiftRecapCustomer, staff: string, pack: CulturePack) {
   if (customer.checkout) return tillLine(customer, customer.checkout, staff, pack);
+  if (customer.table) return tableLine(customer, customer.table, staff, pack);
   const { order, changedFrom, result, served } = customer;
   const changed = changedFrom ? `They first ordered ${orderSaid(changedFrom, pack)}, then changed their mind halfway. ` : '';
   const ordered = `${changed}They ordered: ${orderSaid(order, pack)}.`;

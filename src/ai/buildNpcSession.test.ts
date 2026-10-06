@@ -205,3 +205,20 @@ describe('buildNpcSession: asking the barista for work', () => {
     expect(hiringSession('de').systemInstruction).toMatch(/"wrong_name".*again/);
   });
 });
+
+describe('buildNpcSession: the restaurant', () => {
+  const LUNCHTIME = { day: 3, minuteOfDay: 12 * 60 };
+  const hiringSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.askServerForWork, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.server, { clock: LUNCHTIME });
+
+  it.each(LANGUAGE_CODES)('builds the server taking an application for work in the %s pack', (packId) => {
+    expect(hiringSession(packId)).toMatchSnapshot();
+  });
+
+  it('has the server work at the restaurant by its local name, and hire with the name check', () => {
+    const { systemInstruction, tools } = hiringSession('ja');
+    expect(systemInstruction).toContain(`${CULTURE_PACKS.ja.restaurant.name}, a restaurant`);
+    expect(systemInstruction).toMatch(/ask for work as a server/);
+    expect(tools.map((tool) => tool.name)).toEqual(['hire_applicant', 'not_understood']);
+  });
+});

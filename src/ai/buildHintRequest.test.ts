@@ -117,4 +117,15 @@ describe('buildHintRequest at a Shift', () => {
     expect(prompt).not.toMatch(/hot or iced/);
     expect(prompt).toMatch(/never say, repeat back, guess or translate what the customer wants/i);
   });
+
+  it('builds a server’s hints at a table: about what they’d like and dietary needs, never what anyone wants', () => {
+    const atTheTable: HintRequest = { ...MID_SHIFT, jobId: 'server', transcript: [{ speaker: 'npc', text: 'こんにちは。' }] };
+    const prompt = text(atTheTable);
+
+    expect(buildHintRequest(atTheTable)).toMatchSnapshot();
+    expect(prompt).toMatch(/working a Shift as the server at レストランひまわり, serving a table/);
+    expect(prompt).not.toMatch(/at the counter/);
+    expect(prompt).toMatch(/dietary needs/);
+    expect(prompt).toMatch(/never say, repeat back, guess or translate what the customer wants/i);
+  });
 });

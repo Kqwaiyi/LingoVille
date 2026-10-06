@@ -2,16 +2,21 @@ import { useState } from 'react';
 import {
   BEHIND_THE_COUNTER,
   CULTURE_PACKS,
+  DIETARY_NOTE_IDS,
   DRINK_EXTRAS,
   DRINK_SIZES,
   DRINK_TEMPERATURES,
   formatLocalAmount,
   formatLocalMoney,
+  RESTAURANT_DISHES,
+  RESTAURANT_DRINKS,
   tillFor,
+  type DietaryNoteId,
   type DrinkOptionId,
+  type ItemId,
 } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import type { ShiftOrderLine } from '../sim/index.ts';
+import { ECONOMY, type PadDiner, type ShiftOrderLine } from '../sim/index.ts';
 import {
   selectCanRedoTray,
   selectCanServe,
@@ -22,6 +27,8 @@ import {
   selectCulturePackId,
   selectDrinkModifiers,
   selectNativeLanguage,
+  selectOrderPad,
+  selectQuickPickNotes,
   selectShiftEnd,
   selectShiftMenu,
   selectSuggestsChange,
@@ -29,7 +36,7 @@ import {
   selectTray,
   useGame,
 } from '../store/index.ts';
-import { drinkOptionLabel, itemLabel } from './itemLabel.ts';
+import { dietaryNoteLabel, drinkOptionLabel, itemLabel } from './itemLabel.ts';
 import { JournalPageView } from './JournalPage.tsx';
 
 /**
@@ -227,6 +234,108 @@ export function Till() {
         </button>
         <button type="button" className="primary" onClick={serveTray} disabled={!canServe}>
           {t('till.finish')}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The server's order pad, between the chat and the input bar while a table is being served: a line per diner (add
+ * one for each at the table, and pick which is being written), a dish and a drink tapped onto it, and any dietary
+ * need noted, then Send order. All of it is checked exactly against what the table wanted, whatever order the diners
+ * are written in. Notes are picked from a list until the Server skill offers them as quick picks.
+ */
+export function OrderPad() {
+  const { t } = useTranslation();
+  const pad = useGame(selectOrderPad);
+  const canServe = useGame(selectCanServe);
+  const canTap = useGame(selectCanTapMenu);
+  const quickPick = useGame(selectQuickPickNotes);
+  const packId = useGame(selectCulturePackId);
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const tapMenuItem = useGame((s) => s.tapMenuItem);
+  const addPadDiner = useGame((s) => s.addPadDiner);
+  const choosePadDiner = useGame((s) => s.choosePadDiner);
+  const removePadDiner = useGame((s) => s.removePadDiner);
+  const setDietaryNote = useGame((s) => s.setDietaryNote);
+  const clearTray = useGame((s) => s.clearTray);
+  const serveTray = useGame((s) => s.serveTray);
+  const writing = pad.diners[pad.at]!;
+  const label = (itemId: ItemId) => itemLabel(itemId, packId, nativeLanguage);
+  const noteLabel = (note: DietaryNoteId) => dietaryNoteLabel(note, packId, nativeLanguage);
+  const written = ({ dish, drink, note }: PadDiner) =>
+    [dish ? label(dish) : t('pad.nothing'), drink ? label(drink) : t('pad.nothing'), ...(note ? [noteLabel(note)] : [])].join(', ');
+  const nothingWritten = pad.diners.every(({ dish, drink, note }) => !dish && !drink && !note);
+
+  const course = (heading: string, items: readonly ItemId[], chosen: ItemId | null) => (
+    <div className="menu-grid-items" role="group" aria-label={heading}>
+      <h3 className="menu-grid-group">{heading}</h3>
+      {items.map((itemId) => (
+        <button key={itemId} type="button" aria-pressed={chosen === itemId} onClick={() => tapMenuItem(itemId)} disabled={!canTap}>
+          {label(itemId)}
+        </button>
+      ))}
+    </div>
+  );
+  return (
+    <section className="menu-grid order-pad" aria-label={t('pad.label')}>
+      <div className="menu-grid-options" role="group" aria-label={t('pad.diners')}>
+        <div>
+          {pad.diners.map((_, i) => (
+            <button key={i} type="button" aria-pressed={pad.at === i} onClick={() => choosePadDiner(i)} disabled={!canTap}>
+              {t('pad.diner', { number: i + 1 })}
+            </button>
+          ))}
+        </div>
+        <div>
+          <button type="button" onClick={addPadDiner} disabled={!canTap || pad.diners.length >= ECONOMY.tableDiners.max}>
+            {t('pad.addDiner')}
+          </button>
+          <button type="button" onClick={removePadDiner} disabled={!canTap || pad.diners.length <= 1}>
+            {t('pad.removeDiner')}
+          </button>
+        </div>
+      </div>
+      {course(t('pad.dishes'), RESTAURANT_DISHES, writing.dish)}
+      {course(t('pad.drinks'), RESTAURANT_DRINKS, writing.drink)}
+      {quickPick ? (
+        <div className="menu-grid-options" role="group" aria-label={t('pad.note')}>
+          <div>
+            <button type="button" aria-pressed={writing.note === null} onClick={() => setDietaryNote(null)} disabled={!canTap}>
+              {t('pad.noNote')}
+            </button>
+            {DIETARY_NOTE_IDS.map((note) => (
+              <button key={note} type="button" aria-pressed={writing.note === note} onClick={() => setDietaryNote(note)} disabled={!canTap}>
+                {noteLabel(note)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <label className="order-pad-note">
+          {t('pad.note')}
+          <select value={writing.note ?? ''} onChange={(e) => setDietaryNote((e.target.value || null) as DietaryNoteId | null)} disabled={!canTap}>
+            <option value="">{t('pad.noNote')}</option>
+            {DIETARY_NOTE_IDS.map((note) => (
+              <option key={note} value={note}>
+                {noteLabel(note)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="menu-grid-tray">
+        <p role="status" aria-label={t('pad.written')}>
+          {nothingWritten
+            ? t('pad.writtenEmpty')
+            : pad.diners.map((diner, i) => `${t('pad.diner', { number: i + 1 })}: ${written(diner)}`).join(' / ')}
+        </p>
+        <button type="button" onClick={clearTray} disabled={!canTap || nothingWritten}>
+          {t('shift.clear')}
+        </button>
+        <button type="button" className="primary" onClick={serveTray} disabled={!canServe}>
+          {t('pad.send')}
         </button>
       </div>
     </section>

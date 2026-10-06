@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   APPEARANCE_PRESET_IDS,
   CULTURE_PACKS,
+  DIETARY_NOTE_IDS,
   drinkModifiersSchema,
   INTERACTIONS,
   ITEM_IDS,
@@ -30,7 +31,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 11;
+export const SAVE_SCHEMA_VERSION = 12;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -69,6 +70,9 @@ const checkout = z.object({
   cashHanded: z.number().positive().nullable(),
   changeDue: z.number().min(0).nullable(),
 });
+
+/** One diner at a restaurant table: their dish, their drink and any dietary need. */
+const diner = z.object({ dish: z.enum(ITEM_IDS), drink: z.enum(ITEM_IDS), note: z.enum(DIETARY_NOTE_IDS).nullable() });
 
 const SHIFT_TEMPLATE_IDS = Object.values(SHIFT_TEMPLATES).flatMap((templates) => templates.map(({ id }) => id)) as [string, ...string[]];
 
@@ -132,6 +136,7 @@ const GameStateSchema = z.object({
             order: shiftOrder,
             changedFrom: shiftOrder.nullable(),
             checkout: checkout.nullable(),
+            table: z.array(diner).min(1).readonly().nullable(),
             voiceSeed: z.int().min(0),
           })
           .nullable(),
@@ -252,6 +257,17 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
     return {
       ...save,
       schemaVersion: 11,
+      game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
+    };
+  },
+  // 11 → 12: restaurant tables. No server Shift could be worked, so a customer at the counter has no table.
+  (save) => {
+    const possessions = save.game.possessions as { shift: { customer: object | null } | null };
+    const { shift } = possessions;
+    const customer = shift?.customer && { ...shift.customer, table: null };
+    return {
+      ...save,
+      schemaVersion: 12,
       game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
     };
   },

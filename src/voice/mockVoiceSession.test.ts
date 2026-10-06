@@ -6,6 +6,7 @@ import {
   OUT_OF_PATIENCE_SCENE,
   shiftCustomerChangeScene,
   shiftCustomerServedScene,
+  tableServedScene,
   type ToolResponse,
 } from '../ai/index.ts';
 import { CULTURE_PACKS, formatLocalAmount, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
@@ -609,7 +610,7 @@ describe('mock VoiceSession: a Shift Customer', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, voiceSeed: 7 };
+  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, table: null, voiceSeed: 7 };
   const ICED_TEA: ShiftOrder = [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }];
   const HOT_COFFEE: ShiftOrder = [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }];
 
@@ -668,6 +669,7 @@ describe('mock VoiceSession: a Shift Customer', () => {
     order: [{ itemId: 'eggs', quantity: 2 }, { itemId: 'stamps', quantity: 1 }],
     changedFrom: null,
     checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 1000, changeDue: 160 },
+    table: null,
     voiceSeed: 7,
   };
   const PAYS_BY_CARD: ShiftCustomer = {
@@ -700,6 +702,46 @@ describe('mock VoiceSession: a Shift Customer', () => {
     const wrong = await customerAtTheCounter('ja', PAYS_CASH);
     await wrong.say(shiftCustomerServedScene(PAYS_CASH.order, false, CULTURE_PACKS.ja, { bag: false, pointsCard: false, change: 160 }));
     expect(wrong.turns.at(-1)).not.toBe(thanks);
+  });
+
+  /** At the restaurant: a table of two, the second diner vegetarian. */
+  const TABLE_OF_TWO: ShiftCustomer = {
+    templateId: 'server-table-dietary',
+    order: [
+      { itemId: 'pork-dish', quantity: 1 },
+      { itemId: 'cola', quantity: 1 },
+      { itemId: 'veggie-dish', quantity: 1 },
+      { itemId: 'juice', quantity: 1 },
+    ],
+    changedFrom: null,
+    checkout: null,
+    table: [
+      { dish: 'pork-dish', drink: 'cola', note: null },
+      { dish: 'veggie-dish', drink: 'juice', note: 'vegetarian' },
+    ],
+    voiceSeed: 7,
+  };
+
+  it.each(LANGUAGE_CODES)('orders for the whole table at once in the %s pack: each diner’s dish and drink, and the dietary need', async (packId) => {
+    const { goods, dietaryNotes } = CULTURE_PACKS[packId];
+    const { turns } = await customerAtTheCounter(packId, TABLE_OF_TWO);
+    expect(turns).toHaveLength(1);
+    for (const said of [goods['pork-dish'].name, goods.cola.name, goods['veggie-dish'].name, goods.juice.name, dietaryNotes.vegetarian.name]) {
+      expect(turns[0]).toContain(said);
+    }
+  });
+
+  it('says the table’s order again when asked, and reacts to what the server wrote down', async () => {
+    const { turns, say } = await customerAtTheCounter('ja', TABLE_OF_TWO);
+    await say('すみません、もう一度お願いします');
+    expect(turns.at(-1)).toBe(turns[0]);
+
+    await say(tableServedScene(TABLE_OF_TWO.table!, true, CULTURE_PACKS.ja));
+    const thanks = turns.at(-1);
+    const wrong = await customerAtTheCounter('ja', TABLE_OF_TWO);
+    await wrong.say(tableServedScene([], false, CULTURE_PACKS.ja));
+    expect(wrong.turns.at(-1)).not.toBe(thanks);
+    expect(thanks).not.toBe(turns[0]);
   });
 
   it('changes their mind once the barista has started on it, and says the new order when asked again', async () => {

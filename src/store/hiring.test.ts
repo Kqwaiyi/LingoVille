@@ -117,6 +117,35 @@ describe('asking the barista for work', () => {
     expect(selectTalkWithF(store.getState())).toBeNull();
   });
 
+  it('hires a server the same way: F at the server, the name check, and a retry after failing', () => {
+    const { store, npc, written } = atTheCounter();
+    // The restaurant opens at 11:00, on a Wednesday.
+    store.setState({ game: { ...store.getState().game, placeId: 'restaurant', clock: { day: 3, minuteOfDay: 12 * 60 } } });
+    store.getState().setInteractable('server');
+
+    store.getState().talk('F');
+    expect(selectConversation(store.getState())).toMatchObject({ interaction: { id: 'ask-server-for-work' } });
+    npc.calls('hire_applicant', { ...APPLICATION, name: 'Pam' });
+    expect(npc.answers).toEqual([{ result: 'wrong_name' }]);
+    for (let turn = 0; turn < 10 && !selectConversation(store.getState())?.outcome; turn++) {
+      store.getState().sendTypedLine('あの…');
+      npc.calls('not_understood', { reason: 'unintelligible' });
+    }
+    expect(selectConversation(store.getState())?.outcome).toMatchObject({ kind: 'failure' });
+    store.getState().leaveConversation();
+    store.getState().skipRecap();
+
+    store.getState().talk('F');
+    npc.calls('hire_applicant', APPLICATION);
+    npc.says('採用です！');
+
+    expect(written.at(-1)?.game.possessions.jobsHired).toEqual(['server']);
+    expect(selectClosingCard(store.getState())).toMatchObject({ kind: 'success', hired: 'server' });
+    store.getState().leaveConversation();
+    store.getState().skipRecap();
+    expect(selectTalkWithF(store.getState())).toBeNull();
+  });
+
   it('offers nothing more on F once the Character is hired', () => {
     const { store, npc } = atTheCounter();
     store.getState().talk('F');

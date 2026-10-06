@@ -7,9 +7,12 @@ export {
   readCheckout,
   readServedScene,
   readShiftOrder,
+  readTable,
   shiftCustomerChangeScene,
   shiftCustomerServedScene,
+  tableServedScene,
   type CheckoutSaid,
+  type DinerSaid,
   type ShiftCustomerContext,
 } from './shiftCustomerSession.ts';
 export {
