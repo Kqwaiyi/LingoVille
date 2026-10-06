@@ -19,6 +19,15 @@ const text = (request: HintRequest) => {
   return `${body.systemInstruction.parts[0]!.text}\n\n${body.contents[0]!.parts[0]!.text}`;
 };
 
+/** A barista at a Shift, with a customer at the counter who has just ordered. */
+const MID_SHIFT: HintRequest = {
+  culturePackId: 'ja',
+  step: 'B1',
+  nativeLanguage: 'en',
+  jobId: 'barista',
+  transcript: [{ speaker: 'npc', text: 'すみません、紅茶のLサイズをアイスで、レモン付きでお願いします。' }],
+};
+
 describe('buildHintRequest', () => {
   it('builds hints for the moment in a conversation', () => {
     expect(buildHintRequest(MID_ORDER)).toMatchSnapshot();
@@ -65,7 +74,35 @@ describe('buildHintRequest', () => {
 
   it('accepts only requests it can build hints for', () => {
     expect(HintRequestSchema.safeParse(MID_ORDER).success).toBe(true);
+    expect(HintRequestSchema.safeParse(MID_SHIFT).success).toBe(true);
+    expect(HintRequestSchema.safeParse({ ...MID_SHIFT, jobId: 'astronaut' }).success).toBe(false);
     expect(HintRequestSchema.safeParse({ ...MID_ORDER, interactionId: 'fly-a-plane' }).success).toBe(false);
     expect(HintRequestSchema.safeParse({ ...MID_ORDER, step: 'D1' }).success).toBe(false);
+  });
+});
+
+describe('buildHintRequest at a Shift', () => {
+  it('builds hints for the Player’s own lines as the staff member', () => {
+    expect(buildHintRequest(MID_SHIFT)).toMatchSnapshot();
+  });
+
+  it('writes the hints as the staff member says them, from the step and the transcript so far', () => {
+    const prompt = text(MID_SHIFT);
+
+    expect(prompt).toContain('CEFR B1');
+    expect(prompt).toMatch(/working a Shift as the barista/);
+    expect(prompt).toMatch(/never the customer's/i);
+    for (const line of MID_SHIFT.transcript) expect(prompt).toContain(line.text);
+  });
+
+  it('never helps the Player understand the customer: no order restated, guessed or translated', () => {
+    const prompt = text(MID_SHIFT);
+
+    expect(prompt).toMatch(/never say, repeat back, guess or translate what the customer wants/i);
+    expect(prompt).not.toContain(INTERACTIONS.orderDrink.goal);
+  });
+
+  it('is the same at every step, apart from the level it names', () => {
+    expect(text({ ...MID_SHIFT, step: 'C2' }).replaceAll('CEFR C2', 'CEFR B1')).toBe(text(MID_SHIFT));
   });
 });

@@ -36,6 +36,7 @@ function lived(): GameState {
       proficiencyScore: 0.8,
       lifeSkillXp: { ...game.progression.lifeSkillXp, barista: 9 },
       lastShiftDay: 3,
+      shiftDays: [1, 3],
       today: { day: 3, homeMeals: 1, gymSessions: 0 },
     },
     possessions: {
@@ -48,6 +49,7 @@ function lived(): GameState {
         customers: 6,
         served: 2,
         failed: 1,
+        translated: 1,
         customer: {
           templateId: 'barista-change-of-mind',
           order: [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }],
@@ -84,13 +86,24 @@ function beforeShifts() {
   const game = lived();
   const progression: Partial<GameState['progression']> = { ...game.progression };
   delete progression.lastShiftDay;
+  delete progression.shiftDays;
   return { ...game, progression, possessions: { ...game.possessions, shift: null } };
+}
+
+/** The game before translated Shift Customers were docked and overwork cost Mood: version 9. */
+function beforeOverwork() {
+  const game = lived();
+  const progression: Partial<GameState['progression']> = { ...game.progression };
+  delete progression.shiftDays;
+  const shift: Partial<NonNullable<GameState['possessions']['shift']>> = { ...game.possessions.shift! };
+  delete shift.translated;
+  return { ...game, progression, possessions: { ...game.possessions, shift } };
 }
 
 /** What a save from before Shifts is upgraded to: no Shift under way, and none worked yet. */
 function withNoShiftYet(): GameState {
   const game = lived();
-  return { ...game, progression: { ...game.progression, lastShiftDay: null }, possessions: { ...game.possessions, shift: null } };
+  return { ...game, progression: { ...game.progression, lastShiftDay: null, shiftDays: [] }, possessions: { ...game.possessions, shift: null } };
 }
 
 /** The game before rent fell due: version 6. Nothing ever set what was owed. */
@@ -287,6 +300,18 @@ describe('saves', () => {
       order: [{ itemId: 'latte', quantity: 1 }],
       changedFrom: null,
       voiceSeed: 4242,
+    });
+  });
+
+  it('upgrades a save from before overwork and translated customers with only its last Shift day worked this week, and none translated', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 9, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeOverwork() }, raw);
+
+    const game = lived();
+    expect((await saves.load('slot-1'))?.save.game).toEqual({
+      ...game,
+      progression: { ...game.progression, shiftDays: [3] },
+      possessions: { ...game.possessions, shift: { ...game.possessions.shift!, translated: 0 } },
     });
   });
 

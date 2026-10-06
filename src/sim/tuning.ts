@@ -112,6 +112,8 @@ export const ECONOMY = {
   /** How Shift Customers are mixed: the share from the Player's own band, the one below and the one above. */
   shiftCustomerMix: { ownBand: 0.6, bandBelow: 0.3, bandAbove: 0.1 },
   jobLifeSkillPayRaisePerLevel: 0.06,
+  /** A Shift Customer served correctly after the Player translated their lines is docked this share of a failed one's dock. */
+  translatedCustomerDockShare: 0.5,
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
   /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
@@ -207,8 +209,9 @@ export const MOOD = {
     lateNightPerGameHour: -6,
     fainting: -20,
   },
-  /** Working this many or more days in one week counts as overwork. */
+  /** Working this many or more days in one week (the last `overworkWeekDays` days, today included) counts as overwork. */
   overworkDaysPerWeek: 5,
+  overworkWeekDays: 7,
   overworkPenaltyPerShift: -6,
   /** At the end of each day rent debt is owed, unless the landlord gave more time. */
   debtPenaltyPerDay: -3,
@@ -233,6 +236,11 @@ export const LIFE_SKILLS = {
   xpPerGymSession: 15,
   gymSessionsPerDay: 1,
   xpPerShiftCustomer: 3,
+  /**
+   * The level of a Job's Life Skill that unlocks each of its aids. They only ever help with the mechanics, never with
+   * understanding the customer. Barista: the menu grid grouped by kind, and the size toggle remembering the last size made.
+   */
+  jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: {}, server: {} },
   /** Illness chance reduction at max Fitness, scaled linearly by level. */
   fitnessIllnessReductionAtMax: 0.4,
   /** Health drain while deprived is multiplied by this at max Fitness. */

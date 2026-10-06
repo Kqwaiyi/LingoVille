@@ -20,7 +20,7 @@ import { JournalPageView } from './JournalPage.tsx';
 /**
  * The barista's menu grid, between the chat and the input bar while a Shift Customer is at the counter: set how the
  * next drink is made with the modifier toggles, tap what they ordered onto the tray (undoing and redoing as need be),
- * then Serve. What's served is checked exactly against their order.
+ * then Serve. What's served is checked exactly against their order. The Barista skill groups the grid into drinks and food.
  */
 export function MenuGrid() {
   const { t } = useTranslation();
@@ -66,13 +66,16 @@ export function MenuGrid() {
           {DRINK_EXTRAS.map((extra) => toggle(extra, making.extras.includes(extra), () => toggleDrinkExtra(extra)))}
         </div>
       </div>
-      <div className="menu-grid-items">
-        {menu.map((itemId) => (
-          <button key={itemId} type="button" onClick={() => tapMenuItem(itemId)} disabled={!canTap}>
-            {itemLabel(itemId, packId, nativeLanguage)}
-          </button>
-        ))}
-      </div>
+      {menu.map(({ group, items }) => (
+        <div key={group ?? 'menu'} className="menu-grid-items" role={group ? 'group' : undefined} aria-label={group ? t(`shift.menuGroups.${group}`) : undefined}>
+          {group && <h3 className="menu-grid-group">{t(`shift.menuGroups.${group}`)}</h3>}
+          {items.map((itemId) => (
+            <button key={itemId} type="button" onClick={() => tapMenuItem(itemId)} disabled={!canTap}>
+              {itemLabel(itemId, packId, nativeLanguage)}
+            </button>
+          ))}
+        </div>
+      ))}
       <div className="menu-grid-tray">
         <p role="status" aria-label={t('shift.tray')}>
           {tray.length === 0 ? t('shift.trayEmpty') : tray.map(lineLabel).join(', ')}

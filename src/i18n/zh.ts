@@ -266,6 +266,7 @@ export const zh: UiStrings = {
     size: '杯型',
     temperature: '热的还是冰的',
     extras: '加料',
+    menuGroups: { drinks: '饮品', food: '食物' },
     undo: '撤销',
     redo: '重做',
     serve: '端给顾客',

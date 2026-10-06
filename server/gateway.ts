@@ -233,6 +233,26 @@ const MOCK_HINTS: Record<TargetLanguage, Hints['hints']> = {
   ],
 };
 
+// Canned hints at a Shift: the barista's own lines, which never name what the customer wants.
+const MOCK_SHIFT_HINTS: Record<TargetLanguage, Hints['hints']> = {
+  ja: [
+    { text: 'いらっしゃいませ。ご注文は何になさいますか？', translation: 'Welcome. What would you like?' },
+    { text: 'すみません、もう一度お願いします。', translation: 'Sorry, once more, please.' },
+  ],
+  zh: [
+    { text: '欢迎光临！您要点什么？', translation: 'Welcome! What would you like?' },
+    { text: '不好意思，请再说一遍。', translation: 'Sorry, please say that again.' },
+  ],
+  en: [
+    { text: 'Hi there, what can I get you?', translation: 'Hi there, what can I get you?' },
+    { text: 'Sorry, could you say that again?', translation: 'Sorry, could you say that again?' },
+  ],
+  de: [
+    { text: 'Hallo, was darf es sein?', translation: 'Hello, what would you like?' },
+    { text: 'Entschuldigung, können Sie das wiederholen?', translation: 'Sorry, could you repeat that?' },
+  ],
+};
+
 /** POST /api/hint: 2–3 hint sentences with translations, for the moment the Player opened Help. */
 const hint: Route = (env, deps, req, res) =>
   promptedEndpoint(
@@ -243,7 +263,7 @@ const hint: Route = (env, deps, req, res) =>
       request: HintRequestSchema,
       build: buildHintRequest,
       answer: () => HintsSchema,
-      mock: (request): Hints => ({ hints: MOCK_HINTS[request.culturePackId] }),
+      mock: (request): Hints => ({ hints: ('jobId' in request ? MOCK_SHIFT_HINTS : MOCK_HINTS)[request.culturePackId] }),
     },
   );
 

@@ -87,6 +87,7 @@ import {
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
+  jobAids,
   lifeSkillLevels,
   MIC_CHECK,
   losePatience,
@@ -762,6 +763,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let shiftLog: ShiftLogEntry[] = [];
   // Tells each Shift's end apart, so a late Shift Recap only lands on the end it was written for.
   let shiftsEnded = 0;
+  // The size the Player last set on the toggles this Shift: with the Barista skill's remembered size, the next customer starts at it.
+  let sizeLastSet: DrinkSize | null = null;
   // An NPC due to come up to the Character while the Player is busy, who waits until the Player is free.
   let pendingApproach: ApproachId | null = null;
   let realMsSinceSave = 0;
@@ -1178,9 +1181,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const askForHints = (conversation: Conversation): Conversation => {
       const { game, nativeLanguage } = get();
       const atLine = conversation.lines.length;
-      // Hints are written for a Goal Interaction's goal. Shift Customers get theirs with ticket 20b.
-      if (!conversation.interaction) return { ...conversation, hints: { atLine, view: { status: 'failed' } } };
-      const { interaction } = conversation;
+      // Hints are written for a Goal Interaction's goal, or at a Shift for the Job's own lines (free, like all Help).
+      const jobId = conversation.shiftCustomer ? game.possessions.shift?.jobId : undefined;
+      const about = conversation.interaction ? { interactionId: conversation.interaction.id } : jobId ? { jobId } : null;
+      if (!about) return { ...conversation, hints: { atLine, view: { status: 'failed' } } };
       const landed = (view: HintsView) => {
         const current = get().conversation;
         if (current?.id !== conversation.id || current.hints?.atLine !== atLine) return;
@@ -1191,7 +1195,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           culturePackId: game.identity.culturePackId,
           step: game.proficiencyStep,
           nativeLanguage,
-          interactionId: interaction.id,
+          ...about,
           transcript: conversation.lines.map(({ speaker, text, typed }) => (typed ? { speaker, text, typed } : { speaker, text })),
         })
         .then(
@@ -1270,12 +1274,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     /**
      * The Shift Customer at the counter is dealt with: served what is on the tray, or gone unserved (null). The sim
-     * checks it exactly, and it's saved. The customer says goodbye next, then leaves. Returns whether it was their order.
+     * checks it exactly, and it's saved. One the Player had translated a line of is docked a share even if served right.
+     * The customer says goodbye next, then leaves. Returns whether it was their order.
      */
     const settleShiftCustomer = (served: ShiftOrder | null) => {
       const { game, conversation } = get();
       const customer = game.possessions.shift?.customer;
-      const { state, correct } = applyShiftCustomer(game, served);
+      const { state, correct } = applyShiftCustomer(game, served, { translated: (conversation?.translated.length ?? 0) > 0 });
       const result = correct ? 'served' : served ? 'wrongOrder' : 'walkedOut';
       if (customer && conversation) {
         const { order, changedFrom } = customer;
@@ -1426,7 +1431,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       set({ game: after });
       const customer = after.possessions.shift!.customer!;
       const pack = CULTURE_PACKS[after.identity.culturePackId];
-      openConversation({ npcId: null, interaction: null, shiftCustomer: NEW_SHIFT_CUSTOMER }, () =>
+      const remembered = sizeLastSet && jobAids(after, shift.jobId).includes('rememberedSize') ? sizeLastSet : null;
+      const shiftCustomer = remembered ? { ...NEW_SHIFT_CUSTOMER, making: { ...DEFAULT_DRINK, size: remembered } } : NEW_SHIFT_CUSTOMER;
+      openConversation({ npcId: null, interaction: null, shiftCustomer }, () =>
         buildShiftCustomerSession(customer, pack, after.proficiencyStep, { clock: after.clock }),
       );
     };
@@ -1933,6 +1940,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const after = startShift(game, jobId, placeHours(JOB_PLACES[jobId], game.identity.culturePackId));
         if (after === game) return;
         set({ game: after, shiftEnd: null });
+        sizeLastSet = null;
         nextShiftCustomerOrEnd();
       },
       tapMenuItem: (itemId) => {
@@ -1941,7 +1949,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         changeShiftCustomer((view) => ({ ...view, ...addToTray(view, itemId, isDrink(itemId) ? view.making : null) }));
         tellStartedOn();
       },
-      setDrinkSize: (size) => changeShiftCustomer((view) => ({ ...view, making: { ...view.making, size } })),
+      setDrinkSize: (size) => {
+        if (!selectCanTapMenu(get())) return;
+        sizeLastSet = size;
+        changeShiftCustomer((view) => ({ ...view, making: { ...view.making, size } }));
+      },
       setDrinkTemperature: (temperature) => changeShiftCustomer((view) => ({ ...view, making: { ...view.making, temperature } })),
       toggleDrinkExtra: (extra) =>
         changeShiftCustomer((view) => {
@@ -2054,7 +2066,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!conversation || npcLine?.speaker !== 'npc' || line === conversation.npcLine) return;
         let next = conversation.translated.includes(line) ? conversation : { ...conversation, translated: [...conversation.translated, line] };
         // The Recap was asked for as the session closed: reading back afterwards isn't Help used in the conversation.
-        if (!conversation.closed) next = logHelp(next, 'translate', [npcLine.text]);
+        // Nor is it for a Shift Customer already dealt with, whose dock was settled by what was translated before.
+        const readingBack = conversation.closed || (conversation.shiftCustomer !== null && conversation.outcome !== null);
+        if (!readingBack) next = logHelp(next, 'translate', [npcLine.text]);
         if (next !== conversation) set({ conversation: next });
         const annotation = conversation.annotations[line];
         if (!annotation || annotation.status === 'failed') annotate(conversation.id, line, npcLine.text);
@@ -2343,11 +2357,27 @@ export const selectStaffDoor = (s: GameStore): StaffDoor | null => {
   if (!STAFF_DOORS.has(key)) STAFF_DOORS.set(key, { jobId, refusal });
   return STAFF_DOORS.get(key)!;
 };
-const NO_ITEMS: readonly ItemId[] = [];
-/** What the Player can tap on the grid in the Shift under way. */
-export const selectShiftMenu = (s: GameStore): readonly ItemId[] => {
+/** Part of the menu grid: with the Barista skill's grouped grid, drinks and food apart; otherwise the whole menu, ungrouped. */
+export type MenuGroup = { group: 'drinks' | 'food' | null; items: readonly ItemId[] };
+const NO_MENU: readonly MenuGroup[] = [];
+const MENU_GRIDS = new Map<string, readonly MenuGroup[]>();
+/** What the Player can tap on the grid in the Shift under way, grouped once the Job's Life Skill has unlocked it. */
+export const selectShiftMenu = (s: GameStore): readonly MenuGroup[] => {
   const { shift } = s.game.possessions;
-  return (shift && SHIFT_MENUS[shift.jobId]) || NO_ITEMS;
+  const menu = shift && SHIFT_MENUS[shift.jobId];
+  if (!menu) return NO_MENU;
+  const grouped = jobAids(s.game, shift.jobId).includes('groupedGrid');
+  const key = `${shift.jobId}:${grouped}`;
+  if (!MENU_GRIDS.has(key)) {
+    const groups: MenuGroup[] = grouped
+      ? [
+          { group: 'drinks', items: menu.filter(isDrink) },
+          { group: 'food', items: menu.filter((itemId) => !isDrink(itemId)) },
+        ]
+      : [{ group: null, items: menu }];
+    MENU_GRIDS.set(key, groups.filter(({ items }) => items.length > 0));
+  }
+  return MENU_GRIDS.get(key)!;
 };
 const NOTHING_ON_THE_TRAY: ShiftOrder = [];
 /** The Shift Customer at the counter can still be served: the grid takes taps until they've been dealt with. */

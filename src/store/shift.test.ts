@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { NpcSession, Recap, RecapRequest, ToolResponse } from '../ai/index.ts';
+import type { Hint, HintRequest, NpcSession, Recap, RecapRequest, ToolResponse } from '../ai/index.ts';
 import { DRINK_EXTRAS, SHIFT_TEMPLATES, type DrinkModifiers, type ItemId } from '../content/index.ts';
-import { createSave, ECONOMY, hire, PROFICIENCY_STEP_TABLE, type GameState, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
+import { createSave, ECONOMY, hire, LIFE_SKILLS, PROFICIENCY_STEP_TABLE, type GameState, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { VoiceServiceUnavailableError, type OpenVoiceSession, type VoiceSessionEvents } from '../voice/index.ts';
 import {
   createGameStore,
@@ -16,8 +16,10 @@ import {
   selectClosingCard,
   selectConversation,
   selectDrinkModifiers,
+  selectHints,
   selectShift,
   selectShiftEnd,
+  selectShiftMenu,
   selectStaffDoor,
   selectTray,
 } from './index.ts';
@@ -74,21 +76,29 @@ function keptJournal() {
   return { kept, journal };
 }
 
+const SHIFT_HINTS: Hint[] = [
+  { text: 'いらっしゃいませ。ご注文は？', translation: 'Welcome. What would you like?' },
+  { text: 'もう一度お願いします。', translation: 'Once more, please.' },
+];
+
 /** A hired barista at the staff door at 10:00 on day 3. */
 function atTheStaffDoor(change: (game: GameState) => GameState = (game) => game) {
   const { saves, written } = recordingSaves();
   const customers = fakeCustomers();
   const recaps = fakeRecaps();
   const { kept, journal } = keptJournal();
+  const hintsAsked: HintRequest[] = [];
+  const requestHints = async (request: HintRequest): Promise<Hint[]> => (hintsAsked.push(request), SHIFT_HINTS);
   const game = hire(createSave(DEV_SETUP), 'barista');
   const store = createGameStore(change({ ...game, placeId: 'cafe', clock: { day: 3, minuteOfDay: 10 * 60 } }), {
     saves,
     openVoiceSession: customers.openVoiceSession,
     requestRecap: recaps.requestRecap,
+    requestHints,
     journal,
   });
   store.getState().setInteractable('staff-door');
-  return { store, customers, written, recaps: recaps.asked, recapsAsked: () => recaps.asked.length, kept };
+  return { store, customers, written, recaps: recaps.asked, recapsAsked: () => recaps.asked.length, kept, hintsAsked };
 }
 
 /** The hidden order of the customer at the counter, as the sim holds it. */
@@ -447,6 +457,25 @@ describe('the Shift Recap', () => {
     });
   });
 
+  it('counts the lines translated before a customer was served as Help, and none read back after, as the dock does', () => {
+    const { store, customers, recaps } = atTheStaffDoor();
+    store.getState().startShift();
+    customers.says('ラテをください。');
+    store.getState().translateLine(0);
+    serve(store, customers, orderNow(store));
+    customers.says('ラテをください。');
+    tapOrder(store, orderNow(store));
+    store.getState().serveTray();
+    store.getState().translateLine(0);
+    customers.says('ありがとう！');
+    while (store.getState().game.possessions.shift) serve(store, customers, orderNow(store));
+
+    const { request } = recaps[0]!;
+    if (request.kind !== 'shift') throw new Error('not a Shift Recap');
+    expect(request.customers[0]!.helpLog).toEqual([{ afterLine: 1, kind: 'translate', text: 'ラテをください。' }]);
+    expect(request.customers[1]!.helpLog).toEqual([]);
+  });
+
   it('tells the Recap what a customer who changed their mind first asked for', () => {
     const { store, customers, recaps } = atTheStaffDoor();
     store.getState().startShift();
@@ -540,6 +569,30 @@ describe('docks at the end of a Shift', () => {
     expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(base * ((count - 1) / count) * stakeMultiplier - failedCustomerDock * base);
   });
 
+  it('docks a customer whose order the Player translated, then served correctly, half a failure', () => {
+    const { store, customers } = atTheStaffDoor(atB1);
+    store.getState().startShift();
+    const count = store.getState().game.possessions.shift!.customers;
+    customers.says('ラテをください。');
+    store.getState().translateLine(0);
+    serveTheRest(store, customers);
+
+    expect(selectShiftEnd(store.getState())).toMatchObject({ customers: count, served: count });
+    expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(base * stakeMultiplier - ECONOMY.translatedCustomerDockShare * failedCustomerDock * base);
+  });
+
+  it('docks a customer whose order the Player translated, then served wrongly, as one failure', () => {
+    const { store, customers } = atTheStaffDoor(atB1);
+    store.getState().startShift();
+    const count = store.getState().game.possessions.shift!.customers;
+    customers.says('ラテをください。');
+    store.getState().translateLine(0);
+    serve(store, customers, [{ itemId: wrongDrinkFor(orderNow(store)[0]!.itemId), quantity: 1 }]);
+    serveTheRest(store, customers);
+
+    expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(base * ((count - 1) / count) * stakeMultiplier - failedCustomerDock * base);
+  });
+
   it('doesn’t dock a customer lost to the network, who is replaced', () => {
     const { store, customers } = atTheStaffDoor(atB1);
     store.getState().startShift();
@@ -550,6 +603,68 @@ describe('docks at the end of a Shift', () => {
 
     expect(selectShiftEnd(store.getState())).toMatchObject({ customers: count, served: count });
     expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(base * stakeMultiplier);
+  });
+});
+
+describe('the Barista skill’s aids', () => {
+  /** A barista whose skill has reached the level that unlocks `aid`, or just short of it. */
+  const baristaFor = (aid: keyof typeof LIFE_SKILLS.jobAidsFromLevel.barista, reached: boolean) => (game: GameState): GameState => ({
+    ...game,
+    progression: {
+      ...game.progression,
+      lifeSkillXp: { ...game.progression.lifeSkillXp, barista: LIFE_SKILLS.xpToReachLevel[LIFE_SKILLS.jobAidsFromLevel.barista[aid] - (reached ? 0 : 1)]! },
+    },
+  });
+
+  it('groups the menu grid into drinks and food once unlocked, with the same items', () => {
+    const before = atTheStaffDoor(baristaFor('groupedGrid', false));
+    before.store.getState().startShift();
+    expect(selectShiftMenu(before.store.getState())).toEqual([{ group: null, items: ['latte', 'coffee', 'tea', 'pastry'] }]);
+
+    const after = atTheStaffDoor(baristaFor('groupedGrid', true));
+    after.store.getState().startShift();
+    expect(selectShiftMenu(after.store.getState())).toEqual([
+      { group: 'drinks', items: ['latte', 'coffee', 'tea'] },
+      { group: 'food', items: ['pastry'] },
+    ]);
+  });
+
+  it('remembers the size last set for the next customer once unlocked; hot or iced and extras still start afresh', () => {
+    for (const reached of [false, true]) {
+      const { store, customers } = atTheStaffDoor(baristaFor('rememberedSize', reached));
+      store.getState().startShift();
+      makeAs(store, ICED_TEA[0]!.modifiers!);
+      serve(store, customers, ICED_TEA);
+
+      expect(selectDrinkModifiers(store.getState())).toEqual({ size: reached ? 'large' : 'medium', temperature: 'hot', extras: [] });
+    }
+  });
+});
+
+describe('Help at a Shift', () => {
+  it('gives hints for the Player’s own lines as the barista, from the conversation so far', async () => {
+    const { store, customers, hintsAsked } = atTheStaffDoor();
+    store.getState().startShift();
+    customers.says('ラテをください。');
+
+    store.getState().toggleHelp();
+    await vi.waitFor(() => expect(selectHints(store.getState())).toEqual({ status: 'ready', hints: SHIFT_HINTS }));
+
+    expect(hintsAsked).toEqual([
+      { culturePackId: 'ja', step: 'A1', nativeLanguage: 'en', jobId: 'barista', transcript: [{ speaker: 'npc', text: 'ラテをください。' }] },
+    ]);
+  });
+
+  it('costs nothing: a customer served after the Player read hints pays in full, even where failures are docked', async () => {
+    const { store, customers } = atTheStaffDoor((game) => ({ ...game, proficiencyStep: 'B1', progression: { ...game.progression, highestStep: 'B1' } }));
+    store.getState().startShift();
+    customers.says('ラテをください。');
+    store.getState().toggleHelp();
+    await vi.waitFor(() => expect(selectHints(store.getState())).toMatchObject({ status: 'ready' }));
+    store.getState().toggleHelp();
+    while (store.getState().game.possessions.shift) serve(store, customers, orderNow(store));
+
+    expect(selectShiftEnd(store.getState())!.payInShifts).toBeCloseTo(ECONOMY.shiftBasePayInShifts * PROFICIENCY_STEP_TABLE.B1.stakeMultiplier);
   });
 });
 

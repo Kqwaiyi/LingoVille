@@ -13,6 +13,7 @@ import {
   type ProficiencyStep,
   createSave,
   ECONOMY,
+  LIFE_SKILLS,
   hire,
   nextShiftCustomer,
   shiftRefusal,
@@ -393,5 +394,129 @@ describe('cancelShift: a Shift that can’t go on through no fault of the Player
     let state = withCustomer();
     state = applyShiftCustomer(state, orderOf(state)).state;
     expect(cancelShift(state)).toEqual(endShift(state).state);
+  });
+});
+
+describe('the Barista skill', () => {
+  const baristaXp = (state: GameState) => state.progression.lifeSkillXp.barista;
+
+  it('earns XP for each customer served correctly, times the Mood modifier', () => {
+    const state = withCustomer();
+    expect(baristaXp(applyShiftCustomer(state, orderOf(state)).state)).toBeCloseTo(baristaXp(state) + LIFE_SKILLS.xpPerShiftCustomer);
+    const great = { ...state, character: { ...state.character, mood: METER_MAX } };
+    expect(baristaXp(applyShiftCustomer(great, orderOf(great)).state)).toBeCloseTo(LIFE_SKILLS.xpPerShiftCustomer * moodModifier(METER_MAX));
+  });
+
+  it('earns nothing for a customer served the wrong thing or who walks off', () => {
+    const state = withCustomer();
+    expect(baristaXp(applyShiftCustomer(state, null).state)).toBe(baristaXp(state));
+    expect(baristaXp(applyShiftCustomer(state, []).state)).toBe(baristaXp(state));
+  });
+});
+
+describe('endShift: the Barista skill raise', () => {
+  const atLevel = (state: GameState, level: number): GameState => ({
+    ...state,
+    progression: { ...state.progression, lifeSkillXp: { ...state.progression.lifeSkillXp, barista: LIFE_SKILLS.xpToReachLevel[level]! } },
+  });
+
+  it('adds the raise (6%) to pay for each level', () => {
+    for (let level = 0; level <= LIFE_SKILLS.maxLevel; level++) {
+      expect(endShift(atLevel(finishedShift(6), level)).payInShifts).toBeCloseTo(ECONOMY.shiftBasePayInShifts * (1 + ECONOMY.jobLifeSkillPayRaisePerLevel * level));
+    }
+  });
+
+  it('raises what was earned, not the docks for failed customers', () => {
+    const { stakeMultiplier, failedCustomerDock } = PROFICIENCY_STEP_TABLE.B2;
+    const pay = endShift(atLevel(finishedShift(3, { highestStep: 'B2' }), 2)).payInShifts;
+    expect(pay).toBeCloseTo(ECONOMY.shiftBasePayInShifts * ((3 / 6) * stakeMultiplier * (1 + 2 * ECONOMY.jobLifeSkillPayRaisePerLevel) - 3 * failedCustomerDock));
+  });
+});
+
+describe('endShift: customers the Player had translated', () => {
+  /** A Shift of 6 customers, every one served correctly, the first `translated` of them after translating their lines. */
+  const servedAll = (translated: number, highestStep: ProficiencyStep): GameState => {
+    let state = startShift(hiredBarista(), 'barista', CAFE_HOURS);
+    state = { ...state, possessions: { ...state.possessions, shift: { ...state.possessions.shift!, customers: 6 } } };
+    for (let i = 0; i < 6; i++) {
+      state = nextShiftCustomer(state, [SINGLE_DRINK]);
+      state = applyShiftCustomer(state, orderOf(state), { translated: i < translated }).state;
+    }
+    return { ...state, progression: { ...state.progression, highestStep } };
+  };
+
+  it('pays a translated customer served correctly the per-customer amount minus half the failure dock', () => {
+    for (const step of PROFICIENCY_STEPS) {
+      const halfDock = ECONOMY.translatedCustomerDockShare * PROFICIENCY_STEP_TABLE[step].failedCustomerDock * ECONOMY.shiftBasePayInShifts;
+      expect(endShift(servedAll(1, step)).payInShifts).toBeCloseTo(endShift(servedAll(0, step)).payInShifts - halfDock);
+      expect(endShift(servedAll(2, step)).payInShifts).toBeCloseTo(endShift(servedAll(0, step)).payInShifts - 2 * halfDock);
+    }
+  });
+
+  it('docks nothing for translating at A1–A2, where failing is docked nothing either', () => {
+    for (const step of ['A1', 'A2'] as const) {
+      expect(endShift(servedAll(3, step)).payInShifts).toBeCloseTo(endShift(servedAll(0, step)).payInShifts);
+    }
+  });
+
+  it('always pays more than failing the customer, from B1 up', () => {
+    for (const step of ['B1', 'B2', 'C1', 'C2'] as const) {
+      expect(endShift(servedAll(1, step)).payInShifts).toBeGreaterThan(endShift(finishedShift(5, { highestStep: step })).payInShifts);
+    }
+  });
+
+  it('docks a translated customer served the wrong thing as one failure, no more', () => {
+    const state = withCustomer();
+    const { state: after } = applyShiftCustomer(state, [], { translated: true });
+    expect(endShift(after)).toEqual(endShift(applyShiftCustomer(state, []).state));
+  });
+});
+
+describe('endShift: overwork', () => {
+  /** Works a whole Shift on `day`, every customer served, and returns the state after it is paid. */
+  const workOn = (state: GameState, day: number): GameState => {
+    let working = startShift({ ...state, clock: { day, minuteOfDay: 10 * 60 } }, 'barista', CAFE_HOURS);
+    for (let i = 0; i < working.possessions.shift!.customers; i++) {
+      working = nextShiftCustomer(working, [SINGLE_DRINK]);
+      working = applyShiftCustomer(working, orderOf(working)).state;
+    }
+    return endShift(working).state;
+  };
+  const moodChange = (state: GameState, day: number) => workOn(state, day).character.mood - state.character.mood;
+  const workedDays = (days: number[]) => days.reduce(workOn, hiredBarista());
+  /** `count` days in a row from `from`. */
+  const daysFrom = (from: number, count: number) => Array.from({ length: count }, (_, i) => from + i);
+  const { overworkDaysPerWeek: overwork, overworkWeekDays: week, overworkPenaltyPerShift: penalty } = MOOD;
+  /** Days worked in a row up to the day before `day`: one short of overwork. */
+  const oneShortBefore = (day: number) => workedDays(daysFrom(day - (overwork - 1), overwork - 1));
+
+  it('costs no Mood for the days worked in a week short of overwork', () => {
+    expect(moodChange(workedDays(daysFrom(20, overwork - 2)), 20 + overwork - 2)).toBe(0);
+  });
+
+  it('costs Mood for each Shift once the Character has worked overwork’s days (5) or more in the last week', () => {
+    expect(penalty).toBeLessThan(0);
+    expect(moodChange(oneShortBefore(30), 30)).toBe(penalty);
+    expect(moodChange(workOn(oneShortBefore(30), 30), 31)).toBe(penalty);
+  });
+
+  it('forgets days worked more than a week ago', () => {
+    // A day worked, then the last days of the week it starts but one short of overwork.
+    const first = 20;
+    const worked = workedDays([first, ...daysFrom(first + week - overwork + 1, overwork - 2)]);
+    expect(moodChange(worked, first + week - 1)).toBe(penalty);
+    expect(moodChange(worked, first + week)).toBe(0);
+  });
+
+  it('is taken after the pay, so it never lowers that Shift’s pay', () => {
+    const paid = (state: GameState) => state.character.moneyInShifts;
+    const payOn30 = (state: GameState) => paid(workOn(state, 30)) - paid(state);
+    // The same Shifts worked, with the same Barista XP, but long enough ago not to count.
+    expect(payOn30(oneShortBefore(30))).toBeCloseTo(payOn30(workedDays(daysFrom(1, overwork - 1))));
+  });
+
+  it('never takes Mood below 0', () => {
+    const worked = oneShortBefore(30);
+    expect(workOn({ ...worked, character: { ...worked.character, mood: 1 } }, 30).character.mood).toBe(0);
   });
 });

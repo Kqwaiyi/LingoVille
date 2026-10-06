@@ -417,6 +417,16 @@ describe('POST /api/hint', () => {
     expect(gemini.calls).toEqual([]);
   });
 
+  it('answers a Shift with canned lines for the staff member, which never name an order', async () => {
+    const base = await start({ GEMINI_MOCK: '1' }, offline());
+    const shift: HintRequest = { culturePackId: 'en', step: 'B1', nativeLanguage: 'en', jobId: 'barista', transcript: [] };
+
+    const res = await post(base, '/api/hint', shift);
+    const { hints } = HintsSchema.parse(await res.json());
+
+    expect(hints.map((hint) => hint.text).join(' ')).not.toMatch(/latte|coffee|tea|pastry/i);
+  });
+
   it('rejects a request it cannot build hints from', async () => {
     const base = await start({ GEMINI_MOCK: '1' }, offline());
 

@@ -249,6 +249,21 @@ describe('applyShiftEvidence', () => {
     expect(after).toEqual(state);
   });
 
+  it('counts a tap-translated customer for nothing as listening, even if only one of their lines was translated', () => {
+    const state = settledSave('A1');
+    const partly: ShiftCustomerEvidence = {
+      lines: [
+        { speaker: 'npc', text: 'Hello!' },
+        { speaker: 'npc', text: 'A large iced tea with lemon, please.' },
+      ],
+      helpLog: [{ afterLine: 2, kind: 'translate', text: 'A large iced tea with lemon, please.' }],
+      notUnderstoodTurns: 0,
+      served: true,
+    };
+
+    expect(applyShiftEvidence(state, { ...shift([]), customers: [partly, partly] })).toEqual(state);
+  });
+
   it('also counts what the Player said, as the Recap judged it', () => {
     const state = settledSave('A1');
     const talked: ShiftCustomerEvidence = { lines: linesWithPlayerTurns(3), helpLog: [], notUnderstoodTurns: 0, served: true };

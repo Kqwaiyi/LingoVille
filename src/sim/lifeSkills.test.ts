@@ -4,6 +4,7 @@ import {
   applyInteractionOutcome,
   createSave,
   LIFE_SKILLS,
+  jobAids,
   lifeSkillLevel,
   lifeSkillLevels,
   METER_MAX,
@@ -55,5 +56,24 @@ describe('Life Skill levels', () => {
       const { state: after } = applyInteractionOutcome(state, INTERACTIONS.orderDrink, outcome);
       expect(after.progression.lifeSkillXp).toEqual(state.progression.lifeSkillXp);
     }
+  });
+});
+
+describe('Job aids: what a Job Life Skill makes easier', () => {
+  const baristaAt = (level: number) => withXp({ barista: LIFE_SKILLS.xpToReachLevel[level]! });
+
+  it('unlocks the Barista aids at the levels the tuning sets and keeps them: mechanics only, a grouped grid and a remembered size', () => {
+    expect(jobAids(baristaAt(0), 'barista')).toEqual([]);
+    for (let level = 0; level <= LIFE_SKILLS.maxLevel; level++) {
+      const unlocked = (Object.keys(LIFE_SKILLS.jobAidsFromLevel.barista) as (keyof typeof LIFE_SKILLS.jobAidsFromLevel.barista)[]).filter(
+        (aid) => level >= LIFE_SKILLS.jobAidsFromLevel.barista[aid],
+      );
+      expect([...jobAids(baristaAt(level), 'barista')].sort()).toEqual(unlocked.sort());
+    }
+    expect([...jobAids(baristaAt(LIFE_SKILLS.maxLevel), 'barista')].sort()).toEqual(['groupedGrid', 'rememberedSize']);
+  });
+
+  it("follows each Job's own skill", () => {
+    expect(jobAids(withXp({ cooking: 400, cashier: 400 }), 'barista')).toEqual([]);
   });
 });

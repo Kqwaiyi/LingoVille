@@ -266,6 +266,7 @@ export const ja: UiStrings = {
     size: 'サイズ',
     temperature: 'ホット・アイス',
     extras: 'トッピング',
+    menuGroups: { drinks: 'ドリンク', food: 'フード' },
     undo: '元に戻す',
     redo: 'やり直す',
     serve: '出す',

@@ -79,6 +79,8 @@ export type Shift = {
   served: number;
   /** Customers served something else, or who gave up, so far. */
   failed: number;
+  /** Of the customers served, those whose lines the Player had translated: each is docked a share of a failed customer's dock. */
+  translated: number;
   /** The customer at the counter now, or null between customers. */
   customer: ShiftCustomer | null;
 };
@@ -158,6 +160,8 @@ export type GameState = {
     lifeSkillXp: Record<LifeSkillId, number>;
     /** The day the Character last started a Shift: there's at most one a day. */
     lastShiftDay: number | null;
+    /** The days a Shift was worked in the last week, oldest first, for overwork. */
+    shiftDays: number[];
     /** Daily counters, reset when `day` is no longer today. */
     today: { day: number; homeMeals: number; gymSessions: number };
   };
@@ -214,6 +218,7 @@ export function createSave(setup: NewGameSetup): GameState {
       newcomerDiscountStep: setup.startingStep,
       lifeSkillXp: Object.fromEntries(LIFE_SKILL_IDS.map((skill) => [skill, 0])) as Record<LifeSkillId, number>,
       lastShiftDay: null,
+      shiftDays: [],
       today: { day: FIRST_MORNING.day, homeMeals: 0, gymSessions: 0 },
     },
     possessions: { inventory: [], gymMembershipUntilDay: null, addressRegistered: false, jobsHired: [], shift: null },

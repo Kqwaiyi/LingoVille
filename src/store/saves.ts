@@ -30,7 +30,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 9;
+export const SAVE_SCHEMA_VERSION = 10;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -102,6 +102,7 @@ const GameStateSchema = z.object({
     newcomerDiscountStep: z.enum(PROFICIENCY_STEPS),
     lifeSkillXp: z.record(z.enum(LIFE_SKILL_IDS), z.number().min(0)),
     lastShiftDay: day.nullable(),
+    shiftDays: z.array(day),
     today: z.object({ day, homeMeals: z.int().min(0), gymSessions: z.int().min(0) }),
   }),
   possessions: z.object({
@@ -115,6 +116,7 @@ const GameStateSchema = z.object({
         customers: z.int().min(1),
         served: z.int().min(0),
         failed: z.int().min(0),
+        translated: z.int().min(0),
         customer: z
           .object({ templateId: z.enum(SHIFT_TEMPLATE_IDS), order: shiftOrder, changedFrom: shiftOrder.nullable(), voiceSeed: z.int().min(0) })
           .nullable(),
@@ -210,6 +212,21 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       ...save,
       schemaVersion: 9,
       game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
+    };
+  },
+  // 9 → 10: translated Shift Customers are docked, and working too many days a week costs Mood. No customer under way
+  // has been marked translated, and the only Shift day known is the last one.
+  (save) => {
+    const progression = save.game.progression as { lastShiftDay: number | null };
+    const possessions = save.game.possessions as { shift: object | null };
+    return {
+      ...save,
+      schemaVersion: 10,
+      game: {
+        ...save.game,
+        progression: { ...progression, shiftDays: progression.lastShiftDay === null ? [] : [progression.lastShiftDay] },
+        possessions: { ...possessions, shift: possessions.shift && { ...possessions.shift, translated: 0 } },
+      },
     };
   },
 ];

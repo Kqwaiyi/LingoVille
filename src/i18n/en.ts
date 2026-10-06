@@ -269,6 +269,7 @@ export const en = {
     size: 'Size',
     temperature: 'Hot or iced',
     extras: 'Extras',
+    menuGroups: { drinks: 'Drinks', food: 'Food' },
     undo: 'Undo',
     redo: 'Redo',
     serve: 'Serve',

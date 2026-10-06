@@ -266,6 +266,7 @@ export const de: UiStrings = {
     size: 'Größe',
     temperature: 'Heiß oder mit Eis',
     extras: 'Extras',
+    menuGroups: { drinks: 'Getränke', food: 'Essen' },
     undo: 'Rückgängig',
     redo: 'Wiederholen',
     serve: 'Servieren',

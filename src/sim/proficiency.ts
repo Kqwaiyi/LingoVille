@@ -75,7 +75,7 @@ export type ShiftEvidence = {
  * Moves the hidden Proficiency score after a Shift, as one piece of evidence however many customers it had.
  * The combined Recap's estimate counts as for a conversation, from everything the Player said to the customers.
  * The Shift's results count as listening evidence: serving every order is evidence of the step the customers
- * spoke at, and each missed one pulls lower. A customer's lines the Player had translated count for nothing as listening.
+ * spoke at, and each missed one pulls lower. A customer the Player had translated any line of counts for nothing as listening.
  */
 export function applyShiftEvidence(state: GameState, evidence: ShiftEvidence): GameState {
   const { cefrEstimate, customers } = evidence;
@@ -85,10 +85,10 @@ export function applyShiftEvidence(state: GameState, evidence: ShiftEvidence): G
   const speakingWeight = lineWeights.length === 0 ? 0 : (lengthWeight(lines) * lineWeights.reduce((sum, w) => sum + w, 0)) / lineWeights.length;
   const speakingTarget = recapTarget(cefrEstimate, customers.reduce((sum, customer) => sum + customer.notUnderstoodTurns, 0));
 
-  // How much each customer counts as listening evidence: the share of their lines the Player heard untranslated.
-  const listened = customers.map(({ lines: said }, i) => {
+  // How much each customer counts as listening evidence: in full if the Player heard every line untranslated, else not at all.
+  const listened = customers.map(({ lines: said }, i): number => {
     const npcWeights = weighed[i]!.filter((_, line) => said[line]!.speaker === 'npc');
-    return npcWeights.length === 0 ? 0 : npcWeights.reduce((sum, w) => sum + w, 0) / npcWeights.length;
+    return npcWeights.length > 0 && npcWeights.every((w) => w > 0) ? 1 : 0;
   });
   const listeningWeight = listened.length === 0 ? 0 : listened.reduce((sum, w) => sum + w, 0) / listened.length;
   const missed = listened.reduce((sum, w, i) => sum + (customers[i]!.served ? 0 : w), 0);

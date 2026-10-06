@@ -6,7 +6,7 @@ export { addToBasket, putBackFromBasket, type Basket } from './basket.ts';
 export { APPROACH_IDS, approachDue, hallwayApproach, hallwayApproachMade, type ApproachId, type HallwayApproachId } from './approaches.ts';
 export { cook } from './cook.ts';
 export { faint, faintedBetween } from './faint.ts';
-export { lifeSkillLevel, lifeSkillLevels } from './lifeSkills.ts';
+export { jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';
 export { hire, namesMatch } from './jobs.ts';
 export { applyShiftCustomer, cancelShift, endShift, nextShiftCustomer, shiftRefusal, startShift, type ShiftRefusal } from './shift.ts';
