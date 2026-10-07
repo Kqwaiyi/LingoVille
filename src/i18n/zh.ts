@@ -255,6 +255,7 @@ export const zh: UiStrings = {
     askForTime: '按 <kbd>F</kbd> 请求晚点交',
     askForWork: '按 <kbd>F</kbd> 问工作的事',
     buyGift: '按 <kbd>F</kbd> 买礼物',
+    askRecommendation: '按 <kbd>F</kbd> 请服务员推荐',
     startShift: '按 <kbd>E</kbd> 开始上班 — {{job}}',
     staffOnly: '员工门 · 员工专用',
     workedToday: '员工门 · 你今天已经上过班了',

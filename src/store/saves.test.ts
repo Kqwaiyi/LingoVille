@@ -92,9 +92,16 @@ function beforeShifts() {
   return { ...game, progression, possessions: { ...game.possessions, shift: null } };
 }
 
+/** The game before the Character could eat at the restaurant: version 12. No table, no bill. */
+function beforeRestaurantBills() {
+  const game: Partial<GameState> = { ...lived() };
+  delete game.restaurant;
+  return game as Omit<GameState, 'restaurant'>;
+}
+
 /** The game before restaurant tables: version 11. A Shift Customer had no table. */
 function beforeTables() {
-  const game = lived();
+  const game = beforeRestaurantBills();
   const customer: Partial<ShiftCustomer> = { ...game.possessions.shift!.customer! };
   delete customer.table;
   return { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } } };
@@ -364,6 +371,21 @@ describe('saves', () => {
     await set('slot-1', { schemaVersion: 11, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeTables() }, raw);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('upgrades a save from before restaurant meals with no table and nothing on the bill', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 12, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeRestaurantBills() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it("keeps the Character's restaurant table and an unpaid bill as they were", async () => {
+    const { saves } = freshSaves();
+    const game: GameState = { ...lived(), restaurant: { seated: true, bill: [{ itemId: 'fish-dish', quantity: 1 }] } };
+    await saves.write('slot-1', game);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(game);
   });
 
   it("keeps a restaurant table as it was: each diner's dish, drink and dietary need", async () => {

@@ -260,6 +260,29 @@ describe('buildNpcSession: the restaurant', () => {
     expect(hiringSession(packId)).toMatchSnapshot();
   });
 
+  const BILL = [
+    { itemId: 'veggie-dish', quantity: 1 },
+    { itemId: 'juice', quantity: 1 },
+  ] as const;
+  const guestSessions = (packId: LanguageCode) => ({
+    table: buildNpcSession(INTERACTIONS.getATable, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.server, { clock: LUNCHTIME }),
+    order: buildNpcSession(INTERACTIONS.orderAMeal, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.server, { clock: LUNCHTIME }),
+    recommend: buildNpcSession(INTERACTIONS.recommendAMeal, CULTURE_PACKS[packId], 'C1', NAMED_NPCS.server, { clock: LUNCHTIME }),
+    bill: buildNpcSession(INTERACTIONS.payTheBill, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.server, { clock: LUNCHTIME, bill: BILL }),
+  });
+
+  it.each(LANGUAGE_CODES)('builds the server seating a guest, taking an order, recommending within a diet and taking the bill in the %s pack', (packId) => {
+    expect(guestSessions(packId)).toMatchSnapshot();
+  });
+
+  it('offers seat_guest, serve_order (with the dietary need for a recommendation) and settle_bill', () => {
+    const { table, order, recommend, bill } = guestSessions('en');
+    expect([table, order, recommend, bill].map(({ tools }) => tools[0]!.name)).toEqual(['seat_guest', 'serve_order', 'serve_order', 'settle_bill']);
+    expect(recommend.tools[0]!.parameters.required).toContain('restriction');
+    expect(recommend.systemInstruction).toContain('has meat and pork in it');
+    expect(bill.systemInstruction).toMatch(/Bill total: £/);
+  });
+
   it('has the server work at the restaurant by its local name, and hire with the name check', () => {
     const { systemInstruction, tools } = hiringSession('ja');
     expect(systemInstruction).toContain(`${CULTURE_PACKS.ja.restaurant.name}, a restaurant`);

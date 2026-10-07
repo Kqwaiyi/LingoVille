@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { JOB_IDS, type Basket, type ComfortKind, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { menuPrice } from './currency.ts';
-import { ITEM_IDS, ITEMS, type ItemId, type Restores } from './items.ts';
+import { DIETARY_NOTES, dishContents, dishFits, ITEM_IDS, ITEMS, type DietaryNoteId, type ItemId, type Restores } from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
 import { PLACE_HOURS } from './places.ts';
 import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.ts';
@@ -11,7 +11,20 @@ import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.t
 export type Band = 'B' | 'I' | 'A';
 
 /** Which Culture Pack facts the NPC is told, so it can answer side questions. */
-export const FACT_SOURCES = ['openingHours', 'menu', 'stock', 'shelves', 'basket', 'placeFacts', 'customs', 'ward', 'rent', 'newcomerDiscount'] as const;
+export const FACT_SOURCES = [
+  'openingHours',
+  'menu',
+  'dietary',
+  'stock',
+  'shelves',
+  'basket',
+  'bill',
+  'placeFacts',
+  'customs',
+  'ward',
+  'rent',
+  'newcomerDiscount',
+] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 /** The arguments a `serveOrder` effect reads from its completion function. */
@@ -26,6 +39,12 @@ type PayRentArgs = { amount: number };
 type ExtendRentArgs = { days: number };
 /** The arguments a `hire` effect reads: the applicant's name as the NPC heard it, which the sim checks. */
 type HireArgs = { name: string };
+/** The arguments a `seatGuest` effect's completion carries: how many, and where they'd like to sit. */
+type SeatGuestArgs = { party: number; seating: string };
+/** The arguments an `orderMeal` effect reads: the order, and for a recommendation, the dietary need it must keep to. */
+type OrderMealArgs = ServeOrderArgs & { restriction?: DietaryNoteId };
+/** The arguments a `settleBill` effect's completion carries: how the guest pays. */
+type SettleBillArgs = { method: string };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
@@ -33,9 +52,10 @@ type HireArgs = { name: string };
  * `purchase` charges for what the Character brought to the till, which goes into the inventory.
  * `pointTo` marks where an item is. `payRent` pays the landlord, and `extendRent`
  * gives the Character more time to pay. `hire` gives the Character its Job, once the sim
- * has checked the name. `none` is flavour only.
+ * has checked the name. At the restaurant, `seatGuest` gives the Character a table, `orderMeal` serves a meal there and
+ * puts it on the bill (keeping to a stated dietary need), and `settleBill` charges the bill. `none` is flavour only.
  */
-export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo' | 'payRent' | 'extendRent' | 'hire';
+export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo' | 'payRent' | 'extendRent' | 'hire' | 'seatGuest' | 'orderMeal' | 'settleBill';
 type EffectFor<Args> =
   | { kind: 'none' }
   | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
@@ -43,7 +63,10 @@ type EffectFor<Args> =
   | (Args extends PointToArgs ? { kind: 'pointTo' } : never)
   | (Args extends PayRentArgs ? { kind: 'payRent' } : never)
   | (Args extends ExtendRentArgs ? { kind: 'extendRent' } : never)
-  | (Args extends HireArgs ? { kind: 'hire'; jobId: JobId } : never);
+  | (Args extends HireArgs ? { kind: 'hire'; jobId: JobId } : never)
+  | (Args extends SeatGuestArgs ? { kind: 'seatGuest' } : never)
+  | (Args extends OrderMealArgs ? { kind: 'orderMeal' } : never)
+  | (Args extends SettleBillArgs ? { kind: 'settleBill' } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -80,10 +103,10 @@ export type JobApplication = { jobId: JobId; name: string };
 
 /**
  * What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown,
- * for the landlord, the change to the rent, and for hiring, the application.
+ * for the landlord, the change to the rent, for hiring, the application, and for a restaurant meal, what's already on the bill.
  */
 export type ResolvedCompletion =
-  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange; application?: JobApplication }
+  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange; application?: JobApplication; bill?: OrderLine[] }
   | { success: false; error: string };
 
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
@@ -95,7 +118,7 @@ export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
   parseArgs: (raw: unknown) => ParsedArgs;
   /**
    * Validates the arguments and looks up what they come to in this Culture Pack:
-   * the order, or for a `purchase`, the `basket` the Character brought to the till.
+   * the order, for a `purchase`, the `basket` the Character brought to the till, and at the restaurant, the bill (`basket`).
    */
   resolveCompletion: (raw: unknown, packId: LanguageCode, basket?: Basket) => ResolvedCompletion;
 };
@@ -115,7 +138,7 @@ const definitionSchema = z.object({
   }),
   band: z.enum(['B', 'I', 'A']),
   effect: z.discriminatedUnion('kind', [
-    z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent']) }),
+    z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent', 'seatGuest', 'orderMeal', 'settleBill']) }),
     z.object({ kind: z.literal('hire'), jobId: z.enum(JOB_IDS) }),
   ]),
 });
@@ -134,6 +157,17 @@ function orderLines(items: Basket, packId: LanguageCode): OrderLine[] {
     gift: ITEMS[itemId].gift === true,
     comfort: ITEMS[itemId].comfort ?? null,
   }));
+}
+
+/** Why this order breaks the dietary need, for the NPC, or null if every dish in it keeps to it. */
+function dietaryProblem(items: ServeOrderArgs['items'], restriction: DietaryNoteId, packId: LanguageCode): string | null {
+  const broken = items.find(({ item }) => !dishFits(item, restriction));
+  if (!broken) return null;
+  const has = dishContents(broken.item);
+  return (
+    `${CULTURE_PACKS[packId].goods[broken.item].name} (menu id "${broken.item}") has ${has} in it, ` +
+    `and the customer ${DIETARY_NOTES[restriction].means}. Recommend a dish that keeps to their dietary need.`
+  );
 }
 
 /** The definition's type only allows each effect on arguments shaped for it. */
@@ -158,6 +192,17 @@ function resolveEffect(effect: Interaction['effect'], args: Record<string, unkno
       return { success: true, lines: [], rent: { kind: 'extend', days: (args as ExtendRentArgs).days } };
     case 'hire':
       return { success: true, lines: [], application: { jobId: effect.jobId, name: (args as HireArgs).name } };
+    case 'seatGuest':
+      return { success: true, lines: [] };
+    case 'orderMeal': {
+      const { items, restriction } = args as OrderMealArgs;
+      const problem = restriction ? dietaryProblem(items, restriction, packId) : null;
+      if (problem) return { success: false, error: problem };
+      return { success: true, lines: orderLines(items.map(({ item, quantity }) => ({ itemId: item, quantity })), packId), bill: orderLines(basket, packId) };
+    }
+    case 'settleBill':
+      if (basket.length === 0) return { success: false, error: 'The customer has nothing on their bill to pay.' };
+      return { success: true, lines: orderLines(basket, packId) };
   }
 }
 

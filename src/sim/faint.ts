@@ -23,6 +23,8 @@ export function faint(state: GameState): GameState {
     ...state,
     clock: { day: wakeDay, minuteOfDay: CLOCK.faintWakeAt },
     placeId: 'clinic',
+    // Taken from the restaurant, the Character gives up the table. Any unpaid bill stays open.
+    restaurant: { ...state.restaurant, seated: false },
     wokeInWardOnDay: wakeDay,
     character: {
       ...character,

@@ -6,7 +6,7 @@ import { goalInteractionFamiliarity } from './familiarity.ts';
 import { clampMeter } from './meters.ts';
 import { metNpc } from './npcMemory.ts';
 import { grantExtension, payRent } from './rent.ts';
-import type { GameState, JobId } from './state.ts';
+import type { GameState, JobId, RestaurantTable } from './state.ts';
 import { MOOD } from './tuning.ts';
 
 /**
@@ -61,6 +61,23 @@ function orderTotals(lines: OrderLine[]) {
 function comfortMood(lines: OrderLine[]): number {
   const kinds = new Set(lines.flatMap(({ comfort }) => (comfort ? [comfort] : [])));
   return [...kinds].reduce((lift, kind) => lift + MOOD.changes.comfortPurchase[kind], 0);
+}
+
+/** A success that serves nothing: the Character seated, or a bill paid. */
+function succeeded(state: GameState, paidInShifts = 0): { state: GameState; result: OutcomeResult } {
+  const lifted = changeMood(state, MOOD.changes.goalInteractionSuccess);
+  return { state: lifted.state, result: { kind: 'success', served: [], paidInShifts, moodChange: lifted.moodChange } };
+}
+
+/** The bill with these lines added to it, a line per item. */
+function addToBill(bill: RestaurantTable['bill'], lines: OrderLine[]): RestaurantTable['bill'] {
+  const added = bill.map((line) => ({ ...line }));
+  for (const { itemId, quantity } of lines) {
+    const line = added.find((l) => l.itemId === itemId);
+    if (line) line.quantity += quantity;
+    else added.push({ itemId, quantity });
+  }
+  return added;
 }
 
 /** The landlord's completion: rent paid, checked against what is owed and what the Character has, or more time given. */
@@ -118,37 +135,60 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
     }
 
     case 'success': {
-      const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, outcome.basket);
+      const { effect } = interaction;
+      const { restaurant } = state;
+      // The bill is the sim's to know: the server charges whatever is on it, and a meal is only served if it could be paid.
+      const basket = effect.kind === 'settleBill' || effect.kind === 'orderMeal' ? restaurant.bill : outcome.basket;
+      const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, basket);
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
       if (completion.rent) return applyRentChange(state, completion.rent);
       if (completion.application) return applyJobApplication(state, completion.application);
+      if (effect.kind === 'seatGuest') return succeeded({ ...state, restaurant: { ...restaurant, seated: true } });
+      if (effect.kind === 'orderMeal' && !restaurant.seated) {
+        return { state, result: { kind: 'invalid_arguments', error: 'The customer has no table yet: they must be seated before they order.' } };
+      }
       const { costInShifts, hunger, thirst } = orderTotals(completion.lines);
       const { character, possessions } = state;
-      if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
+      if (effect.kind === 'settleBill') {
+        if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
+        // Paid up, the Character gets up from the table.
+        const settled: GameState = {
+          ...state,
+          restaurant: { seated: false, bill: [] },
+          character: { ...character, moneyInShifts: character.moneyInShifts - costInShifts },
+        };
+        return succeeded(settled, costInShifts);
+      }
+      // A meal at the restaurant goes on the bill rather than being paid now, but is only served if the bill could be paid with it on.
+      const billed = effect.kind === 'orderMeal';
+      const owedInShifts = orderTotals(completion.bill ?? []).costInShifts;
+      if (owedInShifts + costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
+      const paidInShifts = billed ? 0 : costInShifts;
 
       // A purchase is taken home, and so is a gift, to give. The rest of an order is eaten, drunk or read on the spot
       // (groceries fill nothing until cooked).
-      const kept = interaction.effect.kind === 'purchase' ? completion.lines : completion.lines.filter(({ gift }) => gift);
+      const kept = effect.kind === 'purchase' ? completion.lines : completion.lines.filter(({ gift }) => gift);
       const inventory = stockInventory(possessions.inventory, kept, state.clock.day);
       const paid: GameState = {
         ...state,
         possessions: { ...possessions, inventory },
+        ...(billed && { restaurant: { ...restaurant, bill: addToBill(restaurant.bill, completion.lines) } }),
         character: {
           ...character,
-          moneyInShifts: character.moneyInShifts - costInShifts,
+          moneyInShifts: character.moneyInShifts - paidInShifts,
           hunger: clampMeter(character.hunger + hunger),
           thirst: clampMeter(character.thirst + thirst),
         },
       };
-      const succeeded = changeMood(paid, MOOD.changes.goalInteractionSuccess + comfortMood(completion.lines));
+      const lifted = changeMood(paid, MOOD.changes.goalInteractionSuccess + comfortMood(completion.lines));
       const served = completion.lines.map(({ itemId, name, glosses, quantity }) => ({ itemId, name, glosses, quantity }));
       return {
-        state: succeeded.state,
+        state: lifted.state,
         result: {
           kind: 'success',
           served,
-          paidInShifts: costInShifts,
-          moodChange: succeeded.moodChange,
+          paidInShifts,
+          moodChange: lifted.moodChange,
           ...(completion.pointedTo && { pointedTo: completion.pointedTo }),
         },
       };

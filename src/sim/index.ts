@@ -68,6 +68,7 @@ export {
   type PadDiner,
   type TillWork,
   type PlaceId,
+  type RestaurantTable,
 } from './state.ts';
 export { grantExtension, payRent, rentDebt, rentOwed, rentStatement, type RentPayment, type RentStatement } from './rent.ts';
 export { weeklyRent } from './rentPrice.ts';

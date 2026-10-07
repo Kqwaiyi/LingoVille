@@ -538,7 +538,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       facts: [
         'This is a sit-down restaurant with table service: the server takes the order at the table.',
         'Tap water is free; customers only have to ask.',
-        'Tipping about 10% is usual for table service. Card and contactless are fine.',
+        'There is no tipping: the bill is what the customer pays. Card and contactless are fine.',
       ],
     },
     hospital: {

@@ -57,6 +57,7 @@ import {
   type DrinkModifiers,
   type DrinkSize,
   type DrinkTemperature,
+  type EffectKind,
   type GroceryId,
   type Interaction,
   type ItemId,
@@ -820,6 +821,9 @@ const isTramStop = (interactable: Interactable | null): interactable is TramStop
 const isShelf = (interactable: Interactable | null): interactable is GroceryId =>
   (GROCERIES_SOLD as readonly (Interactable | null)[]).includes(interactable);
 
+/** The completions that hand something over, and answer "served": an order, a restaurant meal, or shopping. */
+const SERVED_EFFECTS: readonly EffectKind[] = ['serveOrder', 'orderMeal', 'purchase'];
+
 /** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
 const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
 
@@ -1256,8 +1260,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           if (interaction.effect.kind === 'purchase') set({ basket: [] });
           if (result.pointedTo) set({ shelfMarker: result.pointedTo.itemId as GroceryId });
           settleOutcome(state, result);
-          // An order or shopping is handed over; anything else is simply done.
-          return { result: interaction.effect.kind === 'serveOrder' || interaction.effect.kind === 'purchase' ? 'served' : 'done' };
+          // An order, a meal or shopping is handed over; anything else is simply done.
+          return { result: SERVED_EFFECTS.includes(interaction.effect.kind) ? 'served' : 'done' };
         case 'cannot_afford':
           return { result: 'cannot_afford' };
         case 'invalid_arguments':
@@ -1782,6 +1786,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           ...(approach && { approach }),
           ...(onCounter.length > 0 && { basket: onCounter }),
           ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
+          ...(interaction.effect.kind === 'settleBill' && { bill: game.restaurant.bill }),
           relationship: relationshipWith(game, npc.id),
         });
       // An NPC who comes up to the Character stops them where they are.
@@ -2428,12 +2433,13 @@ export const selectShelf = (s: GameStore) => {
 };
 /**
  * The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring, the Jobs
- * they have and their Proficiency Step, or null.
+ * they have, their Proficiency Step and their restaurant table and bill, or null.
  */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
   if (!isNamedNpc(npcId)) return null;
-  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: s.game.possessions.jobsHired, step: s.game.proficiencyStep });
+  const { possessions, proficiencyStep, restaurant } = s.game;
+  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: possessions.jobsHired, step: proficiencyStep, restaurant });
 };
 /**
  * The key that starts Small Talk with the Named NPC the Character is next to: E with someone who has no other

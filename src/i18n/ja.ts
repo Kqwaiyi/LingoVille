@@ -255,6 +255,7 @@ export const ja: UiStrings = {
     askForTime: '<kbd>F</kbd> で支払いを待ってもらう',
     askForWork: '<kbd>F</kbd> で仕事について聞く',
     buyGift: '<kbd>F</kbd> で贈り物を買う',
+    askRecommendation: '<kbd>F</kbd> でおすすめを聞く',
     startShift: '<kbd>E</kbd> でシフトを始める — {{job}}',
     staffOnly: 'スタッフ用ドア · 関係者以外立入禁止',
     workedToday: 'スタッフ用ドア · 今日はもうシフトに入りました',

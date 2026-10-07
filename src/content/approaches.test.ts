@@ -78,3 +78,29 @@ describe('the shopkeeper at the bookshop', () => {
     expect(interactionStartedWithF('shopkeeper', { shopping: false, step: 'C2' })).toBe(INTERACTIONS.buyAGift);
   });
 });
+
+describe('the server at the restaurant', () => {
+  const NO_TABLE = { seated: false, bill: [] };
+  const SEATED = { seated: true, bill: [] };
+  const EATEN = { seated: true, bill: [{ itemId: 'fish-dish' as const, quantity: 1 }] };
+  const WALKED_OUT = { seated: false, bill: [{ itemId: 'fish-dish' as const, quantity: 1 }] };
+
+  it('gets a table with E, then takes the order, then the bill once anything is on it, even after walking out', () => {
+    expect(interactionStartedWithE('server')).toBe(INTERACTIONS.getATable);
+    expect(interactionStartedWithE('server', { shopping: false, restaurant: NO_TABLE })).toBe(INTERACTIONS.getATable);
+    expect(interactionStartedWithE('server', { shopping: false, restaurant: SEATED })).toBe(INTERACTIONS.orderAMeal);
+    expect(interactionStartedWithE('server', { shopping: false, restaurant: EATEN })).toBe(INTERACTIONS.payTheBill);
+    expect(interactionStartedWithE('server', { shopping: false, restaurant: WALKED_OUT })).toBe(INTERACTIONS.payTheBill);
+  });
+
+  it('asks for a recommendation within a dietary restriction with F at the table, at any step', () => {
+    for (const restaurant of [SEATED, EATEN]) {
+      expect(interactionStartedWithF('server', { shopping: false, restaurant, step: 'A1' })).toBe(INTERACTIONS.recommendAMeal);
+    }
+  });
+
+  it('asks the server for work with F away from a table, until the Character is hired as a server', () => {
+    expect(interactionStartedWithF('server', { shopping: false, restaurant: NO_TABLE })).toBe(INTERACTIONS.askServerForWork);
+    expect(interactionStartedWithF('server', { shopping: false, restaurant: NO_TABLE, jobsHired: ['server'] })).toBeNull();
+  });
+});

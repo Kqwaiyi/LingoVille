@@ -1,4 +1,4 @@
-import { STEP_BANDS, type ApproachId, type JobId, type ProficiencyStep } from '../sim/index.ts';
+import { STEP_BANDS, type ApproachId, type JobId, type ProficiencyStep, type RestaurantTable } from '../sim/index.ts';
 import type { Interaction } from './defineInteraction.ts';
 import { INTERACTIONS } from './interactions.ts';
 import type { NamedNpcId } from './npcs.ts';
@@ -18,17 +18,28 @@ const OPENED_BY_NPCS = new Set(Object.values(APPROACH_INTERACTIONS));
 
 /**
  * What the Character brings to the conversation: shopping from the supermarket's shelves, or none, the Jobs they
- * already have, and their current Proficiency Step.
+ * already have, their current Proficiency Step, and their table and bill at the restaurant.
  */
-export type Bringing = { shopping: boolean; jobsHired?: readonly JobId[]; step?: ProficiencyStep };
+export type Bringing = { shopping: boolean; jobsHired?: readonly JobId[]; step?: ProficiencyStep; restaurant?: RestaurantTable };
+
+/** No table at the restaurant, and nothing owed there. */
+const NO_TABLE: RestaurantTable = { seated: false, bill: [] };
 
 /**
  * The conversation E starts with this Named NPC, or null if they only ever start one themselves.
  * The cashier takes payment for shopping brought to the till, and otherwise helps find something.
- * The shopkeeper sells a book, and from the Advanced band recommends one by taste instead.
+ * The shopkeeper sells a book, and from the Advanced band recommends one by taste instead. The server takes the
+ * bill while anything is on it, takes the order at the Character's table, and otherwise gets them a table.
  */
-export function interactionStartedWithE(npcId: NamedNpcId, { shopping, step = 'A1' }: Bringing = { shopping: false }): Interaction | null {
+export function interactionStartedWithE(
+  npcId: NamedNpcId,
+  { shopping, step = 'A1', restaurant = NO_TABLE }: Bringing = { shopping: false },
+): Interaction | null {
   if (npcId === 'cashier') return shopping ? INTERACTIONS.payForGroceries : INTERACTIONS.findAnItem;
+  if (npcId === 'server') {
+    if (restaurant.bill.length > 0) return INTERACTIONS.payTheBill;
+    return restaurant.seated ? INTERACTIONS.orderAMeal : INTERACTIONS.getATable;
+  }
   if (npcId === 'shopkeeper') return STEP_BANDS[step] === 'A' ? INTERACTIONS.recommendABook : INTERACTIONS.buyABook;
   return Object.values(INTERACTIONS).find((i) => i.npcId === npcId && !OPENED_BY_NPCS.has(i) && i.effect.kind !== 'hire') ?? null;
 }
@@ -36,11 +47,16 @@ export function interactionStartedWithE(npcId: NamedNpcId, { shopping, step = 'A
 /**
  * The second conversation F starts with this Named NPC, or null when E is the only one.
  * With shopping, E at the cashier pays, so F asks where something else is. E at the
- * landlord pays the rent, and F asks for more time. F at the shopkeeper buys a gift. Staff who are hiring take an
- * application on F until the Character has that Job (the cashier, when not paying for shopping).
+ * landlord pays the rent, and F asks for more time. F at the shopkeeper buys a gift, and F at the server, from a
+ * table, asks for a recommendation within a dietary restriction. Staff who are hiring take an application on F until
+ * the Character has that Job (the cashier, when not paying for shopping; the server, when not seated).
  */
-export function interactionStartedWithF(npcId: NamedNpcId, { shopping, jobsHired = [] }: Bringing = { shopping: false }): Interaction | null {
+export function interactionStartedWithF(
+  npcId: NamedNpcId,
+  { shopping, jobsHired = [], restaurant = NO_TABLE }: Bringing = { shopping: false },
+): Interaction | null {
   if (npcId === 'landlord') return INTERACTIONS.askForMoreTime;
+  if (npcId === 'server' && restaurant.seated) return INTERACTIONS.recommendAMeal;
   if (npcId === 'shopkeeper') return INTERACTIONS.buyAGift;
   if (npcId === 'cashier' && shopping) return INTERACTIONS.findAnItem;
   for (const interaction of Object.values(INTERACTIONS)) {

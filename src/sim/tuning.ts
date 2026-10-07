@@ -124,6 +124,8 @@ export const ECONOMY = {
   checkout: { basketLines: { min: 1, max: 3 }, maxQuantity: 2, wantsBag: 0.5, hasPointsCard: 0.5 },
   /** How many diners sit at a restaurant table that the server takes one order for, dietary request and all. */
   tableDiners: { min: 2, max: 3 },
+  /** The most people the Character can ask the restaurant to seat at once. */
+  maxRestaurantParty: 6,
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
   /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
@@ -215,7 +217,7 @@ export const MOOD = {
     sleep: 5,
     bathhouse: 8,
     /** A Comfort Purchase, by kind, on top of the conversation's success. Once per kind per purchase, however many are bought. */
-    comfortPurchase: { cafe: 3, reading: 5, gift: 3 },
+    comfortPurchase: { cafe: 3, reading: 5, gift: 3, meal: 5 },
     gymSession: 4,
     goodHomeMeal: 2,
     unmetNeedPerGameHour: -1,

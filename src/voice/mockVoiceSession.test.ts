@@ -11,7 +11,7 @@ import {
   WRAP_UP_SCENE,
   type ToolResponse,
 } from '../ai/index.ts';
-import { CULTURE_PACKS, formatLocalAmount, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction } from '../content/index.ts';
 import { LANGUAGE_CODES, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
@@ -917,5 +917,105 @@ describe('mock VoiceSession: the bookshop (#18, #19, #20)', () => {
     await say(COMFORTS_ASKED[packId].cake);
     await say(PLAYER[packId].yes);
     expect(toolCalls).toEqual([{ id: expect.any(String), name: 'serve_order', args: { items: [{ item: 'cake', quantity: 1 }] } }]);
+  });
+});
+
+const LUNCH = { clock: { day: 2, minuteOfDay: 12 * 60 } };
+const BILL = [
+  { itemId: 'fish-dish', quantity: 1 },
+  { itemId: 'cola', quantity: 1 },
+] as const;
+const atTheRestaurant = (packId: LanguageCode, interaction: Interaction) =>
+  open(
+    buildNpcSession(interaction, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.server, {
+      ...LUNCH,
+      ...(interaction === INTERACTIONS.payTheBill && { bill: BILL }),
+    }),
+  );
+
+/** What a guest says to the server, in each pack. */
+const GUEST_SAYS = {
+  ja: { party: '一人です', seating: '窓際がいいです', fish: '焼き鮭定食をください', vegetarian: 'ベジタリアンです', cash: '現金で' },
+  zh: { party: '一位', seating: '靠窗的', fish: '我要清蒸鱼', vegetarian: '我吃素', cash: '用现金' },
+  en: { party: 'just me', seating: 'by the window please', fish: 'fish and chips please', vegetarian: "I'm vegetarian", cash: 'cash please' },
+  de: { party: 'eine Person', seating: 'am Fenster bitte', fish: 'den Lachs bitte', vegetarian: 'ich bin Vegetarier', cash: 'bar bitte' },
+} as const;
+
+describe('mock VoiceSession: the restaurant (#8, #9, #10, #11)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('asks how many and where to sit, reads both back, then seats the guest (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheRestaurant(packId, INTERACTIONS.getATable);
+
+    await say(GUEST_SAYS[packId].party);
+    await say(GUEST_SAYS[packId].seating);
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'seat_guest', args: { party: 1, seating: 'window' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(4);
+    expect(new Set(turns).size).toBe(4);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)('reads back a dish with its price, then serves it with serve_order (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheRestaurant(packId, INTERACTIONS.orderAMeal);
+
+    await say(GUEST_SAYS[packId].fish);
+    expect(turns.at(-1)!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods['fish-dish'].name.toLowerCase());
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'serve_order', args: { items: [{ item: 'fish-dish', quantity: 1 }] } }]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)('asks what the guest does not eat, recommends a dish that keeps to it, and serves it (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheRestaurant(packId, INTERACTIONS.recommendAMeal);
+
+    await say(GUEST_SAYS[packId].vegetarian);
+    expect(turns.at(-1)!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods['veggie-dish'].name.toLowerCase());
+    await say(yes);
+    expect(toolCalls).toEqual([
+      { id: expect.any(String), name: 'serve_order', args: { items: [{ item: 'veggie-dish', quantity: 1 }], restriction: 'vegetarian' } },
+    ]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('recommends a dish that keeps to the need again when the game rejects the one the guest asked for', async () => {
+    const { turns, toolCalls, say, answer } = await atTheRestaurant('en', INTERACTIONS.recommendAMeal);
+    await say("I'm vegetarian");
+    await say('fish and chips please');
+    await say('yes');
+    expect(toolCalls.at(-1)!.args).toEqual({ items: [{ item: 'fish-dish', quantity: 1 }], restriction: 'vegetarian' });
+
+    await answer({ result: 'invalid_arguments', error: 'Fish and chips has fish in it.' });
+
+    expect(turns.at(-1)).toContain(CULTURE_PACKS.en.goods['veggie-dish'].name.toLowerCase());
+  });
+
+  it.each(LANGUAGE_CODES)('says the bill total, asks how the guest pays, reads it back and settles the bill (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheRestaurant(packId, INTERACTIONS.payTheBill);
+    const total = formatLocalMoney(menuPrice('fish-dish', packId) + menuPrice('cola', packId), packId);
+    expect(turns[0]).toContain(total);
+
+    await say(GUEST_SAYS[packId].cash);
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'settle_bill', args: { method: 'cash' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
   });
 });

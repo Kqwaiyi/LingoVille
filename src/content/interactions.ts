@@ -1,7 +1,18 @@
 import { z } from 'zod';
 import { ECONOMY } from '../sim/index.ts';
 import { defineInteraction, type Interaction } from './defineInteraction.ts';
-import { CAFE_COUNTER, CONVENIENCE_MENU, GIFTS_SOLD, GROCERIES_SOLD, READING_SOLD, type ItemId } from './items.ts';
+import {
+  BILL_METHODS,
+  CAFE_COUNTER,
+  CONVENIENCE_MENU,
+  DIETARY_NOTE_IDS,
+  GIFTS_SOLD,
+  GROCERIES_SOLD,
+  READING_SOLD,
+  RESTAURANT_MENU,
+  SEATING,
+  type ItemId,
+} from './items.ts';
 
 /** The lines of an order or a sale from a menu: each item by its menu id, and how many. */
 const orderItems = (menu: readonly [ItemId, ...ItemId[]]) =>
@@ -30,6 +41,15 @@ const sellReading = {
     'Sell the customer exactly what they confirmed after your read-back, and take payment. ' +
     'Answers "served", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
   args: z.object({ items: orderItems(READING_SOLD) }),
+};
+
+/** `serve_order(items[])` at a restaurant table: the meal goes on the bill, which the guest pays when they ask for it. */
+const serveMeal = {
+  name: 'serve_order',
+  description:
+    'Serve the guest exactly the meal they confirmed after your read-back. It goes on their bill, which they pay later. ' +
+    'Answers "served", "cannot_afford" (they could not pay for it) or "invalid_arguments".',
+  args: z.object({ items: orderItems(RESTAURANT_MENU) }),
 };
 
 /** When a hired applicant says they can start. Shifts have no schedule, so it is only what was agreed. */
@@ -217,6 +237,78 @@ export const INTERACTIONS = {
     completion: sellReading,
     band: 'A',
     effect: { kind: 'serveOrder' },
+  }),
+  // #8. Getting a table at the restaurant. E at the server, until the Character has one.
+  getATable: defineInteraction({
+    id: 'get-a-table',
+    placeId: 'restaurant',
+    npcId: 'server',
+    goal:
+      'A guest has just come into the restaurant. Welcome them, ask how many they are and where they would like to sit ' +
+      '(at a table, at the counter or by the window), and seat them.',
+    facts: ['openingHours', 'placeFacts'],
+    items: [],
+    completion: {
+      name: 'seat_guest',
+      description: 'Seat the guest, once they have confirmed your read-back of how many they are and where they will sit. Answers "done".',
+      args: z.object({
+        party: z.int().min(1).max(ECONOMY.maxRestaurantParty).describe('How many people are in the party.'),
+        seating: z.enum(SEATING).describe('Where they asked to sit.'),
+      }),
+    },
+    band: 'B',
+    effect: { kind: 'seatGuest' },
+  }),
+  // #9. Ordering a meal at the table: a Comfort Purchase. E at the server once seated. It goes on the bill.
+  // No restaurant interaction gets the café's `customs`: they say there's no table service.
+  orderAMeal: defineInteraction({
+    id: 'order-a-meal',
+    placeId: 'restaurant',
+    npcId: 'server',
+    goal: 'Take the order of the guest at your table: a main dish and a drink make a meal. Answer any questions about the menu.',
+    facts: ['openingHours', 'menu', 'placeFacts'],
+    items: RESTAURANT_MENU,
+    completion: serveMeal,
+    band: 'I',
+    effect: { kind: 'orderMeal' },
+  }),
+  // #10. A recommendation within a dietary restriction. F at the server once seated. The sim rejects a dish that breaks it.
+  recommendAMeal: defineInteraction({
+    id: 'recommend-a-meal',
+    placeId: 'restaurant',
+    npcId: 'server',
+    goal:
+      'The guest at your table would like you to recommend a dish. Ask whether there is anything they do not eat, ' +
+      'then recommend a dish from the menu that keeps to it, using the dietary facts, and say why. Take their order of that, and a drink. ' +
+      'If there is nothing they do not eat, tell them everything on the menu is fine and they can order whatever they like.',
+    facts: ['openingHours', 'menu', 'dietary', 'placeFacts'],
+    items: RESTAURANT_MENU,
+    completion: {
+      ...serveMeal,
+      args: serveMeal.args.extend({
+        restriction: z.enum(DIETARY_NOTE_IDS).describe('The dietary need the guest told you, which every dish must keep to.'),
+      }),
+    },
+    band: 'A',
+    effect: { kind: 'orderMeal' },
+  }),
+  // #11. Paying the bill. E at the server while anything is on it, even after leaving and coming back.
+  payTheBill: defineInteraction({
+    id: 'pay-the-bill',
+    placeId: 'restaurant',
+    npcId: 'server',
+    goal: 'The guest would like to pay. Tell them their bill total, ask how they would like to pay, and take payment.',
+    facts: ['bill', 'placeFacts'],
+    items: [],
+    completion: {
+      name: 'settle_bill',
+      description:
+        'Take payment for the whole bill, once the guest has confirmed your read-back of the total and how they pay. ' +
+        'Answers "done", "cannot_afford" (they cannot pay it) or "invalid_arguments".',
+      args: z.object({ method: z.enum(BILL_METHODS).describe('How the guest pays.') }),
+    },
+    band: 'B',
+    effect: { kind: 'settleBill' },
   }),
   // Not one the Player starts: the nurse begins it when the Character wakes from Fainting.
   wakeInWard: defineInteraction({

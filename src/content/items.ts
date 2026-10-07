@@ -100,6 +100,24 @@ export const GIFTS_SOLD = ['flowers', 'chocolates', 'scented-candle'] as const s
 export const INGREDIENTS = ['meat', 'pork', 'seafood'] as const;
 export type Ingredient = (typeof INGREDIENTS)[number];
 
+/** Each ingredient as the server is told it, in English. */
+const INGREDIENT_NAMES: Record<Ingredient, string> = { meat: 'meat', pork: 'pork', seafood: 'fish or seafood' };
+
+/** What a dish has in it that some diners don't eat, in English ("meat and pork"), or null if none of them. */
+export function dishContents(itemId: ItemId): string | null {
+  const contains = ITEMS[itemId].contains ?? [];
+  return contains.length > 0 ? contains.map((ingredient) => INGREDIENT_NAMES[ingredient]).join(' and ') : null;
+}
+
+/** It's one of the restaurant's main dishes. */
+export const isDish = (itemId: ItemId) => (RESTAURANT_DISHES as readonly ItemId[]).includes(itemId);
+
+/** Where a restaurant guest can ask to sit. Flavour only: every seat serves the same menu. */
+export const SEATING = ['table', 'counter', 'window'] as const;
+
+/** How a restaurant guest pays the bill. Flavour only: payment is automatic. */
+export const BILL_METHODS = ['cash', 'card'] as const;
+
 /** A dietary need a diner can tell the server, which the server notes on the order pad. */
 export const DIETARY_NOTE_IDS = ['vegetarian', 'no-pork', 'no-seafood'] as const;
 export type DietaryNoteId = (typeof DIETARY_NOTE_IDS)[number];
@@ -150,11 +168,11 @@ export const ITEMS: Record<ItemId, Item> = {
   batteries: { priceInShifts: 0.07, restores: {} },
   stamps: { priceInShifts: 0.02, restores: {} },
   'gift-card': { priceInShifts: 0.5, restores: {} },
-  // A restaurant meal is a dish and a drink, about 0.25 Shift together.
-  'pork-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['meat', 'pork'] },
-  'chicken-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['meat'] },
-  'fish-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['seafood'] },
-  'veggie-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger } },
+  // A restaurant meal is a dish and a drink, about 0.25 Shift together. The dish makes it a Comfort Purchase.
+  'pork-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['meat', 'pork'], comfort: 'meal' },
+  'chicken-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['meat'], comfort: 'meal' },
+  'fish-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, contains: ['seafood'], comfort: 'meal' },
+  'veggie-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger }, comfort: 'meal' },
   juice: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.restaurantDrinkThirst } },
   cola: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.restaurantDrinkThirst } },
   cake: { priceInShifts: 0.12, restores: { hunger: WELL_BEING.cafeFoodHunger }, comfort: 'cafe' },
@@ -183,5 +201,5 @@ export const ITEMS: Record<ItemId, Item> = {
   'scented-candle': { priceInShifts: 0.25, restores: {}, comfort: 'gift', gift: true },
 };
 
-/** Every Comfort Purchase the town sells (the restaurant meal and the bathhouse come with their own tickets). */
+/** Every Comfort Purchase the town sells: a restaurant meal by its dish (the bathhouse comes with its own ticket). */
 export const COMFORT_PURCHASES = ITEM_IDS.filter((id) => ITEMS[id].comfort !== undefined);

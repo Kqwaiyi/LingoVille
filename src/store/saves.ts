@@ -31,7 +31,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 12;
+export const SAVE_SCHEMA_VERSION = 13;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -143,6 +143,7 @@ const GameStateSchema = z.object({
       })
       .nullable(),
   }),
+  restaurant: z.object({ seated: z.boolean(), bill: z.array(orderLine) }),
   phrasebook: z.array(
     z.object({ text: z.string(), reading: z.string(), gloss: z.string(), glossLanguage: z.enum(LANGUAGE_CODES), dayAdded: day }),
   ),
@@ -271,6 +272,8 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
     };
   },
+  // 12 → 13: a table and a bill at the restaurant. No one could be seated before, so no one is, and nothing is owed.
+  (save) => ({ ...save, schemaVersion: 13, game: { ...save.game, restaurant: { seated: false, bill: [] } } }),
 ];
 
 /** A loose look at a stored field, for bytes that may not be a readable save. */

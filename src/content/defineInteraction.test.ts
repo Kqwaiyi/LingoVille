@@ -13,6 +13,7 @@ import {
   ITEMS,
   menuPrice,
   READING_SOLD,
+  readBillTotal,
 } from './index.ts';
 
 function interactionWith(args: z.ZodObject) {
@@ -263,5 +264,70 @@ describe('Goal Interactions #18–#20: the bookshop', () => {
 
     expect(gift).toMatchObject({ success: true, lines: [{ itemId: 'scented-candle', gift: true, comfort: 'gift' }] });
     expect(book).toMatchObject({ success: true, lines: [{ itemId: 'cookbook', gift: false, comfort: 'reading' }] });
+  });
+});
+
+describe('the restaurant interactions', () => {
+  const { getATable, orderAMeal, recommendAMeal, payTheBill } = INTERACTIONS;
+  const MEAL = { items: [{ item: 'pork-dish', quantity: 1 }, { item: 'cola', quantity: 1 }] };
+
+  it('are #8 seat_guest (B), #9 and #10 serve_order (I and A) and #11 settle_bill (B), all with the server', () => {
+    expect([getATable, orderAMeal, recommendAMeal, payTheBill].map((i) => [i.npcId, i.completion.name, i.band])).toEqual([
+      ['server', 'seat_guest', 'B'],
+      ['server', 'serve_order', 'I'],
+      ['server', 'serve_order', 'A'],
+      ['server', 'settle_bill', 'B'],
+    ]);
+  });
+
+  it('seats a party of a given size where they asked to sit', () => {
+    expect(getATable.parseArgs({ party: 2, seating: 'window' }).success).toBe(true);
+    expect(getATable.parseArgs({ party: 0, seating: 'table' }).success).toBe(false);
+    expect(getATable.parseArgs({ party: ECONOMY.maxRestaurantParty + 1, seating: 'table' }).success).toBe(false);
+    expect(getATable.parseArgs({ party: 1, seating: 'kitchen' }).success).toBe(false);
+  });
+
+  it('orders from the restaurant menu, and a recommendation must say which dietary need it keeps to', () => {
+    expect(orderAMeal.parseArgs(MEAL).success).toBe(true);
+    expect(orderAMeal.parseArgs({ items: [{ item: 'latte', quantity: 1 }] }).success).toBe(false);
+    expect(recommendAMeal.parseArgs(MEAL).success).toBe(false);
+    expect(recommendAMeal.parseArgs({ ...MEAL, restriction: 'no-seafood' }).success).toBe(true);
+  });
+
+  it.each(LANGUAGE_CODES)('rejects a recommendation in %s that breaks the dietary need, naming the dish', (packId) => {
+    const resolved = recommendAMeal.resolveCompletion({ ...MEAL, restriction: 'no-pork' }, packId);
+
+    expect(resolved).toEqual({ success: false, error: expect.stringContaining(CULTURE_PACKS[packId].goods['pork-dish'].name) });
+  });
+
+  it('pays the bill in cash or by card', () => {
+    expect(payTheBill.parseArgs({ method: 'card' }).success).toBe(true);
+    expect(payTheBill.parseArgs({ method: 'cheque' }).success).toBe(false);
+  });
+
+  it.each(LANGUAGE_CODES)('tells the %s server what is in each dish and which dietary needs it suits, by its local name', (packId) => {
+    const facts = interactionFacts(recommendAMeal, packId);
+    const dish = (id: string) => facts.find((fact) => fact.includes(`(menu id "${id}") has`));
+
+    expect(dish('pork-dish')).toBe(
+      `${CULTURE_PACKS[packId].goods['pork-dish'].name} (menu id "pork-dish") has meat and pork in it. It suits a diner who eats no fish or seafood.`,
+    );
+    expect(dish('veggie-dish')).toContain('has no meat, fish or seafood in it');
+    expect(dish('veggie-dish')).toContain('eats no meat, fish or seafood');
+    expect(dish('juice')).toBeUndefined();
+  });
+
+  it.each(LANGUAGE_CODES)('tells the %s server what is on the bill, with its total', (packId) => {
+    const bill = [
+      { itemId: 'fish-dish', quantity: 1 },
+      { itemId: 'juice', quantity: 2 },
+    ] as const;
+    const total = menuPrice('fish-dish', packId) + 2 * menuPrice('juice', packId);
+
+    const facts = interactionFacts(payTheBill, packId, { bill });
+
+    expect(facts).toContain(`2 × ${CULTURE_PACKS[packId].goods.juice.name}, ${formatLocalMoney(menuPrice('juice', packId), packId)} each`);
+    expect(facts).toContain(`Bill total: ${formatLocalMoney(total, packId)}.`);
+    expect(readBillTotal(facts.join('\n'))).toBe(formatLocalMoney(total, packId));
   });
 });

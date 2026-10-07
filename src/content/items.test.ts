@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { ECONOMY, LANGUAGE_CODES, MOOD } from '../sim/index.ts';
-import { chargeInShifts, COMFORT_PURCHASES, CONVENIENCE_MENU, GIFTS_SOLD, GROCERIES_SOLD, ITEMS, ITEM_IDS, localPrice } from './index.ts';
+import {
+  chargeInShifts,
+  COMFORT_PURCHASES,
+  CONVENIENCE_MENU,
+  GIFTS_SOLD,
+  GROCERIES_SOLD,
+  ITEMS,
+  ITEM_IDS,
+  localPrice,
+  menuPrice,
+  RESTAURANT_DISHES,
+  RESTAURANT_DRINKS,
+} from './index.ts';
 
 /** About 0.06 of a Shift per meal, from the spec's ratio ladder. */
 const GROCERY_SHIFTS_PER_MEAL = 0.06;
@@ -44,10 +56,18 @@ describe('convenience store counter food', () => {
 });
 
 describe('Comfort Purchases', () => {
-  it('cover café cake or a special drink, a book or magazine, and flowers or a gift', () => {
+  it('cover café cake or a special drink, a book or magazine, a restaurant meal, and flowers or a gift', () => {
     expect(COMFORT_PURCHASES).toEqual(
-      expect.arrayContaining(['cake', 'special-drink', 'mystery-novel', 'magazine', 'flowers', 'chocolates']),
+      expect.arrayContaining(['cake', 'special-drink', 'mystery-novel', 'magazine', ...RESTAURANT_DISHES, 'flowers', 'chocolates']),
     );
+  });
+
+  it.each(LANGUAGE_CODES)('make a restaurant meal, a dish and a drink, about 0.25 Shift once rounded to %s price points', (packId) => {
+    for (const dish of RESTAURANT_DISHES) {
+      for (const drink of RESTAURANT_DRINKS) expect(menuPrice(dish, packId) + menuPrice(drink, packId)).toBeCloseTo(0.25, 1);
+      expect(ITEMS[dish].comfort).toBe('meal');
+    }
+    for (const drink of RESTAURANT_DRINKS) expect(ITEMS[drink].comfort).toBeUndefined();
   });
 
   it.each(COMFORT_PURCHASES)('%s costs 0.1–0.3 Shift', (id) => {

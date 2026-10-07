@@ -255,6 +255,7 @@ export const de: UiStrings = {
     askForTime: '<kbd>F</kbd> drücken, um um mehr Zeit zu bitten',
     askForWork: '<kbd>F</kbd> drücken, um nach Arbeit zu fragen',
     buyGift: '<kbd>F</kbd> drücken, um ein Geschenk zu kaufen',
+    askRecommendation: '<kbd>F</kbd> drücken, um nach einer Empfehlung zu fragen',
     startShift: '<kbd>E</kbd> drücken, um eine Schicht anzufangen — {{job}}',
     staffOnly: 'Personaltür · Nur für Personal',
     workedToday: 'Personaltür · Du hast heute schon eine Schicht gearbeitet',

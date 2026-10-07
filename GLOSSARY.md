@@ -120,7 +120,7 @@ The local dressing of the one shared town for a Target Language: its food and go
 _Avoid_: Skin, theme, locale
 
 **Comfort Purchase**:
-Something bought mainly to lift Mood rather than to meet a Well-being need (e.g. cake, a book, a bathhouse visit, flowers). Most are used up when bought; a gift is kept in the inventory, ready to give.
+Something bought mainly to lift Mood rather than to meet a Well-being need (e.g. cake, a book, a restaurant meal, a bathhouse visit, flowers). Most are used up when bought; a gift is kept in the inventory, ready to give. A restaurant meal is eaten first and paid for with the bill.
 _Avoid_: Treat, luxury item
 
 **Appearance Preset**:

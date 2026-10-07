@@ -37,9 +37,16 @@ const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askFor
   hire: 'prompt.askForWork',
 };
 
-/** What F offers with this conversation: at the bookshop, buying a gift, and otherwise by its effect. */
+/** What F offers with this conversation: at the bookshop, buying a gift, at a restaurant table, a recommendation, and otherwise by its effect. */
 const fPrompt = (interaction: Interaction) =>
-  interaction === INTERACTIONS.buyAGift ? 'prompt.buyGift' : (F_PROMPTS[interaction.effect.kind] ?? 'prompt.ask');
+  interaction === INTERACTIONS.buyAGift
+    ? 'prompt.buyGift'
+    : interaction === INTERACTIONS.recommendAMeal
+      ? 'prompt.askRecommendation'
+      : (F_PROMPTS[interaction.effect.kind] ?? 'prompt.ask');
+
+/** E pays at the till for shopping, and for the bill at the restaurant. */
+const PAYS: readonly EffectKind[] = ['purchase', 'settleBill'];
 
 /**
  * "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second
@@ -128,7 +135,7 @@ export function InteractionPrompt() {
       ) : (
         <>
           <Trans
-            i18nKey={talkWithE?.effect.kind === 'purchase' ? 'prompt.pay' : smallTalkKey === 'E' ? 'prompt.chat' : 'prompt.talk'}
+            i18nKey={talkWithE && PAYS.includes(talkWithE.effect.kind) ? 'prompt.pay' : smallTalkKey === 'E' ? 'prompt.chat' : 'prompt.talk'}
             values={{ role: t(`roles.${TOWN_NPCS[interactable as TownNpcId].role}.name`) }}
             components={{ kbd: <kbd /> }}
           />

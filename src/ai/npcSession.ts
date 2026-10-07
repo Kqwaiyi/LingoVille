@@ -46,13 +46,15 @@ export type NpcSessionContext = {
   basket?: Basket;
   /** For the landlord: what the Character owes in rent. */
   rent?: RentStatement;
+  /** For the restaurant's server: what the Character has eaten and not paid for. */
+  bill?: Basket;
   /** What the NPC remembers of the Character, and the Character's name for when they know it. With none, they are strangers. */
   relationship?: Relationship;
 };
 
 export type Relationship = { memory: NpcMemory; characterName: string };
 
-/** What the context of a Small Talk session holds: no goal, so no basket, rent or approach, and always what the NPC remembers. */
+/** What the context of a Small Talk session holds: no goal, so no basket, rent, bill or approach, and always what the NPC remembers. */
 export type SmallTalkContext = Pick<NpcSessionContext, 'clock'> & { relationship: Relationship };
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
@@ -369,6 +371,35 @@ function goalBlock(interaction: Interaction, who: string) {
       `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.`,
       `- If ${name} answers "invalid_arguments", ask them again about the bag and the points card.`,
       `- If ${name} answers "served", hand over their shopping, thank them and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'seatGuest') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know how many they are and where they would like to sit, read both back and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again how many they are and where they would like to sit.`,
+      `- If ${name} answers "done", show them to their seat, tell them you will be back to take their order, and leave them to settle in.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'orderMeal') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you act on it, read back the order with the prices, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they would not have enough money to pay the bill for that, and ask whether they would like something else. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", its error says what is wrong: apologise, put it right with them, and read the order back again.`,
+      `- If ${name} answers "served", bring the meal to the table, wish them a good meal, tell them to ask for the bill when they are ready, and leave them to eat.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'settleBill') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- The bill is exactly the total in FACTS. Read back the total and how they are paying, and wait for the ${who} to confirm.`,
+      `- Only once they have confirmed, call ${name} with how they are paying. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money to pay it now, and that they can come back and pay it later. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again how they would like to pay.`,
+      `- If ${name} answers "done", thank them, say you hope to see them again, and say goodbye.`,
     ]);
   }
   return block('YOUR GOAL', [

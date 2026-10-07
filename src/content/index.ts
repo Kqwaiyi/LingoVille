@@ -34,7 +34,7 @@ export {
   type ResolvedCompletion,
   type ServedItem,
 } from './defineInteraction.ts';
-export { basketFacts, interactionFacts, readBasketTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
+export { basketFacts, interactionFacts, readBasketTotal, readBillTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
 export { INTERACTIONS, START_WHEN } from './interactions.ts';
 export {
   DEFAULT_DRINK,
@@ -58,8 +58,10 @@ export {
   CAFE_COMFORTS,
   COMFORT_PURCHASES,
   CONVENIENCE_MENU,
+  BILL_METHODS,
   DIETARY_NOTE_IDS,
   DIETARY_NOTES,
+  dishContents,
   dishFits,
   DRINK_EXTRAS,
   DRINK_OPTIONS,
@@ -68,12 +70,14 @@ export {
   drinkModifiersSchema,
   GIFTS_SOLD,
   GROCERIES_SOLD,
+  isDish,
   ITEM_IDS,
   ITEMS,
   READING_SOLD,
   RESTAURANT_DISHES,
   RESTAURANT_DRINKS,
   RESTAURANT_MENU,
+  SEATING,
   type DietaryNoteId,
   type DrinkExtra,
   type DrinkModifiers,

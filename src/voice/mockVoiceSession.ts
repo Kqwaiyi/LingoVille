@@ -15,14 +15,20 @@ import {
   type ToolResponse,
 } from '../ai/index.ts';
 import {
+  BILL_METHODS,
   CULTURE_PACKS,
+  dishFits,
   INTERACTIONS,
+  isDish,
   ITEMS,
   localPrice,
   readBasketTotal,
+  readBillTotal,
   readNewWeeklyRent,
   readRentOwed,
+  SEATING,
   START_WHEN,
+  type DietaryNoteId,
   type ItemId,
 } from '../content/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
@@ -33,7 +39,8 @@ const REPLY_DELAY_MS = 600;
 
 // The completions the fake knows how to script: an order over a counter, paying at the till or the bookshop,
 // pointing to an item on the shelves, the nurse letting the patient go home, and the landlord
-// taking rent, giving more time, or telling the tenant their new rent, and the barista hiring.
+// taking rent, giving more time, or telling the tenant their new rent, the barista hiring, and the server seating
+// a guest and taking the bill.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
 const COMPLETE_PURCHASE = INTERACTIONS.payForGroceries.completion.name;
 const POINT_TO = INTERACTIONS.findAnItem.completion.name;
@@ -42,6 +49,8 @@ const ACCEPT_RENT = INTERACTIONS.payRent.completion.name;
 const GRANT_EXTENSION = INTERACTIONS.askForMoreTime.completion.name;
 const FINISH_RENT_NEWS = INTERACTIONS.newcomerDiscountNews.completion.name;
 const HIRE_APPLICANT = INTERACTIONS.askBaristaForWork.completion.name;
+const SEAT_GUEST = INTERACTIONS.getATable.completion.name;
+const SETTLE_BILL = INTERACTIONS.payTheBill.completion.name;
 /** How many more days the fake landlord gives. */
 const EXTENSION_DAYS = 3;
 
@@ -383,6 +392,184 @@ const GIFT_SCRIPT: Record<LanguageCode, GiftScript> = {
     readBack: (item, price, wrap) => `${item} für ${price}, ${wrap ? 'als Geschenk verpackt' : 'nicht verpackt'}, richtig?`,
     served: 'Bitte schön! Viel Freude damit!',
     cannotAfford: 'Oh, das reicht leider nicht. Möchten Sie ein anderes Geschenk?',
+  },
+};
+
+/** The server taking an order at a table: the barista's way of taking an order, in a restaurant's words. */
+const SERVER_ORDER_SCRIPT: Record<LanguageCode, OrderScript> = {
+  ja: {
+    ...SCRIPT.ja,
+    greeting: 'お待たせいたしました。ご注文はお決まりですか？',
+    resume: 'お待たせしました。ご注文をどうぞ。',
+    clarify: [
+      'ご注文は何になさいますか？',
+      'ポークソテー、チキン南蛮、焼き鮭定食、野菜のトマトパスタ、お飲み物はオレンジジュースとコーラがございます。',
+    ],
+    served: 'お待たせしました。どうぞごゆっくり。お会計の際はお声がけください。',
+    cannotAfford: '申し訳ございません、お支払いが足りなくなってしまうようです。ほかのものになさいますか？',
+  },
+  zh: {
+    ...SCRIPT.zh,
+    greeting: '您好，可以点菜了吗？',
+    resume: '让您久等了。您要点什么？',
+    clarify: ['您要点什么？', '我们有糖醋里脊、宫保鸡丁、清蒸鱼和地三鲜，饮料有橙汁和可乐。'],
+    readBack: (item, price) => `${item}，${price}。对吗？`,
+    served: '菜来了，请慢用！吃好了叫我结账。',
+    cannotAfford: '不好意思，您的钱好像不够付这个。要换别的吗？',
+  },
+  en: {
+    ...SCRIPT.en,
+    greeting: 'Are you ready to order?',
+    clarify: [
+      'What would you like?',
+      "We've got sausage and mash, chicken pie, fish and chips and a veggie burger, and orange juice or cola to drink.",
+    ],
+    served: "Here you go. Enjoy your meal, and just ask when you'd like the bill.",
+    cannotAfford: "Sorry, it looks like that won't be enough. Would you like something else?",
+  },
+  de: {
+    ...SCRIPT.de,
+    greeting: 'Haben Sie schon gewählt?',
+    clarify: [
+      'Was möchten Sie bestellen?',
+      'Wir haben Schweineschnitzel, Hähnchengeschnetzeltes, Lachsfilet und Käsespätzle, und zu trinken Orangensaft oder Cola.',
+    ],
+    served: 'Bitte schön, guten Appetit! Sagen Sie Bescheid, wenn Sie zahlen möchten.',
+  },
+};
+
+type Seating = (typeof SEATING)[number];
+type BillMethod = (typeof BILL_METHODS)[number];
+/** The party sizes the fake server understands. */
+const PARTY_SIZES = [1, 2, 3, 4] as const;
+/** The dietary needs in the order the fake server listens for them: "no pork" before a vegetarian's "no meat". */
+const DIETS_HEARD = ['no-pork', 'no-seafood', 'vegetarian'] as const satisfies readonly DietaryNoteId[];
+
+/**
+ * The fake server's own lines: seating a guest (how many, then where), recommending a dish that keeps to what they
+ * don't eat, and taking the bill (the total, then how they pay). Each reads back before calling its completion.
+ */
+type ServerScript = {
+  welcome: string;
+  askParty: string;
+  askSeating: string;
+  readBackTable: (party: number, seating: string) => string;
+  seated: string;
+  party: Record<(typeof PARTY_SIZES)[number], string[]>;
+  seating: Record<Seating, { words: string[]; said: string }>;
+  welcomeToRecommend: string;
+  askDiet: string;
+  diets: Record<DietaryNoteId, string[]>;
+  recommend: (dish: string, price: string) => string;
+  notThatOne: (dish: string, price: string) => string;
+  billTotal: (total: string) => string;
+  askMethod: string;
+  readBackBill: (total: string, method: string) => string;
+  methods: Record<BillMethod, { words: string[]; said: string }>;
+  paid: string;
+  cannotPay: string;
+};
+
+const SERVER_SCRIPT: Record<LanguageCode, ServerScript> = {
+  ja: {
+    welcome: 'いらっしゃいませ！何名様ですか？',
+    askParty: '何名様でいらっしゃいますか？',
+    askSeating: 'テーブル席、カウンター席、窓際の席がございます。どちらがよろしいですか？',
+    readBackTable: (party, seating) => `${party}名様、${seating}ですね。よろしいですか？`,
+    seated: 'こちらへどうぞ。ご注文がお決まりになりましたら、お呼びください。',
+    party: { 1: ['一人', 'ひとり', '1人', '一名', '1名'], 2: ['二人', 'ふたり', '2人', '2名'], 3: ['三人', '3人', '3名'], 4: ['四人', '4人', '4名'] },
+    seating: {
+      table: { words: ['テーブル'], said: 'テーブル席' },
+      counter: { words: ['カウンター'], said: 'カウンター席' },
+      window: { words: ['窓', 'まど'], said: '窓際の席' },
+    },
+    welcomeToRecommend: 'いらっしゃいませ。おすすめですね。何か召し上がれないものはございますか？',
+    askDiet: '何か召し上がれないものはございますか？',
+    diets: { vegetarian: ['ベジタリアン', '菜食'], 'no-pork': ['豚肉', '豚'], 'no-seafood': ['魚', 'シーフード'] },
+    recommend: (dish, price) => `それでしたら、${dish}がおすすめです。${price}です。いかがですか？`,
+    notThatOne: (dish, price) => `申し訳ございません、そちらは召し上がれないものが入っております。${dish}はいかがですか？${price}です。`,
+    billTotal: (total) => `お会計ですね。合計${total}になります。お支払いは現金とカード、どちらになさいますか？`,
+    askMethod: 'お支払いは現金とカード、どちらになさいますか？',
+    readBackBill: (total, method) => `${total}、${method}でのお支払いですね。よろしいですか？`,
+    methods: { cash: { words: ['現金', 'げんきん'], said: '現金' }, card: { words: ['カード', 'かーど'], said: 'カード' } },
+    paid: 'ありがとうございました。またお越しくださいませ。',
+    cannotPay: '申し訳ございません、お支払いが足りないようです。また後でお支払いいただけますか？',
+  },
+  zh: {
+    welcome: '欢迎光临！请问几位？',
+    askParty: '请问几位？',
+    askSeating: '您想坐桌子、吧台还是靠窗的位子？',
+    readBackTable: (party, seating) => `${party}位，${seating}，对吗？`,
+    seated: '这边请。点菜的时候叫我就行。',
+    party: { 1: ['一位', '一个人', '1位'], 2: ['两位', '两个人', '2位'], 3: ['三位', '3位'], 4: ['四位', '4位'] },
+    seating: {
+      table: { words: ['桌'], said: '坐桌子' },
+      counter: { words: ['吧台'], said: '坐吧台' },
+      window: { words: ['窗'], said: '靠窗的位子' },
+    },
+    welcomeToRecommend: '您好！想让我推荐吗？请问您有什么忌口吗？',
+    askDiet: '请问您有什么忌口吗？',
+    diets: { vegetarian: ['吃素', '素食'], 'no-pork': ['猪肉', '不吃猪'], 'no-seafood': ['海鲜', '不吃鱼'] },
+    recommend: (dish, price) => `那我推荐${dish}，${price}。您看可以吗？`,
+    notThatOne: (dish, price) => `不好意思，这个不合您的忌口。我推荐${dish}，${price}，可以吗？`,
+    billTotal: (total) => `好的，一共${total}。您用现金还是刷卡？`,
+    askMethod: '您用现金还是刷卡？',
+    readBackBill: (total, method) => `一共${total}，${method}，对吗？`,
+    methods: { cash: { words: ['现金'], said: '付现金' }, card: { words: ['刷卡', '卡', '扫码'], said: '刷卡' } },
+    paid: '谢谢光临，欢迎下次再来！',
+    cannotPay: '不好意思，您的钱好像不够。您可以下次再来付。',
+  },
+  en: {
+    welcome: 'Hiya, welcome in! How many of you are there?',
+    askParty: 'How many of you are there?',
+    askSeating: 'Would you like a table, a seat at the counter, or one by the window?',
+    readBackTable: (party, seating) => `${party === 1 ? 'Just the one' : `${party} of you`}, ${seating}. Is that right?`,
+    seated: "Right this way. Give me a shout when you're ready to order.",
+    party: { 1: ['just me', 'one', 'alone', 'myself'], 2: ['two'], 3: ['three'], 4: ['four'] },
+    seating: {
+      table: { words: ['table'], said: 'at a table' },
+      counter: { words: ['counter', 'bar'], said: 'at the counter' },
+      window: { words: ['window'], said: 'by the window' },
+    },
+    welcomeToRecommend: "Hiya! Happy to recommend something. Is there anything you don't eat?",
+    askDiet: "Is there anything you don't eat?",
+    diets: { vegetarian: ['vegetarian', 'no meat'], 'no-pork': ['pork'], 'no-seafood': ['seafood', 'no fish'] },
+    recommend: (dish, price) => `Then I'd recommend the ${dish.toLowerCase()}, that's ${price}. How does that sound?`,
+    notThatOne: (dish, price) => `Sorry, that one won't suit you. How about the ${dish.toLowerCase()} instead? That's ${price}.`,
+    billTotal: (total) => `Of course. That comes to ${total} altogether. Cash or card?`,
+    askMethod: 'Will that be cash or card?',
+    readBackBill: (total, method) => `${total}, paying ${method}. Is that right?`,
+    methods: { cash: { words: ['cash'], said: 'in cash' }, card: { words: ['card', 'contactless'], said: 'by card' } },
+    paid: 'Thanks very much. Hope to see you again soon!',
+    cannotPay: "Sorry, it looks like that's not enough. You can come back and pay it later.",
+  },
+  de: {
+    welcome: 'Guten Tag! Für wie viele Personen?',
+    askParty: 'Für wie viele Personen?',
+    askSeating: 'Möchten Sie an einem Tisch, an der Theke oder am Fenster sitzen?',
+    readBackTable: (party, seating) => `${party === 1 ? 'Eine Person' : `${party} Personen`}, ${seating}, richtig?`,
+    seated: 'Bitte hier entlang. Rufen Sie mich, wenn Sie bestellen möchten.',
+    party: { 1: ['eine person', 'allein', 'einer'], 2: ['zwei'], 3: ['drei'], 4: ['vier'] },
+    seating: {
+      table: { words: ['tisch'], said: 'an einem Tisch' },
+      counter: { words: ['theke', 'tresen'], said: 'an der Theke' },
+      window: { words: ['fenster'], said: 'am Fenster' },
+    },
+    welcomeToRecommend: 'Guten Tag! Gern empfehle ich Ihnen etwas. Gibt es etwas, das Sie nicht essen?',
+    askDiet: 'Gibt es etwas, das Sie nicht essen?',
+    diets: {
+      vegetarian: ['vegetarier', 'vegetarierin', 'vegetarisch', 'kein fleisch'],
+      'no-pork': ['schweinefleisch', 'kein schwein'],
+      'no-seafood': ['fisch', 'meeresfrüchte'],
+    },
+    recommend: (dish, price) => `Dann empfehle ich Ihnen ${dish} für ${price}. Wie klingt das?`,
+    notThatOne: (dish, price) => `Das passt leider nicht. Wie wäre es mit ${dish} für ${price}?`,
+    billTotal: (total) => `Gern. Das macht ${total}. Zahlen Sie bar oder mit Karte?`,
+    askMethod: 'Zahlen Sie bar oder mit Karte?',
+    readBackBill: (total, method) => `${total}, ${method}, richtig?`,
+    methods: { cash: { words: ['bar', 'bargeld'], said: 'bar' }, card: { words: ['karte'], said: 'mit Karte' } },
+    paid: 'Vielen Dank! Bis zum nächsten Mal!',
+    cannotPay: 'Oh, das reicht leider nicht. Sie können auch später bezahlen.',
   },
 };
 
@@ -936,6 +1123,121 @@ function wardNpc(ward: WardScript, act: Act): Npc {
   };
 }
 
+/** The server seating a guest: asks how many, then where, reads both back and seats them on a yes. */
+function tableNpc(script: ServerScript, common: OrderScript, act: Act): Npc {
+  let party: number | null = null;
+  let seating: Seating | null = null;
+  const { yes, no, known } = common.words;
+  /** Asks again whatever is still to be answered, or reads everything back. */
+  const currentQuestion = () =>
+    party === null ? script.askParty : seating === null ? script.askSeating : script.readBackTable(party, script.seating[seating].said);
+  return {
+    ...common,
+    greeting: script.welcome,
+    resume: script.askParty,
+    hear: (line) => {
+      const heardParty = PARTY_SIZES.find((size) => mentions(line, script.party[size])) ?? null;
+      const heardSeating = SEATING.find((seat) => mentions(line, script.seating[seat].words)) ?? null;
+      if (heardParty !== null || heardSeating !== null) {
+        party = heardParty ?? party;
+        seating = heardSeating ?? seating;
+        return act.say(currentQuestion());
+      }
+      if (party !== null && seating !== null && mentions(line, no)) {
+        [party, seating] = [null, null];
+        return act.say(script.askParty);
+      }
+      if (party !== null && seating !== null && mentions(line, yes)) {
+        return act.call(SEAT_GUEST, { party, seating }, (response) => act.say(response.result === 'done' ? script.seated : script.askParty));
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(currentQuestion());
+      act.notUnderstood();
+    },
+  };
+}
+
+/**
+ * The server recommending a dish: asks what the guest doesn't eat, recommends the first dish that keeps to it, and
+ * serves it on a yes. A dish the guest names is read back instead. If the game says it breaks the need, they
+ * recommend one that keeps to it.
+ */
+function recommendNpc(script: ServerScript, common: OrderScript, menu: ItemId[], packId: LanguageCode, act: Act): Npc {
+  let restriction: DietaryNoteId | null = null;
+  let dish: ItemId | null = null;
+  const { yes, no, known } = common.words;
+  const name = (item: ItemId) => CULTURE_PACKS[packId].goods[item].name;
+  const price = (item: ItemId) => common.price(localPrice(ITEMS[item].priceInShifts, packId));
+  const dishes = menu.filter(isDish);
+  const recommend = (note: DietaryNoteId, say: ServerScript['recommend']) => {
+    dish = dishes.find((id) => dishFits(id, note)) ?? null;
+    act.say(dish ? say(name(dish), price(dish)) : script.askDiet);
+  };
+  return {
+    ...common,
+    greeting: script.welcomeToRecommend,
+    resume: script.askDiet,
+    hear: (line) => {
+      const diet = DIETS_HEARD.find((note) => mentions(line, script.diets[note])) ?? null;
+      const named = dishes.find((id) => mentions(line, ITEM_WORDS[packId][id])) ?? null;
+      if (diet && !named) {
+        restriction = diet;
+        return recommend(diet, script.recommend);
+      }
+      if (restriction === null) return named || mentions(line, [...yes, ...no, ...known]) ? act.say(script.askDiet) : act.notUnderstood();
+      if (named) {
+        dish = named;
+        return act.say(common.readBack(name(named), price(named)));
+      }
+      if (dish && mentions(line, no)) {
+        dish = null;
+        return act.say(common.askAgain);
+      }
+      if (dish && mentions(line, yes)) {
+        const kept = restriction;
+        return act.call(SERVE_ORDER, { items: [{ item: dish, quantity: 1 }], restriction: kept }, (response) => {
+          if (response.result === 'served') act.say(common.served);
+          else if (response.result === 'cannot_afford') act.say(common.cannotAfford);
+          else recommend(kept, script.notThatOne);
+        });
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(dish ? script.recommend(name(dish), price(dish)) : common.askAgain);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** The server taking the bill: says the total from FACTS, asks how the guest pays, reads both back and settles on a yes. */
+function billNpc(script: ServerScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
+  const total = readBillTotal(systemInstruction) ?? '';
+  let method: BillMethod | null = null;
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: script.billTotal(total),
+    resume: script.billTotal(total),
+    hear: (line) => {
+      const heard = BILL_METHODS.find((how) => mentions(line, script.methods[how].words)) ?? null;
+      if (heard) {
+        method = heard;
+        return act.say(script.readBackBill(total, script.methods[heard].said));
+      }
+      if (method && mentions(line, no)) {
+        method = null;
+        return act.say(script.askMethod);
+      }
+      if (method && mentions(line, yes)) {
+        return act.call(SETTLE_BILL, { method }, (response) => {
+          if (response.result === 'done') act.say(script.paid);
+          else if (response.result === 'cannot_afford') act.say(script.cannotPay);
+          else act.say(script.askMethod);
+        });
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(script.askMethod);
+      act.notUnderstood();
+    },
+  };
+}
+
 /** The landlord taking rent: all that is owed, on a yes. Caught in the hallway, the greeting is a reminder. */
 function rentNpc(script: LandlordScript, words: Words, session: NpcSession, act: Act): Npc {
   const owed = readRentOwed(session.systemInstruction);
@@ -1372,6 +1674,14 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if (offers(GRANT_EXTENSION)) return extensionNpc(LANDLORD_SCRIPT[packId], words, act);
   if (offers(FINISH_RENT_NEWS)) return rentNewsNpc(LANDLORD_SCRIPT[packId], words, session, act);
   if (offers(HIRE_APPLICANT)) return hiringNpc(HIRING_SCRIPT[packId], SCRIPT[packId], act);
+  if (offers(SEAT_GUEST)) return tableNpc(SERVER_SCRIPT[packId], SCRIPT[packId], act);
+  if (offers(SETTLE_BILL)) return billNpc(SERVER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
+  if ('npcId' in session.voice && session.voice.npcId === 'server') {
+    const recommending = session.tools.find((tool) => tool.name === SERVE_ORDER)?.parameters?.properties?.restriction !== undefined;
+    const menu = itemsIn(session, SERVE_ORDER);
+    if (recommending) return recommendNpc(SERVER_SCRIPT[packId], SERVER_ORDER_SCRIPT[packId], menu, packId, act);
+    return orderNpc(SERVER_ORDER_SCRIPT[packId], menu, packId, act);
+  }
   if (isShopkeeper && offers(COMPLETE_PURCHASE)) {
     const items = itemsIn(session, COMPLETE_PURCHASE);
     const wraps = session.tools.find((tool) => tool.name === COMPLETE_PURCHASE)?.parameters?.properties?.wrap !== undefined;
@@ -1400,7 +1710,9 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * the drink in its instruction, says it again when asked, and thanks the barista or says it's the wrong
  * one when a scene says what it was handed; one at the till says all the cashier needs to hear at once
  * (bag, points card, anything from behind the counter, the cash it hands over); one at a restaurant table orders
- * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. In Small Talk it
+ * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. The server
+ * asks how many and where to sit and seats the guest, takes a meal order the barista's way, recommends a dish that
+ * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. In Small Talk it
  * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again

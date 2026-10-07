@@ -2,7 +2,7 @@ import { ECONOMY, weekdayOf, WEEKDAYS, type Basket, type LanguageCode, type Open
 import { CULTURE_PACKS, localPlaceName, localShop } from './culturePacks.ts';
 import { chargeInShifts, formatLocalMoney, menuPrice } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
-import { ITEMS } from './items.ts';
+import { DIETARY_NOTE_IDS, DIETARY_NOTES, dishContents, dishFits, isDish, ITEMS, type ItemId } from './items.ts';
 import { placeHours } from './openingHours.ts';
 import { formatTime } from './places.ts';
 
@@ -31,6 +31,33 @@ export function basketFacts(basket: Basket, packId: LanguageCode): string[] {
 export function readBasketTotal(text: string): string | null {
   const totals = [...text.matchAll(/Total: (.+)\.$/gm)];
   return totals.at(-1)?.[1] ?? null;
+}
+
+/** What the guest has eaten and not paid for yet, each at its price, and the total to pay. */
+function billFacts(bill: Basket, packId: LanguageCode): string[] {
+  if (bill.length === 0) return ['The customer has nothing on their bill.'];
+  const { goods } = CULTURE_PACKS[packId];
+  const money = (shifts: number) => formatLocalMoney(shifts, packId);
+  const total = bill.reduce((sum, { itemId, quantity }) => sum + menuPrice(itemId, packId) * quantity, 0);
+  return [
+    "The customer's bill:",
+    ...bill.map(({ itemId, quantity }) => `${quantity} × ${goods[itemId].name}, ${money(menuPrice(itemId, packId))} each`),
+    `Bill total: ${money(total)}.`,
+  ];
+}
+
+/** The bill total `billFacts` wrote into this text, as local money, or null. */
+export function readBillTotal(text: string): string | null {
+  return /Bill total: (.+)\.$/m.exec(text)?.[1] ?? null;
+}
+
+/** "Dish (menu id "x") has meat and pork in it. It suits a diner who eats no fish or seafood." */
+function dietaryFact(id: ItemId, packId: LanguageCode): string {
+  const contents = dishContents(id);
+  const has = contents ? `has ${contents} in it` : 'has no meat, fish or seafood in it';
+  const suits = DIETARY_NOTE_IDS.filter((note) => dishFits(id, note)).map((note) => DIETARY_NOTES[note].means);
+  const who = suits.length > 0 ? `It suits a diner who ${suits.join(', or who ')}.` : 'It suits none of the usual dietary needs.';
+  return `${CULTURE_PACKS[packId].goods[id].name} (menu id "${id}") ${has}. ${who}`;
 }
 
 /** A day the rent is due, as the landlord would say it. */
@@ -79,16 +106,16 @@ export function readNewWeeklyRent(text: string): string | null {
   return /From now on the tenant's weekly rent is (.+)\.$/m.exec(text)?.[1] ?? null;
 }
 
-/** What the NPC is told about the moment: the shopping on the counter, and for the landlord, the rent. */
-export type FactsContext = { basket?: Basket; rent?: RentStatement };
+/** What the NPC is told about the moment: the shopping on the counter, for the landlord, the rent, and for the server, the bill. */
+export type FactsContext = { basket?: Basket; rent?: RentStatement; bill?: Basket };
 
 /**
  * The facts an interaction's NPC knows, in English, pulled from the Culture
  * Pack, or for the ward, from what Fainting costs. At the till, the cashier
  * also knows what the customer has brought to the counter (`basket`), and the
- * landlord knows what the tenant owes (`rent`).
+ * landlord knows what the tenant owes (`rent`). The restaurant's server knows the guest's `bill`.
  */
-export function interactionFacts(interaction: Interaction, packId: LanguageCode, { basket = [], rent }: FactsContext = {}): string[] {
+export function interactionFacts(interaction: Interaction, packId: LanguageCode, { basket = [], rent, bill = [] }: FactsContext = {}): string[] {
   const { goods, customs } = CULTURE_PACKS[packId];
   const { placeId } = interaction;
   return interaction.facts.flatMap((source) => {
@@ -99,6 +126,8 @@ export function interactionFacts(interaction: Interaction, packId: LanguageCode,
         return interaction.items.map(
           (id) => `On the menu: ${goods[id].name}, ${formatLocalMoney(menuPrice(id, packId), packId)} (menu id "${id}").`,
         );
+      case 'dietary':
+        return interaction.items.filter(isDish).map((id) => dietaryFact(id, packId));
       case 'stock':
         return interaction.items.map((id) => {
           const { about } = ITEMS[id];
@@ -110,6 +139,8 @@ export function interactionFacts(interaction: Interaction, packId: LanguageCode,
         );
       case 'basket':
         return basketFacts(basket, packId);
+      case 'bill':
+        return billFacts(bill, packId);
       case 'placeFacts':
         return localShop(placeId, packId)?.facts ?? [];
       case 'customs':

@@ -119,6 +119,12 @@ export type Shift = {
   customer: ShiftCustomer | null;
 };
 
+/**
+ * At the restaurant: whether the Character has a table (given up on leaving), and what they've eaten and not paid for.
+ * An unpaid bill stays open, even after leaving, until it's paid.
+ */
+export type RestaurantTable = { seated: boolean; bill: { itemId: ItemId; quantity: number }[] };
+
 export const DEBT_KINDS = ['rent', 'hospital'] as const;
 export type Debt = { kind: (typeof DEBT_KINDS)[number]; amountInShifts: number };
 export type PaymentPlan = { debtKind: Debt['kind']; instalmentInShifts: number; nextDueDay: number };
@@ -207,6 +213,7 @@ export type GameState = {
     /** A Shift under way. */
     shift: Shift | null;
   };
+  restaurant: RestaurantTable;
   /** The personal phrasebook. */
   phrasebook: PhrasebookEntry[];
   onboarding: { firstMorningStepsDone: number; firstMorningSkipped: boolean };
@@ -256,6 +263,7 @@ export function createSave(setup: NewGameSetup): GameState {
       today: { day: FIRST_MORNING.day, homeMeals: 0, gymSessions: 0 },
     },
     possessions: { inventory: [], gymMembershipUntilDay: null, addressRegistered: false, jobsHired: [], shift: null },
+    restaurant: { seated: false, bill: [] },
     phrasebook: [],
     onboarding: { firstMorningStepsDone: 0, firstMorningSkipped: setup.skipFirstMorning },
     people: {},

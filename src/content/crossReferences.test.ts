@@ -20,6 +20,14 @@ describe('culturePackProblems', () => {
     expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*"latte".*order-drink/)]);
   });
 
+  it('fails a pack whose restaurant menu is missing a dish the server orders or recommends', () => {
+    const packs = withGerman((de) => delete (de.goods as Partial<CulturePack['goods']>)['veggie-dish']);
+    expect(culturePackProblems(packs, interactions)).toEqual([
+      expect.stringMatching(/^de: .*"veggie-dish".*order-a-meal/),
+      expect.stringMatching(/^de: .*"veggie-dish".*recommend-a-meal/),
+    ]);
+  });
+
   it('fails a gloss missing in one of the three other Native Languages', () => {
     const packs = withGerman((de) => delete de.goods.tea.glosses.zh);
     expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*goods\.tea\.glosses\.zh/s)]);
