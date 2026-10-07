@@ -332,3 +332,81 @@ describe('applyInteractionOutcome: hiring', () => {
     expect(state.possessions.jobsHired).toEqual(['barista']);
   });
 });
+
+describe('applyInteractionOutcome: Comfort Purchases', () => {
+  const { buyABook, buyAGift } = INTERACTIONS;
+  const order = (item: ItemId, quantity = 1) => ({ items: [{ item, quantity }] });
+  const atTheBookshop = (): GameState => ({ ...createSave(TEST_SETUP), placeId: 'bookshop' });
+
+  it('café cake fills Hunger and lifts Mood by the café Comfort Purchase lift, on top of the success', () => {
+    const state = atTheCafe({ hunger: 10 });
+
+    const { state: after, result } = applyInteractionOutcome(state, orderDrink, { kind: 'success', args: order('cake') });
+
+    const lift = MOOD.changes.goalInteractionSuccess + MOOD.changes.comfortPurchase.cafe;
+    expect(after.character.hunger).toBe(10 + WELL_BEING.cafeFoodHunger);
+    expect(after.character.mood).toBe(state.character.mood + lift);
+    expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - price('cake'));
+    expect(result).toMatchObject({ kind: 'success', moodChange: lift });
+  });
+
+  it('a special drink at the café is a Comfort Purchase too, and an everyday drink is not', () => {
+    const comfort = applyInteractionOutcome(atTheCafe(), orderDrink, { kind: 'success', args: order('special-drink') });
+    const everyday = applyInteractionOutcome(atTheCafe(), orderDrink, { kind: 'success', args: order('latte') });
+
+    expect(comfort.result).toMatchObject({ moodChange: MOOD.changes.goalInteractionSuccess + MOOD.changes.comfortPurchase.cafe });
+    expect(everyday.result).toMatchObject({ moodChange: MOOD.changes.goalInteractionSuccess });
+  });
+
+  it('lifts Mood once per kind of Comfort Purchase, however many are bought', () => {
+    const args = { items: [{ item: 'cake', quantity: 3 }, { item: 'special-drink', quantity: 1 }] };
+
+    const { result } = applyInteractionOutcome(atTheCafe(), orderDrink, { kind: 'success', args });
+
+    expect(result).toMatchObject({ moodChange: MOOD.changes.goalInteractionSuccess + MOOD.changes.comfortPurchase.cafe });
+  });
+
+  it('a book is read, not kept: it lifts Mood and charges, and nothing goes into the inventory', () => {
+    const state = atTheBookshop();
+
+    const { state: after } = applyInteractionOutcome(state, buyABook, { kind: 'success', args: order('mystery-novel') });
+
+    expect(after.character.mood).toBe(state.character.mood + MOOD.changes.goalInteractionSuccess + MOOD.changes.comfortPurchase.reading);
+    expect(after.character.moneyInShifts).toBeCloseTo(state.character.moneyInShifts - price('mystery-novel'));
+    expect(after.possessions.inventory).toEqual([]);
+  });
+
+  it('a wrapped gift goes into the inventory, ready to give, and never goes off', () => {
+    const state = atTheBookshop();
+
+    const { state: after, result } = applyInteractionOutcome(state, buyAGift, {
+      kind: 'success',
+      args: { items: [{ item: 'chocolates', quantity: 1 }], wrap: true },
+    });
+
+    expect(after.possessions.inventory).toEqual([{ itemId: 'chocolates', quantity: 1, expiresOnDay: null }]);
+    expect(after.character.mood).toBe(state.character.mood + MOOD.changes.goalInteractionSuccess + MOOD.changes.comfortPurchase.gift);
+    expect(result).toMatchObject({ kind: 'success', paidInShifts: price('chocolates'), served: [{ itemId: 'chocolates', quantity: 1 }] });
+  });
+
+  it('flowers bought unwrapped join the flowers already in the inventory', () => {
+    const state = atTheBookshop();
+    const once = applyInteractionOutcome(state, buyAGift, { kind: 'success', args: { items: [{ item: 'flowers', quantity: 1 }], wrap: false } });
+
+    const { state: after } = applyInteractionOutcome(once.state, buyAGift, {
+      kind: 'success',
+      args: { items: [{ item: 'flowers', quantity: 2 }], wrap: true },
+    });
+
+    expect(after.possessions.inventory).toEqual([{ itemId: 'flowers', quantity: 3, expiresOnDay: null }]);
+  });
+
+  it('a Comfort Purchase the Character cannot afford changes nothing', () => {
+    const broke = { ...atTheBookshop(), character: { ...atTheBookshop().character, moneyInShifts: 0.01 } };
+
+    const { state, result } = applyInteractionOutcome(broke, buyAGift, { kind: 'success', args: { items: [{ item: 'flowers', quantity: 1 }], wrap: true } });
+
+    expect(result).toEqual({ kind: 'cannot_afford' });
+    expect(state).toEqual(broke);
+  });
+});

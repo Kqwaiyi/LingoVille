@@ -147,6 +147,30 @@ describe('buildNpcSession: the supermarket and convenience store', () => {
   });
 });
 
+describe('buildNpcSession: the bookshop', () => {
+  const MORNING = { day: 2, minuteOfDay: 11 * 60 };
+  const shopkeeperSession = (interaction: Interaction, packId: LanguageCode, step: ProficiencyStep = 'A1') =>
+    buildNpcSession(interaction, CULTURE_PACKS[packId], step, NAMED_NPCS.shopkeeper, { clock: MORNING });
+
+  it.each(LANGUAGE_CODES)('builds the shopkeeper selling a book, a gift and a recommendation in the %s pack', (packId) => {
+    expect(shopkeeperSession(INTERACTIONS.buyABook, packId)).toMatchSnapshot();
+    expect(shopkeeperSession(INTERACTIONS.buyAGift, packId, 'B1')).toMatchSnapshot();
+    expect(shopkeeperSession(INTERACTIONS.recommendABook, packId, 'C1')).toMatchSnapshot();
+  });
+
+  it('works at the bookshop by its local name, selling through complete_purchase', () => {
+    const { systemInstruction, tools } = shopkeeperSession(INTERACTIONS.buyABook, 'en');
+    expect(systemInstruction).toContain('The Book Nook');
+    expect(systemInstruction).toContain('For sale: Crime novel, £15 (menu id "mystery-novel")');
+    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', LEARN_NAME_TOOL, 'not_understood']);
+  });
+
+  it('has the shopkeeper ask about wrapping a gift, and recommend by taste', () => {
+    expect(shopkeeperSession(INTERACTIONS.buyAGift, 'de').systemInstruction).toMatch(/gift-wrapped/);
+    expect(shopkeeperSession(INTERACTIONS.recommendABook, 'de', 'C1').systemInstruction).toMatch(/recommend.*taste/);
+  });
+});
+
 describe('buildNpcSession: the landlord', () => {
   // Day 7, a Sunday: this week's rent of 1 Shift is due today, with 0.5 owed from before.
   const RENT: RentStatement = { today: 7, dueDay: 7, owedThisWeekInShifts: 1, debtInShifts: 0.5, weeklyRentInShifts: 1.2 };

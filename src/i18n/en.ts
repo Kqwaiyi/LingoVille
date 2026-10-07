@@ -257,6 +257,7 @@ export const en = {
     ask: 'Press <kbd>F</kbd> to ask where something is',
     askForTime: 'Press <kbd>F</kbd> to ask for more time',
     askForWork: 'Press <kbd>F</kbd> to ask for work',
+    buyGift: 'Press <kbd>F</kbd> to buy a gift',
     startShift: 'Press <kbd>E</kbd> to start a shift — {{job}}',
     staffOnly: 'Staff door · Staff only',
     workedToday: 'Staff door · You’ve already worked a shift today',

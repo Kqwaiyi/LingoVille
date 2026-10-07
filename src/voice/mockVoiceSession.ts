@@ -31,7 +31,7 @@ import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from '
 /** Roughly how long the real NPC takes to start answering. */
 const REPLY_DELAY_MS = 600;
 
-// The completions the fake knows how to script: an order over a counter, paying at the till,
+// The completions the fake knows how to script: an order over a counter, paying at the till or the bookshop,
 // pointing to an item on the shelves, the nurse letting the patient go home, and the landlord
 // taking rent, giving more time, or telling the tenant their new rent, and the barista hiring.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
@@ -75,6 +75,15 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'veggie-dish': ['パスタ', 'ぱすた', 'pasta'],
     juice: ['ジュース', 'じゅーす', 'juice'],
     cola: ['コーラ', 'こーら', 'cola'],
+    cake: ['ケーキ', 'けーき', 'cake'],
+    'special-drink': ['クリームソーダ', 'くりーむそーだ', 'ソーダ'],
+    'mystery-novel': ['ミステリー', '推理小説', '小説'],
+    cookbook: ['料理', 'レシピ'],
+    'travel-book': ['散歩', 'ガイド'],
+    magazine: ['雑誌', 'ざっし'],
+    flowers: ['花束', 'はなたば', '花'],
+    chocolates: ['チョコ'],
+    'scented-candle': ['キャンドル', 'ろうそく'],
   },
   zh: {
     latte: ['拿铁', 'latte'],
@@ -95,6 +104,15 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'veggie-dish': ['地三鲜'],
     juice: ['橙汁', '果汁', 'juice'],
     cola: ['可乐', 'cola'],
+    cake: ['提拉米苏', '蛋糕'],
+    'special-drink': ['芒果冰沙', '冰沙'],
+    'mystery-novel': ['推理', '小说'],
+    cookbook: ['菜谱', '食谱'],
+    'travel-book': ['旅游', '指南'],
+    magazine: ['杂志'],
+    flowers: ['鲜花', '花'],
+    chocolates: ['巧克力'],
+    'scented-candle': ['蜡烛', '香薰'],
   },
   en: {
     latte: ['latte'],
@@ -115,6 +133,15 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'veggie-dish': ['veggie burger', 'burger'],
     juice: ['orange juice', 'juice'],
     cola: ['cola', 'coke'],
+    cake: ['victoria sponge', 'sponge', 'cake'],
+    'special-drink': ['hot chocolate', 'chocolate'],
+    'mystery-novel': ['crime novel', 'novel', 'crime', 'mystery'],
+    cookbook: ['cookbook', 'recipe'],
+    'travel-book': ['walking guide', 'guide', 'walking'],
+    magazine: ['magazine'],
+    flowers: ['flowers', 'bouquet'],
+    chocolates: ['chocolates'],
+    'scented-candle': ['candle'],
   },
   de: {
     latte: ['latte', 'milchkaffee'],
@@ -135,6 +162,15 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'veggie-dish': ['käsespätzle'],
     juice: ['orangensaft', 'saft'],
     cola: ['cola'],
+    cake: ['käsekuchen', 'kuchen'],
+    'special-drink': ['heiße schokolade', 'schokolade', 'kakao'],
+    'mystery-novel': ['krimi', 'roman'],
+    cookbook: ['kochbuch', 'rezept'],
+    'travel-book': ['wanderführer', 'reiseführer'],
+    magazine: ['zeitschrift', 'magazin'],
+    flowers: ['blumenstrauß', 'blumen'],
+    chocolates: ['pralinen'],
+    'scented-candle': ['duftkerze', 'kerze'],
   },
 };
 
@@ -256,6 +292,97 @@ const CLERK_SCRIPT: Record<LanguageCode, OrderScript> = {
     resume: 'Entschuldigung! Was darf’s sein?',
     clarify: ['Was möchten Sie?', 'Wir haben Bockwurst und Fertiggerichte. Was darf’s sein?'],
     served: 'Bitte schön! Schönen Tag noch!',
+  },
+};
+
+/** The shopkeeper selling something to read: the barista's way of taking an order, in a bookshop's words. */
+const BOOKSHOP_SCRIPT: Record<LanguageCode, OrderScript> = {
+  ja: {
+    ...SCRIPT.ja,
+    greeting: 'いらっしゃいませ。本をお探しですか？',
+    resume: 'お待たせしました。何をお探しですか？',
+    clarify: ['どの本になさいますか？', 'ミステリー小説、料理の本、散歩ガイド、雑誌がございます。どれになさいますか？'],
+    served: 'ありがとうございました。どうぞお楽しみください。',
+    cannotAfford: '申し訳ございません、お支払いが足りないようです。ほかの本になさいますか？',
+    askAgain: '失礼しました。どの本になさいますか？',
+  },
+  zh: {
+    ...SCRIPT.zh,
+    greeting: '欢迎光临！您想找什么书？',
+    resume: '让您久等了。您想找什么书？',
+    clarify: ['您要哪本书？', '我们有推理小说、家常菜谱、旅游指南和杂志。您要哪个？'],
+    readBack: (item, price) => `${item}，${price}。对吗？`,
+    served: '谢谢！祝您阅读愉快。',
+    cannotAfford: '不好意思，您的钱好像不够。要换别的书吗？',
+    askAgain: '不好意思。您要哪本书？',
+  },
+  en: {
+    ...SCRIPT.en,
+    greeting: 'Hiya! Looking for something to read?',
+    resume: 'Sorry about that! What are you looking for?',
+    clarify: ['Which one would you like?', "We've got a crime novel, a cookbook, a walking guide and magazines. Which one?"],
+    served: 'There you go. Happy reading!',
+    cannotAfford: "Sorry, it looks like that's not enough. Would you like a different one?",
+    askAgain: 'Sorry! Which one would you like?',
+  },
+  de: {
+    ...SCRIPT.de,
+    greeting: 'Hallo! Suchen Sie etwas zum Lesen?',
+    resume: 'Entschuldigung! Was suchen Sie?',
+    clarify: ['Welches möchten Sie?', 'Wir haben einen Krimi, ein Kochbuch, einen Wanderführer und Zeitschriften. Was darf es sein?'],
+    served: 'Bitte schön! Viel Spaß beim Lesen!',
+    cannotAfford: 'Oh, das reicht leider nicht. Möchten Sie ein anderes?',
+    askAgain: 'Entschuldigung! Welches möchten Sie?',
+  },
+};
+
+/** The shopkeeper selling a gift: finds out which, asks whether to wrap it, and reads both back with the price. */
+type GiftScript = {
+  greeting: string;
+  resume: string;
+  clarify: string;
+  askWrap: (item: string) => string;
+  readBack: (item: string, price: string, wrap: boolean) => string;
+  served: string;
+  cannotAfford: string;
+};
+
+const GIFT_SCRIPT: Record<LanguageCode, GiftScript> = {
+  ja: {
+    greeting: 'いらっしゃいませ。贈り物をお探しですか？',
+    resume: 'お待たせしました。贈り物をお探しですか？',
+    clarify: '花束、チョコレート、アロマキャンドルがございます。どれになさいますか？',
+    askWrap: (item) => `${item}ですね。プレゼント用にお包みしましょうか？`,
+    readBack: (item, price, wrap) => `${item}、${price}、${wrap ? 'お包みあり' : 'お包みなし'}ですね。よろしいですか？`,
+    served: 'ありがとうございました。喜ばれるといいですね。',
+    cannotAfford: '申し訳ございません、お支払いが足りないようです。ほかの贈り物になさいますか？',
+  },
+  zh: {
+    greeting: '欢迎光临！您想买礼物吗？',
+    resume: '让您久等了。您想买什么礼物？',
+    clarify: '我们有鲜花、巧克力礼盒和香薰蜡烛。您要哪个？',
+    askWrap: (item) => `${item}，好的。需要包装吗？`,
+    readBack: (item, price, wrap) => `${item}，${price}，${wrap ? '要包装' : '不要包装'}，对吗？`,
+    served: '谢谢！希望对方会喜欢。',
+    cannotAfford: '不好意思，您的钱好像不够。要换别的礼物吗？',
+  },
+  en: {
+    greeting: 'Hiya! Looking for a present?',
+    resume: 'Sorry about that! What present are you after?',
+    clarify: "We've got flowers, chocolates and scented candles. Which one?",
+    askWrap: (item) => `${item}, lovely. Shall I gift-wrap it for you?`,
+    readBack: (item, price, wrap) => `${item}, that's ${price}, ${wrap ? 'gift-wrapped' : 'not wrapped'}. Is that right?`,
+    served: 'There you go. I hope they love it!',
+    cannotAfford: "Sorry, it looks like that's not enough. Would you like a different present?",
+  },
+  de: {
+    greeting: 'Hallo! Suchen Sie ein Geschenk?',
+    resume: 'Entschuldigung! Was für ein Geschenk suchen Sie?',
+    clarify: 'Wir haben Blumensträuße, Pralinen und Duftkerzen. Was darf es sein?',
+    askWrap: (item) => `${item}, gern. Soll ich es als Geschenk einpacken?`,
+    readBack: (item, price, wrap) => `${item} für ${price}, ${wrap ? 'als Geschenk verpackt' : 'nicht verpackt'}, richtig?`,
+    served: 'Bitte schön! Viel Freude damit!',
+    cannotAfford: 'Oh, das reicht leider nicht. Möchten Sie ein anderes Geschenk?',
   },
 };
 
@@ -648,7 +775,8 @@ type Act = {
 /** A scripted NPC: what it says first, and how it answers each line the Player types. */
 type Npc = { greeting: string; resume: string; outOfPatience: string; notUnderstood: string; hear: (line: string) => void };
 
-function orderNpc(script: OrderScript, menu: ItemId[], packId: LanguageCode, act: Act): Npc {
+/** An order read back and taken over a counter, completed with `toolName`: serve_order, or the bookshop's complete_purchase. */
+function orderNpc(script: OrderScript, menu: ItemId[], packId: LanguageCode, act: Act, toolName = SERVE_ORDER): Npc {
   let clarifications = 0;
   let readBack: ItemId | null = null;
   return {
@@ -668,7 +796,7 @@ function orderNpc(script: OrderScript, menu: ItemId[], packId: LanguageCode, act
       if (readBack && mentions(line, yes)) {
         const order = { items: [{ item: readBack, quantity: 1 }] };
         readBack = null;
-        return act.call(SERVE_ORDER, order, (response) => {
+        return act.call(toolName, order, (response) => {
           if (response.result === 'served') act.say(script.served);
           else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
           else act.say(script.askAgain);
@@ -676,6 +804,46 @@ function orderNpc(script: OrderScript, menu: ItemId[], packId: LanguageCode, act
       }
       if (mentions(line, [...yes, ...no, ...known])) return act.say(script.clarify[clarifications++ % script.clarify.length]!);
       act.notUnderstood();
+    },
+  };
+}
+
+function giftNpc(script: GiftScript, common: OrderScript, gifts: ItemId[], packId: LanguageCode, act: Act): Npc {
+  let gift: ItemId | null = null;
+  let wrap: boolean | null = null;
+  const { yes, no, known } = common.words;
+  const name = (item: ItemId) => CULTURE_PACKS[packId].goods[item].name;
+  const readBack = (item: ItemId, wrapped: boolean) =>
+    script.readBack(name(item), common.price(localPrice(ITEMS[item].priceInShifts, packId)), wrapped);
+  /** Asks again whatever is still to be answered, or reads everything back. */
+  const currentQuestion = () => (gift === null ? script.clarify : wrap === null ? script.askWrap(name(gift)) : readBack(gift, wrap));
+  return {
+    ...common,
+    ...script,
+    hear: (line) => {
+      const asked = gifts.find((id) => mentions(line, ITEM_WORDS[packId][id]));
+      if (asked) {
+        [gift, wrap] = [asked, null];
+        return act.say(script.askWrap(name(asked)));
+      }
+      // "No" first: "不要" holds "要", and "no thanks" holds "thanks".
+      const answer = mentions(line, no) ? false : mentions(line, yes) ? true : null;
+      if (answer === null || gift === null) return mentions(line, [...yes, ...no, ...known]) ? act.say(currentQuestion()) : act.notUnderstood();
+      if (wrap === null) {
+        wrap = answer;
+        return act.say(readBack(gift, wrap));
+      }
+      if (!answer) {
+        [gift, wrap] = [null, null];
+        return act.say(script.clarify);
+      }
+      const sale = { items: [{ item: gift, quantity: 1 }], wrap };
+      [gift, wrap] = [null, null];
+      act.call(COMPLETE_PURCHASE, sale, (response) => {
+        if (response.result === 'served') act.say(script.served);
+        else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
+        else act.say(script.clarify);
+      });
     },
   };
 }
@@ -1198,11 +1366,18 @@ function castNpc(session: NpcSession, act: Act): Npc {
     return smallTalkNpc(SMALL_TALK_SCRIPT[packId], HIRING_SCRIPT[packId].introductions, act);
   }
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
+  const isShopkeeper = 'npcId' in session.voice && session.voice.npcId === 'shopkeeper';
   const { words } = SCRIPT[packId];
   if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
   if (offers(GRANT_EXTENSION)) return extensionNpc(LANDLORD_SCRIPT[packId], words, act);
   if (offers(FINISH_RENT_NEWS)) return rentNewsNpc(LANDLORD_SCRIPT[packId], words, session, act);
   if (offers(HIRE_APPLICANT)) return hiringNpc(HIRING_SCRIPT[packId], SCRIPT[packId], act);
+  if (isShopkeeper && offers(COMPLETE_PURCHASE)) {
+    const items = itemsIn(session, COMPLETE_PURCHASE);
+    const wraps = session.tools.find((tool) => tool.name === COMPLETE_PURCHASE)?.parameters?.properties?.wrap !== undefined;
+    if (wraps) return giftNpc(GIFT_SCRIPT[packId], SCRIPT[packId], items, packId, act);
+    return orderNpc(BOOKSHOP_SCRIPT[packId], items, packId, act, COMPLETE_PURCHASE);
+  }
   if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
   const script = 'npcId' in session.voice && session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
@@ -1216,7 +1391,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * calls serve_order only once the Player confirms; the cashier at the till asks
  * about a bag and a points card, reads them back with the total and calls
  * complete_purchase, reading back again when something is put back; the
- * cashier by the shelves checks which item and calls point_to; the nurse on the
+ * cashier by the shelves checks which item and calls point_to; the shopkeeper reads back a book with its price
+ * and calls complete_purchase on a yes, or for a gift, asks whether to wrap it first and reads both back; the nurse on the
  * ward lets the patient go home once they say how they feel; the landlord takes
  * all that is owed on a yes, offers three more days, or tells the tenant their
  * new rent; the barista asked for work takes a name and a start, reads them

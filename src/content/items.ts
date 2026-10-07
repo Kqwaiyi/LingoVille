@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WELL_BEING } from '../sim/index.ts';
+import { WELL_BEING, type ComfortKind } from '../sim/index.ts';
 
 // The shared catalogue of things the town sells. What an item does and what it
 // costs are authored once, here; each Culture Pack gives it a local name and
@@ -24,11 +24,26 @@ export const ITEM_IDS = [
   'veggie-dish',
   'juice',
   'cola',
+  'cake',
+  'special-drink',
+  'mystery-novel',
+  'cookbook',
+  'travel-book',
+  'magazine',
+  'flowers',
+  'chocolates',
+  'scented-candle',
 ] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 
-/** What the café serves, in every pack. Its menu board and its order interaction both read this. */
+/** The café's everyday drinks and food, in every pack: what Shift Customers order from the barista. */
 export const CAFE_MENU = ['latte', 'coffee', 'tea', 'pastry'] as const satisfies readonly ItemId[];
+
+/** The café's Comfort Purchases, in every pack: a cake and a special drink. Customers order them, Shift Customers don't. */
+export const CAFE_COMFORTS = ['cake', 'special-drink'] as const satisfies readonly ItemId[];
+
+/** Everything the café serves a customer. Its menu board and its order interaction both read this. */
+export const CAFE_COUNTER = [...CAFE_MENU, ...CAFE_COMFORTS] as const satisfies readonly ItemId[];
 
 /** The sizes a café drink is made in. */
 export const DRINK_SIZES = ['small', 'medium', 'large'] as const;
@@ -75,6 +90,12 @@ export const RESTAURANT_DRINKS = ['juice', 'cola'] as const satisfies readonly I
 /** Everything on the restaurant's menu: a dish and a drink make a meal. */
 export const RESTAURANT_MENU = [...RESTAURANT_DISHES, ...RESTAURANT_DRINKS] as const satisfies readonly ItemId[];
 
+/** What the bookshop sells to read, in every pack. Each has a taste (`about`) the shopkeeper recommends it by. */
+export const READING_SOLD = ['mystery-novel', 'cookbook', 'travel-book', 'magazine'] as const satisfies readonly ItemId[];
+
+/** The gifts the bookshop sells, in every pack. They go into the inventory, ready to give. */
+export const GIFTS_SOLD = ['flowers', 'chocolates', 'scented-candle'] as const satisfies readonly ItemId[];
+
 /** What a dish can have in it that some diners don't eat. */
 export const INGREDIENTS = ['meat', 'pork', 'seafood'] as const;
 export type Ingredient = (typeof INGREDIENTS)[number];
@@ -108,6 +129,12 @@ export type Item = {
   meals?: number;
   /** Restaurant dishes only: their dietary facts, which every pack's local dish keeps to. Nothing listed: none of these. */
   contains?: readonly Ingredient[];
+  /** A Comfort Purchase: bought mainly to lift Mood, by this kind's amount. */
+  comfort?: ComfortKind;
+  /** A gift: kept in the inventory, ready to give, rather than used up when bought. */
+  gift?: true;
+  /** Books only: what it is and who would like it, in English, for the shopkeeper's recommendation. Every pack's local book keeps to it. */
+  about?: string;
 };
 
 export const ITEMS: Record<ItemId, Item> = {
@@ -130,4 +157,31 @@ export const ITEMS: Record<ItemId, Item> = {
   'veggie-dish': { priceInShifts: 0.2, restores: { hunger: WELL_BEING.restaurantDishHunger } },
   juice: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.restaurantDrinkThirst } },
   cola: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.restaurantDrinkThirst } },
+  cake: { priceInShifts: 0.12, restores: { hunger: WELL_BEING.cafeFoodHunger }, comfort: 'cafe' },
+  'special-drink': { priceInShifts: 0.1, restores: { thirst: WELL_BEING.cafeDrinkThirst }, comfort: 'cafe' },
+  'mystery-novel': {
+    priceInShifts: 0.25,
+    restores: {},
+    comfort: 'reading',
+    about: 'a gripping mystery novel, for someone who likes exciting stories and puzzles',
+  },
+  cookbook: { priceInShifts: 0.3, restores: {}, comfort: 'reading', about: 'a cookbook of easy home recipes, for someone who likes cooking and food' },
+  'travel-book': {
+    priceInShifts: 0.25,
+    restores: {},
+    comfort: 'reading',
+    about: 'a book of walks and day trips round the region, with photos, for someone who likes travel and nature',
+  },
+  magazine: {
+    priceInShifts: 0.1,
+    restores: {},
+    comfort: 'reading',
+    about: "this month's lifestyle magazine, for someone who wants something light: fashion, music and what's on in town",
+  },
+  flowers: { priceInShifts: 0.2, restores: {}, comfort: 'gift', gift: true },
+  chocolates: { priceInShifts: 0.15, restores: {}, comfort: 'gift', gift: true },
+  'scented-candle': { priceInShifts: 0.25, restores: {}, comfort: 'gift', gift: true },
 };
+
+/** Every Comfort Purchase the town sells (the restaurant meal and the bathhouse come with their own tickets). */
+export const COMFORT_PURCHASES = ITEM_IDS.filter((id) => ITEMS[id].comfort !== undefined);

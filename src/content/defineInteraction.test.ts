@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ECONOMY } from '../sim/index.ts';
-import { CAFE_MENU, CONVENIENCE_MENU, defineInteraction, GROCERIES_SOLD, INTERACTIONS } from './index.ts';
+import { ECONOMY, LANGUAGE_CODES } from '../sim/index.ts';
+import {
+  CAFE_COUNTER,
+  CONVENIENCE_MENU,
+  CULTURE_PACKS,
+  defineInteraction,
+  formatLocalMoney,
+  GROCERIES_SOLD,
+  interactionFacts,
+  INTERACTIONS,
+  ITEMS,
+  menuPrice,
+  READING_SOLD,
+} from './index.ts';
 
 function interactionWith(args: z.ZodObject) {
   return defineInteraction({
@@ -106,10 +118,10 @@ describe('waking in the ward: the nurse sees the patient home', () => {
 describe('Goal Interaction #1: order a drink', () => {
   const { orderDrink } = INTERACTIONS;
 
-  it('declares serve_order with an item from the café menu and a quantity', () => {
+  it('declares serve_order with an item from the café counter (Comfort Purchases included) and a quantity', () => {
     expect(orderDrink.toolDeclaration.name).toBe('serve_order');
     const item = orderDrink.toolDeclaration.parameters.properties!.items!.items!.properties!.item!;
-    expect(item.enum).toEqual([...CAFE_MENU]);
+    expect(item.enum).toEqual([...CAFE_COUNTER]);
   });
 
   it('accepts an order of menu items and rejects anything else', () => {
@@ -210,5 +222,46 @@ describe('the landlord’s completions', () => {
     expect(INTERACTIONS.askForMoreTime.resolveCompletion({ days: 3 }, 'en')).toEqual({ success: true, lines: [], rent: { kind: 'extend', days: 3 } });
     expect(INTERACTIONS.askForMoreTime.resolveCompletion({ days: 0 }, 'en').success).toBe(false);
     expect(INTERACTIONS.askForMoreTime.resolveCompletion({ days: ECONOMY.maxRentExtensionDays + 1 }, 'en').success).toBe(false);
+  });
+});
+
+describe('Goal Interactions #18–#20: the bookshop', () => {
+  const { buyABook, buyAGift, recommendABook } = INTERACTIONS;
+
+  it('sells something to read through complete_purchase, by name (#18, Beginner) or recommended (#20, Advanced)', () => {
+    for (const interaction of [buyABook, recommendABook]) {
+      expect(interaction.toolDeclaration.name).toBe('complete_purchase');
+      const item = interaction.toolDeclaration.parameters.properties!.items!.items!.properties!.item!;
+      expect(item.enum).toEqual([...READING_SOLD]);
+      expect(interaction.parseArgs({ items: [{ item: 'magazine', quantity: 1 }] }).success).toBe(true);
+      expect(interaction.parseArgs({ items: [{ item: 'flowers', quantity: 1 }] }).success).toBe(false);
+    }
+    expect([buyABook.band, recommendABook.band]).toEqual(['B', 'A']);
+  });
+
+  it('sells a gift through complete_purchase(wrap) (#19, Intermediate), which must say whether to wrap it', () => {
+    expect(buyAGift.toolDeclaration.name).toBe('complete_purchase');
+    expect(buyAGift.band).toBe('I');
+    expect(buyAGift.parseArgs({ items: [{ item: 'flowers', quantity: 1 }], wrap: true }).success).toBe(true);
+    expect(buyAGift.parseArgs({ items: [{ item: 'flowers', quantity: 1 }] }).success).toBe(false);
+    expect(buyAGift.parseArgs({ items: [{ item: 'magazine', quantity: 1 }], wrap: false }).success).toBe(false);
+  });
+
+  it.each(LANGUAGE_CODES)('tells the %s shopkeeper what each book is for, with its local name and price, to recommend by taste', (packId) => {
+    const facts = interactionFacts(recommendABook, packId);
+    for (const id of READING_SOLD) {
+      const line = facts.find((fact) => fact.includes(`"${id}"`));
+      expect(line).toContain(CULTURE_PACKS[packId].goods[id].name);
+      expect(line).toContain(formatLocalMoney(menuPrice(id, packId), packId));
+      expect(line).toContain(ITEMS[id].about);
+    }
+  });
+
+  it.each(LANGUAGE_CODES)('resolves a gift in %s to a line kept to give, and a book to one that is not', (packId) => {
+    const gift = buyAGift.resolveCompletion({ items: [{ item: 'scented-candle', quantity: 1 }], wrap: true }, packId);
+    const book = buyABook.resolveCompletion({ items: [{ item: 'cookbook', quantity: 1 }] }, packId);
+
+    expect(gift).toMatchObject({ success: true, lines: [{ itemId: 'scented-candle', gift: true, comfort: 'gift' }] });
+    expect(book).toMatchObject({ success: true, lines: [{ itemId: 'cookbook', gift: false, comfort: 'reading' }] });
   });
 });

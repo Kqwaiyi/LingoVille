@@ -59,3 +59,22 @@ describe('NPCs who start conversations themselves', () => {
     expect(interactionStartedWithE('convenience-clerk')).toBe(INTERACTIONS.buyCounterFood);
   });
 });
+
+describe('the shopkeeper at the bookshop', () => {
+  it('sells a book with E in the Beginner and Intermediate bands', () => {
+    for (const step of ['A1', 'A2', 'B1', 'B2'] as const) {
+      expect(interactionStartedWithE('shopkeeper', { shopping: false, step })).toBe(INTERACTIONS.buyABook);
+    }
+  });
+
+  it('recommends a book by taste with E in the Advanced band', () => {
+    for (const step of ['C1', 'C2'] as const) {
+      expect(interactionStartedWithE('shopkeeper', { shopping: false, step })).toBe(INTERACTIONS.recommendABook);
+    }
+  });
+
+  it('sells a gift with F, at any step', () => {
+    expect(interactionStartedWithF('shopkeeper')).toBe(INTERACTIONS.buyAGift);
+    expect(interactionStartedWithF('shopkeeper', { shopping: false, step: 'C2' })).toBe(INTERACTIONS.buyAGift);
+  });
+});

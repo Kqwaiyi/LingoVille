@@ -2,6 +2,7 @@ import { ECONOMY, weekdayOf, WEEKDAYS, type Basket, type LanguageCode, type Open
 import { CULTURE_PACKS, localPlaceName, localShop } from './culturePacks.ts';
 import { chargeInShifts, formatLocalMoney, menuPrice } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
+import { ITEMS } from './items.ts';
 import { placeHours } from './openingHours.ts';
 import { formatTime } from './places.ts';
 
@@ -98,6 +99,11 @@ export function interactionFacts(interaction: Interaction, packId: LanguageCode,
         return interaction.items.map(
           (id) => `On the menu: ${goods[id].name}, ${formatLocalMoney(menuPrice(id, packId), packId)} (menu id "${id}").`,
         );
+      case 'stock':
+        return interaction.items.map((id) => {
+          const { about } = ITEMS[id];
+          return `For sale: ${goods[id].name}, ${formatLocalMoney(menuPrice(id, packId), packId)} (menu id "${id}")${about ? `: ${about}` : ''}.`;
+        });
       case 'shelves':
         return interaction.items.map(
           (id) => `On the shelves: ${goods[id].name} (shelf id "${id}"), ${formatLocalMoney(menuPrice(id, packId), packId)}.`,

@@ -110,6 +110,8 @@ export const ECONOMY = {
   faintingBillInShifts: 1.5,
   gymMembershipInShifts: 0.5,
   gymMembershipDays: 30,
+  /** What a Comfort Purchase may cost: bought to feel good, not to get by. */
+  comfortPurchaseInShifts: { min: 0.1, max: 0.3 },
   /** Money is held in Shifts, so one Shift's base pay is 1 by definition. Every price is a ratio of it. */
   shiftBasePayInShifts: 1,
   shiftCustomers: { min: 5, max: 8 },
@@ -212,6 +214,8 @@ export const MOOD = {
     smallTalkExchange: { stranger: 2, acquaintance: 3, friend: 4 },
     sleep: 5,
     bathhouse: 8,
+    /** A Comfort Purchase, by kind, on top of the conversation's success. Once per kind per purchase, however many are bought. */
+    comfortPurchase: { cafe: 3, reading: 5, gift: 3 },
     gymSession: 4,
     goodHomeMeal: 2,
     unmetNeedPerGameHour: -1,
@@ -229,6 +233,9 @@ export const MOOD = {
   /** The lowest Mood each face on the dock's Mood gauge shows from. */
   faceFrom: { miserable: 0, low: 0.2 * METER_MAX, okay: 0.4 * METER_MAX, good: 0.6 * METER_MAX, great: 0.8 * METER_MAX },
 } as const;
+
+/** The kinds of Comfort Purchase, each with its own Mood lift. */
+export type ComfortKind = keyof typeof MOOD.changes.comfortPurchase;
 
 // --- Life Skills (default: open question 5) ---------------------------------
 

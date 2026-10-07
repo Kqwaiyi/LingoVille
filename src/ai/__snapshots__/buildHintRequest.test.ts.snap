@@ -61,6 +61,8 @@ What the barista knows:
 - On the menu: Filterkaffee, 3,80 € (menu id "coffee").
 - On the menu: Schwarztee, 3 € (menu id "tea").
 - On the menu: Butterbrezel, 6 € (menu id "pastry").
+- On the menu: Käsekuchen, 7,20 € (menu id "cake").
+- On the menu: Heiße Schokolade, 6 € (menu id "special-drink").
 - Card and cash are both fine.
 - The toilet is at the back.
 - There is free Wi-Fi.
@@ -142,6 +144,8 @@ What the barista knows:
 - On the menu: ブレンドコーヒー, ¥380 (menu id "coffee").
 - On the menu: 紅茶, ¥300 (menu id "tea").
 - On the menu: メロンパン, ¥600 (menu id "pastry").
+- On the menu: いちごのショートケーキ, ¥720 (menu id "cake").
+- On the menu: クリームソーダ, ¥600 (menu id "special-drink").
 - Cash, card and IC cards are all fine.
 - The toilet is at the back.
 - There is free Wi-Fi.

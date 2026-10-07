@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LANGUAGE_CODES } from '../sim/index.ts';
-import { CONVENIENCE_MENU, GROCERIES_SOLD, ITEMS, ITEM_IDS, localPrice } from './index.ts';
+import { ECONOMY, LANGUAGE_CODES, MOOD } from '../sim/index.ts';
+import { chargeInShifts, COMFORT_PURCHASES, CONVENIENCE_MENU, GIFTS_SOLD, GROCERIES_SOLD, ITEMS, ITEM_IDS, localPrice } from './index.ts';
 
 /** About 0.06 of a Shift per meal, from the spec's ratio ladder. */
 const GROCERY_SHIFTS_PER_MEAL = 0.06;
@@ -40,5 +40,34 @@ describe('convenience store counter food', () => {
 
   it('prices the bento at about 0.12 Shift', () => {
     expect(ITEMS.bento.priceInShifts).toBeCloseTo(0.12, 3);
+  });
+});
+
+describe('Comfort Purchases', () => {
+  it('cover café cake or a special drink, a book or magazine, and flowers or a gift', () => {
+    expect(COMFORT_PURCHASES).toEqual(
+      expect.arrayContaining(['cake', 'special-drink', 'mystery-novel', 'magazine', 'flowers', 'chocolates']),
+    );
+  });
+
+  it.each(COMFORT_PURCHASES)('%s costs 0.1–0.3 Shift', (id) => {
+    expect(ITEMS[id].priceInShifts).toBeGreaterThanOrEqual(ECONOMY.comfortPurchaseInShifts.min);
+    expect(ITEMS[id].priceInShifts).toBeLessThanOrEqual(ECONOMY.comfortPurchaseInShifts.max);
+  });
+
+  it.each(LANGUAGE_CODES)('still cost 0.1–0.3 Shift once rounded to %s price points', (packId) => {
+    const { min, max } = ECONOMY.comfortPurchaseInShifts;
+    for (const id of COMFORT_PURCHASES) {
+      expect(chargeInShifts(ITEMS[id].priceInShifts, packId)).toBeGreaterThanOrEqual(min);
+      expect(chargeInShifts(ITEMS[id].priceInShifts, packId)).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it('each lift Mood by an amount set in the tuning module', () => {
+    for (const id of COMFORT_PURCHASES) expect(MOOD.changes.comfortPurchase[ITEMS[id].comfort!]).toBeGreaterThan(0);
+  });
+
+  it('the gifts are kept to give, and nothing else is', () => {
+    expect(ITEM_IDS.filter((id) => ITEMS[id].gift)).toEqual([...GIFTS_SOLD]);
   });
 });

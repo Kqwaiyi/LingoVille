@@ -1,7 +1,7 @@
 import type { LanguageCode } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { formatLocalMoney, menuPrice } from './currency.ts';
-import { CAFE_MENU } from './items.ts';
+import { CAFE_COUNTER } from './items.ts';
 import { placeHours } from './openingHours.ts';
 import { formatTime } from './places.ts';
 
@@ -29,7 +29,7 @@ export function worldSign(signId: SignId, packId: LanguageCode): SignLine[] {
     case 'cafe-menu':
       return [
         { ...pack.signs.menu, note: null },
-        ...CAFE_MENU.map((id) => {
+        ...CAFE_COUNTER.map((id) => {
           const { name, glosses } = pack.goods[id];
           return { text: name, note: formatLocalMoney(menuPrice(id, packId), packId), glosses };
         }),

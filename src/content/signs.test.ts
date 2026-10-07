@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { LANGUAGE_CODES } from '../sim/index.ts';
-import { CAFE_MENU, CULTURE_PACKS, formatLocalMoney, menuPrice, SIGN_IDS, worldSign } from './index.ts';
+import { CAFE_COUNTER, CULTURE_PACKS, formatLocalMoney, menuPrice, SIGN_IDS, worldSign } from './index.ts';
 
 describe('worldSign', () => {
-  it('writes the café menu board from the pack’s goods, with local prices', () => {
+  it('writes the café menu board from the pack’s goods, Comfort Purchases included, with local prices', () => {
     const [title, ...items] = worldSign('cafe-menu', 'de');
     expect(title).toEqual({ text: 'Karte', note: null, glosses: CULTURE_PACKS.de.signs.menu.glosses });
     expect(items).toEqual(
-      CAFE_MENU.map((id) => {
+      CAFE_COUNTER.map((id) => {
         const good = CULTURE_PACKS.de.goods[id];
         return { text: good.name, note: formatLocalMoney(menuPrice(id, 'de'), 'de'), glosses: good.glosses };
       }),

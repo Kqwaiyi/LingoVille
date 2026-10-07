@@ -1,5 +1,14 @@
 import { useEffect } from 'react';
-import { formatLocalMoney, formatTime, menuPrice, TOWN_NPCS, type EffectKind, type TownNpcId } from '../content/index.ts';
+import {
+  formatLocalMoney,
+  formatTime,
+  INTERACTIONS,
+  menuPrice,
+  TOWN_NPCS,
+  type EffectKind,
+  type Interaction,
+  type TownNpcId,
+} from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
 import {
   selectConversation,
@@ -27,6 +36,10 @@ const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askFor
   extendRent: 'prompt.askForTime',
   hire: 'prompt.askForWork',
 };
+
+/** What F offers with this conversation: at the bookshop, buying a gift, and otherwise by its effect. */
+const fPrompt = (interaction: Interaction) =>
+  interaction === INTERACTIONS.buyAGift ? 'prompt.buyGift' : (F_PROMPTS[interaction.effect.kind] ?? 'prompt.ask');
 
 /**
  * "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second
@@ -122,7 +135,7 @@ export function InteractionPrompt() {
           {talkWithF && (
             <>
               {' · '}
-              <Trans i18nKey={F_PROMPTS[talkWithF.effect.kind] ?? 'prompt.ask'} components={{ kbd: <kbd /> }} />
+              <Trans i18nKey={fPrompt(talkWithF)} components={{ kbd: <kbd /> }} />
             </>
           )}
           {smallTalkKey === 'T' && (

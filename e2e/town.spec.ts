@@ -55,10 +55,10 @@ test('each place has its staff: Press E near the bookshop’s shopkeeper', async
   await expect(placeLine(page)).toContainText('Bookshop');
   await page.locator('canvas').click();
   await page.keyboard.down('KeyW');
-  await expect(page.getByText('to chat — shopkeeper')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText('to talk — shopkeeper')).toBeVisible({ timeout: 5_000 });
   await page.keyboard.up('KeyW');
 
-  // With nothing else to talk about yet, E starts Small Talk with the shopkeeper.
+  // E sells a book; the shopkeeper chats on T.
   await page.keyboard.press('KeyE');
   await expect(page.getByRole('complementary', { name: 'Conversation' })).toBeVisible();
 });

@@ -1,7 +1,18 @@
 import { z } from 'zod';
 import { ECONOMY } from '../sim/index.ts';
 import { defineInteraction, type Interaction } from './defineInteraction.ts';
-import { CAFE_MENU, CONVENIENCE_MENU, GROCERIES_SOLD, type ItemId } from './items.ts';
+import { CAFE_COUNTER, CONVENIENCE_MENU, GIFTS_SOLD, GROCERIES_SOLD, READING_SOLD, type ItemId } from './items.ts';
+
+/** The lines of an order or a sale from a menu: each item by its menu id, and how many. */
+const orderItems = (menu: readonly [ItemId, ...ItemId[]]) =>
+  z
+    .array(
+      z.object({
+        item: z.enum(menu).describe('The menu id given in FACTS.'),
+        quantity: z.int().min(1).max(ECONOMY.maxQuantityPerOrderLine),
+      }),
+    )
+    .min(1);
 
 /** `serve_order(items[])` over a menu: the café, convenience store and restaurant orders share it. */
 const serveOrder = (menu: readonly [ItemId, ...ItemId[]]) => ({
@@ -9,17 +20,17 @@ const serveOrder = (menu: readonly [ItemId, ...ItemId[]]) => ({
   description:
     'Serve the customer exactly the order they confirmed after your read-back. ' +
     'Answers "served", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
-  args: z.object({
-    items: z
-      .array(
-        z.object({
-          item: z.enum(menu).describe('The menu id given in FACTS.'),
-          quantity: z.int().min(1).max(ECONOMY.maxQuantityPerOrderLine),
-        }),
-      )
-      .min(1),
-  }),
+  args: z.object({ items: orderItems(menu) }),
 });
+
+/** `complete_purchase(items[])` at the bookshop: selling something to read, asked for by name (#18) or recommended (#20). */
+const sellReading = {
+  name: 'complete_purchase',
+  description:
+    'Sell the customer exactly what they confirmed after your read-back, and take payment. ' +
+    'Answers "served", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
+  args: z.object({ items: orderItems(READING_SOLD) }),
+};
 
 /** When a hired applicant says they can start. Shifts have no schedule, so it is only what was agreed. */
 export const START_WHEN = ['today', 'tomorrow', 'this_week', 'next_week'] as const;
@@ -56,8 +67,8 @@ export const INTERACTIONS = {
     npcId: 'barista',
     goal: "Take the customer's order.",
     facts: ['openingHours', 'menu', 'placeFacts', 'customs'],
-    items: CAFE_MENU,
-    completion: serveOrder(CAFE_MENU),
+    items: CAFE_COUNTER,
+    completion: serveOrder(CAFE_COUNTER),
     band: 'B',
     effect: { kind: 'serveOrder' },
   }),
@@ -155,6 +166,56 @@ export const INTERACTIONS = {
     items: CONVENIENCE_MENU,
     completion: serveOrder(CONVENIENCE_MENU),
     band: 'B',
+    effect: { kind: 'serveOrder' },
+  }),
+  // #18. Buying a book or a magazine at the bookshop: a Comfort Purchase.
+  buyABook: defineInteraction({
+    id: 'buy-a-book',
+    placeId: 'bookshop',
+    npcId: 'shopkeeper',
+    goal: 'Sell the customer a book or a magazine. Find out which one they would like.',
+    facts: ['openingHours', 'stock'],
+    items: READING_SOLD,
+    completion: sellReading,
+    band: 'B',
+    effect: { kind: 'serveOrder' },
+  }),
+  // #19. Buying a gift at the bookshop, wrapped or not. It goes into the inventory, ready to give.
+  buyAGift: defineInteraction({
+    id: 'buy-a-gift',
+    placeId: 'bookshop',
+    npcId: 'shopkeeper',
+    goal:
+      'The customer wants to buy a gift for someone. Help them choose one, and ask whether they would like it gift-wrapped: ' +
+      'wrapping is free. Read back the gift, its price and whether to wrap it.',
+    facts: ['openingHours', 'stock'],
+    items: GIFTS_SOLD,
+    completion: {
+      name: 'complete_purchase',
+      description:
+        'Sell the customer the gift they confirmed after your read-back, wrapped if they asked, and take payment. ' +
+        'Answers "served", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
+      args: z.object({
+        items: orderItems(GIFTS_SOLD),
+        wrap: z.boolean().describe('The customer wants it gift-wrapped.'),
+      }),
+    },
+    band: 'I',
+    effect: { kind: 'serveOrder' },
+  }),
+  // #20. Asking the shopkeeper to recommend something by taste. From the Advanced band, E at the shopkeeper starts it instead of #18.
+  recommendABook: defineInteraction({
+    id: 'recommend-a-book',
+    placeId: 'bookshop',
+    npcId: 'shopkeeper',
+    goal:
+      'The customer would like you to recommend something to read. Ask what they like (what they enjoy reading, or doing), ' +
+      'then recommend the book or magazine in FACTS that suits their taste best, and say why. ' +
+      'If they would rather have something else in FACTS, sell them that.',
+    facts: ['openingHours', 'stock'],
+    items: READING_SOLD,
+    completion: sellReading,
+    band: 'A',
     effect: { kind: 'serveOrder' },
   }),
   // Not one the Player starts: the nurse begins it when the Character wakes from Fainting.

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { JOB_IDS, type Basket, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
+import { JOB_IDS, type Basket, type ComfortKind, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { menuPrice } from './currency.ts';
 import { ITEM_IDS, ITEMS, type ItemId, type Restores } from './items.ts';
@@ -11,7 +11,7 @@ import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.t
 export type Band = 'B' | 'I' | 'A';
 
 /** Which Culture Pack facts the NPC is told, so it can answer side questions. */
-export const FACT_SOURCES = ['openingHours', 'menu', 'shelves', 'basket', 'placeFacts', 'customs', 'ward', 'rent', 'newcomerDiscount'] as const;
+export const FACT_SOURCES = ['openingHours', 'menu', 'stock', 'shelves', 'basket', 'placeFacts', 'customs', 'ward', 'rent', 'newcomerDiscount'] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
 /** The arguments a `serveOrder` effect reads from its completion function. */
@@ -29,7 +29,7 @@ type HireArgs = { name: string };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
- * `serveOrder` serves the confirmed items from the menu and charges for them.
+ * `serveOrder` serves the confirmed items from the menu and charges for them: used up on the spot, or for a gift, kept.
  * `purchase` charges for what the Character brought to the till, which goes into the inventory.
  * `pointTo` marks where an item is. `payRent` pays the landlord, and `extendRent`
  * gives the Character more time to pay. `hire` gives the Character its Job, once the sim
@@ -64,8 +64,11 @@ export type InteractionDefinition<Args extends z.ZodObject> = {
 /** An item as served: its local name, and its glosses in the other Native Languages. */
 export type ServedItem = { itemId: ItemId; name: string; glosses: Glosses; quantity: number };
 
-/** One line of a confirmed order or purchase, with what each one costs and gives back, and whether it goes off (groceries). The sim adds them up. */
-export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores; goesOff: boolean };
+/**
+ * One line of a confirmed order or purchase, with what each one costs and gives back, whether it goes off (groceries),
+ * whether it's a gift (kept to give), and what kind of Comfort Purchase it is, if any. The sim adds them up.
+ */
+export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores; goesOff: boolean; gift: boolean; comfort: ComfortKind | null };
 
 export type ParsedArgs = { success: true; data: Record<string, unknown> } | { success: false; error: string };
 
@@ -128,6 +131,8 @@ function orderLines(items: Basket, packId: LanguageCode): OrderLine[] {
     priceInShifts: menuPrice(itemId, packId),
     restores: ITEMS[itemId].restores,
     goesOff: ITEMS[itemId].meals !== undefined,
+    gift: ITEMS[itemId].gift === true,
+    comfort: ITEMS[itemId].comfort ?? null,
   }));
 }
 

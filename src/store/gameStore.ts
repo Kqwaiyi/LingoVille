@@ -2426,11 +2426,14 @@ export const selectShelf = (s: GameStore) => {
   const interactable = selectInteractable(s);
   return isShelf(interactable) ? interactable : null;
 };
-/** The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring and the Jobs they have, or null. */
+/**
+ * The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring, the Jobs
+ * they have and their Proficiency Step, or null.
+ */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
   if (!isNamedNpc(npcId)) return null;
-  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: s.game.possessions.jobsHired });
+  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: s.game.possessions.jobsHired, step: s.game.proficiencyStep });
 };
 /**
  * The key that starts Small Talk with the Named NPC the Character is next to: E with someone who has no other

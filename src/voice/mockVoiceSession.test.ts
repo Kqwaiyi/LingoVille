@@ -840,3 +840,82 @@ describe('mock VoiceSession: a Shift Customer', () => {
     expect(turns.at(-1)).toContain(goods.tea.name);
   });
 });
+
+const atTheBookshop = (packId: LanguageCode, interaction: Interaction = INTERACTIONS.buyABook, step: 'A1' | 'C1' = 'A1') =>
+  open(buildNpcSession(interaction, CULTURE_PACKS[packId], step, NAMED_NPCS.shopkeeper, CLOCK_10AM));
+
+/** What the Player asks for at the bookshop and the café's Comfort Purchases, in each pack. */
+const COMFORTS_ASKED = {
+  ja: { magazine: '雑誌をください', flowers: '花束をください', cake: 'ケーキをください' },
+  zh: { magazine: '我要杂志', flowers: '我要买花', cake: '我要提拉米苏' },
+  en: { magazine: 'a magazine please', flowers: 'some flowers please', cake: 'a slice of victoria sponge please' },
+  de: { magazine: 'eine Zeitschrift bitte', flowers: 'einen Blumenstrauß bitte', cake: 'ein Stück Käsekuchen bitte' },
+} as const;
+
+describe('mock VoiceSession: the bookshop (#18, #19, #20)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('reads back a magazine with its price, then sells it with complete_purchase (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheBookshop(packId);
+
+    await say(COMFORTS_ASKED[packId].magazine);
+    expect(turns.at(-1)!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods.magazine.name.toLowerCase());
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'complete_purchase', args: { items: [{ item: 'magazine', quantity: 1 }] } }]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('greets as the shopkeeper, not as the barista or the cashier', async () => {
+    const barista = await atTheCounter('ja');
+    const cashier = await atTheTill('ja');
+    const shopkeeper = await atTheBookshop('ja');
+    expect(shopkeeper.turns[0]).not.toBe(barista.turns[0]);
+    expect(shopkeeper.turns[0]).not.toBe(cashier.turns[0]);
+  });
+
+  it('sells a book asked for by name when recommending, too (#20)', async () => {
+    const { toolCalls, say } = await atTheBookshop('en', INTERACTIONS.recommendABook, 'C1');
+    await say('a magazine please');
+    await say('yes');
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'complete_purchase', args: { items: [{ item: 'magazine', quantity: 1 }] } }]);
+  });
+
+  it.each(LANGUAGE_CODES)('asks whether to wrap a gift, reads both back, then sells it wrapped (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheBookshop(packId, INTERACTIONS.buyAGift);
+
+    await say(COMFORTS_ASKED[packId].flowers);
+    await say(yes);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods.flowers.name.toLowerCase());
+    await say(yes);
+    expect(toolCalls).toEqual([
+      { id: expect.any(String), name: 'complete_purchase', args: { items: [{ item: 'flowers', quantity: 1 }], wrap: true } },
+    ]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(4);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('sells a gift unwrapped when the Player says no to wrapping', async () => {
+    const { toolCalls, say } = await atTheBookshop('zh', INTERACTIONS.buyAGift);
+    await say('我要买花');
+    await say(PLAYER.zh.no);
+    await say(PLAYER.zh.yes);
+    expect(toolCalls.at(-1)!.args).toEqual({ items: [{ item: 'flowers', quantity: 1 }], wrap: false });
+  });
+
+  it.each(LANGUAGE_CODES)('the barista sells the café’s cake, a Comfort Purchase (%s)', async (packId) => {
+    const { toolCalls, say } = await atTheCounter(packId);
+    await say(COMFORTS_ASKED[packId].cake);
+    await say(PLAYER[packId].yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'serve_order', args: { items: [{ item: 'cake', quantity: 1 }] } }]);
+  });
+});

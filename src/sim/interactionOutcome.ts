@@ -57,6 +57,12 @@ function orderTotals(lines: OrderLine[]) {
   return { costInShifts, hunger, thirst };
 }
 
+/** What the Comfort Purchases among these lines lift Mood by: each kind once, however many are bought. */
+function comfortMood(lines: OrderLine[]): number {
+  const kinds = new Set(lines.flatMap(({ comfort }) => (comfort ? [comfort] : [])));
+  return [...kinds].reduce((lift, kind) => lift + MOOD.changes.comfortPurchase[kind], 0);
+}
+
 /** The landlord's completion: rent paid, checked against what is owed and what the Character has, or more time given. */
 function applyRentChange(state: GameState, change: RentChange): { state: GameState; result: OutcomeResult } {
   if (change.kind === 'extend') {
@@ -82,7 +88,7 @@ function applyJobApplication(state: GameState, { jobId, name }: JobApplication):
 /**
  * Applies the end of a Goal Interaction. Success validates the completion
  * arguments and checks the Character can afford them (money is never in the
- * prompt), then pays, applies the effect and lifts Mood. Failure dips Mood a
+ * prompt), then pays, applies the effect and lifts Mood, more for a Comfort Purchase. Failure dips Mood a
  * little and charges nothing. Abandoning costs nothing. A finished conversation,
  * however it ended, counts as meeting the NPC once more, and a success makes them
  * a little more familiar.
@@ -120,9 +126,10 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
       const { character, possessions } = state;
       if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
 
-      // A purchase is taken home; an order is eaten or drunk on the spot (groceries fill nothing until cooked).
-      const inventory =
-        interaction.effect.kind === 'purchase' ? stockInventory(possessions.inventory, completion.lines, state.clock.day) : possessions.inventory;
+      // A purchase is taken home, and so is a gift, to give. The rest of an order is eaten, drunk or read on the spot
+      // (groceries fill nothing until cooked).
+      const kept = interaction.effect.kind === 'purchase' ? completion.lines : completion.lines.filter(({ gift }) => gift);
+      const inventory = stockInventory(possessions.inventory, kept, state.clock.day);
       const paid: GameState = {
         ...state,
         possessions: { ...possessions, inventory },
@@ -133,7 +140,7 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
           thirst: clampMeter(character.thirst + thirst),
         },
       };
-      const succeeded = changeMood(paid, MOOD.changes.goalInteractionSuccess);
+      const succeeded = changeMood(paid, MOOD.changes.goalInteractionSuccess + comfortMood(completion.lines));
       const served = completion.lines.map(({ itemId, name, glosses, quantity }) => ({ itemId, name, glosses, quantity }));
       return {
         state: succeeded.state,
