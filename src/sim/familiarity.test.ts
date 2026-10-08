@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { INTERACTIONS } from '../content/index.ts';
+import { INTERACTIONS, NAMED_NPCS, type ItemId } from '../content/index.ts';
 import {
   applyInteractionOutcome,
   createSave,
   endSmallTalk,
   FAMILIARITY,
   familiarityTier,
+  giveGift,
   learnName,
   memoryOf,
   MOOD,
   rememberTopic,
+  revealFavourite,
   SMALL_TALK,
   smallTalkExchange,
   startSmallTalk,
@@ -180,6 +182,94 @@ describe('learn_name', () => {
 
     expect(learned).toBe(false);
     expect(state).toBe(before);
+  });
+});
+
+describe('giving a gift', () => {
+  const regular = NAMED_NPCS['park-regular-1'];
+  /** A gift the NPC likes, but isn't their favourite. */
+  const notTheirFavourite: ItemId = (['flowers', 'chocolates'] as const).find((gift) => gift !== regular.favouriteGift)!;
+
+  function holding(state: GameState, ...gifts: ItemId[]): GameState {
+    const inventory = gifts.map((itemId) => ({ itemId, quantity: 1, expiresOnDay: null }));
+    return { ...state, possessions: { ...state.possessions, inventory } };
+  }
+
+  function daysLater(state: GameState, days: number): GameState {
+    return { ...state, clock: { ...state.clock, day: state.clock.day + days } };
+  }
+
+  it('hands the gift over and bumps Familiarity once', () => {
+    const before = holding(inThePark(), notTheirFavourite);
+
+    const { state, counted, favourite } = giveGift(before, regular, notTheirFavourite);
+
+    expect(counted).toBe(true);
+    expect(favourite).toBe(false);
+    expect(memoryOf(state, 'park-regular-1').familiarity).toBe(FAMILIARITY.gift);
+    expect(memoryOf(state, 'park-regular-1').lastGiftDay).toBe(before.clock.day);
+    expect(state.possessions.inventory).toEqual([]);
+  });
+
+  it('counts the favourite for more', () => {
+    const { state, favourite } = giveGift(holding(inThePark(), regular.favouriteGift), regular, regular.favouriteGift);
+
+    expect(favourite).toBe(true);
+    expect(memoryOf(state, 'park-regular-1').familiarity).toBe(FAMILIARITY.favouriteGift);
+    expect(FAMILIARITY.favouriteGift).toBeGreaterThan(FAMILIARITY.gift);
+  });
+
+  it('gives just one of several alike', () => {
+    const before = holding(inThePark(), regular.favouriteGift);
+    const two = { ...before, possessions: { ...before.possessions, inventory: [{ itemId: regular.favouriteGift, quantity: 2, expiresOnDay: null }] } };
+
+    const { state } = giveGift(two, regular, regular.favouriteGift);
+
+    expect(state.possessions.inventory).toEqual([{ itemId: regular.favouriteGift, quantity: 1, expiresOnDay: null }]);
+  });
+
+  it('counts only one gift per NPC per week, though the gift is still given', () => {
+    const first = giveGift(holding(inThePark(), notTheirFavourite, regular.favouriteGift), regular, notTheirFavourite).state;
+    const almostAWeek = daysLater(first, FAMILIARITY.giftCooldownDays - 1);
+
+    const second = giveGift(almostAWeek, regular, regular.favouriteGift);
+
+    expect(second.counted).toBe(false);
+    expect(memoryOf(second.state, 'park-regular-1').familiarity).toBe(FAMILIARITY.gift);
+    expect(memoryOf(second.state, 'park-regular-1').lastGiftDay).toBe(first.clock.day);
+    expect(second.state.possessions.inventory).toEqual([]);
+  });
+
+  it('counts again a week after the last gift that counted', () => {
+    const first = giveGift(holding(inThePark(), notTheirFavourite, notTheirFavourite), regular, notTheirFavourite).state;
+
+    const second = giveGift(daysLater(first, FAMILIARITY.giftCooldownDays), regular, notTheirFavourite);
+
+    expect(second.counted).toBe(true);
+    expect(memoryOf(second.state, 'park-regular-1').familiarity).toBe(2 * FAMILIARITY.gift);
+  });
+
+  it("counts each NPC's week on their own", () => {
+    const first = giveGift(holding(inThePark(), notTheirFavourite, notTheirFavourite), regular, notTheirFavourite).state;
+
+    expect(giveGift(first, NAMED_NPCS['park-regular-2'], notTheirFavourite).counted).toBe(true);
+  });
+
+  it("is a one-off bump outside the day's cap", () => {
+    const capped = chat(holding(inThePark(), notTheirFavourite), 'park-regular-1', EXCHANGES_PER_DAY);
+
+    const { state } = giveGift(capped, regular, notTheirFavourite);
+
+    expect(memoryOf(state, 'park-regular-1').familiarity).toBe(FAMILIARITY.dailyCapPerNpc + FAMILIARITY.gift);
+  });
+});
+
+describe('reveal_favourite', () => {
+  it('remembers that the NPC has told the Character their favourite gift', () => {
+    const state = revealFavourite(inThePark(), 'park-regular-1');
+
+    expect(memoryOf(state, 'park-regular-1').favouriteKnown).toBe(true);
+    expect(memoryOf(state, 'park-regular-2').favouriteKnown).toBe(false);
   });
 });
 

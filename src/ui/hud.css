@@ -708,6 +708,68 @@ ruby {
   font-size: 15px;
 }
 
+/* Gives a gift from the inventory: the list opens upwards from its button, over the chat. */
+.chat-gift {
+  position: relative;
+}
+
+.chat-gift > button,
+.gift-list button {
+  padding: 8px 12px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.gift-list {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.gift-list h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.gift-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gift-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gift-list li + li {
+  margin-top: 6px;
+}
+
+.gift-list li button {
+  white-space: normal;
+  text-align: left;
+}
+
+.gift-favourite {
+  color: #b07d12;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .closing-card {
   padding: 14px 16px 16px;
   border-top: 1px solid var(--rule);

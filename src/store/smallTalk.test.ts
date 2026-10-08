@@ -1,8 +1,16 @@
 import 'fake-indexeddb/auto';
 import { createStore } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
-import { LEARN_NAME_TOOL, WRAP_UP_SCENE, type NpcSession, type Recap, type RecapRequest, type ToolResponse } from '../ai/index.ts';
-import { INTERACTIONS, placeHours, type TownNpcId } from '../content/index.ts';
+import {
+  LEARN_NAME_TOOL,
+  REVEAL_FAVOURITE_TOOL,
+  WRAP_UP_SCENE,
+  type NpcSession,
+  type Recap,
+  type RecapRequest,
+  type ToolResponse,
+} from '../ai/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, placeHours, type ItemId, type TownNpcId } from '../content/index.ts';
 import { createSave, FAMILIARITY, memoryOf, MOOD, type GameState, type NpcMemory } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -11,6 +19,7 @@ import {
   DEV_SETUP,
   selectClosingCard,
   selectConversation,
+  selectGiftsToGive,
   selectSmallTalkKey,
   selectToast,
   type GameStoreDeps,
@@ -79,7 +88,7 @@ describe('starting Small Talk', () => {
     store.getState().talk('E');
 
     expect(selectConversation(store.getState())).toMatchObject({ npcId: 'park-regular-1', interaction: null });
-    expect(npc.session?.tools.map((tool) => tool.name)).toEqual([LEARN_NAME_TOOL, 'not_understood']);
+    expect(npc.session?.tools.map((tool) => tool.name)).toEqual([LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('starts with T on staff, whose E is still their Goal Interaction', () => {
@@ -264,6 +273,111 @@ describe('learn_name', () => {
     npc.calls(LEARN_NAME_TOOL, { name: DEV_SETUP.characterName });
 
     expect(memoryOf(store.getState().game, 'barista').knowsName).toBe(true);
+  });
+});
+
+/** The DEV_SETUP game with these gifts in the inventory, one of each. */
+function holding(...gifts: ItemId[]): GameState {
+  const game = createSave(DEV_SETUP);
+  return { ...game, possessions: { ...game.possessions, inventory: gifts.map((itemId) => ({ itemId, quantity: 1, expiresOnDay: null })) } };
+}
+
+const regular = NAMED_NPCS['park-regular-1'];
+const notTheirFavourite = (['flowers', 'chocolates'] as const).find((gift) => gift !== regular.favouriteGift)!;
+
+describe('giving a gift', () => {
+  it('hands a gift from the inventory to the NPC in Small Talk, who is told it by its local name', () => {
+    const setup = chattingInThePark(holding(notTheirFavourite, 'cake'));
+    expect(selectGiftsToGive(setup.store.getState())).toEqual([{ itemId: notTheirFavourite, quantity: 1, favourite: false }]);
+
+    setup.store.getState().giveGift(notTheirFavourite);
+
+    const { game } = setup.store.getState();
+    expect(game.possessions.inventory.map((item) => item.itemId)).toEqual(['cake']);
+    expect(memoryOf(game, 'park-regular-1').familiarity).toBe(FAMILIARITY.gift);
+    expect(setup.npc.sent.at(-1)).toMatch(new RegExp(`^\\[SCENE: .*gift: ${CULTURE_PACKS.ja.goods[notTheirFavourite].name}\\.`));
+    expect(selectGiftsToGive(setup.store.getState())).toEqual([]);
+  });
+
+  it("doesn't count the gift as a Small Talk exchange", () => {
+    const setup = chattingInThePark(holding(notTheirFavourite));
+
+    setup.store.getState().giveGift(notTheirFavourite);
+    setup.npc.says('わあ、ありがとう！');
+
+    expect(selectConversation(setup.store.getState())?.smallTalk?.turns).toBe(0);
+  });
+
+  it('works in a Goal Interaction too', () => {
+    const { store, npc } = nextTo('barista', 'cafe', holding('flowers'));
+    store.getState().talk('E');
+    npc.says('いらっしゃいませ！');
+
+    store.getState().giveGift('flowers');
+
+    expect(store.getState().game.possessions.inventory).toEqual([]);
+    expect(memoryOf(store.getState().game, 'barista').lastGiftDay).toBe(store.getState().game.clock.day);
+    expect(selectConversation(store.getState())?.outcome).toBeNull();
+  });
+
+  it('has the NPC delighted by their favourite', () => {
+    const setup = chattingInThePark(holding(regular.favouriteGift));
+
+    setup.store.getState().giveGift(regular.favouriteGift);
+
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').familiarity).toBe(FAMILIARITY.favouriteGift);
+    expect(setup.npc.sent.at(-1)).toContain('the gift you would love most');
+  });
+
+  it("counts only one gift a week, and the NPC says the Character shouldn't have", () => {
+    const setup = chattingInThePark(holding(notTheirFavourite, regular.favouriteGift));
+
+    setup.store.getState().giveGift(notTheirFavourite);
+    setup.store.getState().giveGift(regular.favouriteGift);
+
+    expect(setup.store.getState().game.possessions.inventory).toEqual([]);
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').familiarity).toBe(FAMILIARITY.gift);
+    expect(setup.npc.sent.at(-1)).toMatch(/only a few days ago/);
+  });
+
+  it('marks the favourite only once the NPC has told it', () => {
+    const setup = chattingInThePark(holding(regular.favouriteGift));
+    expect(selectGiftsToGive(setup.store.getState())).toEqual([{ itemId: regular.favouriteGift, quantity: 1, favourite: false }]);
+
+    setup.npc.calls(REVEAL_FAVOURITE_TOOL, { gift: '花' });
+
+    expect(selectGiftsToGive(setup.store.getState())).toEqual([{ itemId: regular.favouriteGift, quantity: 1, favourite: true }]);
+  });
+
+  it('offers nothing to give once the outcome is decided, or outside a conversation', () => {
+    const setup = chattingInThePark(holding(notTheirFavourite));
+    for (let i = 0; i < smallTalkOf(setup.store)!.exchanges; i++) exchange(setup);
+
+    expect(selectConversation(setup.store.getState())?.outcome).not.toBeNull();
+    expect(selectGiftsToGive(setup.store.getState())).toEqual([]);
+    setup.store.getState().giveGift(notTheirFavourite);
+    expect(setup.store.getState().game.possessions.inventory).toHaveLength(1);
+    expect(selectGiftsToGive(nextTo('park-regular-1', 'park', holding(notTheirFavourite)).store.getState())).toEqual([]);
+  });
+});
+
+describe('reveal_favourite', () => {
+  it('remembers the NPC told the Character their favourite gift', () => {
+    const setup = chattingInThePark();
+
+    setup.npc.calls(REVEAL_FAVOURITE_TOOL, { gift: '花' });
+
+    expect(setup.npc.answers).toEqual([{ result: 'remembered' }]);
+    expect(memoryOf(setup.store.getState().game, 'park-regular-1').favouriteKnown).toBe(true);
+  });
+
+  it('works in a Goal Interaction too', () => {
+    const { store, npc } = nextTo('barista', 'cafe');
+    store.getState().talk('E');
+
+    npc.calls(REVEAL_FAVOURITE_TOOL, { gift: 'チョコレート' });
+
+    expect(memoryOf(store.getState().game, 'barista').favouriteKnown).toBe(true);
   });
 });
 

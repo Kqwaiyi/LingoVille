@@ -5,9 +5,11 @@ import {
   readChangedOrder,
   readChangeScene,
   readCheckout,
+  readGiftScene,
   readServedScene,
   readShiftOrder,
   readTable,
+  REVEAL_FAVOURITE_TOOL,
   WRAP_UP_SCENE,
   type CheckoutSaid,
   type DinerSaid,
@@ -22,6 +24,7 @@ import {
   isDish,
   ITEMS,
   localPrice,
+  NAMED_NPCS,
   readBasketTotal,
   readBillTotal,
   readNewWeeklyRent,
@@ -1431,6 +1434,69 @@ function smallTalkNpc(script: SmallTalkScript, introductions: readonly string[],
   };
 }
 
+/** Any Named NPC, whatever the conversation: thanks for a gift, and their favourite told when asked. */
+type GivenGiftScript = {
+  thanks: string;
+  /** For a gift that came only days after the last one. */
+  shouldntHave: string;
+  /** For the gift they would love most. */
+  delighted: string;
+  /** Tells the Character their favourite, by the pack's local name. */
+  favourite: (gift: string) => string;
+  /** What asks them which gift they would like: about gifts only, so a question in a Goal Interaction isn't taken for it. */
+  asked: string[];
+};
+
+const GIVEN_GIFT_SCRIPT: Record<LanguageCode, GivenGiftScript> = {
+  ja: {
+    thanks: 'わあ、ありがとうございます！',
+    shouldntHave: 'え、この前もいただいたのに…気をつかわないでくださいね。ありがとう！',
+    delighted: 'えっ、これ大好きなんです！本当にありがとう！',
+    favourite: (gift) => `プレゼントなら、${gift}が一番うれしいです！`,
+    asked: ['好きなプレゼント', 'ほしいプレゼント'],
+  },
+  zh: {
+    thanks: '哇，谢谢你！',
+    shouldntHave: '你前几天才送过我礼物，太客气了！谢谢！',
+    delighted: '天哪，这是我最喜欢的！太谢谢你了！',
+    favourite: (gift) => `礼物的话，我最喜欢${gift}！`,
+    asked: ['喜欢的礼物', '喜欢什么礼物'],
+  },
+  en: {
+    thanks: 'Oh, thank you so much!',
+    shouldntHave: "Oh, you really shouldn't have, not again so soon! Thank you!",
+    delighted: 'Oh, I love these! How did you know? Thank you!',
+    favourite: (gift) => `My favourite? ${gift}, every time!`,
+    asked: ['favourite gift', 'favorite gift'],
+  },
+  de: {
+    thanks: 'Oh, vielen Dank!',
+    shouldntHave: 'Oh, das wäre doch nicht nötig gewesen, schon wieder! Danke!',
+    delighted: 'Oh, die liebe ich! Woher wusstest du das? Danke!',
+    favourite: (gift) => `Am liebsten? ${gift}, immer!`,
+    asked: ['lieblingsgeschenk'],
+  },
+};
+
+/**
+ * What any Named NPC answers, whatever else they are doing: a gift scene is thanked for, and asked their favourite,
+ * they call reveal_favourite and say it. Returns whether the line was one of these.
+ */
+function heardAsAnyNamedNpc(session: NpcSession, line: string, act: Act): boolean {
+  if (!('npcId' in session.voice) || !session.tools.some((tool) => tool.name === REVEAL_FAVOURITE_TOOL)) return false;
+  const packId = session.voice.targetLanguage;
+  const script = GIVEN_GIFT_SCRIPT[packId];
+  const gift = readGiftScene(line);
+  if (gift) {
+    act.say(gift.favourite ? script.delighted : gift.counted ? script.thanks : script.shouldntHave);
+    return true;
+  }
+  if (!mentions(line, script.asked)) return false;
+  const favourite = CULTURE_PACKS[packId].goods[NAMED_NPCS[session.voice.npcId].favouriteGift].name;
+  act.call(REVEAL_FAVOURITE_TOOL, { gift: favourite }, () => act.say(script.favourite(favourite)));
+  return true;
+}
+
 /** The fake Shift Customer: orders their drink, says it again when asked, and reacts to what they are handed. */
 type CustomerScript = {
   order: (items: string) => string;
@@ -1663,8 +1729,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
     if (atTheTable) return tableCustomerNpc(TABLE_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTable, act);
     return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   }
-  // Small Talk has no completion function: only learn_name and not_understood.
-  if (session.tools.every((tool) => tool.name === LEARN_NAME_TOOL || tool.name === NOT_UNDERSTOOD_TOOL)) {
+  // Small Talk has no completion function: only learn_name, reveal_favourite and not_understood.
+  if (session.tools.every((tool) => [LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, NOT_UNDERSTOOD_TOOL].includes(tool.name))) {
     return smallTalkNpc(SMALL_TALK_SCRIPT[packId], HIRING_SCRIPT[packId].introductions, act);
   }
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
@@ -1713,7 +1779,9 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. The server
  * asks how many and where to sit and seats the guest, takes a meal order the barista's way, recommends a dish that
  * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. In Small Talk it
- * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Each calls
+ * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Any Named NPC,
+ * in any conversation, thanks the Character for a gift (more warmly for their favourite), and asked what gift they
+ * would like, calls reveal_favourite and says their favourite by its local name. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back.
@@ -1762,7 +1830,7 @@ export const openMockVoiceSession: OpenVoiceSession = (
       events.onDisconnect();
     });
 
-  const npc: Npc = castNpc(session, {
+  const act: Act = {
     say,
     call,
     drop,
@@ -1770,11 +1838,13 @@ export const openMockVoiceSession: OpenVoiceSession = (
       call(NOT_UNDERSTOOD_TOOL, { reason: 'unintelligible' }, (response) =>
         say(response.result === 'out_of_patience' ? npc.outOfPatience : npc.notUnderstood),
       ),
-  });
+  };
+  const npc: Npc = castNpc(session, act);
 
   const hear = (line: string) => {
     if (line === OUT_OF_PATIENCE_SCENE) return say(npc.outOfPatience);
     if (line === MOCK_DROP_LINE) return drop();
+    if (heardAsAnyNamedNpc(session, line, act)) return;
     npc.hear(line);
   };
 

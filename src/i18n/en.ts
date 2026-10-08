@@ -378,6 +378,10 @@ export const en = {
     mic: 'Hold to talk (Space)',
     micOff: '🎤 off',
     micOffHint: 'No mic, so you’re typing your replies',
+    gift: '🎁 Gift',
+    gifts: 'Give a gift',
+    /** Beside the gift the NPC told the Character they would love most. */
+    favourite: '★ Their favourite',
   },
   closing: {
     label: 'Conversation over',

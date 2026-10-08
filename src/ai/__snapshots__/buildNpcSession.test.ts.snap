@@ -6,7 +6,7 @@ exports[`buildNpcSession > builds the barista session in the de pack at A1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -110,6 +110,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -148,7 +164,7 @@ exports[`buildNpcSession > builds the barista session in the de pack at A2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -252,6 +268,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -290,7 +322,7 @@ exports[`buildNpcSession > builds the barista session in the de pack at B1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -393,6 +425,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -431,7 +479,7 @@ exports[`buildNpcSession > builds the barista session in the de pack at B2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -534,6 +582,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -572,7 +636,7 @@ exports[`buildNpcSession > builds the barista session in the de pack at C1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -675,6 +739,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -713,7 +793,7 @@ exports[`buildNpcSession > builds the barista session in the de pack at C2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -821,6 +901,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -854,7 +950,7 @@ exports[`buildNpcSession > builds the barista session in the en pack at A1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -958,6 +1054,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -996,7 +1108,7 @@ exports[`buildNpcSession > builds the barista session in the en pack at A2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1100,6 +1212,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -1138,7 +1266,7 @@ exports[`buildNpcSession > builds the barista session in the en pack at B1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1241,6 +1369,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -1279,7 +1423,7 @@ exports[`buildNpcSession > builds the barista session in the en pack at B2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1382,6 +1526,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -1420,7 +1580,7 @@ exports[`buildNpcSession > builds the barista session in the en pack at C1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1523,6 +1683,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -1561,7 +1737,7 @@ exports[`buildNpcSession > builds the barista session in the en pack at C2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1669,6 +1845,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -1702,7 +1894,7 @@ exports[`buildNpcSession > builds the barista session in the ja pack at A1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1806,6 +1998,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },
@@ -1844,7 +2052,7 @@ exports[`buildNpcSession > builds the barista session in the ja pack at A2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -1953,6 +2161,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -1986,7 +2210,7 @@ exports[`buildNpcSession > builds the barista session in the ja pack at B1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2094,6 +2318,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2127,7 +2367,7 @@ exports[`buildNpcSession > builds the barista session in the ja pack at B2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2235,6 +2475,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2268,7 +2524,7 @@ exports[`buildNpcSession > builds the barista session in the ja pack at C1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2376,6 +2632,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2409,7 +2681,7 @@ exports[`buildNpcSession > builds the barista session in the ja pack at C2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2517,6 +2789,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2550,7 +2838,7 @@ exports[`buildNpcSession > builds the barista session in the zh pack at A1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2659,6 +2947,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2692,7 +2996,7 @@ exports[`buildNpcSession > builds the barista session in the zh pack at A2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2801,6 +3105,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2834,7 +3154,7 @@ exports[`buildNpcSession > builds the barista session in the zh pack at B1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -2942,6 +3262,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -2975,7 +3311,7 @@ exports[`buildNpcSession > builds the barista session in the zh pack at B2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3083,6 +3419,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3116,7 +3468,7 @@ exports[`buildNpcSession > builds the barista session in the zh pack at C1 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3224,6 +3576,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3257,7 +3625,7 @@ exports[`buildNpcSession > builds the barista session in the zh pack at C2 1`] =
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3365,6 +3733,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3398,7 +3782,7 @@ exports[`buildNpcSession: an NPC who starts the conversation > builds the nurse 
   "systemInstruction": "WHO YOU ARE
 You are Petra, the nurse at Klinikum am Park, the town hospital, on the ward where people who faint are looked after, in a small town in Germany, where everyone speaks German.
 You are 46: calm, kind and practical, used to patients waking up confused. Quirks: checks the time on the watch pinned to the uniform and gently tells people off for skipping meals.
-The gift you would love most is a tin of herbal tea. Don't bring it up yourself.
+The gift you would love most is a scented candle with a fresh citrus scent. Don't bring it up yourself, but if the patient asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3475,6 +3859,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when you tell the patient which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3508,7 +3908,7 @@ exports[`buildNpcSession: an NPC who starts the conversation > builds the nurse 
   "systemInstruction": "WHO YOU ARE
 You are Bridget, the nurse at St Mary’s Hospital, the town hospital, on the ward where people who faint are looked after, in a small town in the UK, where everyone speaks British English.
 You are 46: calm, kind and practical, used to patients waking up confused. Quirks: checks the time on the watch pinned to the uniform and gently tells people off for skipping meals.
-The gift you would love most is a box of good tea bags. Don't bring it up yourself.
+The gift you would love most is a scented candle, something fresh like lemon. Don't bring it up yourself, but if the patient asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3585,6 +3985,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when you tell the patient which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3618,7 +4034,7 @@ exports[`buildNpcSession: an NPC who starts the conversation > builds the nurse 
   "systemInstruction": "WHO YOU ARE
 You are 高橋, the nurse at みどり総合病院, the town hospital, on the ward where people who faint are looked after, in a small town in Japan, where everyone speaks Japanese.
 You are 46: calm, kind and practical, used to patients waking up confused. Quirks: checks the time on the watch pinned to the uniform and gently tells people off for skipping meals.
-The gift you would love most is a tin of green tea. Don't bring it up yourself.
+The gift you would love most is a scented candle, ideally with a yuzu scent. Don't bring it up yourself, but if the patient asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3695,6 +4111,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when you tell the patient which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3728,7 +4160,7 @@ exports[`buildNpcSession: an NPC who starts the conversation > builds the nurse 
   "systemInstruction": "WHO YOU ARE
 You are 王芳, the nurse at 绿城医院, the town hospital, on the ward where people who faint are looked after, in a small town in China, where everyone speaks Mandarin Chinese.
 You are 46: calm, kind and practical, used to patients waking up confused. Quirks: checks the time on the watch pinned to the uniform and gently tells people off for skipping meals.
-The gift you would love most is a box of dried longan. Don't bring it up yourself.
+The gift you would love most is a scented candle with an osmanthus scent. Don't bring it up yourself, but if the patient asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3805,6 +4237,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the patient spea
       },
     },
     {
+      "description": "Call this when you tell the patient which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the patient just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3838,7 +4286,7 @@ exports[`buildNpcSession: asking the barista for work > builds the hiring sessio
   "systemInstruction": "WHO YOU ARE
 You are Lena, the barista at Café Stern, a café in a small town in Germany, where everyone speaks German.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the dark ones that go with an espresso. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -3906,6 +4354,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -3939,7 +4403,7 @@ exports[`buildNpcSession: asking the barista for work > builds the hiring sessio
   "systemInstruction": "WHO YOU ARE
 You are Jess, the barista at The Little Star Café, a café in a small town in the UK, where everyone speaks British English.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, the posh dark kind that goes with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4007,6 +4471,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4040,7 +4520,7 @@ exports[`buildNpcSession: asking the barista for work > builds the hiring sessio
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4108,6 +4588,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4141,7 +4637,7 @@ exports[`buildNpcSession: asking the barista for work > builds the hiring sessio
   "systemInstruction": "WHO YOU ARE
 You are 小李, the barista at 星星咖啡, a café in a small town in China, where everyone speaks Mandarin Chinese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of Yunnan coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially dark ones that go with coffee. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4209,6 +4705,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4242,7 +4754,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are Herr Lange, the shopkeeper at Buchhandlung Seitenweise, a bookshop in a small town in Germany, where everyone speaks German.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a leather bookmark. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by on long winter evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4342,6 +4854,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4375,7 +4903,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are Herr Lange, the shopkeeper at Buchhandlung Seitenweise, a bookshop in a small town in Germany, where everyone speaks German.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a leather bookmark. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by on long winter evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4477,6 +5005,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4510,7 +5054,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are Herr Lange, the shopkeeper at Buchhandlung Seitenweise, a bookshop in a small town in Germany, where everyone speaks German.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a leather bookmark. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by on long winter evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4609,6 +5153,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4642,7 +5202,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are Mr Price, the shopkeeper at The Book Nook, a bookshop in a small town in the UK, where everyone speaks British English.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a fountain pen. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by on winter evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4742,6 +5302,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4775,7 +5351,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are Mr Price, the shopkeeper at The Book Nook, a bookshop in a small town in the UK, where everyone speaks British English.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a fountain pen. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by on winter evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -4877,6 +5453,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -4910,7 +5502,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are Mr Price, the shopkeeper at The Book Nook, a bookshop in a small town in the UK, where everyone speaks British English.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a fountain pen. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by on winter evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5009,6 +5601,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5042,7 +5650,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are 松本, the shopkeeper at ひだまり書店, a bookshop in a small town in Japan, where everyone speaks Japanese.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a bookmark made of pressed flowers. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by in the evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5142,6 +5750,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5175,7 +5799,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are 松本, the shopkeeper at ひだまり書店, a bookshop in a small town in Japan, where everyone speaks Japanese.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a bookmark made of pressed flowers. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by in the evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5277,6 +5901,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5310,7 +5950,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are 松本, the shopkeeper at ひだまり書店, a bookshop in a small town in Japan, where everyone speaks Japanese.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a bookmark made of pressed flowers. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by in the evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5409,6 +6049,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5442,7 +6098,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are 马老师, the shopkeeper at 书香书店, a bookshop in a small town in China, where everyone speaks Mandarin Chinese.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a calligraphy brush. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by in the evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5542,6 +6198,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5575,7 +6247,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are 马老师, the shopkeeper at 书香书店, a bookshop in a small town in China, where everyone speaks Mandarin Chinese.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a calligraphy brush. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by in the evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5677,6 +6349,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5710,7 +6398,7 @@ exports[`buildNpcSession: the bookshop > builds the shopkeeper selling a book, a
   "systemInstruction": "WHO YOU ARE
 You are 马老师, the shopkeeper at 书香书店, a bookshop in a small town in China, where everyone speaks Mandarin Chinese.
 You are 58: thoughtful and dry-humoured, glad of a customer who lingers. Quirks: recommends a book to everyone, whether they asked or not, and wraps gifts with great care.
-The gift you would love most is a calligraphy brush. Don't bring it up yourself.
+The gift you would love most is a scented candle to read by in the evenings. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5809,6 +6497,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5842,7 +6546,7 @@ exports[`buildNpcSession: the landlord > announces a Newcomer Discount step-down
   "systemInstruction": "WHO YOU ARE
 You are Frau Becker, the landlord at Haus Lindenhof, the apartment block where you live and let flats, in a small town in Germany, where everyone speaks German.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a potted geranium for the window box. Don't bring it up yourself.
+The gift you would love most is flowers for the stairwell, ideally tulips. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -5913,6 +6617,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -5946,7 +6666,7 @@ exports[`buildNpcSession: the landlord > announces a Newcomer Discount step-down
   "systemInstruction": "WHO YOU ARE
 You are Mrs Hughes, the landlord at Rosewood House, the apartment block where you live and let flats, in a small town in the UK, where everyone speaks British English.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a packet of seeds for the hallway plants. Don't bring it up yourself.
+The gift you would love most is flowers for the hallway, sweet peas if you can find them. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6017,6 +6737,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6050,7 +6786,7 @@ exports[`buildNpcSession: the landlord > announces a Newcomer Discount step-down
   "systemInstruction": "WHO YOU ARE
 You are 山本, the landlord at さくら荘, the apartment block where you live and let flats, in a small town in Japan, where everyone speaks Japanese.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a box of seasonal wagashi from the old sweet shop. Don't bring it up yourself.
+The gift you would love most is flowers for the hallway, seasonal ones like cosmos or chrysanthemums. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6121,6 +6857,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6154,7 +6906,7 @@ exports[`buildNpcSession: the landlord > announces a Newcomer Discount step-down
   "systemInstruction": "WHO YOU ARE
 You are 刘阿姨, the landlord at 幸福公寓, the apartment block where you live and let flats, in a small town in China, where everyone speaks Mandarin Chinese.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a jar of good honey. Don't bring it up yourself.
+The gift you would love most is flowers for the stairwell, something bright like peonies. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6225,6 +6977,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6258,7 +7026,7 @@ exports[`buildNpcSession: the landlord > builds the session for paying rent in t
   "systemInstruction": "WHO YOU ARE
 You are Frau Becker, the landlord at Haus Lindenhof, the apartment block where you live and let flats, in a small town in Germany, where everyone speaks German.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a potted geranium for the window box. Don't bring it up yourself.
+The gift you would love most is flowers for the stairwell, ideally tulips. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6332,6 +7100,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6365,7 +7149,7 @@ exports[`buildNpcSession: the landlord > builds the session for paying rent in t
   "systemInstruction": "WHO YOU ARE
 You are Mrs Hughes, the landlord at Rosewood House, the apartment block where you live and let flats, in a small town in the UK, where everyone speaks British English.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a packet of seeds for the hallway plants. Don't bring it up yourself.
+The gift you would love most is flowers for the hallway, sweet peas if you can find them. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6439,6 +7223,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6472,7 +7272,7 @@ exports[`buildNpcSession: the landlord > builds the session for paying rent in t
   "systemInstruction": "WHO YOU ARE
 You are 山本, the landlord at さくら荘, the apartment block where you live and let flats, in a small town in Japan, where everyone speaks Japanese.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a box of seasonal wagashi from the old sweet shop. Don't bring it up yourself.
+The gift you would love most is flowers for the hallway, seasonal ones like cosmos or chrysanthemums. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6546,6 +7346,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6579,7 +7395,7 @@ exports[`buildNpcSession: the landlord > builds the session for paying rent in t
   "systemInstruction": "WHO YOU ARE
 You are 刘阿姨, the landlord at 幸福公寓, the apartment block where you live and let flats, in a small town in China, where everyone speaks Mandarin Chinese.
 You are 63: fussy but fair, firm about rent and kind about everything else. Quirks: potters about the hallway in a cardigan, watering the plants and keeping an eye on who comes and goes.
-The gift you would love most is a jar of good honey. Don't bring it up yourself.
+The gift you would love most is flowers for the stairwell, something bright like peonies. Don't bring it up yourself, but if the tenant asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6653,6 +7469,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the tenant speak
       },
     },
     {
+      "description": "Call this when you tell the tenant which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the tenant just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -6687,7 +7519,7 @@ exports[`buildNpcSession: the restaurant > builds the server seating a guest, ta
     "systemInstruction": "WHO YOU ARE
 You are Sabine, the server at Gasthaus zur Linde, a restaurant in a small town in Germany, where everyone speaks German.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of Lebkuchen. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6769,6 +7601,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -6799,7 +7647,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are Sabine, the server at Gasthaus zur Linde, a restaurant in a small town in Germany, where everyone speaks German.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of Lebkuchen. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -6905,6 +7753,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -6935,7 +7799,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are Sabine, the server at Gasthaus zur Linde, a restaurant in a small town in Germany, where everyone speaks German.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of Lebkuchen. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7055,6 +7919,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7085,7 +7965,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are Sabine, the server at Gasthaus zur Linde, a restaurant in a small town in Germany, where everyone speaks German.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of Lebkuchen. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7171,6 +8051,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7206,7 +8102,7 @@ exports[`buildNpcSession: the restaurant > builds the server seating a guest, ta
     "systemInstruction": "WHO YOU ARE
 You are Tom, the server at Rosie’s Kitchen, a restaurant in a small town in the UK, where everyone speaks British English.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a jar of homemade chutney. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7288,6 +8184,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7318,7 +8230,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are Tom, the server at Rosie’s Kitchen, a restaurant in a small town in the UK, where everyone speaks British English.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a jar of homemade chutney. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7424,6 +8336,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7454,7 +8382,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are Tom, the server at Rosie’s Kitchen, a restaurant in a small town in the UK, where everyone speaks British English.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a jar of homemade chutney. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7574,6 +8502,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7604,7 +8548,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are Tom, the server at Rosie’s Kitchen, a restaurant in a small town in the UK, where everyone speaks British English.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a jar of homemade chutney. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7690,6 +8634,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7725,7 +8685,7 @@ exports[`buildNpcSession: the restaurant > builds the server seating a guest, ta
     "systemInstruction": "WHO YOU ARE
 You are 中村, the server at レストランひまわり, a restaurant in a small town in Japan, where everyone speaks Japanese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a furoshiki cloth with a wave pattern. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch to brighten the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7807,6 +8767,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7837,7 +8813,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are 中村, the server at レストランひまわり, a restaurant in a small town in Japan, where everyone speaks Japanese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a furoshiki cloth with a wave pattern. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch to brighten the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -7943,6 +8919,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -7973,7 +8965,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are 中村, the server at レストランひまわり, a restaurant in a small town in Japan, where everyone speaks Japanese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a furoshiki cloth with a wave pattern. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch to brighten the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8093,6 +9085,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -8123,7 +9131,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are 中村, the server at レストランひまわり, a restaurant in a small town in Japan, where everyone speaks Japanese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a furoshiki cloth with a wave pattern. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch to brighten the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8209,6 +9217,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -8244,7 +9268,7 @@ exports[`buildNpcSession: the restaurant > builds the server seating a guest, ta
     "systemInstruction": "WHO YOU ARE
 You are 小赵, the server at 老街饭馆, a restaurant in a small town in China, where everyone speaks Mandarin Chinese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of egg tarts. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8326,6 +9350,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -8356,7 +9396,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are 小赵, the server at 老街饭馆, a restaurant in a small town in China, where everyone speaks Mandarin Chinese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of egg tarts. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8462,6 +9502,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -8492,7 +9548,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are 小赵, the server at 老街饭馆, a restaurant in a small town in China, where everyone speaks Mandarin Chinese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of egg tarts. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8612,6 +9668,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -8642,7 +9714,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
     "systemInstruction": "WHO YOU ARE
 You are 小赵, the server at 老街饭馆, a restaurant in a small town in China, where everyone speaks Mandarin Chinese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of egg tarts. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8728,6 +9800,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
         },
       },
       {
+        "description": "Call this when you tell the customer which gift you would love most.",
+        "name": "reveal_favourite",
+        "parameters": {
+          "properties": {
+            "gift": {
+              "description": "The gift you told them you would love most, as you said it.",
+              "type": "STRING",
+            },
+          },
+          "required": [
+            "gift",
+          ],
+          "type": "OBJECT",
+        },
+      },
+      {
         "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
         "name": "not_understood",
         "parameters": {
@@ -8762,7 +9850,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking an applicati
   "systemInstruction": "WHO YOU ARE
 You are Sabine, the server at Gasthaus zur Linde, a restaurant in a small town in Germany, where everyone speaks German.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of Lebkuchen. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8830,6 +9918,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -8863,7 +9967,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking an applicati
   "systemInstruction": "WHO YOU ARE
 You are Tom, the server at Rosie’s Kitchen, a restaurant in a small town in the UK, where everyone speaks British English.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a jar of homemade chutney. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -8931,6 +10035,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -8964,7 +10084,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking an applicati
   "systemInstruction": "WHO YOU ARE
 You are 中村, the server at レストランひまわり, a restaurant in a small town in Japan, where everyone speaks Japanese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a furoshiki cloth with a wave pattern. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch to brighten the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9032,6 +10152,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9065,7 +10201,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking an applicati
   "systemInstruction": "WHO YOU ARE
 You are 小赵, the server at 老街饭馆, a restaurant in a small town in China, where everyone speaks Mandarin Chinese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of egg tarts. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9133,6 +10269,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9166,7 +10318,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking payment for 
   "systemInstruction": "WHO YOU ARE
 You are Sabine, the server at Gasthaus zur Linde, a restaurant in a small town in Germany, where everyone speaks German.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of Lebkuchen. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9249,6 +10401,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9282,7 +10450,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking payment for 
   "systemInstruction": "WHO YOU ARE
 You are Tom, the server at Rosie’s Kitchen, a restaurant in a small town in the UK, where everyone speaks British English.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a jar of homemade chutney. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9365,6 +10533,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9398,7 +10582,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking payment for 
   "systemInstruction": "WHO YOU ARE
 You are 中村, the server at レストランひまわり, a restaurant in a small town in Japan, where everyone speaks Japanese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a furoshiki cloth with a wave pattern. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch to brighten the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9481,6 +10665,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9514,7 +10714,7 @@ exports[`buildNpcSession: the restaurant > builds the server taking payment for 
   "systemInstruction": "WHO YOU ARE
 You are 小赵, the server at 老街饭馆, a restaurant in a small town in China, where everyone speaks Mandarin Chinese.
 You are 31: attentive and unflappable, good at keeping a full dining room happy. Quirks: writes every order on a little pad and always asks about allergies.
-The gift you would love most is a box of egg tarts. Don't bring it up yourself.
+The gift you would love most is flowers, a small bunch for the restaurant counter. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9597,6 +10797,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9630,7 +10846,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are Jonas, the cashier at Frischmarkt Krause, a supermarket in a small town in Germany, where everyone speaks German.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a bag of Haribo. Don't bring it up yourself.
+The gift you would love most is a scented candle with a cosy vanilla scent. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9716,6 +10932,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9749,7 +10981,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are Jonas, the cashier at Frischmarkt Krause, a supermarket in a small town in Germany, where everyone speaks German.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a bag of Haribo. Don't bring it up yourself.
+The gift you would love most is a scented candle with a cosy vanilla scent. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9832,6 +11064,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9865,7 +11113,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are Murat, the clerk at Späti am Eck, a convenience store in a small town in Germany, where everyone speaks German.
 You are 21: easy-going and polite, a student working shifts around lectures. Quirks: always offers to heat things up and remembers which snacks are fresh out of the fryer.
-The gift you would love most is a ticket to a football match. Don't bring it up yourself.
+The gift you would love most is chocolates, the more marzipan the better. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -9966,6 +11214,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -9999,7 +11263,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are Priya, the cashier at Brooks Supermarket, a supermarket in a small town in the UK, where everyone speaks British English.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a box of shortbread. Don't bring it up yourself.
+The gift you would love most is a scented candle, something like lavender for the bath. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10085,6 +11349,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10118,7 +11398,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are Priya, the cashier at Brooks Supermarket, a supermarket in a small town in the UK, where everyone speaks British English.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a box of shortbread. Don't bring it up yourself.
+The gift you would love most is a scented candle, something like lavender for the bath. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10201,6 +11481,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10234,7 +11530,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are Dev, the clerk at Patel’s Corner Shop, a convenience store in a small town in the UK, where everyone speaks British English.
 You are 21: easy-going and polite, a student working shifts around lectures. Quirks: always offers to heat things up and remembers which snacks are fresh out of the fryer.
-The gift you would love most is a bar of fancy chocolate. Don't bring it up yourself.
+The gift you would love most is chocolates, the bigger the box the better. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10335,6 +11631,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10368,7 +11680,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are 鈴木, the cashier at スーパーまるやま, a supermarket in a small town in Japan, where everyone speaks Japanese.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a pot of hand cream. Don't bring it up yourself.
+The gift you would love most is a scented candle with a calm hinoki cypress scent. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10454,6 +11766,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10487,7 +11815,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are 鈴木, the cashier at スーパーまるやま, a supermarket in a small town in Japan, where everyone speaks Japanese.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a pot of hand cream. Don't bring it up yourself.
+The gift you would love most is a scented candle with a calm hinoki cypress scent. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10570,6 +11898,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10603,7 +11947,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are 田中, the clerk at ニコニコマート, a convenience store in a small town in Japan, where everyone speaks Japanese.
 You are 21: easy-going and polite, a student working shifts around lectures. Quirks: always offers to heat things up and remembers which snacks are fresh out of the fryer.
-The gift you would love most is a new manga volume. Don't bring it up yourself.
+The gift you would love most is chocolates, the more unusual the limited-edition flavour the better. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10704,6 +12048,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10737,7 +12097,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are 张敏, the cashier at 好又多超市, a supermarket in a small town in China, where everyone speaks Mandarin Chinese.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a pot of hand cream. Don't bring it up yourself.
+The gift you would love most is a scented candle with a jasmine scent. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10823,6 +12183,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10856,7 +12232,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are 张敏, the cashier at 好又多超市, a supermarket in a small town in China, where everyone speaks Mandarin Chinese.
 You are 34: brisk and cheerful, good at keeping the queue moving without rushing anyone. Quirks: knows exactly which aisle everything is in and is a little proud of it.
-The gift you would love most is a pot of hand cream. Don't bring it up yourself.
+The gift you would love most is a scented candle with a jasmine scent. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -10939,6 +12315,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -10972,7 +12364,7 @@ exports[`buildNpcSession: the supermarket and convenience store > builds the cas
   "systemInstruction": "WHO YOU ARE
 You are 小陈, the clerk at 快客便利店, a convenience store in a small town in China, where everyone speaks Mandarin Chinese.
 You are 21: easy-going and polite, a student working shifts around lectures. Quirks: always offers to heat things up and remembers which snacks are fresh out of the fryer.
-The gift you would love most is a phone charm of a cartoon cat. Don't bring it up yourself.
+The gift you would love most is chocolates, the fancier the gift box the better. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -11073,6 +12465,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -11126,7 +12534,7 @@ exports[`buildSmallTalkSession > builds Small Talk with a barista who is a frien
   "systemInstruction": "WHO YOU ARE
 You are 佐藤, the barista at ほしコーヒー, a café in a small town in Japan, where everyone speaks Japanese.
 You are 27: warm and quick, a little chatty when the café is quiet. Quirks: hums while making drinks and is proud of the house blend.
-The gift you would love most is a bag of single-origin coffee beans. Don't bring it up yourself.
+The gift you would love most is chocolates, especially ones flavoured with matcha. Don't bring it up yourself, but if the customer asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person at work.
 
 YOU AND THIS PERSON
@@ -11178,6 +12586,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the customer spe
       },
     },
     {
+      "description": "Call this when you tell the customer which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
       "description": "Call this only when you could not make sense of what the customer just said at all: gibberish, nothing heard, or a whole sentence in a language other than yours. Do not call it if you understood their meaning, even roughly.",
       "name": "not_understood",
       "parameters": {
@@ -11211,7 +12635,7 @@ exports[`buildSmallTalkSession > builds Small Talk with a park regular who is a 
   "systemInstruction": "WHO YOU ARE
 You are Arthur, one of the regulars at Victoria Park, the town park, in a small town in the UK, where everyone speaks British English.
 You are 74: cheerful and talkative, a retiree with all the time in the world. Quirks: feeds the pigeons from a paper bag and knows the weather forecast for the whole week.
-The gift you would love most is a bag of birdseed. Don't bring it up yourself.
+The gift you would love most is flowers that remind them of their allotment. Don't bring it up yourself, but if the person asks what you would like or what you like as a gift, tell them, and call reveal_favourite.
 Talk like a real, friendly person.
 
 YOU AND THIS PERSON
@@ -11256,6 +12680,22 @@ A "[SCENE: ...]" message tells you what is happening; it is not the person speak
         },
         "required": [
           "name",
+        ],
+        "type": "OBJECT",
+      },
+    },
+    {
+      "description": "Call this when you tell the person which gift you would love most.",
+      "name": "reveal_favourite",
+      "parameters": {
+        "properties": {
+          "gift": {
+            "description": "The gift you told them you would love most, as you said it.",
+            "type": "STRING",
+          },
+        },
+        "required": [
+          "gift",
         ],
         "type": "OBJECT",
       },

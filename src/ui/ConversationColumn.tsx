@@ -8,6 +8,7 @@ import {
   selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectGiftsToGive,
   selectHelpOpen,
   selectInputMode,
   selectLineReading,
@@ -29,6 +30,7 @@ import {
 } from '../store/index.ts';
 import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
+import { itemLabel } from './itemLabel.ts';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
 import { MenuGrid, OrderPad, Till } from './ShiftPanel.tsx';
@@ -300,6 +302,46 @@ function MicButton() {
   );
 }
 
+/** Gifts in the inventory, given to a Named NPC from a list that opens upwards. Shown only while there's one to give. */
+function GiftButton() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const gifts = useGame(selectGiftsToGive);
+  const packId = useGame(selectCulturePackId);
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const giveGift = useGame((s) => s.giveGift);
+  if (gifts.length === 0) return null;
+  return (
+    <div className="chat-gift">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {t('chat.gift')}
+      </button>
+      {open && (
+        <section className="gift-list" aria-label={t('chat.gifts')}>
+          <h2>{t('chat.gifts')}</h2>
+          <ul>
+            {gifts.map(({ itemId, quantity, favourite }) => (
+              <li key={itemId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    giveGift(itemId);
+                    setOpen(false);
+                  }}
+                >
+                  {itemLabel(itemId, packId, nativeLanguage)}
+                  {quantity > 1 && ` ×${quantity}`}
+                </button>
+                {favourite && <span className="gift-favourite">{t('chat.favourite')}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
 /** In the Typed Fallback, a chip says the mic is off where the mic button would be. */
 function InputBar() {
   const { t } = useTranslation();
@@ -314,6 +356,7 @@ function InputBar() {
         <MicButton />
       )}
       <TypedField />
+      <GiftButton />
     </div>
   );
 }

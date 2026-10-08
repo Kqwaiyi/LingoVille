@@ -42,3 +42,27 @@ test('buys wrapped flowers on F, and they go into the inventory, ready to give',
   await dock(page).getByRole('button', { name: 'Inventory (1)' }).click();
   await expect(page.getByRole('region', { name: 'Inventory' })).toContainText('花束 (Bouquet of flowers) ×1');
 });
+
+test('gives the flowers to the shopkeeper in a chat, after asking what they would love', async ({ page }) => {
+  await atTheShopkeeper(page);
+  await page.keyboard.press('KeyF');
+  await typeLine(page, '花束をください');
+  await expect(npcLine(page, '花束ですね。プレゼント用にお包みしましょうか？')).toBeVisible();
+  await typeLine(page, 'はい');
+  await expect(npcLine(page, '花束、1200円、お包みありですね。よろしいですか？')).toBeVisible();
+  await typeLine(page, 'はい');
+  await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
+  await expect(column(page)).toBeHidden();
+
+  await page.keyboard.press('KeyT');
+  await expect(npcLine(page, 'こんにちは！今日はいい天気ですね。')).toBeVisible();
+  await typeLine(page, '好きなプレゼントは何ですか');
+  await expect(npcLine(page, 'プレゼントなら、アロマキャンドルが一番うれしいです！')).toBeVisible();
+
+  await column(page).getByRole('button', { name: '🎁 Gift' }).click();
+  await column(page).getByRole('region', { name: 'Give a gift' }).getByRole('button', { name: '花束 (Bouquet of flowers)' }).click();
+
+  await expect(npcLine(page, 'わあ、ありがとうございます！')).toBeVisible();
+  await expect(column(page).getByRole('button', { name: '🎁 Gift' })).toBeHidden();
+  await expect(dock(page).getByRole('button', { name: 'Inventory (0)' })).toBeVisible();
+});

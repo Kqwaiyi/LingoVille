@@ -374,6 +374,9 @@ export const de: UiStrings = {
     mic: 'Zum Sprechen halten (Leertaste)',
     micOff: '🎤 aus',
     micOffHint: 'Kein Mikrofon, also tippst du deine Antworten',
+    gift: '🎁 Geschenk',
+    gifts: 'Ein Geschenk geben',
+    favourite: '★ Lieblingsgeschenk',
   },
   closing: {
     label: 'Gespräch beendet',

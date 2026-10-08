@@ -4,7 +4,9 @@ import {
   buildNpcSession,
   buildShiftCustomerSession,
   buildSmallTalkSession,
+  giftScene,
   OUT_OF_PATIENCE_SCENE,
+  REVEAL_FAVOURITE_TOOL,
   shiftCustomerChangeScene,
   shiftCustomerServedScene,
   tableServedScene,
@@ -687,6 +689,71 @@ describe('mock VoiceSession: Small Talk', () => {
     const { toolCalls, say } = await chatting('zh');
     await say('xqzt');
     expect(toolCalls.map((call) => call.name)).toEqual(['not_understood']);
+  });
+});
+
+describe('mock VoiceSession: gifts and the favourite', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const FAVOURITE_ASKED: Record<LanguageCode, string> = {
+    ja: '好きなプレゼントは何ですか',
+    zh: '你最喜欢的礼物是什么？',
+    en: "What's your favourite gift?",
+    de: 'Was ist dein Lieblingsgeschenk?',
+  };
+
+  async function chatting(packId: LanguageCode) {
+    const heard = listen();
+    const npcSession = buildSmallTalkSession(CULTURE_PACKS[packId], 'A1', NAMED_NPCS['park-regular-1'], {
+      clock: { day: 2, minuteOfDay: 600 },
+      relationship: { memory: STRANGER, characterName: 'Sam' },
+    });
+    const session = openMockVoiceSession(npcSession, heard.events);
+    await session.connect();
+    await vi.runAllTimersAsync();
+    const say = async (text: string) => {
+      session.sendText(text);
+      await vi.runAllTimersAsync();
+    };
+    const answer = async (response: ToolResponse) => {
+      session.sendToolResponse(heard.toolCalls.at(-1)!.id, response);
+      await vi.runAllTimersAsync();
+    };
+    return { ...heard, say, answer };
+  }
+
+  it.each(LANGUAGE_CODES)('tells its favourite gift when asked, by its local name, calling reveal_favourite, in the %s pack', async (packId) => {
+    const { turns, toolCalls, say, answer } = await chatting(packId);
+    const favourite = CULTURE_PACKS[packId].goods[NAMED_NPCS['park-regular-1'].favouriteGift].name;
+
+    await say(FAVOURITE_ASKED[packId]);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: REVEAL_FAVOURITE_TOOL, args: { gift: favourite } }]);
+    await answer({ result: 'remembered' });
+
+    expect(turns.at(-1)).toContain(favourite);
+  });
+
+  it.each(LANGUAGE_CODES)('thanks the Character for a gift, more warmly for the favourite, in the %s pack', async (packId) => {
+    const { turns, toolCalls, say } = await chatting(packId);
+    const npc = NAMED_NPCS['park-regular-1'];
+    const name = CULTURE_PACKS[packId].goods.chocolates.name;
+
+    await say(giftScene(npc, name, { counted: true, favourite: false }));
+    await say(giftScene(npc, name, { counted: false, favourite: false }));
+    await say(giftScene(npc, name, { counted: true, favourite: true }));
+
+    expect(toolCalls).toEqual([]);
+    expect(new Set(turns.slice(1)).size).toBe(3);
+  });
+
+  it('thanks the Character for a gift in a Goal Interaction too', async () => {
+    const { turns, toolCalls, say } = await atTheCounter('en');
+
+    await say(giftScene(NAMED_NPCS.barista, 'Bunch of flowers', { counted: true, favourite: false }));
+
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)).toMatch(/thank/i);
   });
 });
 

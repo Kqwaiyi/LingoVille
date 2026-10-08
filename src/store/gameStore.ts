@@ -5,6 +5,7 @@ import {
   buildNpcSession,
   buildShiftCustomerSession,
   buildSmallTalkSession,
+  giftScene,
   shiftCustomerChangeScene,
   checkReadings,
   hasReadingAids,
@@ -12,6 +13,7 @@ import {
   LearnNameArgsSchema,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
+  REVEAL_FAVOURITE_TOOL,
   shiftCustomerServedScene,
   tableServedScene,
   wordReading,
@@ -39,6 +41,7 @@ import {
   interactionStartedWithE,
   isDrink,
   interactionStartedWithF,
+  ITEMS,
   jobAt,
   JOB_PLACES,
   localPlaceName,
@@ -94,6 +97,7 @@ import {
   hallwayApproach,
   hallwayApproachMade,
   gameMinutesFor,
+  giveGift,
   isGoneOff,
   isOpen,
   isOutOfPatience,
@@ -112,6 +116,7 @@ import {
   putBackFromBasket,
   rememberTopic,
   rentStatement,
+  revealFavourite,
   restaurantDebt,
   rideTram,
   SAVE,
@@ -777,6 +782,8 @@ export type GameStore = {
   /** Starts a conversation with the NPC in reach: E and F their Goal Interactions, and Small Talk on the key `selectSmallTalkKey` gives. */
   talk: (key?: TalkKey) => void;
   sendTypedLine: (text: string) => void;
+  /** Gives a Named NPC a gift from the inventory, mid-conversation: the NPC is handed it, and thanks the Character. */
+  giveGift: (itemId: ItemId) => void;
   /** Space or the mic button pressed: interrupts the NPC and listens. */
   startTalking: () => void;
   /** Space or the mic button released: the Player's turn is over. */
@@ -1250,6 +1257,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const answerToolCall = (conversation: Conversation, { name, args }: ToolCall): ToolResponse => {
       if (name === NOT_UNDERSTOOD_TOOL) return { result: notUnderstood(conversation) ? 'out_of_patience' : 'noted' };
       if (name === LEARN_NAME_TOOL && conversation.npcId) return learnTheName(conversation.npcId, args);
+      if (name === REVEAL_FAVOURITE_TOOL && conversation.npcId) {
+        set({ game: revealFavourite(get().game, conversation.npcId) });
+        return { result: 'remembered' };
+      }
       // A Shift Customer has no completion: what they're served is checked by the game.
       if (!conversation.interaction || name !== conversation.interaction.completion.name || conversation.outcome) return { result: 'unknown_tool' };
 
@@ -2242,6 +2253,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         }
         voice.sendText(line);
       },
+      giveGift: (itemId) => {
+        const conversation = get().conversation;
+        if (!canTakeTurn(conversation) || !voice || !conversation.npcId) return;
+        if (!selectGiftsToGive(get()).some((gift) => gift.itemId === itemId)) return;
+        const npc = NAMED_NPCS[conversation.npcId];
+        const given = giveGift(get().game, npc, itemId);
+        set({ game: given.state });
+        voice.sendText(giftScene(npc, CULTURE_PACKS[given.state.identity.culturePackId].goods[itemId].name, given));
+      },
       startTalking: () => {
         const conversation = get().conversation;
         if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed') return;
@@ -2565,6 +2585,26 @@ export const selectLineReading =
 /** The NPC partway through saying a line, for the "speaking…" indicator over them. */
 export const selectNpcSpeaking = (s: GameStore): NamedNpcId | null =>
   s.conversation && !s.conversation.closed && s.conversation.npcLine !== null ? s.conversation.npcId : null;
+/** A gift in the inventory, ready to give, and whether the NPC has told the Character it's the one they would love most. */
+export type GiftToGive = { itemId: ItemId; quantity: number; favourite: boolean };
+const NO_GIFTS: readonly GiftToGive[] = [];
+const giftsToGive = new WeakMap<readonly InventoryItem[], { favourite: ItemId | null; gifts: readonly GiftToGive[] }>();
+/** The gifts the Character can give the Named NPC they're talking to, until the conversation's outcome is decided. The same array until they change. */
+export const selectGiftsToGive = (s: GameStore): readonly GiftToGive[] => {
+  const { conversation, game } = s;
+  if (!conversation?.npcId || conversation.outcome || conversation.reconnecting) return NO_GIFTS;
+  const { inventory } = game.possessions;
+  const npc = NAMED_NPCS[conversation.npcId];
+  const favourite = memoryOf(game, npc.id).favouriteKnown ? npc.favouriteGift : null;
+  const kept = giftsToGive.get(inventory);
+  if (kept?.favourite === favourite) return kept.gifts;
+  const held = inventory
+    .filter((item) => ITEMS[item.itemId].gift)
+    .map(({ itemId, quantity }) => ({ itemId, quantity, favourite: itemId === favourite }));
+  const gifts = held.length > 0 ? held : NO_GIFTS;
+  giftsToGive.set(inventory, { favourite, gifts });
+  return gifts;
+};
 const NO_PHRASES: readonly PlacePhrase[] = [];
 /** The phrasebook for the place the Character is at. */
 export const selectPlacePhrasebook = (s: GameStore): readonly PlacePhrase[] => {

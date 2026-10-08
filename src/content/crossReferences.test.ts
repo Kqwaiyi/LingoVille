@@ -59,4 +59,9 @@ describe('culturePackProblems', () => {
     const packs = withGerman((de) => delete (de.personas['park-regular-1'] as { favouriteGift?: string }).favouriteGift);
     expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*park-regular-1.*favouriteGift/s)]);
   });
+
+  it('fails a favourite gift that is not the one the persona loves most', () => {
+    const packs = withGerman((de) => (de.personas['park-regular-1'].favouriteGift = 'a bag of birdseed'));
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*park-regular-1.*flowers/)]);
+  });
 });

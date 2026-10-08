@@ -374,6 +374,9 @@ export const ja: UiStrings = {
     mic: '押している間話す（スペース）',
     micOff: '🎤 オフ',
     micOffHint: 'マイクがないので、返事は入力します',
+    gift: '🎁 プレゼント',
+    gifts: 'プレゼントをあげる',
+    favourite: '★ 一番好きなもの',
   },
   closing: {
     label: '会話終了',

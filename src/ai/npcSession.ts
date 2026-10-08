@@ -61,6 +61,7 @@ export type SmallTalkContext = Pick<NpcSessionContext, 'clock'> & { relationship
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
 export const LEARN_NAME_TOOL = 'learn_name';
+export const REVEAL_FAVOURITE_TOOL = 'reveal_favourite';
 
 // What the game answers each tool call with. The system instruction tells the NPC what each answer means.
 export type CompletionResponse =
@@ -72,7 +73,8 @@ export type CompletionResponse =
 export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
 /** `wrong_name`: the name heard isn't the Character's, so the NPC misheard it. */
 export type LearnNameResponse = { result: 'learned' } | { result: 'wrong_name' };
-export type ToolResponse = CompletionResponse | NotUnderstoodResponse | LearnNameResponse | { result: 'unknown_tool' };
+export type RevealFavouriteResponse = { result: 'remembered' };
+export type ToolResponse = CompletionResponse | NotUnderstoodResponse | LearnNameResponse | RevealFavouriteResponse | { result: 'unknown_tool' };
 
 /**
  * Sent instead of the player's turn when an unreadable transcript uses up the
@@ -105,6 +107,33 @@ export function basketChangedScene(basket: Basket, packId: LanguageCode): string
   ].join('\n');
 }
 
+/** How a gift went: whether it counted (only one a week does), and whether it was the NPC's favourite. */
+export type GiftOutcome = { counted: boolean; favourite: boolean };
+
+const GIFT_HANDED = 'hands you a gift: ';
+const FAVOURITE_GIFT = 'It is the gift you would love most: be delighted, and say so.';
+const GIFT_TOO_SOON = "They gave you a gift only a few days ago, so tell them kindly that they really shouldn't have.";
+
+/**
+ * Sent when the Character hands the NPC a gift from the inventory, by the pack's local name, in any conversation. Their
+ * favourite delights them. A gift that didn't count, coming only days after the last one, gets "you shouldn't have".
+ */
+export function giftScene(npc: NamedNpc, gift: string, { counted, favourite }: GiftOutcome): string {
+  const { who } = workplace(npc);
+  return [
+    `[SCENE: The ${who} ${GIFT_HANDED}${gift}.`,
+    ...(favourite ? [FAVOURITE_GIFT] : []),
+    ...(counted ? [] : [GIFT_TOO_SOON]),
+    'Thank them for it in a sentence or two, then carry on where you left off.]',
+  ].join(' ');
+}
+
+/** How the gift went, from a scene `giftScene` wrote, or null if the text isn't one. */
+export function readGiftScene(text: string): GiftOutcome | null {
+  if (!text.startsWith('[SCENE: ') || !text.includes(GIFT_HANDED)) return null;
+  return { counted: !text.includes(GIFT_TOO_SOON), favourite: text.includes(FAVOURITE_GIFT) };
+}
+
 /** Sent when Small Talk has gone on long enough, or the NPC has become busy, so they wrap it up. */
 export const WRAP_UP_SCENE =
   '[SCENE: You need to get on with your day now. Wrap up the chat warmly in a sentence or two, and say goodbye.]';
@@ -122,6 +151,12 @@ export const LearnNameArgsSchema = z.object({ name: z.string().describe('Their n
 
 export const learnNameTool = (who: string) =>
   toToolDeclaration(LEARN_NAME_TOOL, `Call this when the ${who} tells you their name, with the name as they said it.`, LearnNameArgsSchema);
+
+/** What `reveal_favourite` takes: only the gift as the NPC put it, since the game already knows their favourite. */
+const RevealFavouriteArgsSchema = z.object({ gift: z.string().describe('The gift you told them you would love most, as you said it.') });
+
+export const revealFavouriteTool = (who: string) =>
+  toToolDeclaration(REVEAL_FAVOURITE_TOOL, `Call this when you tell the ${who} which gift you would love most.`, RevealFavouriteArgsSchema);
 
 export const notUnderstoodTool = (who: string) =>
   toToolDeclaration(
@@ -236,7 +271,8 @@ function personaBlock(npc: NamedNpc, pack: CulturePack) {
   return block('WHO YOU ARE', [
     `You are ${name}, ${place.as ?? `the ${npc.role} at`} ${place.at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
     `You are ${npc.age}: ${npc.temperament}. Quirks: ${npc.quirks}.`,
-    `The gift you would love most is ${favouriteGift}. Don't bring it up yourself.`,
+    `The gift you would love most is ${favouriteGift}. Don't bring it up yourself, but if the ${place.who} asks what you would like ` +
+      `or what you like as a gift, tell them, and call ${REVEAL_FAVOURITE_TOOL}.`,
     place.offDuty ? 'Talk like a real, friendly person.' : 'Talk like a real, friendly person at work.',
   ]);
 }
@@ -451,7 +487,12 @@ export function buildNpcSession(
   return {
     systemInstruction,
     // Hiring takes the applicant's name in its own completion, so learn_name would only get in the way.
-    tools: [interaction.toolDeclaration, ...(interaction.effect.kind === 'hire' ? [] : [learnNameTool(who)]), notUnderstoodTool(who)],
+    tools: [
+      interaction.toolDeclaration,
+      ...(interaction.effect.kind === 'hire' ? [] : [learnNameTool(who)]),
+      revealFavouriteTool(who),
+      notUnderstoodTool(who),
+    ],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
     openingScene: context.approach ? APPROACH_SCENES[context.approach] : greetingScene(who),
   };
@@ -489,7 +530,7 @@ export function buildSmallTalkSession(culturePack: CulturePack, proficiencyStep:
 
   return {
     systemInstruction,
-    tools: [learnNameTool(who), notUnderstoodTool(who)],
+    tools: [learnNameTool(who), revealFavouriteTool(who), notUnderstoodTool(who)],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
     openingScene: `[SCENE: A ${who} you might chat with comes up to you. Greet them first.]`,
   };

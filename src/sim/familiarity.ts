@@ -1,4 +1,4 @@
-import type { NamedNpcId } from '../content/index.ts';
+import type { ItemId, NamedNpc, NamedNpcId } from '../content/index.ts';
 import { clampMeter } from './meters.ts';
 import { namesMatch } from './jobs.ts';
 import { memoryOf, metNpc } from './npcMemory.ts';
@@ -50,6 +50,32 @@ export function smallTalkExchange(state: GameState, npcId: NamedNpcId): { state:
 /** A Goal Interaction with this NPC succeeded: a little Familiarity, under the same daily cap. */
 export function goalInteractionFamiliarity(state: GameState, npcId: NamedNpcId): GameState {
   return gainFamiliarity(state, npcId, FAMILIARITY.goalInteractionSuccess).state;
+}
+
+/**
+ * The Character gives a Named NPC a gift from the inventory: one of it leaves the inventory. Only one gift per NPC
+ * per week counts, as a one-off Familiarity bump outside the daily cap, bigger for the NPC's favourite. A gift
+ * within the week of the last one that counted is still given, but changes nothing else.
+ */
+export function giveGift(state: GameState, npc: NamedNpc, itemId: ItemId): { state: GameState; counted: boolean; favourite: boolean } {
+  const { inventory } = state.possessions;
+  const held = inventory.find((item) => item.itemId === itemId);
+  if (!held) throw new Error(`The Character has no ${itemId} to give`);
+  const given = inventory.flatMap((item) => (item !== held ? [item] : item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : []));
+  const handedOver: GameState = { ...state, possessions: { ...state.possessions, inventory: given } };
+
+  const favourite = itemId === npc.favouriteGift;
+  const memory = memoryOf(state, npc.id);
+  const { day } = state.clock;
+  if (memory.lastGiftDay !== null && day - memory.lastGiftDay < FAMILIARITY.giftCooldownDays) return { state: handedOver, counted: false, favourite };
+  const bump = favourite ? FAMILIARITY.favouriteGift : FAMILIARITY.gift;
+  const remembered: NpcMemory = { ...memory, familiarity: memory.familiarity + bump, lastGiftDay: day };
+  return { state: { ...handedOver, people: { ...state.people, [npc.id]: remembered } }, counted: true, favourite };
+}
+
+/** The NPC told the Character which gift they would love most (`reveal_favourite`). */
+export function revealFavourite(state: GameState, npcId: NamedNpcId): GameState {
+  return { ...state, people: { ...state.people, [npcId]: { ...memoryOf(state, npcId), favouriteKnown: true } } };
 }
 
 /** Small Talk begins: how many exchanges the NPC chats for before wrapping up, drawn from the save's RNG. */

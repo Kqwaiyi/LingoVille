@@ -11,7 +11,16 @@ import {
   type ProficiencyStep,
   type RentStatement,
 } from '../sim/index.ts';
-import { buildNpcSession, buildSmallTalkSession, GREETING_SCENE, LEARN_NAME_TOOL, WRAP_UP_SCENE } from './index.ts';
+import {
+  buildNpcSession,
+  buildSmallTalkSession,
+  giftScene,
+  GREETING_SCENE,
+  LEARN_NAME_TOOL,
+  readGiftScene,
+  REVEAL_FAVOURITE_TOOL,
+  WRAP_UP_SCENE,
+} from './index.ts';
 
 const FIRST_MORNING_CLOCK = { day: 1, minuteOfDay: CLOCK.wakeAt + 12 };
 
@@ -50,7 +59,7 @@ describe('buildNpcSession', () => {
   it("offers the interaction's completion function and not_understood as tools", () => {
     const { tools } = baristaSession('en');
 
-    expect(tools.map((tool) => tool.name)).toEqual(['serve_order', LEARN_NAME_TOOL, 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['serve_order', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
     expect(tools[0]).toEqual(INTERACTIONS.orderDrink.toolDeclaration);
   });
 
@@ -59,10 +68,10 @@ describe('buildNpcSession', () => {
     const ja = nurseSession('ja').systemInstruction;
 
     expect(de).toContain('You are Petra, the nurse');
-    expect(de).toContain('a tin of herbal tea');
+    expect(de).toContain('a scented candle with a fresh citrus scent');
     expect(ja).toContain('You are 高橋, the nurse');
-    expect(ja).toContain('a tin of green tea');
-    expect(ja).not.toContain('herbal');
+    expect(ja).toContain('a scented candle, ideally with a yuzu scent');
+    expect(ja).not.toContain('citrus');
   });
 
   it('is pure: the same inputs give the same session', () => {
@@ -91,8 +100,8 @@ describe('buildNpcSession: an NPC who starts the conversation', () => {
     expect(systemInstruction).toContain('patient');
   });
 
-  it('offers discharge_patient, learn_name and not_understood as tools', () => {
-    expect(nurseSession('zh').tools.map((tool) => tool.name)).toEqual(['discharge_patient', LEARN_NAME_TOOL, 'not_understood']);
+  it('offers discharge_patient, learn_name, reveal_favourite and not_understood as tools', () => {
+    expect(nurseSession('zh').tools.map((tool) => tool.name)).toEqual(['discharge_patient', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 });
 
@@ -126,7 +135,7 @@ describe('buildNpcSession: the supermarket and convenience store', () => {
   it('has the cashier read back the total, the bag and the points card before taking payment', () => {
     const { systemInstruction, tools } = tillSession('en');
     expect(systemInstruction).toMatch(/read back the total.*bag.*points card/i);
-    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', LEARN_NAME_TOOL, 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('works at Brooks Supermarket and the corner shop, by their local names', () => {
@@ -139,7 +148,7 @@ describe('buildNpcSession: the supermarket and convenience store', () => {
     const { systemInstruction, tools } = shelvesSession('de');
     expect(systemInstruction).toContain('Eier (shelf id "eggs")');
     expect(systemInstruction).toMatch(/check.*which item/i);
-    expect(tools.map((tool) => tool.name)).toEqual(['point_to', LEARN_NAME_TOOL, 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['point_to', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('says the convenience store never closes', () => {
@@ -162,7 +171,7 @@ describe('buildNpcSession: the bookshop', () => {
     const { systemInstruction, tools } = shopkeeperSession(INTERACTIONS.buyABook, 'en');
     expect(systemInstruction).toContain('The Book Nook');
     expect(systemInstruction).toContain('For sale: Crime novel, £15 (menu id "mystery-novel")');
-    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', LEARN_NAME_TOOL, 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['complete_purchase', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('has the shopkeeper ask about wrapping a gift, and recommend by taste', () => {
@@ -204,8 +213,8 @@ describe('buildNpcSession: the landlord', () => {
   });
 
   it('offers accept_rent, or grant_extension for more time', () => {
-    expect(landlordSession(INTERACTIONS.payRent, 'de').tools.map((tool) => tool.name)).toEqual(['accept_rent', LEARN_NAME_TOOL, 'not_understood']);
-    expect(landlordSession(INTERACTIONS.askForMoreTime, 'de').tools.map((tool) => tool.name)).toEqual(['grant_extension', LEARN_NAME_TOOL, 'not_understood']);
+    expect(landlordSession(INTERACTIONS.payRent, 'de').tools.map((tool) => tool.name)).toEqual(['accept_rent', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
+    expect(landlordSession(INTERACTIONS.askForMoreTime, 'de').tools.map((tool) => tool.name)).toEqual(['grant_extension', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('catches the tenant in the hallway, speaking first, when rent is due', () => {
@@ -236,8 +245,8 @@ describe('buildNpcSession: asking the barista for work', () => {
     expect(hiringSession(packId)).toMatchSnapshot();
   });
 
-  it('offers hire_applicant and not_understood as tools', () => {
-    expect(hiringSession('ja').tools.map((tool) => tool.name)).toEqual(['hire_applicant', 'not_understood']);
+  it('offers hire_applicant, reveal_favourite and not_understood as tools', () => {
+    expect(hiringSession('ja').tools.map((tool) => tool.name)).toEqual(['hire_applicant', REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('lets the barista ask the applicant’s name, which a customer is never asked', () => {
@@ -292,7 +301,7 @@ describe('buildNpcSession: the restaurant', () => {
     const { systemInstruction, tools } = hiringSession('ja');
     expect(systemInstruction).toContain(`${CULTURE_PACKS.ja.restaurant.name}, a restaurant`);
     expect(systemInstruction).toMatch(/ask for work as a server/);
-    expect(tools.map((tool) => tool.name)).toEqual(['hire_applicant', 'not_understood']);
+    expect(tools.map((tool) => tool.name)).toEqual(['hire_applicant', REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 });
 
@@ -379,6 +388,45 @@ describe('buildNpcSession: you and this person', () => {
     });
 
     expect(tools.map((tool) => tool.name)).not.toContain(LEARN_NAME_TOOL);
+    expect(tools.map((tool) => tool.name)).toContain(REVEAL_FAVOURITE_TOOL);
+  });
+});
+
+describe('the favourite gift', () => {
+  it('has the NPC tell it only when asked, and call reveal_favourite as they do', () => {
+    const { systemInstruction } = smallTalk('park-regular-1');
+
+    expect(systemInstruction).toContain("Don't bring it up yourself");
+    expect(systemInstruction).toMatch(new RegExp(`asks .*call ${REVEAL_FAVOURITE_TOOL}`));
+  });
+
+  it('remembers having told it already', () => {
+    expect(youAndThisPerson(baristaWho(FRIEND))).toContain('already told them which gift you would love most');
+    expect(youAndThisPerson(baristaWho(STRANGER))).not.toContain('already told them');
+  });
+
+  it("hands the NPC the gift by the pack's local name, and has them thank the Character and carry on", () => {
+    const scene = giftScene(NAMED_NPCS.barista, CULTURE_PACKS.ja.goods.flowers.name, { counted: true, favourite: false });
+
+    expect(scene).toMatch(/^\[SCENE: The customer hands you a gift: 花束\..*carry on.*\]$/s);
+    expect(scene).not.toMatch(/love most|shouldn't have/);
+  });
+
+  it('has the NPC delighted by their favourite', () => {
+    expect(giftScene(NAMED_NPCS.barista, 'Pralinen', { counted: true, favourite: true })).toContain('the gift you would love most');
+  });
+
+  it('reads back what a gift scene says, for the mock NPC', () => {
+    for (const counted of [true, false]) {
+      for (const favourite of [true, false]) {
+        expect(readGiftScene(giftScene(NAMED_NPCS.doctor, '花束', { counted, favourite }))).toEqual({ counted, favourite });
+      }
+    }
+    expect(readGiftScene(WRAP_UP_SCENE)).toBeNull();
+  });
+
+  it("has the NPC say the Character shouldn't have, when a gift came only days ago", () => {
+    expect(giftScene(NAMED_NPCS.nurse, 'Duftkerze', { counted: false, favourite: false })).toMatch(/The patient .*only a few days ago.*shouldn't have/s);
   });
 });
 
@@ -398,8 +446,8 @@ describe('buildSmallTalkSession', () => {
     expect(smallTalk('barista', FRIEND, 'ja')).toMatchSnapshot();
   });
 
-  it('has no completion function: only learn_name and not_understood', () => {
-    expect(smallTalk('barista').tools.map((tool) => tool.name)).toEqual([LEARN_NAME_TOOL, 'not_understood']);
+  it('has no completion function: only learn_name, reveal_favourite and not_understood', () => {
+    expect(smallTalk('barista').tools.map((tool) => tool.name)).toEqual([LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
   });
 
   it('points a stated goal to the counter instead of switching to it', () => {

@@ -374,6 +374,9 @@ export const zh: UiStrings = {
     mic: '按住说话（空格键）',
     micOff: '🎤 关',
     micOffHint: '没有麦克风，所以你用打字回复',
+    gift: '🎁 礼物',
+    gifts: '送礼物',
+    favourite: '★ 最喜欢的',
   },
   closing: {
     label: '对话结束',
