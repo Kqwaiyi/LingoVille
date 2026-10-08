@@ -6,7 +6,7 @@
 
 **Spec:** [spec.md](../spec.md): Goal Interactions (#9, #11); Economy
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Decided (2026-10-07):** it becomes debt.
 

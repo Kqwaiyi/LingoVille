@@ -19,6 +19,7 @@ import {
   selectPlaceId,
   selectPlaceOpen,
   selectSavedCount,
+  selectSymptoms,
   selectThirst,
   selectWeekday,
   useGame,
@@ -206,6 +207,22 @@ function PlaceLine() {
   );
 }
 
+/**
+ * Just above the dock while the Character is ill: what they feel, so the Player knows to see the doctor and
+ * what to describe. It never names the Illness: working that out is the doctor's job.
+ */
+function UnwellLine() {
+  const { t, i18n } = useTranslation();
+  const symptoms = useGame(selectSymptoms);
+  if (symptoms.length === 0) return null;
+  const felt = new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(symptoms.map((symptom) => t(`symptoms.${symptom}`)));
+  return (
+    <div className="unwell-line" role="status" aria-label={t('dock.unwell.label')}>
+      <span aria-hidden>🤒</span> {t('dock.unwell.symptoms', { symptoms: felt })}
+    </div>
+  );
+}
+
 /** The always-visible dock at the bottom centre: Well-being, Mood, the clock and money, with the place line above it. */
 export function Dock() {
   const { t } = useTranslation();
@@ -220,6 +237,7 @@ export function Dock() {
 
   return (
     <div className="dock-area">
+      <UnwellLine />
       <PlaceLine />
       <section className="dock" aria-label={t('dock.label')}>
         <RingGauge label={t('dock.health')} icon="❤️" value={health} />

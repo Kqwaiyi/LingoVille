@@ -227,6 +227,22 @@ export const en = {
       rent: 'Rent debt {{amount}}',
       restaurant: 'Restaurant debt {{amount}}',
     },
+    unwell: {
+      label: 'Feeling unwell',
+      symptoms: 'Feeling unwell: {{symptoms}}',
+    },
+  },
+  symptoms: {
+      cough: 'a cough',
+      'sore-throat': 'a sore throat',
+      'runny-nose': 'a runny nose',
+      fever: 'a fever',
+      'body-aches': 'aches all over',
+      chills: 'chills',
+      'stomach-ache': 'a stomach ache',
+      nausea: 'nausea',
+      sneezing: 'sneezing',
+      'itchy-eyes': 'itchy eyes',
   },
   placeLine: {
     label: 'Place',

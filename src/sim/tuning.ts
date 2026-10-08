@@ -224,6 +224,8 @@ export const MOOD = {
     goodHomeMeal: 2,
     unmetNeedPerGameHour: -1,
     lateNightPerGameHour: -6,
+    /** While the Character is ill, whatever the Illness. */
+    illnessPerGameHour: -0.5,
     fainting: -20,
   },
   /** Working this many or more days in one week (the last `overworkWeekDays` days, today included) counts as overwork. */
@@ -307,6 +309,8 @@ export const ILLNESS = {
   healthFullToEmptyGameMinutes: 48 * MINUTES_PER_HOUR,
   /** Food poisoning chance from cooking one gone-off grocery at Cooking 0. Fresh groceries carry none. */
   expiredFoodPoisoningChance: 0.25,
+  /** Food poisoning chance from each piece of cheap counter food eaten (a convenience store snack or bento). */
+  cheapFoodPoisoningChance: 0.03,
 } as const;
 
 export const GROCERIES = {

@@ -72,6 +72,8 @@ import {
   TRAM_LINE,
   type TownNpcId,
   type TramStopId,
+  ILLNESSES,
+  type SymptomId,
 } from '../content/index.ts';
 import {
   addToBasket,
@@ -179,6 +181,8 @@ import {
   type GymRefusal,
   type ShiftRefusal,
   type StartingStep,
+  ILLNESS_IDS,
+  type IllnessId,
 } from '../sim/index.ts';
 import {
   addUsage,
@@ -539,6 +543,8 @@ export type GameStoreDeps = {
   devStartDay: () => number | null;
   /** Dev only: a new game starts about to faint, with money for the bill or (`broke`) none, or as usual (null). */
   devFaintSoon: () => 'paying' | 'broke' | null;
+  /** Dev only: a new game starts already ill with this Illness, or well (null). */
+  devIllness: () => IllnessId | null;
   /** Opens the mic for the mic check. */
   openMic: OpenMic;
 };
@@ -619,6 +625,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   devStartHour: devStartHourFromUrl,
   devStartDay: devStartDayFromUrl,
   devFaintSoon: devFaintSoonFromUrl,
+  devIllness: devIllnessFromUrl,
   openMic: openBrowserMic,
 };
 
@@ -642,6 +649,13 @@ function devFaintSoonFromUrl(): 'paying' | 'broke' | null {
   const faint = new URLSearchParams(window.location.search).get('faint');
   if (faint === null) return null;
   return faint === 'broke' ? 'broke' : 'paying';
+}
+
+/** Dev only: `?ill=flu` starts a new game already ill, so a smoke test can see what the Player is shown. */
+function devIllnessFromUrl(): IllnessId | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const ill = new URLSearchParams(window.location.search).get('ill');
+  return (ILLNESS_IDS as readonly (string | null)[]).includes(ill) ? (ill as IllnessId) : null;
 }
 
 export type GameStore = {
@@ -1078,13 +1092,16 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const faintSoon = deps.devFaintSoon();
       const onDay = startDay === null ? game : { ...game, clock: { ...game.clock, day: startDay } };
       const atHour = startHour === null ? onDay : { ...onDay, clock: { ...onDay.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
+      const illnessId = deps.devIllness();
+      const ill =
+        illnessId === null ? atHour : { ...atHour, character: { ...atHour.character, illness: { illnessId, onsetDay: atHour.clock.day } } };
       play(
         faintSoon === null
-          ? atHour
+          ? ill
           : {
-              ...atHour,
+              ...ill,
               character: {
-                ...atHour.character,
+                ...ill.character,
                 health: DEV_FAINT_SOON_HEALTH,
                 hunger: 0,
                 thirst: 0,
@@ -2509,6 +2526,12 @@ export const selectThirst = (s: GameStore) => s.game.character.thirst;
 export const selectMood = (s: GameStore) => s.game.character.mood;
 /** The face on the dock's Mood gauge. */
 export const selectMoodFace = (s: GameStore) => moodFace(s.game.character.mood);
+const NO_SYMPTOMS: readonly SymptomId[] = [];
+/** What the Character feels while ill, for the Player to describe to the doctor: the symptoms, never which Illness it is. */
+export const selectSymptoms = (s: GameStore): readonly SymptomId[] => {
+  const { illness } = s.game.character;
+  return illness ? ILLNESSES[illness.illnessId].symptoms : NO_SYMPTOMS;
+};
 export const selectMoneyInShifts = (s: GameStore) => s.game.character.moneyInShifts;
 /** What the Character owes, by kind, for the dock to show next to the money. */
 export const selectDebts = (s: GameStore) => s.game.debts;

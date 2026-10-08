@@ -224,6 +224,22 @@ export const zh: UiStrings = {
       rent: '房租欠款 {{amount}}',
       restaurant: '餐厅欠款 {{amount}}',
     },
+    unwell: {
+      label: '身体不适',
+      symptoms: '身体不舒服：{{symptoms}}',
+    },
+  },
+  symptoms: {
+      cough: '咳嗽',
+      'sore-throat': '喉咙痛',
+      'runny-nose': '流鼻涕',
+      fever: '发烧',
+      'body-aches': '浑身酸痛',
+      chills: '发冷',
+      'stomach-ache': '肚子疼',
+      nausea: '恶心',
+      sneezing: '打喷嚏',
+      'itchy-eyes': '眼睛痒',
   },
   placeLine: {
     label: '地点',

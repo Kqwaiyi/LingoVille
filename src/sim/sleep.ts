@@ -1,6 +1,6 @@
 import { throwOutSpoiled } from './inventory.ts';
 import { clampMeter } from './meters.ts';
-import { endDaysSince } from './rent.ts';
+import { endDaysSince } from './days.ts';
 import type { GameState } from './state.ts';
 import { CLOCK, MOOD } from './tuning.ts';
 

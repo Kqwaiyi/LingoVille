@@ -159,6 +159,8 @@ export type Item = {
   comfort?: ComfortKind;
   /** A gift: kept in the inventory, ready to give, rather than used up when bought. */
   gift?: true;
+  /** Cheap ready-to-eat food: each one eaten adds a little to the chance of food poisoning. */
+  cheap?: true;
   /** Books only: what it is and who would like it, in English, for the shopkeeper's recommendation. Every pack's local book keeps to it. */
   about?: string;
 };
@@ -168,8 +170,8 @@ export const ITEMS: Record<ItemId, Item> = {
   coffee: { priceInShifts: 0.0625, restores: { thirst: WELL_BEING.cafeDrinkThirst } },
   tea: { priceInShifts: 0.05, restores: { thirst: WELL_BEING.cafeDrinkThirst } },
   pastry: { priceInShifts: 0.1, restores: { hunger: WELL_BEING.cafeFoodHunger } },
-  snack: { priceInShifts: 0.07, restores: { hunger: WELL_BEING.counterSnackHunger } },
-  bento: { priceInShifts: 0.12, restores: { hunger: WELL_BEING.bentoHunger } },
+  snack: { priceInShifts: 0.07, restores: { hunger: WELL_BEING.counterSnackHunger }, cheap: true },
+  bento: { priceInShifts: 0.12, restores: { hunger: WELL_BEING.bentoHunger }, cheap: true },
   vegetables: { priceInShifts: 0.06, restores: {}, meals: 1 },
   eggs: { priceInShifts: 0.06, restores: {}, meals: 1 },
   noodles: { priceInShifts: 0.06, restores: {}, meals: 1 },

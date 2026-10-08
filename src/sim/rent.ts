@@ -14,7 +14,7 @@ export function rentDebt(state: GameState): number {
  * becomes rent debt (never taken from the Character's money), and the next
  * week's rent is owed, at the Newcomer Discount for the highest step reached. Rent debt then costs Mood, unless the landlord gave more time.
  */
-function endDay(state: GameState, day: number): GameState {
+export function endRentDay(state: GameState, day: number): GameState {
   let { rent, debts } = state;
   if (day === rent.dueDay) {
     if (rent.owedInShifts > 0) debts = addDebt(debts, { kind: 'rent', amountInShifts: rent.owedInShifts });
@@ -28,13 +28,6 @@ function endDay(state: GameState, day: number): GameState {
   const extended = rent.extendedThroughDay !== null && day <= rent.extendedThroughDay;
   if (rentDebt(after) === 0 || extended) return after;
   return { ...after, character: { ...after.character, mood: clampMeter(after.character.mood + MOOD.debtPenaltyPerDay) } };
-}
-
-/** Ends each day the clock has moved past since `fromDay`, so rent falls due however the day ended: awake, asleep or fainted. */
-export function endDaysSince(fromDay: number, state: GameState): GameState {
-  let after = state;
-  for (let day = fromDay; day < state.clock.day; day++) after = endDay(after, day);
-  return after;
 }
 
 /**

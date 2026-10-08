@@ -111,7 +111,15 @@ export type ServedItem = { itemId: ItemId; name: string; glosses: Glosses; quant
  * One line of a confirmed order or purchase, with what each one costs and gives back, whether it goes off (groceries),
  * whether it's a gift (kept to give), and what kind of Comfort Purchase it is, if any. The sim adds them up.
  */
-export type OrderLine = ServedItem & { priceInShifts: number; restores: Restores; goesOff: boolean; gift: boolean; comfort: ComfortKind | null };
+export type OrderLine = ServedItem & {
+  priceInShifts: number;
+  restores: Restores;
+  goesOff: boolean;
+  gift: boolean;
+  comfort: ComfortKind | null;
+  /** Cheap ready-to-eat food, which risks food poisoning when eaten. */
+  cheap: boolean;
+};
 
 export type ParsedArgs = { success: true; data: Record<string, unknown> } | { success: false; error: string };
 
@@ -179,6 +187,7 @@ function orderLines(items: Basket, packId: LanguageCode): OrderLine[] {
     goesOff: ITEMS[itemId].meals !== undefined,
     gift: ITEMS[itemId].gift === true,
     comfort: ITEMS[itemId].comfort ?? null,
+    cheap: ITEMS[itemId].cheap === true,
   }));
 }
 

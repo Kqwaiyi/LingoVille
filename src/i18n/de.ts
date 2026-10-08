@@ -224,6 +224,22 @@ export const de: UiStrings = {
       rent: 'Mietschulden {{amount}}',
       restaurant: 'Restaurantschulden {{amount}}',
     },
+    unwell: {
+      label: 'Unwohl',
+      symptoms: 'Unwohl: {{symptoms}}',
+    },
+  },
+  symptoms: {
+      cough: 'Husten',
+      'sore-throat': 'Halsschmerzen',
+      'runny-nose': 'Schnupfen',
+      fever: 'Fieber',
+      'body-aches': 'Gliederschmerzen',
+      chills: 'Schüttelfrost',
+      'stomach-ache': 'Bauchschmerzen',
+      nausea: 'Übelkeit',
+      sneezing: 'Niesen',
+      'itchy-eyes': 'juckende Augen',
   },
   placeLine: {
     label: 'Ort',

@@ -10,7 +10,7 @@ import { recordOrder } from './regulars.ts';
 import { grantExtension, payRent } from './rent.ts';
 import { billTotal, restaurantDebt } from './restaurant.ts';
 import type { GameState, JobId, RestaurantTable } from './state.ts';
-import { MOOD } from './tuning.ts';
+import { ILLNESS, MOOD } from './tuning.ts';
 
 /**
  * How a Goal Interaction ended, as the store saw it. `args` are the NPC's
@@ -58,6 +58,12 @@ function orderTotals(lines: OrderLine[]) {
     thirst += (restores.thirst ?? 0) * quantity;
   }
   return { costInShifts, hunger, thirst };
+}
+
+/** The chance of food poisoning after eating these lines on top of what was already risked: each cheap food eaten adds to it. */
+function afterEating(foodPoisoningChance: number, eaten: OrderLine[]): number {
+  const cheapEaten = eaten.reduce((count, { cheap, quantity }) => count + (cheap ? quantity : 0), 0);
+  return 1 - (1 - foodPoisoningChance) * (1 - ILLNESS.cheapFoodPoisoningChance) ** cheapEaten;
 }
 
 /** What the Comfort Purchases among these lines lift Mood by: each kind once, however many are bought. */
@@ -190,6 +196,7 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
           moneyInShifts: character.moneyInShifts - paidInShifts,
           hunger: clampMeter(character.hunger + hunger),
           thirst: clampMeter(character.thirst + thirst),
+          foodPoisoningChance: effect.kind === 'purchase' ? character.foodPoisoningChance : afterEating(character.foodPoisoningChance, completion.lines),
         },
       };
       const lifted = changeMood(paid, MOOD.changes.goalInteractionSuccess + comfortMood(completion.lines));

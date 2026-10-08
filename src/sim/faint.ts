@@ -2,7 +2,7 @@ import { addDebt } from './debts.ts';
 import { throwOutSpoiled } from './inventory.ts';
 import type { GameState } from './state.ts';
 import { clampMeter } from './meters.ts';
-import { endDaysSince } from './rent.ts';
+import { endDaysSince } from './days.ts';
 import { leaveTable } from './restaurant.ts';
 import { CLOCK, ECONOMY, MOOD, WELL_BEING } from './tuning.ts';
 
@@ -11,7 +11,7 @@ import { CLOCK, ECONOMY, MOOD, WELL_BEING } from './tuning.ts';
  * at 08:00 the next day, losing the rest of today. Past midnight, as after a
  * late bedtime, "the next day" is the same day number. The bill is paid if there's
  * money enough; otherwise it all becomes hospital debt, and the money is left
- * for food. Nothing in the game kills the Character.
+ * for food. The ward cures any Illness. Nothing in the game kills the Character.
  */
 export function faint(state: GameState): GameState {
   const bill = ECONOMY.faintingBillInShifts;
@@ -31,6 +31,8 @@ export function faint(state: GameState): GameState {
       ...character,
       ...WELL_BEING.afterFainting,
       mood: clampMeter(character.mood + MOOD.changes.fainting),
+      // The ward sees to any Illness the Character had. The night's roll may still bring a new one by morning.
+      illness: null,
       moneyInShifts: canPay ? character.moneyInShifts - bill : character.moneyInShifts,
     },
     debts: canPay ? left.debts : addDebt(left.debts, { kind: 'hospital', amountInShifts: bill }),

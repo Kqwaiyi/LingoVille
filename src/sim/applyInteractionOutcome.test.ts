@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CULTURE_PACKS, formatLocalMoney, INTERACTIONS, menuPrice, type ItemId } from '../content/index.ts';
-import { applyInteractionOutcome, createSave, GROCERIES, METER_MAX, MOOD, WELL_BEING, type GameState } from './index.ts';
+import { applyInteractionOutcome, createSave, GROCERIES, ILLNESS, METER_MAX, MOOD, WELL_BEING, type GameState } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
 
 const { orderDrink } = INTERACTIONS;
@@ -251,6 +251,20 @@ describe('applyInteractionOutcome: counter food at the convenience store (#7)', 
       args: { items: [{ item: 'snack', quantity: 1 }] },
     });
     expect(after.character.hunger).toBe(10 + WELL_BEING.counterSnackHunger);
+  });
+
+  it('cheap counter food adds to the chance of food poisoning, for each one eaten', () => {
+    const state = { ...atTheCafe(), placeId: 'convenience-store' as const };
+    const eat = (quantity: number) =>
+      applyInteractionOutcome(state, buyCounterFood, { kind: 'success', args: { items: [{ item: 'bento', quantity }] } }).state.character
+        .foodPoisoningChance;
+    expect(eat(1)).toBeCloseTo(ILLNESS.cheapFoodPoisoningChance);
+    expect(eat(2)).toBeCloseTo(1 - (1 - ILLNESS.cheapFoodPoisoningChance) ** 2);
+  });
+
+  it('a café drink carries no risk of food poisoning', () => {
+    const { state: after } = applyInteractionOutcome(atTheCafe(), orderDrink, { kind: 'success', args: LATTE });
+    expect(after.character.foodPoisoningChance).toBe(0);
   });
 });
 

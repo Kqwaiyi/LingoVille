@@ -224,6 +224,22 @@ export const ja: UiStrings = {
       rent: '家賃の未払い {{amount}}',
       restaurant: 'レストランの未払い {{amount}}',
     },
+    unwell: {
+      label: '体調不良',
+      symptoms: '体調が悪い：{{symptoms}}',
+    },
+  },
+  symptoms: {
+      cough: '咳',
+      'sore-throat': 'のどの痛み',
+      'runny-nose': '鼻水',
+      fever: '熱',
+      'body-aches': '体の痛み',
+      chills: '寒気',
+      'stomach-ache': '腹痛',
+      nausea: '吐き気',
+      sneezing: 'くしゃみ',
+      'itchy-eyes': '目のかゆみ',
   },
   placeLine: {
     label: '場所',

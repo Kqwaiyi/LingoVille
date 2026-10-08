@@ -31,6 +31,7 @@ export {
   selectMicLevel,
   selectMood,
   selectMoodFace,
+  selectSymptoms,
   selectMoneyInShifts,
   selectNativeLanguage,
   selectNpcExpression,

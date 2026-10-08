@@ -53,3 +53,17 @@ test('walking to the tap at home and pressing E refills Thirst for free', async 
   await expect(thirst).toHaveAttribute('aria-valuenow', '100');
   await expect(money).toHaveText(moneyBefore!);
 });
+
+test('an ill Character shows how they feel above the dock, without naming the Illness', async ({ page }) => {
+  await startNewGame(page, { path: '/?ill=flu' });
+
+  const unwell = page.getByRole('status', { name: 'Feeling unwell' });
+  await expect(unwell).toHaveText(/a fever, aches all over,? and chills/);
+  await expect(unwell).not.toContainText(/flu/i);
+});
+
+test('a well Character shows no such line', async ({ page }) => {
+  await startNewGame(page);
+  await expect(dock(page)).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Feeling unwell' })).toHaveCount(0);
+});

@@ -89,6 +89,7 @@ export {
   type ItemId,
   type Restores,
 } from './items.ts';
+export { ILLNESSES, illnessSchema, MEDICINE_IDS, SYMPTOM_IDS, type Illness, type MedicineId, type SymptomId } from './illnesses.ts';
 export { NAMED_NPC_IDS, NAMED_NPCS, namedNpcSchema, type NamedNpc, type NamedNpcId } from './npcs.ts';
 export { PLACE_PHRASEBOOKS, placePhrasebook, placePhrasebookSchema, type PlacePhrase } from './phrasebooks.ts';
 export { placeHours } from './openingHours.ts';
