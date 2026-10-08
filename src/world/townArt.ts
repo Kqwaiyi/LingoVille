@@ -1,5 +1,6 @@
 // What the game expects of the shared town art in `public/town/`, built by `npm run build:town`.
 // The build script and `tooling/townArt.test.ts` hold the art to these names.
+import { PROP_IDS, type PropId } from '../content/index.ts';
 import type { PaletteColour } from './palette.ts';
 
 export const TOWN_ART_URL = '/town/town.glb';
@@ -51,11 +52,18 @@ export const TOWN_PIECES = [
 ] as const;
 export type TownPiece = (typeof TOWN_PIECES)[number];
 
+/**
+ * Every node of `town.glb`: the shared town's pieces, and every Culture Pack's props (`PROP_IDS`), each standing where
+ * the world sets it out (on a counter, a table, a floor, or at a door's foot, hung over it), its front facing +z.
+ */
+export const ART_PIECES = [...TOWN_PIECES, ...PROP_IDS] as const;
+export type ArtPiece = TownPiece | PropId;
+
 /** The glass in a window, lit while its place is open. Every other material is named for its palette colour. */
 export const WINDOW_GLASS = 'window';
 export type TownMaterial = PaletteColour | typeof WINDOW_GLASS;
 /** The material of each piece's bulb, which glows while it's lit: a street light's, from dusk. */
-export const LAMP_BULBS: Partial<Record<TownPiece, TownMaterial>> = { 'street-light': 'white' };
+export const LAMP_BULBS: Partial<Record<ArtPiece, TownMaterial>> = { 'street-light': 'white' };
 
 /** The colour the kit's walls come in, which each building repaints with its own façade colour. */
 export const KIT_FACADE: PaletteColour = 'lavender';

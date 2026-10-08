@@ -1,6 +1,5 @@
-import { PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type GroceryId, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
-import { PLACE_IDS, type JobId, type PlaceId } from '../sim/index.ts';
-import type { Arrival } from '../store/index.ts';
+import { PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type GroceryId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
+import type { JobId, PlaceId } from '../sim/index.ts';
 import type { PaletteColour } from './palette.ts';
 import type { TownPiece } from './townArt.ts';
 
@@ -216,33 +215,70 @@ export const WORKPLACES: Record<JobId, { door: Vec3; usedFrom: Vec3; behindTheCo
   },
 };
 
-/** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */
-export const SIGNS: Record<SignId, { position: Vec3; size: readonly [width: number, height: number] }> = {
-  // Over the café door, hung from the eaves, in front of the roof.
-  'cafe-name': { position: [12, 2.75, 3.32], size: [3.4, 0.7] },
-  // Beside the door, at eye height.
-  'cafe-hours': { position: [14.1, 1.5, 3.02], size: [1, 0.7] },
+/**
+ * A sign: where its middle hangs, its size in metres, and which way it faces (radians about y; 0 faces +z). A building's
+ * name board hides while the Character is inside (`liftsInside`), when the roof is off too, so it never hides them.
+ */
+export type SignSpot = { position: Vec3; size: readonly [width: number, height: number]; rotation?: number; liftsInside?: PlaceId };
+
+/** A building's front, outside: the middle of its wall's outer face, its width, and the way it faces (and turns to). */
+export function frontOf({ centre: [x, z], size: [width, depth], facing }: Building) {
+  return { x, z: z + (facing * depth) / 2, width, facing, rotation: facing === 1 ? 0 : Math.PI };
+}
+
+/** Over a building's door, hung from the eaves in front of the roof. */
+function nameBoard(building: Building): SignSpot {
+  const { x, z, facing, rotation } = frontOf(building);
+  return { position: [x, 2.75, z + facing * 0.32], size: [3.4, 0.7], rotation, liftsInside: building.placeId };
+}
+
+/** Beside a building's door at eye height, clear of the door frame and the window: smaller where the wall beside the door is short. */
+function hoursBoard(building: Building): SignSpot {
+  const { x, z, width, facing, rotation } = frontOf(building);
+  const roomy = width >= 10;
+  return { position: [x + facing * (roomy ? 2.1 : 1.55), 1.5, z + facing * 0.02], size: roomy ? [1, 0.7] : [0.6, 0.45], rotation };
+}
+
+/** On a tram stop's pole, above head height. */
+function stopBoard(stopId: TramStopId): SignSpot {
+  const [x, z] = TRAM_STOPS[stopId].centre;
+  return { position: [x, 2.45, z + 0.17], size: [1.3, 0.4] };
+}
+
+/** The building a place is in, if it has one. */
+export const buildingOf = (placeId: PlaceId) => BUILDINGS.find((b) => b.placeId === placeId);
+const building = (placeId: PlaceId) => buildingOf(placeId)!;
+
+/** Where each sign hangs. The park's name stands on two posts at its way in; each tram stop's hangs on its pole. */
+export const SIGNS: Record<SignId, SignSpot> = {
+  'home-name': nameBoard(building('home')),
+  'cafe-name': nameBoard(building('cafe')),
+  'supermarket-name': nameBoard(building('supermarket')),
+  'convenience-store-name': nameBoard(building('convenience-store')),
+  'restaurant-name': nameBoard(building('restaurant')),
+  'clinic-name': nameBoard(building('clinic')),
+  'park-name': { position: [-3.2, 1.6, PARK.centre[1] - PARK.size[1] / 2 + 0.1], size: [2, 0.5] },
+  'bookshop-name': nameBoard(building('bookshop')),
+  'bathhouse-name': nameBoard(building('bathhouse')),
+  'town-office-name': nameBoard(building('town-office')),
+  'west-stop-name': stopBoard('west-stop'),
+  'central-stop-name': stopBoard('central-stop'),
+  'east-stop-name': stopBoard('east-stop'),
+  'cafe-hours': hoursBoard(building('cafe')),
+  'supermarket-hours': hoursBoard(building('supermarket')),
+  'restaurant-hours': hoursBoard(building('restaurant')),
+  'clinic-hours': hoursBoard(building('clinic')),
+  'bookshop-hours': hoursBoard(building('bookshop')),
+  'bathhouse-hours': hoursBoard(building('bathhouse')),
+  'town-office-hours': hoursBoard(building('town-office')),
   // On the back wall behind the counter, to the barista's left.
   'cafe-menu': { position: [14.3, 1.65, -4.68], size: [1.7, 1.5] },
+  // On the back wall, between the two tables.
+  'restaurant-menu': { position: [42, 1.65, -4.68], size: [1.7, 1.5] },
 };
 
-/** Where a pack's props stand: hung at the café door, or set out on the counter (one spot per counter prop). */
-export const PROP_SPOTS = {
-  door: [12, 2.1, 3.1] as Vec3,
-  counter: [[10.5, 1.1, -3] as Vec3, [13.5, 1.1, -3] as Vec3],
-} as const;
-
-/** Which spot each prop takes. */
-export const SPOT_FOR_PROP: Record<PropId, 'door' | 'counter'> = {
-  noren: 'door',
-  'red-lantern': 'door',
-  bunting: 'door',
-  'lucky-cat': 'counter',
-  'tea-set': 'counter',
-  'cake-stand': 'counter',
-  'pretzel-basket': 'counter',
-  teapot: 'counter',
-};
+/** The posts the park's name board stands on. */
+export const PARK_SIGN_POSTS: readonly Vec2[] = [-1, 1].map((side): Vec2 => [SIGNS['park-name'].position[0] + side * 0.9, SIGNS['park-name'].position[2] - 0.05]);
 
 /** Where the tram sets the Character down: on the platform, west of the pole. */
 export function tramStopSpawn(stopId: TramStopId): Vec3 {
@@ -280,22 +316,6 @@ export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
 
 /** In front of the doctor: where the Character goes when the doctor calls their name from the waiting room. */
 export const BEFORE_THE_DOCTOR: Vec3 = [NPC_SPOTS.doctor[0], 1.5, NPC_SPOTS.doctor[2] - 1.8];
-
-/**
- * Where the Character appears. A new game starts the First Morning at home
- * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the
- * saved place's entrance, or in bed if that's home.
- */
-export function spawnPoint(arrival: Arrival, placeId: PlaceId, search: string): Vec3 {
-  if (arrival === 'newGame') return spawnAt(devSpawnPlace(search));
-  return placeId === 'home' ? IN_BED : spawnAt(placeId);
-}
-
-/** Dev only: `?spawn=cafe` starts a new game at the café door, so a smoke test doesn't have to walk across town. */
-function devSpawnPlace(search: string): PlaceId {
-  const place = new URLSearchParams(search).get('spawn');
-  return import.meta.env.DEV && (PLACE_IDS as readonly (string | null)[]).includes(place) ? (place as PlaceId) : 'home';
-}
 
 const within = (x: number, z: number, [cx, cz]: Vec2, [w, d]: Vec2) => Math.abs(x - cx) < w / 2 && Math.abs(z - cz) < d / 2;
 

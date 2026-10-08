@@ -1,11 +1,11 @@
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { CanvasTexture, SRGBColorSpace } from 'three';
+import { CanvasTexture, Mesh, SRGBColorSpace } from 'three';
 import { SIGN_IDS, worldSign, type SignId, type SignLine } from '../content/index.ts';
 import { MOVEMENT } from '../sim/index.ts';
-import { selectCulturePackId, selectScreen, useGame } from '../store/index.ts';
+import { selectCulturePackId, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
-import { SIGNS } from './town.ts';
+import { placeAt, SIGNS } from './town.ts';
 import { PALETTE } from './palette.ts';
 
 /** Pixels per metre of sign. */
@@ -18,9 +18,13 @@ const FONT = 'system-ui, "Hiragino Sans", "Noto Sans CJK JP", "Microsoft YaHei",
 
 /**
  * Paints a sign's lines onto a canvas: the first line as its heading, and any
- * note (a price or a time) right-aligned beside its line.
+ * note (a price or a time) right-aligned beside its line. A sign of one line
+ * with a note (opening hours) has the note on a row of its own, under it.
  */
 function paintSign(lines: SignLine[], [width, height]: readonly [number, number]) {
+  const [only] = lines;
+  const timeBelow = lines.length === 1 && !!only?.note;
+  const rows = timeBelow ? [{ ...only, note: null }, { text: only.note!, note: null, glosses: {} }] : lines;
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * RESOLUTION);
   canvas.height = Math.round(height * RESOLUTION);
@@ -31,17 +35,17 @@ function paintSign(lines: SignLine[], [width, height]: readonly [number, number]
   ctx.lineWidth = 8;
   ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
 
-  const pad = canvas.height * (lines.length === 1 ? 0.18 : 0.08);
-  const rowHeight = (canvas.height - pad * 2) / (lines.length + (lines.length > 1 ? 0.4 : 0));
+  const pad = canvas.height * (rows.length === 1 ? 0.18 : 0.08);
+  const rowHeight = (canvas.height - pad * 2) / (rows.length + (rows.length > 1 ? 0.4 : 0));
   ctx.fillStyle = INK;
   ctx.textBaseline = 'middle';
-  lines.forEach(({ text, note }, i) => {
-    const heading = i === 0 && lines.length > 1;
+  rows.forEach(({ text, note }, i) => {
+    const heading = i === 0 && rows.length > 1;
     const size = rowHeight * (heading ? 0.85 : 0.62);
-    const y = pad + rowHeight * (i + 0.5 + (i > 0 && lines.length > 1 ? 0.4 : 0));
+    const y = pad + rowHeight * (i + 0.5 + (i > 0 && rows.length > 1 ? 0.4 : 0));
     ctx.font = `${heading ? 'bold ' : ''}${Math.round(size)}px ${FONT}`;
     if (!note) {
-      ctx.textAlign = lines.length === 1 || heading ? 'center' : 'left';
+      ctx.textAlign = rows.length === 1 || timeBelow || heading ? 'center' : 'left';
       ctx.fillText(text, ctx.textAlign === 'center' ? canvas.width / 2 : pad, y, canvas.width - pad * 2);
       return;
     }
@@ -68,7 +72,9 @@ function Sign({ signId }: { signId: SignId }) {
   const playing = useGame(selectScreen) === 'playing';
   const pointAtSign = useGame((s) => s.pointAtSign);
   const unpointSign = useGame((s) => s.unpointSign);
-  const { position, size } = SIGNS[signId];
+  const titlePlaceId = useGame(selectTitlePlaceId);
+  const { position, size, rotation = 0, liftsInside } = SIGNS[signId];
+  const board = useRef<Mesh>(null);
   const texture = useMemo(() => paintSign(worldSign(signId, packId), size), [signId, packId, size]);
   useEffect(() => () => texture.dispose(), [texture]);
 
@@ -83,6 +89,13 @@ function Sign({ signId }: { signId: SignId }) {
 
   // The Character walks while the pointer rests, so range is checked every frame.
   useFrame(() => {
+    if (liftsInside && board.current) {
+      // Lifted off, the board is out of sight and out of the pointer's way, so signs behind it can still be pointed at.
+      // On the title screen, as the roof does, off the save's place.
+      const lifted = playing ? placeAt(characterPosition.x, characterPosition.z) === liftsInside : titlePlaceId === liftsInside;
+      board.current.visible = !lifted;
+      board.current.raycast = lifted ? () => {} : Mesh.prototype.raycast;
+    }
     if (!hovered.current) return;
     const distance = Math.hypot(characterPosition.x - position[0], characterPosition.z - position[2]);
     const inRange = playing && distance <= MOVEMENT.signReadRangeMetres;
@@ -114,7 +127,7 @@ function Sign({ signId }: { signId: SignId }) {
   };
 
   return (
-    <mesh position={[...position]} onPointerOver={point} onPointerMove={point} onPointerOut={leave}>
+    <mesh ref={board} position={[...position]} rotation-y={rotation} onPointerOver={point} onPointerMove={point} onPointerOut={leave}>
       <planeGeometry args={[size[0], size[1]]} />
       <meshStandardMaterial map={texture} />
     </mesh>

@@ -1,6 +1,7 @@
 /**
- * Builds the shared town art, `public/town/town.glb`, from Kenney's CC0 kits: one node per piece the town asks for
- * (`TOWN_PIECES` in `src/world/townArt.ts`), in metres, standing on the ground and centred on its footprint.
+ * Builds the town art, `public/town/town.glb`, from Kenney's CC0 kits: one node per piece the town asks for
+ * (`TOWN_PIECES` in `src/world/townArt.ts`), in metres, standing on the ground and centred on its footprint, and one
+ * per Culture Pack prop (`PROP_IDS`), put together in `scripts/town-props.ts`.
  *
  * Every colour is snapped to the one shared palette (`src/world/palette.ts`): a textured kit's colour map is read under
  * each triangle, a plain kit's material colour is taken as it is, and either becomes the nearest palette colour. Each
@@ -15,6 +16,8 @@
  * - train-kit: https://kenney.nl/assets/train-kit
  * - furniture-kit: https://kenney.nl/assets/furniture-kit
  * - nature-kit: https://kenney.nl/assets/nature-kit
+ * - food-kit: https://kenney.nl/assets/food-kit
+ * - fantasy-town-kit: https://kenney.nl/assets/fantasy-town-kit
  *
  * `npm run build:town -- <folder>`
  */
@@ -27,20 +30,33 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
 import { fromLinear, hexRgb, nearest, toLinear, type Rgb } from './palette.ts';
-import { KIT_FACADE, KIT_ROOF, TOWN_ART_URL, WINDOW_GLASS, type TownMaterial, type TownPiece } from '../src/world/townArt.ts';
+import { KIT_FACADE, KIT_ROOF, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type TownMaterial, type TownPiece } from '../src/world/townArt.ts';
+import { PROP_PARTS } from './town-props.ts';
 
 const source = process.argv[2];
 if (!source) throw new Error('Pass the folder the Kenney kits were unzipped into.');
 
-type Kit = 'building-kit' | 'modular-buildings' | 'city-kit-roads' | 'train-kit' | 'furniture-kit' | 'nature-kit';
-type Vec3 = [number, number, number];
+type Kit = 'building-kit' | 'modular-buildings' | 'city-kit-roads' | 'train-kit' | 'furniture-kit' | 'nature-kit' | 'food-kit' | 'fantasy-town-kit';
+export type Vec3 = [number, number, number];
 
 /**
  * One kit model in a piece. It is turned (`turns`, quarter turns about y, anticlockwise from above), then stood on the
  * ground and centred on its footprint, then sized (`scale`, or `fit` to an exact size in metres) and moved (`at`).
- * `glass` makes the model's glass the window glass. `repaint` swaps palette colours after snapping.
+ * `flip` turns it upside down first. `glass` makes the model's glass the window glass. `repaint` swaps palette colours
+ * after snapping; `paint` makes the whole model one palette colour instead.
  */
-type Part = { kit: Kit; model: string; turns?: number; scale?: number | Vec3; fit?: Vec3; at?: Vec3; glass?: boolean; repaint?: Partial<Record<PaletteColour, PaletteColour>> };
+export type Part = {
+  kit: Kit;
+  model: string;
+  turns?: number;
+  flip?: boolean;
+  scale?: number | Vec3;
+  fit?: Vec3;
+  at?: Vec3;
+  glass?: boolean;
+  repaint?: Partial<Record<PaletteColour, PaletteColour>>;
+  paint?: PaletteColour;
+};
 
 /** Kenney's furniture and nature kits store their material colours as sRGB, where glTF expects linear. */
 const SRGB_FACTORS = new Set<Kit>(['furniture-kit', 'nature-kit']);
@@ -63,7 +79,7 @@ const NATURE_SCALE = 2.6;
 /** Wall pieces are 0.1 m thick, their frames 0.2 m: thickened to sit in the town's 0.3 m walls without bulging out. */
 const WALL_DEPTH = 2;
 
-const PIECES: Record<TownPiece, Part[]> = {
+const TOWN: Record<TownPiece, Part[]> = {
   wall: [{ kit: 'building-kit', model: 'wall', turns: 1, scale: [1, 1, WALL_DEPTH], repaint: WALL_COLOURS }],
   'wall-window': [{ kit: 'building-kit', model: 'wall-window-square', turns: 1, scale: [1, 1, WALL_DEPTH], glass: true, repaint: WALL_COLOURS }],
   // The wide doorway, narrowed so its opening is the town's 1.8 m door.
@@ -108,6 +124,8 @@ const PIECES: Record<TownPiece, Part[]> = {
     { kit: 'furniture-kit', model: 'computerScreen', turns: 2, fit: [0.5, 0.3, 0.08], at: [0, 1.12, 0.84] },
   ],
 };
+
+const PIECES: Record<ArtPiece, Part[]> = { ...TOWN, ...PROP_PARTS };
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ sharp });
 
@@ -175,9 +193,19 @@ async function bakePart(part: Part): Promise<Triangles> {
         const corners = [0, 1, 2].map((k) => (indices ? indices.getScalar(i + k) : i + k));
         const uv = [0, 1].map((axis) => (uvs ? corners.reduce((sum, corner) => sum + uvs.getElement(corner, [])[axis]!, 0) / 3 : 0)) as [number, number];
         const snapped = nearest(colourAt(uv));
-        const name: TownMaterial = isGlass ? WINDOW_GLASS : (part.repaint?.[snapped] ?? snapped);
+        const name: TownMaterial = isGlass ? WINDOW_GLASS : (part.paint ?? part.repaint?.[snapped] ?? snapped);
         const list = triangles.get(name) ?? triangles.set(name, []).get(name)!;
         for (const corner of corners) list.push(...transform(matrix, position.getElement(corner, [])));
+      }
+    }
+  }
+
+  // Upside down: mirrored top to bottom, each triangle's corners reversed so it still faces out.
+  if (part.flip) {
+    for (const list of triangles.values()) {
+      for (let i = 0; i < list.length; i += 9) {
+        for (let k = 1; k < 9; k += 3) list[i + k] = -list[i + k]!;
+        for (let k = 0; k < 3; k++) [list[i + 3 + k], list[i + 6 + k]] = [list[i + 6 + k]!, list[i + 3 + k]!];
       }
     }
   }
@@ -239,7 +267,7 @@ async function buildTown() {
     return materials.get(name)!;
   };
 
-  for (const [piece, parts] of Object.entries(PIECES) as [TownPiece, Part[]][]) {
+  for (const [piece, parts] of Object.entries(PIECES) as [ArtPiece, Part[]][]) {
     const triangles: Triangles = new Map();
     for (const part of parts) {
       for (const [name, list] of await bakePart(part)) (triangles.get(name) ?? triangles.set(name, []).get(name)!).push(...list);

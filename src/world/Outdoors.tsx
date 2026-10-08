@@ -3,7 +3,7 @@ import { TRAM_LINE, type TramStopId } from '../content/index.ts';
 import { selectLampsOn, useGame } from '../store/index.ts';
 import { laidAlong, Piece, Solid, usePieceSize } from './Kit.tsx';
 import { PALETTE } from './palette.ts';
-import { GROUND_HALF_SIZE, PARK, PARK_PLANTING, PLATFORM, STREET, STREET_LIGHTS, TRAM_STOPS, TREES } from './town.ts';
+import { GROUND_HALF_SIZE, PARK, PARK_PLANTING, PARK_SIGN_POSTS, PLATFORM, SIGNS, STREET, STREET_LIGHTS, TRAM_STOPS, TREES } from './town.ts';
 import type { TownPiece } from './townArt.ts';
 
 /** The kit's road and rail pieces are this long; the street is laid with them end to end. */
@@ -105,7 +105,7 @@ function TramStop({ stopId }: { stopId: TramStopId }) {
   );
 }
 
-/** The park: a lawn with trees, and bushes and flowers around its edges. */
+/** The park: a lawn with trees, bushes and flowers around its edges, and its name board's posts at the way in. */
 function Park() {
   return (
     <>
@@ -121,6 +121,9 @@ function Park() {
       ))}
       {PARK_PLANTING.map(({ at: [x, z], piece }, i) => (
         <Piece key={`${x},${z}`} piece={piece} position={[x, 0, z]} rotation={i * 1.3} />
+      ))}
+      {PARK_SIGN_POSTS.map(([x, z]) => (
+        <Piece key={`${x},${z}`} piece="shelter-post" position={[x, 0, z]} size={[null, SIGNS['park-name'].position[1] + SIGNS['park-name'].size[1] / 2, null]} />
       ))}
     </>
   );

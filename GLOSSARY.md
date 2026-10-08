@@ -124,7 +124,7 @@ One Character's whole life in one Target Language, kept only in this browser. A 
 _Avoid_: Profile, game, file, run
 
 **Culture Pack**:
-The local dressing of the one shared town for a Target Language: its food and goods, currency, customs, signs and opening hours.
+The local dressing of the one shared town for a Target Language: its food and goods, currency, customs, signs, opening hours, and the props it sets out at each place. Façades, roofs and layout are the same in every pack.
 _Avoid_: Skin, theme, locale
 
 **Comfort Purchase**:

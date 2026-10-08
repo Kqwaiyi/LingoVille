@@ -3,7 +3,7 @@ import { CuboidCollider } from '@react-three/rapier';
 import { useMemo } from 'react';
 import { Box3, MeshStandardMaterial, Vector3, type Mesh, type Object3D } from 'three';
 import { PALETTE, type PaletteColour } from './palette.ts';
-import { LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS, type TownPiece } from './townArt.ts';
+import { LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece } from './townArt.ts';
 import type { Vec3 } from './town.ts';
 
 // The town's kit pieces, built by `npm run build:town`: every building, street piece and stick of furniture is one of
@@ -57,7 +57,7 @@ function useTownArt(): TownArt {
 }
 
 /** A piece's size in metres, as the art has it: width (x), height (y) and depth (z). */
-export function usePieceSize(piece: TownPiece): Vec3 {
+export function usePieceSize(piece: ArtPiece): Vec3 {
   return useTownArt().get(piece)!.size;
 }
 
@@ -69,7 +69,7 @@ export function laidAlong(length: number, pieceLength: number) {
 }
 
 type PieceProps = {
-  piece: TownPiece;
+  piece: ArtPiece;
   position?: Vec3;
   /** Turned about y, in radians: 0 faces +z. */
   rotation?: number;

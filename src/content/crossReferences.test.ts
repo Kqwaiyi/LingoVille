@@ -104,4 +104,28 @@ describe('culturePackProblems', () => {
     const packs = withGerman((de) => (de.personas['park-regular-1'].favouriteGift = 'a bag of birdseed'));
     expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*park-regular-1.*flowers/)]);
   });
+
+  it('fails a pack that leaves one of the 11 places undressed', () => {
+    const packs = withGerman((de) => {
+      delete (de.props as Partial<CulturePack['props']>).park;
+      de.props.bookshop = [];
+    });
+    const [problem, ...others] = culturePackProblems(packs, interactions);
+    expect(others).toEqual([]);
+    expect(problem).toMatch(/^de: .*props\.bookshop/s);
+    expect(problem).toMatch(/props\.park/);
+  });
+
+  it('fails a pack that shows a grocery on the shelf in no way of its own', () => {
+    const packs = withGerman((de) => delete (de.shelves as Partial<CulturePack['shelves']>).eggs);
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*shelves\.eggs/s)]);
+  });
+
+  it('fails a place dressed just as another pack dresses it: each pack swaps the props', () => {
+    const packs = withGerman((de) => (de.props.bookshop = [...CULTURE_PACKS.ja.props.bookshop].reverse()));
+    expect(culturePackProblems(packs, interactions)).toEqual([
+      'ja: dresses the bookshop just as the de pack does.',
+      'de: dresses the bookshop just as the ja pack does.',
+    ]);
+  });
 });

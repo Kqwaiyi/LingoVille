@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ECONOMY, LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
+import { ECONOMY, LANGUAGE_CODES, PLACE_IDS, type LanguageCode } from '../sim/index.ts';
 import { BODY_PRESETS } from './appearance.ts';
 import { culturePackSchema, type CulturePack } from './culturePacks.ts';
 import { priceProblem } from './currency.ts';
@@ -16,7 +16,7 @@ const GIFT_WORDS: Record<(typeof GIFTS_SOLD)[number], string> = { flowers: 'flow
  * sells every item an interaction refers to (saying which allergens are in each one the barista sells avoiding an
  * allergen), converts every catalogue price and the postage, and
  * localises and dresses every Named NPC, keeping to the gift each one loves most and to the same build in every pack
- * (as the Japanese pack has it).
+ * (as the Japanese pack has it), and dresses each place in props of its own, not just as another pack does.
  */
 export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, interactions: readonly Interaction[]): string[] {
   return LANGUAGE_CODES.flatMap((packId) => {
@@ -56,6 +56,18 @@ export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, in
         problems.push(`gives ${npcId} a ${BODY_PRESETS[body].build} build, not the ${build} one they have in every pack.`);
       }
     }
+    for (const placeId of PLACE_IDS) {
+      for (const otherId of LANGUAGE_CODES) {
+        if (otherId !== packId && sameDressing(pack.props[placeId], packs[otherId].props[placeId])) {
+          problems.push(`dresses the ${placeId} just as the ${otherId} pack does.`);
+        }
+      }
+    }
     return problems.map((problem) => `${packId}: ${problem}`);
   });
+}
+
+/** The same props, in whatever order. */
+function sameDressing(a: readonly string[] | undefined, b: readonly string[] | undefined) {
+  return !!a?.length && !!b?.length && [...a].sort().join() === [...b].sort().join();
 }

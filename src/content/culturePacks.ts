@@ -1,16 +1,18 @@
 import { z } from 'zod';
-import { CLOCK, LANGUAGE_CODES, lookFromSeed, WEEKDAYS, type LanguageCode, type LookWeights, type OpeningHours, type PlaceId } from '../sim/index.ts';
+import { CLOCK, LANGUAGE_CODES, lookFromSeed, PLACE_IDS, WEEKDAYS, type LanguageCode, type LookWeights, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import { AppearancePresetSchema, BODY_IDS, BODY_PRESETS, CustomerWeightsSchema, type AppearancePreset, type CustomerWeights } from './appearance.ts';
 import {
   ALLERGENS,
   DIETARY_NOTE_IDS,
   DRINK_OPTIONS,
   EXTRA_ALLERGENS,
+  GROCERIES_SOLD,
   ITEM_IDS,
   type Allergen,
   type DietaryNoteId,
   type DrinkExtra,
   type DrinkOptionId,
+  type GroceryId,
   type ItemId,
 } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
@@ -45,8 +47,81 @@ export type Currency = {
   denominations: number[];
 };
 
-/** Prop ids the world knows how to draw. Each pack picks the small set dressing it shows. */
-export const PROP_IDS = ['noren', 'lucky-cat', 'red-lantern', 'tea-set', 'cake-stand', 'pretzel-basket', 'teapot', 'bunting'] as const;
+/**
+ * The props the world knows how to draw, from the pack art: money at the till, what hangs at a door, food and goods on
+ * show, and small local touches. Each pack picks the ones it sets out at each place; façades, roofs and layout stay shared.
+ */
+export const PROP_IDS = [
+  // Money at the till, as each pack pays.
+  'cash-tray',
+  'qr-stand',
+  'card-reader',
+  'coin-dish',
+  // At a door.
+  'noren',
+  'red-lantern',
+  'bunting',
+  'flower-box',
+  // On a counter.
+  'lucky-cat',
+  'tea-set',
+  'cake-stand',
+  'bread-basket',
+  'onigiri',
+  'tea-eggs',
+  'sausage-rolls',
+  'bockwurst',
+  'medicine-boxes',
+  'book-stack',
+  'paperwork',
+  'towel-stack',
+  'nabe',
+  'steamer',
+  'fry-up',
+  'sausage-pan',
+  // On a table.
+  'teishoku',
+  'dim-sum',
+  'fish-and-chips',
+  'sauerkraut',
+  // On a floor.
+  'mikan-crate',
+  'rice-sacks',
+  'flower-buckets',
+  'drinks-crates',
+  'bonsai',
+  'water-dispenser',
+  'magazine-table',
+  'coat-stand',
+  'wash-buckets',
+  'foot-basins',
+  'sauna-bucket',
+  'andon',
+  'lucky-bamboo',
+  'radio',
+  'teddy',
+  // On the park's lawn.
+  'hanami-mat',
+  'stone-lantern',
+  'xiangqi-table',
+  'picnic-blanket',
+  'beer-bench',
+  // On a tram platform.
+  'vending-machine',
+  'sorting-bins',
+  'post-box',
+  'litfass-column',
+  // Groceries on the supermarket's shelves.
+  'cabbages',
+  'bok-choy',
+  'carrots',
+  'potatoes',
+  'eggs',
+  'udon',
+  'dried-noodles',
+  'spaghetti',
+  'spaetzle',
+] as const;
 export type PropId = (typeof PROP_IDS)[number];
 
 /** A shop the Character can be served at: its local name, glosses, and facts its staff know (in English). */
@@ -104,7 +179,10 @@ export type CulturePack = {
     /** How often each part of a look turns up among Shift Customers and passers-by. */
     customers: CustomerWeights;
   };
-  props: PropId[];
+  /** Each place's set dressing: the props the world sets out there, each in a spot of its kind. */
+  props: Record<PlaceId, PropId[]>;
+  /** How each grocery looks on the supermarket's shelf. */
+  shelves: Record<GroceryId, PropId>;
 };
 
 const DAY = CLOCK.minutesPerDay;
@@ -170,7 +248,8 @@ export function culturePackSchema(packId: LanguageCode) {
       npcs: z.record(z.string(), AppearancePresetSchema),
       customers: CustomerWeightsSchema,
     }),
-    props: z.array(z.enum(PROP_IDS)),
+    props: z.record(z.enum(PLACE_IDS), z.array(z.enum(PROP_IDS)).min(1)),
+    shelves: z.record(z.enum(GROCERIES_SOLD), z.enum(PROP_IDS)),
   });
 }
 
@@ -371,7 +450,20 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         skinTone: { 'tone-1': 3, 'tone-2': 4, 'tone-3': 2 },
       },
     },
-    props: ['noren', 'lucky-cat'],
+    props: {
+      home: ['nabe', 'andon'],
+      cafe: ['noren', 'lucky-cat', 'cash-tray'],
+      supermarket: ['cash-tray', 'mikan-crate'],
+      'convenience-store': ['onigiri', 'cash-tray'],
+      restaurant: ['noren', 'teishoku', 'teishoku', 'teishoku'],
+      clinic: ['cash-tray', 'medicine-boxes', 'bonsai'],
+      park: ['hanami-mat', 'stone-lantern'],
+      'tram-stop': ['vending-machine', 'vending-machine', 'vending-machine'],
+      bookshop: ['cash-tray', 'book-stack'],
+      bathhouse: ['noren', 'cash-tray', 'wash-buckets'],
+      'town-office': ['cash-tray', 'paperwork'],
+    },
+    shelves: { vegetables: 'cabbages', eggs: 'eggs', noodles: 'udon' },
   },
   zh: {
     id: 'zh',
@@ -565,7 +657,20 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         skinTone: { 'tone-1': 2, 'tone-2': 4, 'tone-3': 3 },
       },
     },
-    props: ['red-lantern', 'tea-set'],
+    props: {
+      home: ['steamer', 'lucky-bamboo'],
+      cafe: ['red-lantern', 'tea-set', 'qr-stand'],
+      supermarket: ['red-lantern', 'qr-stand', 'rice-sacks'],
+      'convenience-store': ['tea-eggs', 'qr-stand'],
+      restaurant: ['red-lantern', 'dim-sum', 'dim-sum', 'dim-sum'],
+      clinic: ['qr-stand', 'medicine-boxes', 'water-dispenser'],
+      park: ['xiangqi-table'],
+      'tram-stop': ['sorting-bins', 'sorting-bins', 'sorting-bins'],
+      bookshop: ['red-lantern', 'qr-stand', 'book-stack'],
+      bathhouse: ['red-lantern', 'qr-stand', 'foot-basins'],
+      'town-office': ['red-lantern', 'qr-stand', 'paperwork'],
+    },
+    shelves: { vegetables: 'bok-choy', eggs: 'eggs', noodles: 'dried-noodles' },
   },
   en: {
     id: 'en',
@@ -761,7 +866,20 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         skinTone: { 'tone-1': 3, 'tone-2': 3, 'tone-3': 1, 'tone-4': 2, 'tone-5': 1, 'tone-6': 1 },
       },
     },
-    props: ['teapot', 'bunting'],
+    props: {
+      home: ['fry-up', 'radio'],
+      cafe: ['bunting', 'cake-stand', 'card-reader'],
+      supermarket: ['card-reader', 'flower-buckets'],
+      'convenience-store': ['sausage-rolls', 'card-reader'],
+      restaurant: ['bunting', 'fish-and-chips', 'fish-and-chips', 'fish-and-chips'],
+      clinic: ['card-reader', 'medicine-boxes', 'magazine-table'],
+      park: ['picnic-blanket'],
+      'tram-stop': ['post-box', 'post-box', 'post-box'],
+      bookshop: ['bunting', 'card-reader', 'book-stack'],
+      bathhouse: ['card-reader', 'towel-stack'],
+      'town-office': ['bunting', 'card-reader', 'paperwork'],
+    },
+    shelves: { vegetables: 'carrots', eggs: 'eggs', noodles: 'spaghetti' },
   },
   de: {
     id: 'de',
@@ -965,7 +1083,20 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
         skinTone: { 'tone-1': 3, 'tone-2': 4, 'tone-3': 2, 'tone-4': 1, 'tone-5': 1 },
       },
     },
-    props: ['cake-stand', 'pretzel-basket'],
+    props: {
+      home: ['sausage-pan', 'teddy'],
+      cafe: ['flower-box', 'bread-basket', 'coin-dish'],
+      supermarket: ['coin-dish', 'drinks-crates'],
+      'convenience-store': ['bockwurst', 'coin-dish'],
+      restaurant: ['flower-box', 'sauerkraut', 'sauerkraut', 'sauerkraut'],
+      clinic: ['coin-dish', 'medicine-boxes', 'coat-stand'],
+      park: ['beer-bench'],
+      'tram-stop': ['litfass-column', 'litfass-column', 'litfass-column'],
+      bookshop: ['flower-box', 'coin-dish', 'book-stack'],
+      bathhouse: ['flower-box', 'coin-dish', 'sauna-bucket'],
+      'town-office': ['flower-box', 'coin-dish', 'paperwork'],
+    },
+    shelves: { vegetables: 'potatoes', eggs: 'eggs', noodles: 'spaetzle' },
   },
 };
 
@@ -990,14 +1121,25 @@ export function localPlaceFacts(placeId: PlaceId, packId: LanguageCode): string[
   return localShop(placeId, packId)?.facts ?? [];
 }
 
+/** A place's local name in this pack, and what it means in the three other Native Languages. */
+function localTitle(placeId: PlaceId, packId: LanguageCode): { name: string; nameGlosses: Glosses } {
+  const pack = CULTURE_PACKS[packId];
+  if (placeId === 'clinic') return pack.hospital;
+  if (placeId === 'home') return pack.apartments;
+  if (isTownPlace(placeId)) return pack.townPlaces[placeId];
+  const shop = localShop(placeId, packId);
+  if (shop) return shop;
+  throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
+}
+
 /** A staffed place by its local name in this pack, as the Journal keeps it: a shop, the hospital, the apartment block, or another place Named NPCs are found. */
 export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
-  if (placeId === 'clinic') return CULTURE_PACKS[packId].hospital.name;
-  if (placeId === 'home') return CULTURE_PACKS[packId].apartments.name;
-  if (isTownPlace(placeId)) return CULTURE_PACKS[packId].townPlaces[placeId].name;
-  const shop = localShop(placeId, packId);
-  if (shop) return shop.name;
-  throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
+  return localTitle(placeId, packId).name;
+}
+
+/** What a place's local name means in each of the three other Native Languages, as its name board glosses it. */
+export function placeNameGlosses(placeId: PlaceId, packId: LanguageCode): Glosses {
+  return localTitle(placeId, packId).nameGlosses;
 }
 
 /** Where a town NPC is found, by its local name in this pack: their place's, or for a passer-by, the tram stop they wait at. */

@@ -105,3 +105,17 @@ test('pointing at a sign shows its pinyin, and Translate shows what it means', a
   await expect(signTooltip(page).locator('.sign-gloss').first()).toBeVisible();
   await expect(signTooltip(page).getByRole('button', { name: 'Translate' })).toBeHidden();
 });
+
+test('the town’s signs outdoors, not just the café’s, show pinyin and Translate', async ({ page }) => {
+  await startNewGame(page, { path: '/?spawn=bookshop', target: 'zh' });
+  // Out of the bookshop's door and onto the pavement, with its name board and hours, and a tram stop's name, in view.
+  await page.locator('canvas').click();
+  await page.keyboard.down('KeyS');
+  await page.waitForTimeout(900);
+  await page.keyboard.up('KeyS');
+  await pointAtASign(page);
+
+  await expect(signTooltip(page).locator('ruby rt').first()).toBeVisible();
+  await signTooltip(page).getByRole('button', { name: 'Translate' }).click();
+  await expect(signTooltip(page).locator('.sign-gloss').first()).toBeVisible();
+});

@@ -11,7 +11,7 @@ import {
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Vector3, type Group } from 'three';
 import { GROCERIES_SOLD, jobAt, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
-import { CLOCK, MOVEMENT } from '../sim/index.ts';
+import { CLOCK, MOVEMENT, PLACE_IDS, type PlaceId } from '../sim/index.ts';
 import {
   selectAppearance,
   selectArrival,
@@ -24,6 +24,7 @@ import {
   selectDoctorCall,
   selectWorldKeysOff,
   useGame,
+  type Arrival,
   type Interactable,
 } from '../store/index.ts';
 import { CharacterFigure, JOG_METRES_PER_SECOND } from './CharacterFigure.tsx';
@@ -34,17 +35,34 @@ import {
   HOME_BED,
   HOME_STOVE,
   HOME_TAP,
+  IN_BED,
   IN_WARD_BED,
   isWaitingForTram,
   NPC_SPOTS,
   placeAt,
   SHELF_SPOTS,
-  spawnPoint,
+  spawnAt,
   tramStopAt,
   tramStopSpawn,
   type Vec3,
   WORKPLACES,
 } from './town.ts';
+
+/**
+ * Where the Character appears. A new game starts the First Morning at home
+ * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the
+ * saved place's entrance, or in bed if that's home.
+ */
+function spawnPoint(arrival: Arrival, placeId: PlaceId, search: string): Vec3 {
+  if (arrival === 'newGame') return spawnAt(devSpawnPlace(search));
+  return placeId === 'home' ? IN_BED : spawnAt(placeId);
+}
+
+/** Dev only: `?spawn=cafe` starts a new game at the café door, so a smoke test doesn't have to walk across town. */
+function devSpawnPlace(search: string): PlaceId {
+  const place = new URLSearchParams(search).get('spawn');
+  return import.meta.env.DEV && (PLACE_IDS as readonly (string | null)[]).includes(place) ? (place as PlaceId) : 'home';
+}
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;

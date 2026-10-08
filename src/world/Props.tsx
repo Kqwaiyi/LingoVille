@@ -1,125 +1,16 @@
-import type { ReactNode } from 'react';
-import { CULTURE_PACKS, type PropId } from '../content/index.ts';
+import { CULTURE_PACKS } from '../content/index.ts';
+import { PLACE_IDS } from '../sim/index.ts';
 import { selectCulturePackId, useGame } from '../store/index.ts';
-import { SPOT_FOR_PROP, PROP_SPOTS, type Vec3 } from './town.ts';
-import { PALETTE } from './palette.ts';
+import { Piece } from './Kit.tsx';
+import { setOut } from './setDressing.ts';
 
-// Stand-ins, in palette colours, for each pack's small set dressing, until the pack art
-// (ticket 31c). Door props hang centred on the café door; counter props sit on
-// the counter top, origin at their base.
-
-const SHAPES: Record<PropId, ReactNode> = {
-  noren: (
-    <group>
-      {[-0.6, 0, 0.6].map((x) => (
-        <mesh key={x} position={[x, 0, 0]}>
-          <boxGeometry args={[0.56, 0.5, 0.02]} />
-          <meshStandardMaterial color={PALETTE.denim} />
-        </mesh>
-      ))}
-    </group>
-  ),
-  'red-lantern': (
-    <group>
-      {[-1.2, 1.2].map((x) => (
-        <mesh key={x} position={[x, -0.1, 0.15]} scale={[1, 1.25, 1]}>
-          <sphereGeometry args={[0.2, 12, 10]} />
-          <meshStandardMaterial color={PALETTE.red} emissive={PALETTE.brick} emissiveIntensity={0.4} />
-        </mesh>
-      ))}
-    </group>
-  ),
-  bunting: (
-    <group>
-      {[-1.6, -1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6].map((x, i) => (
-        <mesh key={x} position={[x, 0.05, 0.05]} rotation-z={Math.PI}>
-          <coneGeometry args={[0.14, 0.26, 3]} />
-          <meshStandardMaterial color={[PALETTE.red, PALETTE.cream, PALETTE.denim][i % 3]} />
-        </mesh>
-      ))}
-    </group>
-  ),
-  'lucky-cat': (
-    <group>
-      <mesh position={[0, 0.12, 0]}>
-        <boxGeometry args={[0.18, 0.24, 0.14]} />
-        <meshStandardMaterial color={PALETTE.white} />
-      </mesh>
-      <mesh position={[0, 0.3, 0]}>
-        <sphereGeometry args={[0.1, 12, 10]} />
-        <meshStandardMaterial color={PALETTE.white} />
-      </mesh>
-      <mesh position={[0.08, 0.34, 0.04]}>
-        <boxGeometry args={[0.04, 0.1, 0.04]} />
-        <meshStandardMaterial color={PALETTE.mustard} />
-      </mesh>
-    </group>
-  ),
-  'tea-set': (
-    <group>
-      <mesh position={[0, 0.1, 0]}>
-        <sphereGeometry args={[0.11, 12, 10]} />
-        <meshStandardMaterial color={PALETTE.walnut} />
-      </mesh>
-      {[-0.22, 0.22].map((x) => (
-        <mesh key={x} position={[x, 0.04, 0.05]}>
-          <cylinderGeometry args={[0.04, 0.03, 0.07, 10]} />
-          <meshStandardMaterial color={PALETTE.cream} />
-        </mesh>
-      ))}
-    </group>
-  ),
-  teapot: (
-    <group>
-      <mesh position={[0, 0.11, 0]}>
-        <sphereGeometry args={[0.12, 12, 10]} />
-        <meshStandardMaterial color={PALETTE.sky} />
-      </mesh>
-      <mesh position={[0.15, 0.12, 0]} rotation-z={-Math.PI / 3}>
-        <cylinderGeometry args={[0.015, 0.025, 0.12, 8]} />
-        <meshStandardMaterial color={PALETTE.sky} />
-      </mesh>
-    </group>
-  ),
-  'cake-stand': (
-    <group>
-      <mesh position={[0, 0.06, 0]}>
-        <cylinderGeometry args={[0.18, 0.18, 0.02, 16]} />
-        <meshStandardMaterial color={PALETTE.cream} />
-      </mesh>
-      <mesh position={[0, 0.13, 0]}>
-        <cylinderGeometry args={[0.13, 0.13, 0.1, 16]} />
-        <meshStandardMaterial color={PALETTE.wood} />
-      </mesh>
-    </group>
-  ),
-  'pretzel-basket': (
-    <group>
-      <mesh position={[0, 0.05, 0]}>
-        <cylinderGeometry args={[0.2, 0.15, 0.1, 14]} />
-        <meshStandardMaterial color={PALETTE.wood} />
-      </mesh>
-      {[-0.07, 0.07].map((x) => (
-        <mesh key={x} position={[x, 0.13, 0]} rotation-x={Math.PI / 2}>
-          <torusGeometry args={[0.07, 0.025, 6, 14]} />
-          <meshStandardMaterial color={PALETTE.walnut} />
-        </mesh>
-      ))}
-    </group>
-  ),
-};
-
-/** The Culture Pack's props at the café. */
+/** The Culture Pack's set dressing at all 11 places: its money, door hangings, food and goods, and small local touches. */
 export function Props() {
   const packId = useGame(selectCulturePackId);
-  const props = CULTURE_PACKS[packId].props;
-  let counterProps = 0;
-  return props.map((propId) => {
-    const position: Vec3 = SPOT_FOR_PROP[propId] === 'door' ? PROP_SPOTS.door : PROP_SPOTS.counter[counterProps++ % PROP_SPOTS.counter.length]!;
-    return (
-      <group key={propId} position={[...position]}>
-        {SHAPES[propId]}
-      </group>
-    );
-  });
+  const { props } = CULTURE_PACKS[packId];
+  return PLACE_IDS.flatMap((placeId) =>
+    setOut(placeId, props[placeId]).placed.map(({ propId, spot: { at, rotation } }, i) => (
+      <Piece key={`${placeId}-${i}-${propId}`} piece={propId} position={at} rotation={rotation} />
+    )),
+  );
 }

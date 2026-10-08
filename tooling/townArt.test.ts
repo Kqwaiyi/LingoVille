@@ -4,11 +4,12 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_ART_URLS } from '../src/world/characterArt.ts';
 import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
-import { LAMP_BULBS, TOWN_ART_URL, TOWN_PIECES, WINDOW_GLASS } from '../src/world/townArt.ts';
+import { ART_PIECES, LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS } from '../src/world/townArt.ts';
 
-// Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from, a bulb in
-// each piece that lights up, and nothing but flat colours from the one shared palette. World code draws from the same palette, by name, and the
-// character art's outfit (`npm run build:characters`) is painted in it too.
+// Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from and every
+// Culture Pack's props, a bulb in each piece that lights up, and nothing but flat colours from the one shared palette.
+// World code draws from the same palette, by name, and the character art's outfit (`npm run build:characters`) is
+// painted in it too.
 
 type Gltf = {
   scenes: { nodes: number[] }[];
@@ -46,7 +47,7 @@ const isPaletteColour = (name: string): name is PaletteColour => name in PALETTE
 function townArtProblems(town: Gltf): string[] {
   const problems: string[] = [];
   const pieces = new Set(town.scenes[0]!.nodes.map((index) => town.nodes[index]!.name));
-  for (const piece of TOWN_PIECES) if (!pieces.has(piece)) problems.push(`town.glb has no ${piece}.`);
+  for (const piece of ART_PIECES) if (!pieces.has(piece)) problems.push(`town.glb has no ${piece}.`);
   for (const { name = '', pbrMetallicRoughness: pbr = {} } of town.materials ?? []) {
     if (pbr.baseColorTexture) problems.push(`town.glb's ${name} material has a texture.`);
     if (name === WINDOW_GLASS) continue;
@@ -107,13 +108,14 @@ const worldSources = () =>
 describe('the town art', () => {
   const town = readGlb(TOWN_ART_URL);
 
-  it('holds every piece the town is built from, in flat palette colours', () => {
+  it('holds every piece the town is built from and every pack’s props, in flat palette colours', () => {
     expect(townArtProblems(town)).toEqual([]);
   });
 
   it('fails art built before a piece was added, or with colours off the palette, or without a bulb to light', () => {
     const stale = structuredClone(town);
     for (const index of stale.scenes[0]!.nodes) if (stale.nodes[index]!.name === 'bench') stale.nodes[index]!.name = 'seat';
+    for (const index of stale.scenes[0]!.nodes) if (stale.nodes[index]!.name === 'noren') stale.nodes[index]!.name = 'curtain';
     stale.materials = [
       { name: 'leaf', pbrMetallicRoughness: { baseColorFactor: [0, 0, 1, 1] } },
       { name: 'colormap', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], baseColorTexture: { index: 0 } } },
@@ -122,6 +124,7 @@ describe('the town art', () => {
 
     expect(townArtProblems(stale)).toEqual([
       'town.glb has no bench.',
+      'town.glb has no noren.',
       `town.glb's leaf material is not ${PALETTE.leaf}.`,
       "town.glb's colormap material has a texture.",
       "town.glb's colormap material is not a palette colour.",
