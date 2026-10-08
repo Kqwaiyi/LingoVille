@@ -14,7 +14,7 @@ import {
   WRAP_UP_SCENE,
   type ToolResponse,
 } from '../ai/index.ts';
-import { chargeInShifts, CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction, type MedicineId } from '../content/index.ts';
+import { chargeInShifts, CULTURE_PACKS, DEFAULT_APPEARANCE, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction, type MedicineId } from '../content/index.ts';
 import { ECONOMY, FAMILIARITY, LANGUAGE_CODES, namedNpcOf, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
@@ -764,7 +764,7 @@ describe('mock VoiceSession: a Shift Customer', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, table: null, voiceSeed: 7 };
+  const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, table: null, voiceSeed: 7, appearances: [DEFAULT_APPEARANCE] };
   const ICED_TEA: ShiftOrder = [{ itemId: 'tea', quantity: 1, modifiers: { size: 'large', temperature: 'iced', extras: ['lemon'] } }];
   const HOT_COFFEE: ShiftOrder = [{ itemId: 'coffee', quantity: 1, modifiers: { size: 'small', temperature: 'hot', extras: ['milk'] } }];
 
@@ -825,6 +825,7 @@ describe('mock VoiceSession: a Shift Customer', () => {
     checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 1000, changeDue: 160 },
     table: null,
     voiceSeed: 7,
+    appearances: [DEFAULT_APPEARANCE],
   };
   const PAYS_BY_CARD: ShiftCustomer = {
     ...PAYS_CASH,
@@ -874,6 +875,7 @@ describe('mock VoiceSession: a Shift Customer', () => {
       { dish: 'veggie-dish', drink: 'juice', note: 'vegetarian' },
     ],
     voiceSeed: 7,
+    appearances: [DEFAULT_APPEARANCE],
   };
 
   it.each(LANGUAGE_CODES)('orders for the whole table at once in the %s pack: each diner’s dish and drink, and the dietary need', async (packId) => {

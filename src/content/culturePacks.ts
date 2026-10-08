@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours, type PlaceId } from '../sim/index.ts';
-import { BODY_IDS, type BodyId } from './appearance.ts';
+import { CLOCK, LANGUAGE_CODES, lookFromSeed, WEEKDAYS, type LanguageCode, type LookWeights, type OpeningHours, type PlaceId } from '../sim/index.ts';
+import { AppearancePresetSchema, BODY_IDS, BODY_PRESETS, CustomerWeightsSchema, type AppearancePreset, type CustomerWeights } from './appearance.ts';
 import {
   ALLERGENS,
   DIETARY_NOTE_IDS,
@@ -15,7 +15,7 @@ import {
 } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
 import { hours, HOURS_IDS, type HoursId } from './places.ts';
-import { isPasserBy, PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type TownNpcId, type TramStopId } from './townNpcs.ts';
+import { isPasserBy, PASSER_BY_IDS, PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type PasserById, type TownNpcId, type TramStopId } from './townNpcs.ts';
 
 // Each Culture Pack dresses the same town as Japan, China, the UK or Germany:
 // local names, prices, money, customs, signs, sounds and props. Everything the
@@ -99,10 +99,10 @@ export type CulturePack = {
    */
   casualRegister: { formal: string; casual: string; offer: string; inUse: string };
   appearances: {
-    /** Persona × pack → body and face preset. The rest of each look arrives with ticket 30b. */
-    npcs: Record<NamedNpcId, BodyId>;
-    /** How often each body and face preset turns up among Shift Customers. */
-    customerWeights: Partial<Record<BodyId, number>>;
+    /** Persona × pack → Appearance Preset: each Named NPC's local look, on the build they have in every pack. */
+    npcs: Record<NamedNpcId, AppearancePreset>;
+    /** How often each part of a look turns up among Shift Customers and passers-by. */
+    customers: CustomerWeights;
   };
   props: PropId[];
 };
@@ -167,8 +167,8 @@ export function culturePackSchema(packId: LanguageCode) {
     personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
     casualRegister: z.object({ formal: text, casual: text, offer: text, inUse: text }),
     appearances: z.object({
-      npcs: z.record(z.string(), z.enum(BODY_IDS)),
-      customerWeights: z.partialRecord(z.enum(BODY_IDS), z.number().positive()),
+      npcs: z.record(z.string(), AppearancePresetSchema),
+      customers: CustomerWeightsSchema,
     }),
     props: z.array(z.enum(PROP_IDS)),
   });
@@ -345,23 +345,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: 'body-3',
-        barista: 'body-2',
-        cashier: 'body-1',
-        'convenience-clerk': 'body-3',
-        server: 'body-1',
-        receptionist: 'body-3',
-        doctor: 'body-4',
-        nurse: 'body-4',
-        pharmacist: 'body-2',
-        'park-regular-1': 'body-3',
-        'park-regular-2': 'body-4',
-        'park-regular-3': 'body-1',
-        shopkeeper: 'body-2',
-        attendant: 'body-3',
-        'office-clerk': 'body-4',
+        landlord: { body: 'body-3', hairStyle: 'buns', hairColour: 'grey', skinTone: 'tone-2' },
+        barista: { body: 'body-2', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' },
+        cashier: { body: 'body-1', hairStyle: 'buzzed', hairColour: 'black', skinTone: 'tone-3' },
+        'convenience-clerk': { body: 'body-3', hairStyle: 'long', hairColour: 'brown', skinTone: 'tone-1' },
+        server: { body: 'body-1', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
+        receptionist: { body: 'body-3', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-2' },
+        doctor: { body: 'body-4', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-2' },
+        nurse: { body: 'body-4', hairStyle: 'buns', hairColour: 'dark-brown', skinTone: 'tone-3' },
+        pharmacist: { body: 'body-2', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
+        'park-regular-1': { body: 'body-3', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-3' },
+        'park-regular-2': { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-1' },
+        'park-regular-3': { body: 'body-1', hairStyle: 'buzzed', hairColour: 'brown', skinTone: 'tone-2' },
+        shopkeeper: { body: 'body-2', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-3' },
+        attendant: { body: 'body-3', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-3' },
+        'office-clerk': { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
       },
-      customerWeights: { 'body-1': 3, 'body-2': 3, 'body-3': 2, 'body-4': 2 },
+      customers: {
+        body: { 'body-1': 3, 'body-2': 3, 'body-3': 2, 'body-4': 2 },
+        hairStyle: {
+          masculine: { short: 4, buzzed: 2, long: 1, bearded: 1, bald: 1 },
+          feminine: { long: 4, short: 3, buns: 3 },
+        },
+        hairColour: { black: 5, 'dark-brown': 4, brown: 1, grey: 2 },
+        skinTone: { 'tone-1': 3, 'tone-2': 4, 'tone-3': 2 },
+      },
     },
     props: ['noren', 'lucky-cat'],
   },
@@ -531,23 +539,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: 'body-4',
-        barista: 'body-2',
-        cashier: 'body-2',
-        'convenience-clerk': 'body-4',
-        server: 'body-1',
-        receptionist: 'body-4',
-        doctor: 'body-4',
-        nurse: 'body-4',
-        pharmacist: 'body-2',
-        'park-regular-1': 'body-4',
-        'park-regular-2': 'body-4',
-        'park-regular-3': 'body-2',
-        shopkeeper: 'body-2',
-        attendant: 'body-4',
-        'office-clerk': 'body-4',
+        landlord: { body: 'body-4', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-2' },
+        barista: { body: 'body-2', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
+        cashier: { body: 'body-2', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-1' },
+        'convenience-clerk': { body: 'body-4', hairStyle: 'long', hairColour: 'dark-brown', skinTone: 'tone-2' },
+        server: { body: 'body-1', hairStyle: 'buzzed', hairColour: 'black', skinTone: 'tone-3' },
+        receptionist: { body: 'body-4', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-1' },
+        doctor: { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
+        nurse: { body: 'body-4', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-2' },
+        pharmacist: { body: 'body-2', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-3' },
+        'park-regular-1': { body: 'body-4', hairStyle: 'buzzed', hairColour: 'grey', skinTone: 'tone-3' },
+        'park-regular-2': { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-2' },
+        'park-regular-3': { body: 'body-2', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' },
+        shopkeeper: { body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-3' },
+        attendant: { body: 'body-4', hairStyle: 'buns', hairColour: 'dark-brown', skinTone: 'tone-3' },
+        'office-clerk': { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
       },
-      customerWeights: { 'body-1': 3, 'body-2': 2, 'body-3': 3, 'body-4': 2 },
+      customers: {
+        body: { 'body-1': 3, 'body-2': 2, 'body-3': 3, 'body-4': 2 },
+        hairStyle: {
+          masculine: { short: 4, buzzed: 3, long: 1, bearded: 1, bald: 1 },
+          feminine: { long: 4, short: 3, buns: 3 },
+        },
+        hairColour: { black: 6, 'dark-brown': 3, grey: 2 },
+        skinTone: { 'tone-1': 2, 'tone-2': 4, 'tone-3': 3 },
+      },
     },
     props: ['red-lantern', 'tea-set'],
   },
@@ -719,23 +735,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: 'body-3',
-        barista: 'body-1',
-        cashier: 'body-1',
-        'convenience-clerk': 'body-3',
-        server: 'body-2',
-        receptionist: 'body-4',
-        doctor: 'body-3',
-        nurse: 'body-3',
-        pharmacist: 'body-1',
-        'park-regular-1': 'body-4',
-        'park-regular-2': 'body-3',
-        'park-regular-3': 'body-2',
-        shopkeeper: 'body-1',
-        attendant: 'body-4',
-        'office-clerk': 'body-3',
+        landlord: { body: 'body-3', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-1' },
+        barista: { body: 'body-1', hairStyle: 'long', hairColour: 'auburn', skinTone: 'tone-1' },
+        cashier: { body: 'body-1', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-4' },
+        'convenience-clerk': { body: 'body-3', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-4' },
+        server: { body: 'body-2', hairStyle: 'short', hairColour: 'blonde', skinTone: 'tone-1' },
+        receptionist: { body: 'body-4', hairStyle: 'buns', hairColour: 'blonde', skinTone: 'tone-2' },
+        doctor: { body: 'body-3', hairStyle: 'buzzed', hairColour: 'black', skinTone: 'tone-6' },
+        nurse: { body: 'body-3', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-1' },
+        pharmacist: { body: 'body-1', hairStyle: 'bearded', hairColour: 'black', skinTone: 'tone-4' },
+        'park-regular-1': { body: 'body-4', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-2' },
+        'park-regular-2': { body: 'body-3', hairStyle: 'long', hairColour: 'brown', skinTone: 'tone-2' },
+        'park-regular-3': { body: 'body-2', hairStyle: 'buzzed', hairColour: 'brown', skinTone: 'tone-1' },
+        shopkeeper: { body: 'body-1', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-2' },
+        attendant: { body: 'body-4', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-1' },
+        'office-clerk': { body: 'body-3', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' },
       },
-      customerWeights: { 'body-1': 3, 'body-2': 2, 'body-3': 2, 'body-4': 3 },
+      customers: {
+        body: { 'body-1': 3, 'body-2': 2, 'body-3': 2, 'body-4': 3 },
+        hairStyle: {
+          masculine: { short: 4, buzzed: 2, long: 1, bearded: 2, bald: 1 },
+          feminine: { long: 4, short: 3, buns: 2 },
+        },
+        hairColour: { black: 2, 'dark-brown': 3, brown: 3, auburn: 1, blonde: 2, grey: 2 },
+        skinTone: { 'tone-1': 3, 'tone-2': 3, 'tone-3': 1, 'tone-4': 2, 'tone-5': 1, 'tone-6': 1 },
+      },
     },
     props: ['teapot', 'bunting'],
   },
@@ -915,23 +939,31 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: 'body-4',
-        barista: 'body-1',
-        cashier: 'body-2',
-        'convenience-clerk': 'body-4',
-        server: 'body-2',
-        receptionist: 'body-3',
-        doctor: 'body-3',
-        nurse: 'body-3',
-        pharmacist: 'body-1',
-        'park-regular-1': 'body-3',
-        'park-regular-2': 'body-3',
-        'park-regular-3': 'body-1',
-        shopkeeper: 'body-1',
-        attendant: 'body-3',
-        'office-clerk': 'body-3',
+        landlord: { body: 'body-4', hairStyle: 'buns', hairColour: 'grey', skinTone: 'tone-1' },
+        barista: { body: 'body-1', hairStyle: 'long', hairColour: 'blonde', skinTone: 'tone-1' },
+        cashier: { body: 'body-2', hairStyle: 'short', hairColour: 'brown', skinTone: 'tone-2' },
+        'convenience-clerk': { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-3' },
+        server: { body: 'body-2', hairStyle: 'long', hairColour: 'auburn', skinTone: 'tone-1' },
+        receptionist: { body: 'body-3', hairStyle: 'short', hairColour: 'blonde', skinTone: 'tone-2' },
+        doctor: { body: 'body-3', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-1' },
+        nurse: { body: 'body-3', hairStyle: 'buns', hairColour: 'brown', skinTone: 'tone-2' },
+        pharmacist: { body: 'body-1', hairStyle: 'bearded', hairColour: 'brown', skinTone: 'tone-2' },
+        'park-regular-1': { body: 'body-3', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-2' },
+        'park-regular-2': { body: 'body-3', hairStyle: 'long', hairColour: 'dark-brown', skinTone: 'tone-1' },
+        'park-regular-3': { body: 'body-1', hairStyle: 'buzzed', hairColour: 'blonde', skinTone: 'tone-1' },
+        shopkeeper: { body: 'body-1', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-2' },
+        attendant: { body: 'body-3', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-2' },
+        'office-clerk': { body: 'body-3', hairStyle: 'short', hairColour: 'brown', skinTone: 'tone-2' },
       },
-      customerWeights: { 'body-1': 2, 'body-2': 3, 'body-3': 3, 'body-4': 2 },
+      customers: {
+        body: { 'body-1': 2, 'body-2': 3, 'body-3': 3, 'body-4': 2 },
+        hairStyle: {
+          masculine: { short: 4, buzzed: 2, long: 1, bearded: 2, bald: 1 },
+          feminine: { long: 4, short: 3, buns: 2 },
+        },
+        hairColour: { black: 1, 'dark-brown': 2, brown: 4, auburn: 1, blonde: 3, grey: 2 },
+        skinTone: { 'tone-1': 3, 'tone-2': 4, 'tone-3': 2, 'tone-4': 1, 'tone-5': 1 },
+      },
     },
     props: ['cake-stand', 'pretzel-basket'],
   },
@@ -977,4 +1009,24 @@ export function localNpcPlaceName(npcId: TownNpcId, packId: LanguageCode): strin
 export function cafeAllergensIn(itemId: ItemId, extras: readonly DrinkExtra[], packId: LanguageCode): Allergen[] {
   const added = extras.flatMap((extra) => EXTRA_ALLERGENS[extra] ?? []);
   return ALLERGENS.filter((allergen) => (CULTURE_PACKS[packId].cafeAllergens[itemId] ?? []).includes(allergen) || added.includes(allergen));
+}
+
+/** This pack's weights for anonymous looks, as the sim draws them: each body with the hair styles its build wears. */
+export function customerLookWeights(packId: LanguageCode): LookWeights {
+  const { customers } = CULTURE_PACKS[packId].appearances;
+  const hairStyle = Object.fromEntries(BODY_IDS.map((body) => [body, customers.hairStyle[BODY_PRESETS[body].build]]));
+  return { ...customers, hairStyle: hairStyle as LookWeights['hairStyle'] };
+}
+
+/** Each pack's passers-by, each in a look drawn once from the pack's weights: the same every day. */
+const PASSER_BY_LOOKS = Object.fromEntries(
+  LANGUAGE_CODES.map((packId) => [
+    packId,
+    Object.fromEntries(PASSER_BY_IDS.map((npcId, i) => [npcId, lookFromSeed(i, customerLookWeights(packId))])),
+  ]),
+) as Record<LanguageCode, Record<PasserById, AppearancePreset>>;
+
+/** How a town NPC looks in this pack: a Named NPC as the persona × pack table has them, a passer-by as drawn for the pack. */
+export function townNpcLook(npcId: TownNpcId, packId: LanguageCode): AppearancePreset {
+  return isPasserBy(npcId) ? PASSER_BY_LOOKS[packId][npcId] : CULTURE_PACKS[packId].appearances.npcs[npcId];
 }

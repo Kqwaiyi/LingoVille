@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BODY_IDS, BODY_PRESETS, CULTURE_PACKS, culturePackProblems, INTERACTIONS, type CulturePack } from './index.ts';
+import { BODY_IDS, BODY_PRESETS, CULTURE_PACKS, culturePackProblems, INTERACTIONS, type AppearancePreset, type CulturePack } from './index.ts';
 
 const interactions = Object.values(INTERACTIONS);
 
@@ -73,10 +73,26 @@ describe('culturePackProblems', () => {
   });
 
   it('fails a Named NPC whose build changes from pack to pack', () => {
-    const jaBarista = BODY_PRESETS[CULTURE_PACKS.ja.appearances.npcs.barista];
+    const jaBarista = BODY_PRESETS[CULTURE_PACKS.ja.appearances.npcs.barista.body];
     const otherBuild = BODY_IDS.find((body) => BODY_PRESETS[body].build !== jaBarista.build)!;
-    const packs = withGerman((de) => (de.appearances.npcs.barista = otherBuild));
+    const packs = withGerman((de) => (de.appearances.npcs.barista.body = otherBuild));
     expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*barista.*build/)]);
+  });
+
+  it('fails a Named NPC whose look is missing a part', () => {
+    const packs = withGerman((de) => delete (de.appearances.npcs.barista as Partial<AppearancePreset>).hairColour);
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*appearances\.npcs\.barista\.hairColour/s)]);
+  });
+
+  it('fails Shift Customer weights that leave a part of a look with nothing to draw', () => {
+    const packs = withGerman((de) => {
+      de.appearances.customers.skinTone = {};
+      de.appearances.customers.hairStyle.feminine = {};
+    });
+    const [problem, ...others] = culturePackProblems(packs, interactions);
+    expect(others).toEqual([]);
+    expect(problem).toMatch(/^de: .*customers\.skinTone/s);
+    expect(problem).toMatch(/customers\.hairStyle\.feminine/);
   });
 
   it('fails a persona localisation with no favourite gift', () => {

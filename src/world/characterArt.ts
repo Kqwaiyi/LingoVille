@@ -8,6 +8,11 @@ export const CHARACTER_ART_URLS = { characters: '/characters/characters.glb', an
 export const CHARACTER_CLIPS = ['idle', 'walk', 'jog', 'talk', 'sit', 'interact'] as const;
 export type CharacterClip = (typeof CHARACTER_CLIPS)[number];
 
+/** The bones the game moves or hangs things on (an expression's head turn, a role's apron), in every build. */
+export const CHARACTER_BONES = ['Head', 'pelvis', 'spine_03'] as const;
+export const HEAD_BONE = 'Head' satisfies CharacterBone;
+export type CharacterBone = (typeof CHARACTER_BONES)[number];
+
 /** The hair parts each style shows. A part ending in `-` is cut to fit each face, and takes the face's letter. */
 const HAIR: Record<HairStyleId, string[]> = {
   short: ['hair-parted'],

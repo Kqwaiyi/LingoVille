@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { CULTURE_PACKS, formatLocalMoney, isPasserBy, localNpcPlaceName, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import type { JobId, LanguageCode, NpcExpression } from '../sim/index.ts';
+import type { JobId, LanguageCode } from '../sim/index.ts';
 import {
   selectChatLines,
   selectClockMinute,
@@ -16,6 +16,7 @@ import {
   selectMicLevel,
   selectNativeLanguage,
   selectNpcExpression,
+  selectNpcLook,
   selectPlaceId,
   selectReconnecting,
   selectRecap,
@@ -28,6 +29,7 @@ import {
   type ClosingCard,
   type RecapView,
 } from '../store/index.ts';
+import { NpcPortrait } from '../world/index.ts';
 import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
 import { itemLabel } from './itemLabel.ts';
@@ -91,23 +93,16 @@ function Bubble({ line, index, finished }: { line: ChatLine; index: number; fini
   );
 }
 
-// A placeholder face until real NPC faces arrive (ticket 30). It's the only way Patience shows.
-const FACE: Record<NpcExpression, string> = { relaxed: '🙂', puzzled: '😕', strained: '😟' };
-
-/** The face of whoever the Player is talking to; `who` names them to start a sentence. */
+/** The face of whoever the Player is talking to, which shows their Patience; `who` names them to start a sentence. */
 function NpcFace({ who }: { who: string }) {
   const { t } = useTranslation();
   const expression = useGame(selectNpcExpression);
-  if (!expression) return null;
+  const look = useGame(selectNpcLook);
+  if (!expression || !look) return null;
   return (
-    <span
-      className="npc-face"
-      role="img"
-      aria-label={t(`faces.${expression}`, { who })}
-      data-expression={expression}
-    >
-      {FACE[expression]}
-    </span>
+    <div className="npc-face" role="img" aria-label={t(`faces.${expression}`, { who })} data-expression={expression}>
+      <NpcPortrait appearance={look} expression={expression} />
+    </div>
   );
 }
 

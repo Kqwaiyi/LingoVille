@@ -58,6 +58,7 @@ function lived(): GameState {
           checkout: null,
           table: null,
           voiceSeed: 4242,
+          appearances: [{ body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-1' }],
         },
       },
     },
@@ -105,9 +106,17 @@ function beforeTheClinic() {
   return { ...game, character: { ...game.character!, illness } } as unknown as Omit<GameState, 'clinic'>;
 }
 
+/** The game before Shift Customers had looks: version 17. */
+function beforeCustomerLooks() {
+  const game = lived();
+  const customer: Partial<ShiftCustomer> = { ...game.possessions.shift!.customer! };
+  delete customer.appearances;
+  return { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } } } as GameState;
+}
+
 /** The game before Appearance Presets had parts: version 16. The look was one of four placeholder ids. */
 function beforeAppearanceParts(preset: string) {
-  const game: Partial<GameState> = { ...lived() };
+  const game: Partial<GameState> = { ...beforeCustomerLooks() };
   const identity: Partial<GameState['identity']> = { ...game.identity! };
   delete identity.appearance;
   return { ...game, identity: { ...identity, appearancePresetId: preset } };
@@ -363,6 +372,7 @@ describe('saves', () => {
       checkout: null,
       table: null,
       voiceSeed: 4242,
+      appearances: [{ body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-1' }],
     });
   });
 
@@ -395,6 +405,7 @@ describe('saves', () => {
       checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 5, changeDue: 0.6 },
       table: null,
       voiceSeed: 7,
+      appearances: [{ body: 'body-3', hairStyle: 'buns', hairColour: 'dark-brown', skinTone: 'tone-3' }],
     } as const;
     const atTheTill = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'cashier' as const, customer } } };
     await saves.write('slot-1', atTheTill);
@@ -474,6 +485,21 @@ describe('saves', () => {
     });
   });
 
+  it('upgrades a save from before Shift Customers had looks with a look for each at the table, drawn from their voice seed', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 17, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeCustomerLooks() }, raw);
+    const game = beforeCustomerLooks();
+    const customer = { ...game.possessions.shift!.customer!, voiceSeed: 9, table: [{ dish: 'pork-dish', drink: 'juice', note: null }, { dish: 'fish-dish', drink: 'cola', note: null }] };
+    const atTheTable = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'server', customer } } };
+    await set('slot-2', { schemaVersion: 17, slotId: 'slot-2', createdAt: '', lastPlayedAt: '', game: atTheTable }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+    expect((await saves.load('slot-2'))?.save.game.possessions.shift?.customer?.appearances).toEqual([
+      { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-3' },
+      { body: 'body-4', hairStyle: 'long', hairColour: 'brown', skinTone: 'tone-1' },
+    ]);
+  });
+
   it('keeps the clinic as it was: the check-in, the prescription, a treated flu and a payment plan', async () => {
     const { saves } = freshSaves();
     const game = lived();
@@ -519,6 +545,10 @@ describe('saves', () => {
         { dish: 'pork-dish', drink: 'juice', note: null },
       ],
       voiceSeed: 9,
+      appearances: [
+        { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-3' },
+        { body: 'body-1', hairStyle: 'short', hairColour: 'brown', skinTone: 'tone-6' },
+      ],
     } as const;
     const atTheTable = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'server' as const, customer } } };
     await saves.write('slot-1', atTheTable);

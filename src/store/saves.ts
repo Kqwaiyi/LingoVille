@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   AppearancePresetSchema,
   CULTURE_PACKS,
+  customerLookWeights,
   DIETARY_NOTE_IDS,
   drinkModifiersSchema,
   INTERACTIONS,
@@ -21,6 +22,7 @@ import {
   JOB_IDS,
   LANGUAGE_CODES,
   LIFE_SKILL_IDS,
+  lookFromSeed,
   PLACE_IDS,
   PROFICIENCY_STEPS,
   weeklyRent,
@@ -34,7 +36,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 17;
+export const SAVE_SCHEMA_VERSION = 18;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -148,6 +150,7 @@ const GameStateSchema = z.object({
             checkout: checkout.nullable(),
             table: z.array(diner).min(1).readonly().nullable(),
             voiceSeed: z.int().min(0),
+            appearances: z.array(AppearancePresetSchema).min(1).readonly(),
           })
           .nullable(),
       })
@@ -318,6 +321,18 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
     const number = Number(appearancePresetId.replace('preset-', ''));
     const appearance = { body: `body-${number}`, hairStyle: number <= 2 ? 'short' : 'long', hairColour: 'dark-brown', skinTone: 'tone-3' };
     return { ...save, schemaVersion: 17, game: { ...save.game, identity: { ...identity, appearance } } };
+  },
+  // 17 → 18: Shift Customers have looks. One at the counter is given a look for each at their table, drawn with the
+  // pack's weights from their voice seed (the save's RNG has moved on since they walked up).
+  (save) => {
+    const game = save.game as { identity: { culturePackId: LanguageCode }; possessions: { shift: { customer: { voiceSeed: number; table: unknown[] | null } | null } | null } };
+    const { shift } = game.possessions;
+    const weights = customerLookWeights(game.identity.culturePackId);
+    const customer = shift?.customer && {
+      ...shift.customer,
+      appearances: Array.from({ length: shift.customer.table?.length ?? 1 }, (_, i) => lookFromSeed(shift.customer!.voiceSeed + i, weights)),
+    };
+    return { ...save, schemaVersion: 18, game: { ...save.game, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } } };
   },
 ];
 

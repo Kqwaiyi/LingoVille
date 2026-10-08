@@ -13,7 +13,7 @@ import {
   type OpeningHours,
   type PadDiner,
 } from './index.ts';
-import { TEST_SETUP } from './testSetup.ts';
+import { TEST_LOOKS, TEST_SETUP } from './testSetup.ts';
 
 const RESTAURANT_HOURS: OpeningHours = { opensAt: 11 * 60, closesAt: 22 * 60, closedOn: [] };
 
@@ -35,7 +35,7 @@ function serverShift(seed = TEST_SETUP.rngSeed): GameState {
 }
 
 const customerOf = (state: GameState) => state.possessions.shift!.customer!;
-const atTheTable = (template: ShiftTemplate = TABLE, seed = TEST_SETUP.rngSeed) => nextShiftCustomer(serverShift(seed), [template]);
+const atTheTable = (template: ShiftTemplate = TABLE, seed = TEST_SETUP.rngSeed) => nextShiftCustomer(serverShift(seed), [template], TEST_LOOKS);
 const drawn = (template: ShiftTemplate) => Array.from({ length: 80 }, (_, seed) => customerOf(atTheTable(template, seed)));
 
 /** The order pad written exactly as the table wants it, diner by diner. */
@@ -45,6 +45,13 @@ const linesOf = (pad: readonly PadDiner[]) =>
   pad.flatMap(({ dish, drink }) => [dish, drink].filter((itemId) => itemId !== null).map((itemId) => ({ itemId, quantity: 1 })));
 
 describe('nextShiftCustomer: a restaurant table', () => {
+  it('brings a look for everyone at the table, each drawn from the seeded RNG', () => {
+    const tables = drawn(TABLE);
+    expect(tables.every((customer) => customer.appearances.length === customer.table!.length)).toBe(true);
+    const seated = tables.flatMap((customer) => customer.appearances.map((look) => JSON.stringify(look)));
+    expect(new Set(seated).size).toBeGreaterThan(5);
+  });
+
   it('seats one diner with a dish and a drink and no dietary need, and orders just those', () => {
     for (const { table, order, checkout, changedFrom } of drawn(SINGLE)) {
       expect(table).toHaveLength(1);
@@ -86,7 +93,7 @@ describe('nextShiftCustomer: a restaurant table', () => {
 
   it('draws everything from the seeded RNG', () => {
     const shift = serverShift();
-    expect(nextShiftCustomer(shift, [TABLE])).toEqual(nextShiftCustomer(shift, [TABLE]));
+    expect(nextShiftCustomer(shift, [TABLE], TEST_LOOKS)).toEqual(nextShiftCustomer(shift, [TABLE], TEST_LOOKS));
     expect(new Set(drawn(TABLE).map(({ table }) => JSON.stringify(table))).size).toBeGreaterThan(1);
   });
 });

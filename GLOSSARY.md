@@ -132,5 +132,5 @@ Something bought mainly to lift Mood rather than to meet a Well-being need (e.g.
 _Avoid_: Treat, luxury item
 
 **Appearance Preset**:
-One look on the shared character body (build and face, hair, skin tone, clothing), drawn from a single pool that the Character, Named NPCs and Shift Customers all use. The player picks the Character's once, at setup.
+One look on the shared character body (build and face, hair, skin tone, clothing), drawn from a single pool that the Character, Named NPCs, Shift Customers and passers-by all use. The player picks the Character's once, at setup. A Named NPC's comes from the persona × pack table; a Shift Customer's or passer-by's is drawn with the pack's weights.
 _Avoid_: Skin, avatar, outfit

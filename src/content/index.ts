@@ -3,6 +3,7 @@ export {
   AppearancePresetSchema,
   BODY_IDS,
   BODY_PRESETS,
+  BUILDS,
   DEFAULT_APPEARANCE,
   HAIR_COLOUR_IDS,
   HAIR_COLOURS,
@@ -11,9 +12,12 @@ export {
   SKIN_TONES,
   type AppearancePreset,
   type BodyId,
+  type Build,
+  type CustomerWeights,
   type HairColourId,
   type HairStyleId,
   type SkinToneId,
+  type Weights,
 } from './appearance.ts';
 export { approachInteraction, interactionStartedWithE, interactionStartedWithF, interactionStartedWithR } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
@@ -21,7 +25,9 @@ export {
   CULTURE_PACKS,
   culturePackSchema,
   cafeAllergensIn,
+  customerLookWeights,
   localNpcPlaceName,
+  townNpcLook,
   localPlaceName,
   localShop,
   PROP_IDS,

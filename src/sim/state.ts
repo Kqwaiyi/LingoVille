@@ -106,6 +106,8 @@ export type ShiftCustomer = {
   table: readonly Diner[] | null;
   /** Picks their voice: the gateway turns it into one of its Shift Customer voices. */
   voiceSeed: number;
+  /** How they look, drawn with the pack's weights: the one who speaks, then the rest of their table. */
+  appearances: readonly AppearancePreset[];
 };
 
 /** A stretch of work at a Job: a set number of Shift Customers, served one after another. */

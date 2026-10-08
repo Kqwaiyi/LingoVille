@@ -36,6 +36,7 @@ import {
 import {
   approachInteraction,
   CULTURE_PACKS,
+  customerLookWeights,
   DEFAULT_APPEARANCE,
   DEFAULT_DRINK,
   GROCERIES_SOLD,
@@ -77,6 +78,7 @@ import {
   type SignId,
   stopsBetween,
   TOWN_NPCS,
+  townNpcLook,
   TRAM_LINE,
   type TownNpcId,
   type TramStopId,
@@ -1696,7 +1698,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (!shift) return;
       const templates = shiftTemplates(shift.jobId);
       if (templates.length === 0 || shift.served + shift.failed >= shift.customers) return finishShift();
-      const after = nextShiftCustomer(game, templates, tillFor(game.identity.culturePackId));
+      const after = nextShiftCustomer(game, templates, customerLookWeights(game.identity.culturePackId), tillFor(game.identity.culturePackId));
       set({ game: after });
       const customer = after.possessions.shift!.customer!;
       const pack = CULTURE_PACKS[after.identity.culturePackId];
@@ -2753,6 +2755,14 @@ export const selectJournal = (s: GameStore) => s.journal;
 export const selectFainting = (s: GameStore) => s.fainting;
 export const selectWardArrival = (s: GameStore) => s.wardArrival;
 export const selectDoctorCall = (s: GameStore) => s.doctorCall;
+/** This town NPC's face while the Player talks to them, or null when they aren't. */
+export const selectNpcExpressionOf = (npcId: TownNpcId) => (s: GameStore) => (s.conversation?.npcId === npcId ? selectNpcExpression(s) : null);
+/** How the NPC the Player is talking to looks, for their face: a Shift Customer as drawn, anyone else as the pack dresses them. */
+export const selectNpcLook = (s: GameStore): AppearancePreset | null => {
+  if (!s.conversation) return null;
+  if (s.conversation.npcId) return townNpcLook(s.conversation.npcId, s.game.identity.culturePackId);
+  return selectShiftCustomerLooks(s)[0] ?? null;
+};
 /** The NPC's face: Patience shows only like this, never as a number. */
 export const selectNpcExpression = (s: GameStore): NpcExpression | null =>
   s.conversation ? npcExpression(s.conversation.patience) : null;
@@ -2950,8 +2960,7 @@ export const selectCanSuggestChange = (s: GameStore) => {
 /** A Shift Customer is at the counter, and partway through saying a line: for the "speaking…" indicator over them. */
 export const selectShiftCustomerSpeaking = (s: GameStore) =>
   s.conversation?.shiftCustomer != null && !s.conversation.closed && s.conversation.npcLine !== null;
-/** A Shift Customer stands at the counter, from walking up until they leave. */
-export const selectShiftCustomerAtCounter = (s: GameStore) => s.conversation?.shiftCustomer != null;
-/** How many people the Shift Customer at the counter is: everyone at their table at the restaurant, otherwise just them; none between customers. */
-export const selectShiftCustomerParty = (s: GameStore) =>
-  s.conversation?.shiftCustomer ? (s.game.possessions.shift?.customer?.table?.length ?? 1) : 0;
+const NO_ONE: readonly AppearancePreset[] = [];
+/** How the Shift Customer at the counter looks: them, then the rest of their table at the restaurant; no one between customers. */
+export const selectShiftCustomerLooks = (s: GameStore): readonly AppearancePreset[] =>
+  (s.conversation?.shiftCustomer && s.game.possessions.shift?.customer?.appearances) || NO_ONE;

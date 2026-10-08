@@ -4,6 +4,7 @@ import { nextRandom, randomInt } from './rng.ts';
 import type { Checkout, Diner, GameState, JobId, PadDiner, ShiftOrder, ShiftOrderLine, TillWork } from './state.ts';
 import { gainLifeSkillXp, lifeSkillLevel } from './lifeSkills.ts';
 import { clampMeter } from './meters.ts';
+import { drawLooks, type LookWeights } from './looks.ts';
 import { moodModifier } from './mood.ts';
 import { hundredths, tillTotal, type Till } from './till.ts';
 import { kitchenOrder } from './orderPad.ts';
@@ -178,17 +179,19 @@ function drawCustomer(rngState: number, template: ShiftTemplate, till: Till | un
 
 /**
  * The next Shift Customer walks up to the counter, drawn from the Job's `templates` by the customer mix: their order,
- * any change of mind and their voice all come from the seeded RNG. A customer at the supermarket till needs the pack's
- * `till`, for their total and their cash. Nothing changes with no Shift under way or no templates.
+ * any change of mind, their voice and their look (with the pack's `looks` weights, one for each at their table) all come
+ * from the seeded RNG. A customer at the supermarket till needs the pack's `till`, for their total and their cash.
+ * Nothing changes with no Shift under way or no templates.
  */
-export function nextShiftCustomer(state: GameState, templates: readonly ShiftTemplate[], till?: Till): GameState {
+export function nextShiftCustomer(state: GameState, templates: readonly ShiftTemplate[], looks: LookWeights, till?: Till): GameState {
   const { shift } = state.possessions;
   if (!shift || templates.length === 0) return state;
   const template = drawTemplate(state.rngState, state.proficiencyStep, templates);
   const drawn = drawCustomer(template.rngState, template.value, till);
   const voice = randomInt(drawn.rngState, 0, VOICE_SEEDS - 1);
-  const customer = { templateId: template.value.id, ...drawn.customer, voiceSeed: voice.value };
-  return { ...state, rngState: voice.rngState, possessions: { ...state.possessions, shift: { ...shift, customer } } };
+  const appearances = drawLooks(voice.rngState, looks, drawn.customer.table?.length ?? 1);
+  const customer = { templateId: template.value.id, ...drawn.customer, voiceSeed: voice.value, appearances: appearances.value };
+  return { ...state, rngState: appearances.rngState, possessions: { ...state.possessions, shift: { ...shift, customer } } };
 }
 
 /** Everything at the till went as the customer wanted: their bag, their points card, and their change to the penny (none for a card payment). */

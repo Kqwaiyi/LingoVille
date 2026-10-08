@@ -19,11 +19,12 @@ import {
   shiftRefusal,
   startShift,
   type GameState,
+  type LookWeights,
   type OpeningHours,
   type ShiftOrder,
   STEP_BANDS,
 } from './index.ts';
-import { TEST_SETUP } from './testSetup.ts';
+import { TEST_LOOKS, TEST_SETUP } from './testSetup.ts';
 
 const CAFE_HOURS: OpeningHours = { opensAt: 7 * 60, closesAt: 19 * 60, closedOn: [] };
 
@@ -92,7 +93,7 @@ const BARISTA = [SINGLE_DRINK, MADE_TO_ORDER, CHANGE_OF_MIND];
 
 /** A Shift under way, with its first customer at the counter, drawn from `templates`. */
 function withCustomer(state = startShift(hiredBarista(), 'barista', CAFE_HOURS), templates: readonly ShiftTemplate[] = [SINGLE_DRINK]): GameState {
-  return nextShiftCustomer(state, templates);
+  return nextShiftCustomer(state, templates, TEST_LOOKS);
 }
 
 const customerOf = (state: GameState) => state.possessions.shift!.customer!;
@@ -117,9 +118,40 @@ describe('nextShiftCustomer: a Shift Customer walks up', () => {
 
   it('does nothing with no Shift under way, or with no templates', () => {
     const state = hiredBarista();
-    expect(nextShiftCustomer(state, BARISTA)).toBe(state);
+    expect(nextShiftCustomer(state, BARISTA, TEST_LOOKS)).toBe(state);
     const shift = startShift(state, 'barista', CAFE_HOURS);
-    expect(nextShiftCustomer(shift, [])).toBe(shift);
+    expect(nextShiftCustomer(shift, [], TEST_LOOKS)).toBe(shift);
+  });
+});
+
+describe('nextShiftCustomer: how a Shift Customer looks', () => {
+  const shift = startShift(hiredBarista(), 'barista', CAFE_HOURS);
+  const looksOf = (looks: LookWeights, seeds = 200) =>
+    Array.from({ length: seeds }, (_, seed) => customerOf(nextShiftCustomer({ ...shift, rngState: seed }, [SINGLE_DRINK], looks)).appearances);
+
+  it('has one look of their own, drawn from the seeded RNG', () => {
+    expect(withCustomer(shift)).toEqual(withCustomer(shift));
+    const looks = looksOf(TEST_LOOKS, 30);
+    expect(looks.every((appearances) => appearances.length === 1)).toBe(true);
+    expect(new Set(looks.map(([look]) => JSON.stringify(look))).size).toBeGreaterThan(5);
+  });
+
+  it('draws only parts the pack weighs, with a hair style weighed for the body drawn', () => {
+    const looks = looksOf({
+      body: { 'body-2': 1, 'body-3': 1 },
+      hairStyle: { 'body-1': { bald: 1 }, 'body-2': { bearded: 1 }, 'body-3': { buns: 1 }, 'body-4': { long: 1 } },
+      hairColour: { auburn: 1 },
+      skinTone: { 'tone-4': 1 },
+    }).map(([look]) => look!);
+    expect(new Set(looks.map((look) => `${look.body} ${look.hairStyle}`))).toEqual(new Set(['body-2 bearded', 'body-3 buns']));
+    expect(new Set(looks.map((look) => `${look.hairColour} ${look.skinTone}`))).toEqual(new Set(['auburn tone-4']));
+  });
+
+  it('draws each part as often as the pack weighs it', () => {
+    const looks = looksOf({ ...TEST_LOOKS, skinTone: { 'tone-1': 3, 'tone-6': 1 } }, 2000).map(([look]) => look!);
+    const share = looks.filter((look) => look.skinTone === 'tone-1').length / looks.length;
+    expect(share).toBeGreaterThan(0.7);
+    expect(share).toBeLessThan(0.8);
   });
 });
 
@@ -160,7 +192,7 @@ describe('nextShiftCustomer: the customer mix', () => {
     let state: GameState = { ...startShift(hiredBarista(), 'barista', CAFE_HOURS), proficiencyStep: step };
     const counts: Record<string, number> = {};
     for (let i = 0; i < DRAWS; i++) {
-      state = nextShiftCustomer(state, templates);
+      state = nextShiftCustomer(state, templates, TEST_LOOKS);
       const { templateId } = customerOf(state);
       counts[templateId] = (counts[templateId] ?? 0) + 1;
     }
@@ -195,7 +227,7 @@ describe('nextShiftCustomer: the customer mix', () => {
     const atA2 = (state: GameState): GameState => ({ ...state, progression: { ...state.progression, highestStep: 'C2' } });
     let state = atA2({ ...startShift(hiredBarista(), 'barista', CAFE_HOURS), proficiencyStep: 'A2' });
     for (let i = 0; i < 200; i++) {
-      state = nextShiftCustomer(state, BARISTA);
+      state = nextShiftCustomer(state, BARISTA, TEST_LOOKS);
       expect(customerOf(state).templateId).not.toBe('change-of-mind');
     }
   });
@@ -258,7 +290,7 @@ function finishedShift(served: number, { highestStep = 'A1' as ProficiencyStep, 
   let state = startShift(hiredBarista(), 'barista', CAFE_HOURS);
   state = { ...state, possessions: { ...state.possessions, shift: { ...state.possessions.shift!, customers: 6 } } };
   for (let i = 0; i < 6; i++) {
-    state = nextShiftCustomer(state, [SINGLE_DRINK]);
+    state = nextShiftCustomer(state, [SINGLE_DRINK], TEST_LOOKS);
     state = applyShiftCustomer(state, i < served ? orderOf(state) : null).state;
   }
   return {
@@ -374,7 +406,7 @@ describe('closing time and a Shift', () => {
     state = tick(state, 60);
     expect(state.possessions.shift).not.toBeNull();
     for (let i = 0; i < state.possessions.shift!.customers; i++) {
-      state = nextShiftCustomer(state, [SINGLE_DRINK]);
+      state = nextShiftCustomer(state, [SINGLE_DRINK], TEST_LOOKS);
       state = applyShiftCustomer(state, orderOf(state)).state;
     }
     expect(endShift(state).payInShifts).toBeCloseTo(ECONOMY.shiftBasePayInShifts);
@@ -439,7 +471,7 @@ describe('endShift: customers the Player had translated', () => {
     let state = startShift(hiredBarista(), 'barista', CAFE_HOURS);
     state = { ...state, possessions: { ...state.possessions, shift: { ...state.possessions.shift!, customers: 6 } } };
     for (let i = 0; i < 6; i++) {
-      state = nextShiftCustomer(state, [SINGLE_DRINK]);
+      state = nextShiftCustomer(state, [SINGLE_DRINK], TEST_LOOKS);
       state = applyShiftCustomer(state, orderOf(state), { translated: i < translated }).state;
     }
     return { ...state, progression: { ...state.progression, highestStep } };
@@ -477,7 +509,7 @@ describe('endShift: overwork', () => {
   const workOn = (state: GameState, day: number): GameState => {
     let working = startShift({ ...state, clock: { day, minuteOfDay: 10 * 60 } }, 'barista', CAFE_HOURS);
     for (let i = 0; i < working.possessions.shift!.customers; i++) {
-      working = nextShiftCustomer(working, [SINGLE_DRINK]);
+      working = nextShiftCustomer(working, [SINGLE_DRINK], TEST_LOOKS);
       working = applyShiftCustomer(working, orderOf(working)).state;
     }
     return endShift(working).state;

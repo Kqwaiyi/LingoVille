@@ -48,10 +48,13 @@ export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, in
       if (favourite && !favourite.includes(GIFT_WORDS[favouriteGift])) {
         problems.push(`gives ${npcId} a favourite gift that isn't ${GIFT_WORDS[favouriteGift]}, the one they love most.`);
       }
-      const body = pack.appearances.npcs[npcId];
-      const build = packs.ja.appearances.npcs[npcId] && BODY_PRESETS[packs.ja.appearances.npcs[npcId]].build;
-      if (!body) problems.push(`gives ${npcId} no Appearance Preset.`);
-      else if (build && BODY_PRESETS[body].build !== build) problems.push(`gives ${npcId} a ${BODY_PRESETS[body].build} build, not the ${build} one they have in every pack.`);
+      const body = pack.appearances.npcs[npcId]?.body;
+      const jaBody = packs.ja.appearances.npcs[npcId]?.body;
+      const build = jaBody && BODY_PRESETS[jaBody]?.build;
+      if (!pack.appearances.npcs[npcId]) problems.push(`gives ${npcId} no Appearance Preset.`);
+      else if (body && build && BODY_PRESETS[body] && BODY_PRESETS[body].build !== build) {
+        problems.push(`gives ${npcId} a ${BODY_PRESETS[body].build} build, not the ${build} one they have in every pack.`);
+      }
     }
     return problems.map((problem) => `${packId}: ${problem}`);
   });

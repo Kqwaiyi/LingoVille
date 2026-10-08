@@ -1,20 +1,24 @@
 import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { CapsuleCollider, CuboidCollider, RigidBody } from '@react-three/rapier';
-import { useState } from 'react';
-import { TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId, type TownNpcId, type TramStopId } from '../content/index.ts';
+import { Suspense, useRef, useState, type ReactNode } from 'react';
+import type { Group } from 'three';
+import { TOWN_NPC_IDS, TOWN_NPCS, townNpcLook, TRAM_LINE, type RoleId, type TownNpcId, type TramStopId } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import {
+  selectCulturePackId,
   selectIsOpen,
+  selectNpcExpression,
+  selectNpcExpressionOf,
   selectNpcSpeaking,
   selectShift,
-  selectShiftCustomerAtCounter,
-  selectShiftCustomerParty,
+  selectShiftCustomerLooks,
   selectShiftCustomerSpeaking,
   selectTramRunning,
   useGame,
 } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
+import { CharacterFigure } from './CharacterFigure.tsx';
 import { Groceries } from './Groceries.tsx';
 import { RouteMarker } from './Marker.tsx';
 import { Props } from './Props.tsx';
@@ -45,21 +49,21 @@ import {
 /** How near the doorway the Character can be before a closing door would shut on them. */
 const DOORWAY_CLEARANCE = 1.5;
 
-/** Placeholder colours, one per role, until the NPC looks arrive (ticket 30b). */
-const ROLE_COLOURS: Record<RoleId, string> = {
-  landlord: '#9a8c7a',
-  barista: '#7fb3a3',
-  cashier: '#c9b458',
-  clerk: '#6f9fc8',
-  server: '#b5655a',
-  receptionist: '#8fc1c9',
-  doctor: '#f2f2f2',
-  nurse: '#9cc9a8',
-  pharmacist: '#b9d0e0',
-  regular: '#a3a07c',
-  'passer-by': '#8c8fa3',
-  shopkeeper: '#9b7fb5',
-  attendant: '#5f88a8',
+/**
+ * Each role's signifier, the same in every Culture Pack: staff wear an apron in their role's colour. The landlord, the
+ * park regulars and passers-by wear their everyday clothes.
+ */
+const APRONS: Partial<Record<RoleId, string>> = {
+  barista: '#4f8f7f',
+  cashier: '#c9a43a',
+  clerk: '#4f7fae',
+  server: '#8e3b34',
+  receptionist: '#6fa9b3',
+  doctor: '#f4f4f0',
+  nurse: '#86bf96',
+  pharmacist: '#a9c6dc',
+  shopkeeper: '#7b5f99',
+  attendant: '#3f6f94',
 };
 
 const WINDOW = { width: 1.4, height: 0.9, sill: 1.1, lit: '#ffd98a', dark: '#3d4452' } as const;
@@ -90,45 +94,90 @@ function SpeakingIndicator({ speaking }: { speaking: boolean }) {
   );
 }
 
-/** A greybox NPC: a capsule the Character can't walk through. */
-function Npc({ npcId }: { npcId: TownNpcId }) {
-  const speaking = useGame(selectNpcSpeaking) === npcId;
+/** How near the Character must come before someone turns to face them, in metres. */
+const TURN_RANGE = 6;
+/** How quickly someone turns to face the Character (per second). */
+const TURN_SPEED = 4;
+
+/** Turns what it holds, on the spot, to face the Character once they come near. */
+function FacingTheCharacter({ at: [x, , z], children }: { at: Vec3; children: ReactNode }) {
+  const turning = useRef<Group>(null);
+  useFrame((_, delta) => {
+    const group = turning.current;
+    const [dx, dz] = [characterPosition.x - x, characterPosition.z - z];
+    if (!group || dx * dx + dz * dz > TURN_RANGE * TURN_RANGE) return;
+    // The shorter way round.
+    const turn = Math.atan2(dx, dz) - group.rotation.y;
+    group.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, TURN_SPEED * delta);
+  });
+  return <group ref={turning}>{children}</group>;
+}
+
+/** Someone on the shared rig standing at `at` (a capsule's middle, as the spots are given), feet on the floor, facing the Character. */
+function Figure({ at, children }: { at: Vec3; children: ReactNode }) {
   return (
-    <group position={NPC_SPOTS[npcId]}>
-      <mesh castShadow>
-        <capsuleGeometry args={[0.35, 1, 4, 12]} />
-        <meshStandardMaterial color={ROLE_COLOURS[TOWN_NPCS[npcId].role]} flatShading />
-      </mesh>
-      <CapsuleCollider args={[0.5, 0.35]} />
-      <SpeakingIndicator speaking={speaking} />
+    <group position={at}>
+      <FacingTheCharacter at={at}>
+        <group position-y={-at[1]}>
+          <Suspense fallback={null}>{children}</Suspense>
+        </group>
+      </FacingTheCharacter>
     </group>
   );
 }
 
-/** Placeholder colour for Shift Customers, until their Appearance Presets arrive (ticket 30b). */
-const SHIFT_CUSTOMER_COLOUR = '#c79a6b';
-
-/**
- * The Shift Customer at the café counter or the supermarket till, from walking up until they leave. At the restaurant,
- * the rest of their table sits with them; the one speaking for the table shows the speaking indicator.
- */
-function ShiftCustomer() {
-  const atCounter = useGame(selectShiftCustomerAtCounter);
-  const party = useGame(selectShiftCustomerParty);
-  const speaking = useGame(selectShiftCustomerSpeaking);
-  const jobId = useGame((s) => selectShift(s)?.jobId);
-  const workplace = jobId && WORKPLACES[jobId];
-  if (!atCounter || !workplace) return null;
-  const seats = [workplace.customerSpot, ...(workplace.otherSeats ?? [])].slice(0, party);
+/** A town NPC in their look for this Culture Pack, whose face shows their Patience while the Player talks to them. Solid to the Character. */
+function Npc({ npcId }: { npcId: TownNpcId }) {
+  const speaking = useGame(selectNpcSpeaking) === npcId;
+  const packId = useGame(selectCulturePackId);
+  const expression = useGame(selectNpcExpressionOf(npcId));
   return (
     <>
-      {seats.map((seat, i) => (
-        <group key={i} position={seat}>
-          <mesh castShadow>
-            <capsuleGeometry args={[0.35, 1, 4, 12]} />
-            <meshStandardMaterial color={SHIFT_CUSTOMER_COLOUR} flatShading />
-          </mesh>
-          {i === 0 && <SpeakingIndicator speaking={speaking} />}
+      <Figure at={NPC_SPOTS[npcId]}>
+        <CharacterFigure
+          appearance={townNpcLook(npcId, packId)}
+          clip={speaking ? 'talk' : 'idle'}
+          expression={expression ?? 'relaxed'}
+          apron={APRONS[TOWN_NPCS[npcId].role]}
+        />
+      </Figure>
+      <group position={NPC_SPOTS[npcId]}>
+        <CapsuleCollider args={[0.5, 0.35]} />
+        <SpeakingIndicator speaking={speaking} />
+      </group>
+    </>
+  );
+}
+
+/**
+ * The Shift Customer at the café counter or the supermarket till, from walking up until they leave, in the look drawn
+ * for them. At the restaurant, the rest of their table stands with them; the one speaking for the table shows the
+ * speaking indicator, and their Patience.
+ */
+function ShiftCustomer() {
+  const looks = useGame(selectShiftCustomerLooks);
+  const speaking = useGame(selectShiftCustomerSpeaking);
+  const expression = useGame(selectNpcExpression);
+  const jobId = useGame((s) => selectShift(s)?.jobId);
+  const workplace = jobId && WORKPLACES[jobId];
+  if (!workplace) return null;
+  const seats = [workplace.customerSpot, ...(workplace.otherSeats ?? [])];
+  return (
+    <>
+      {looks.map((look, i) => (
+        <group key={i}>
+          <Figure at={seats[i]!}>
+            <CharacterFigure
+              appearance={look}
+              clip={i === 0 && speaking ? 'talk' : 'idle'}
+              expression={i === 0 ? (expression ?? 'relaxed') : 'relaxed'}
+            />
+          </Figure>
+          {i === 0 && (
+            <group position={seats[i]}>
+              <SpeakingIndicator speaking={speaking} />
+            </group>
+          )}
         </group>
       ))}
     </>

@@ -6,8 +6,12 @@ import { z } from 'zod';
 export const BODY_IDS = ['body-1', 'body-2', 'body-3', 'body-4'] as const;
 export type BodyId = (typeof BODY_IDS)[number];
 
-/** Each body and face preset: a build (a skeleton in its everyday clothes) and one of the two faces. */
-export const BODY_PRESETS: Record<BodyId, { build: 'masculine' | 'feminine'; face: 'a' | 'b' }> = {
+/** The builds: each a skeleton in its everyday clothes. */
+export const BUILDS = ['masculine', 'feminine'] as const;
+export type Build = (typeof BUILDS)[number];
+
+/** Each body and face preset: a build and one of the two faces. */
+export const BODY_PRESETS: Record<BodyId, { build: Build; face: 'a' | 'b' }> = {
   'body-1': { build: 'masculine', face: 'a' },
   'body-2': { build: 'masculine', face: 'b' },
   'body-3': { build: 'feminine', face: 'b' },
@@ -53,3 +57,25 @@ export type AppearancePreset = z.infer<typeof AppearancePresetSchema>;
 
 /** The look setup starts from, until the Player chooses. */
 export const DEFAULT_APPEARANCE: AppearancePreset = { body: 'body-1', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-3' };
+
+/** How often each of some parts turns up, by how much it weighs against the others. */
+export type Weights<K extends string> = Partial<Record<K, number>>;
+
+/** How often each part of an anonymous look turns up in a pack: the body, a hair style that suits its build, hair colour and skin tone. */
+export type CustomerWeights = {
+  body: Weights<BodyId>;
+  hairStyle: Record<Build, Weights<HairStyleId>>;
+  hairColour: Weights<HairColourId>;
+  skinTone: Weights<SkinToneId>;
+};
+
+/** Weights over `ids` that leave something to draw. */
+const weights = <K extends string>(ids: readonly [K, ...K[]]) =>
+  z.partialRecord(z.enum(ids), z.number().positive()).refine((drawn) => Object.keys(drawn).length > 0, 'Something must be left to draw.');
+
+export const CustomerWeightsSchema = z.object({
+  body: weights(BODY_IDS),
+  hairStyle: z.object({ masculine: weights(HAIR_STYLE_IDS), feminine: weights(HAIR_STYLE_IDS) }),
+  hairColour: weights(HAIR_COLOUR_IDS),
+  skinTone: weights(SKIN_TONE_IDS),
+});

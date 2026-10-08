@@ -493,8 +493,12 @@ body,
 }
 
 .npc-face {
-  font-size: 22px;
-  line-height: 1;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e7eef4;
 }
 
 .chat-role {

@@ -14,7 +14,7 @@ import {
   type OpeningHours,
   type Till,
 } from './index.ts';
-import { TEST_SETUP } from './testSetup.ts';
+import { TEST_LOOKS, TEST_SETUP } from './testSetup.ts';
 
 const SUPERMARKET_HOURS: OpeningHours = { opensAt: 9 * 60, closesAt: 21 * 60, closedOn: [] };
 
@@ -42,7 +42,7 @@ function cashierShift(seed = TEST_SETUP.rngSeed): GameState {
 
 const customerOf = (state: GameState) => state.possessions.shift!.customer!;
 const drawn = (template: ShiftTemplate, till = YEN) =>
-  Array.from({ length: 80 }, (_, seed) => customerOf(nextShiftCustomer(cashierShift(seed), [template], till)));
+  Array.from({ length: 80 }, (_, seed) => customerOf(nextShiftCustomer(cashierShift(seed), [template], TEST_LOOKS, till)));
 
 /** What the customer's shopping and anything from behind the counter come to, at this till. */
 const totalOf = (state: GameState, till = YEN) => customerOf(state).order.reduce((sum, { itemId, quantity }) => sum + till.prices[itemId] * quantity, 0);
@@ -81,7 +81,7 @@ describe('nextShiftCustomer: a customer at the till', () => {
   it('hands over more cash than the total, in a round amount of the money in the drawer, and is owed the difference', () => {
     for (const till of [YEN, POUNDS]) {
       for (let seed = 0; seed < 60; seed++) {
-        const state = nextShiftCustomer(cashierShift(seed), [PAYS_CASH], till);
+        const state = nextShiftCustomer(cashierShift(seed), [PAYS_CASH], TEST_LOOKS, till);
         const { cashHanded, changeDue } = customerOf(state).checkout!;
         const total = totalOf(state, till);
         expect(cashHanded!).toBeGreaterThan(total);
@@ -93,17 +93,17 @@ describe('nextShiftCustomer: a customer at the till', () => {
 
   it('draws everything from the seeded RNG', () => {
     const shift = cashierShift();
-    expect(nextShiftCustomer(shift, [PAYS_CASH], YEN)).toEqual(nextShiftCustomer(shift, [PAYS_CASH], YEN));
+    expect(nextShiftCustomer(shift, [PAYS_CASH], TEST_LOOKS, YEN)).toEqual(nextShiftCustomer(shift, [PAYS_CASH], TEST_LOOKS, YEN));
     expect(new Set(drawn(PAYS_CASH).map(({ checkout }) => checkout!.cashHanded)).size).toBeGreaterThan(1);
   });
 
   it('cannot be drawn without the till', () => {
-    expect(() => nextShiftCustomer(cashierShift(), [PAYS])).toThrow(/till/);
+    expect(() => nextShiftCustomer(cashierShift(), [PAYS], TEST_LOOKS)).toThrow(/till/);
   });
 });
 
 /** A Shift with a customer at the till, drawn from `template`. */
-const atTheTill = (template = PAYS_CASH, seed = TEST_SETUP.rngSeed, till = YEN) => nextShiftCustomer(cashierShift(seed), [template], till);
+const atTheTill = (template = PAYS_CASH, seed = TEST_SETUP.rngSeed, till = YEN) => nextShiftCustomer(cashierShift(seed), [template], TEST_LOOKS, till);
 
 /** Everything done right for the customer at the till: their bag and card as they wanted, and their change. */
 const rightly = (state: GameState) => {

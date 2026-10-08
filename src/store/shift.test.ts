@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Hint, HintRequest, NpcSession, Recap, RecapRequest, ToolResponse } from '../ai/index.ts';
-import { DRINK_EXTRAS, SHIFT_TEMPLATES, type DrinkModifiers, type ItemId } from '../content/index.ts';
+import { BODY_PRESETS, CULTURE_PACKS, DRINK_EXTRAS, SHIFT_TEMPLATES, type DrinkModifiers, type ItemId } from '../content/index.ts';
 import { createSave, ECONOMY, hire, LIFE_SKILLS, PROFICIENCY_STEP_TABLE, type GameState, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { VoiceServiceUnavailableError, type OpenVoiceSession, type VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -17,7 +17,9 @@ import {
   selectConversation,
   selectDrinkModifiers,
   selectHints,
+  selectNpcLook,
   selectShift,
+  selectShiftCustomerLooks,
   selectShiftEnd,
   selectShiftMenu,
   selectStaffDoor,
@@ -154,6 +156,21 @@ describe('the staff door', () => {
     expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: store.getState().game.possessions.shift!.customer!.voiceSeed });
     expect(session.openingScene).toMatch(/walk up to the counter/);
     expect(session.systemInstruction).toContain('YOUR ORDER');
+  });
+
+  it('brings a Shift Customer who looks local: a look drawn with the pack’s weights, and that is the face the Player talks to', () => {
+    const { store } = atTheStaffDoor();
+    store.getState().startShift();
+
+    const looks = selectShiftCustomerLooks(store.getState());
+    expect(looks).toEqual(store.getState().game.possessions.shift!.customer!.appearances);
+    expect(looks).toHaveLength(1);
+    const { customers } = CULTURE_PACKS.ja.appearances;
+    const [look] = looks;
+    expect(customers.hairStyle[BODY_PRESETS[look!.body].build][look!.hairStyle]).toBeDefined();
+    expect(customers.hairColour[look!.hairColour]).toBeDefined();
+    expect(customers.skinTone[look!.skinTone]).toBeDefined();
+    expect(selectNpcLook(store.getState())).toEqual(look);
   });
 
   it('says why it can’t start a Shift: not hired, closed, or already worked today', () => {

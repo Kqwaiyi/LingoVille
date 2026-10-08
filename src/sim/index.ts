@@ -32,6 +32,7 @@ export { gymMembership, gymRefusal, gymSession, type GymMembership, type GymRefu
 export { fitnessIllnessFactor, jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';
 export { hire, namesMatch } from './jobs.ts';
+export { lookFromSeed, type LookWeights } from './looks.ts';
 export { applyShiftCustomer, cancelShift, endShift, nextShiftCustomer, shiftRefusal, startShift, type ShiftRefusal } from './shift.ts';
 export { addToTray, clearTray, EMPTY_TRAY, redoTray, undoTray, type TrayHistory } from './tray.ts';
 export { addPadLine, choosePadLine, EMPTY_PAD, kitchenOrder, noteOnPad, removePadLine, writeOnPad, type OrderPad } from './orderPad.ts';

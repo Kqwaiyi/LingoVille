@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CULTURE_PACKS } from '../content/index.ts';
+import { CULTURE_PACKS, DEFAULT_APPEARANCE } from '../content/index.ts';
 import { LANGUAGE_CODES, PROFICIENCY_STEPS, type LanguageCode, type ProficiencyStep, type ShiftCustomer } from '../sim/index.ts';
 import {
   buildShiftCustomerSession,
@@ -16,11 +16,11 @@ import {
 } from './index.ts';
 
 const MID_MORNING = { day: 3, minuteOfDay: 10 * 60 + 20 };
-const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, table: null, voiceSeed: 4242 };
+const WANTS_A_LATTE: ShiftCustomer = { templateId: 'barista-single-drink', order: [{ itemId: 'latte', quantity: 1 }], changedFrom: null, checkout: null, table: null, voiceSeed: 4242, appearances: [DEFAULT_APPEARANCE] };
 const ICED_TEA = [{ itemId: 'tea' as const, quantity: 1, modifiers: { size: 'large' as const, temperature: 'iced' as const, extras: ['lemon' as const] } }];
 const HOT_COFFEE = [{ itemId: 'coffee' as const, quantity: 1, modifiers: { size: 'small' as const, temperature: 'hot' as const, extras: ['milk' as const] } }];
-const WANTS_ICED_TEA: ShiftCustomer = { templateId: 'barista-made-to-order', order: ICED_TEA, changedFrom: null, checkout: null, table: null, voiceSeed: 7 };
-const CHANGES_MIND: ShiftCustomer = { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE, checkout: null, table: null, voiceSeed: 7 };
+const WANTS_ICED_TEA: ShiftCustomer = { templateId: 'barista-made-to-order', order: ICED_TEA, changedFrom: null, checkout: null, table: null, voiceSeed: 7, appearances: [DEFAULT_APPEARANCE] };
+const CHANGES_MIND: ShiftCustomer = { templateId: 'barista-change-of-mind', order: ICED_TEA, changedFrom: HOT_COFFEE, checkout: null, table: null, voiceSeed: 7, appearances: [DEFAULT_APPEARANCE] };
 /** At the till: eggs and cabbage, a bag but no points card, paying by card. */
 const PAYS: ShiftCustomer = {
   templateId: 'cashier-pays',
@@ -29,6 +29,7 @@ const PAYS: ShiftCustomer = {
   checkout: { bag: true, pointsCard: false, fromBehindTheCounter: null, cashHanded: null, changeDue: null },
   table: null,
   voiceSeed: 11,
+  appearances: [DEFAULT_APPEARANCE],
 };
 /** The same shopping and stamps from behind the counter, no bag but a points card, paying ¥2,000 in cash. */
 const PAYS_CASH: ShiftCustomer = {
@@ -38,6 +39,7 @@ const PAYS_CASH: ShiftCustomer = {
   checkout: { bag: false, pointsCard: true, fromBehindTheCounter: 'stamps', cashHanded: 2000, changeDue: 800 },
   table: null,
   voiceSeed: 12,
+  appearances: [DEFAULT_APPEARANCE],
 };
 /** At the restaurant: one diner, wanting fish and a juice. */
 const SINGLE_ORDER: ShiftCustomer = {
@@ -47,6 +49,7 @@ const SINGLE_ORDER: ShiftCustomer = {
   checkout: null,
   table: [{ dish: 'fish-dish', drink: 'juice', note: null }],
   voiceSeed: 21,
+  appearances: [DEFAULT_APPEARANCE],
 };
 /** A table of three: the second diner is vegetarian. */
 const TABLE_OF_THREE: ShiftCustomer = {
@@ -66,6 +69,7 @@ const TABLE_OF_THREE: ShiftCustomer = {
     { dish: 'chicken-dish', drink: 'juice', note: null },
   ],
   voiceSeed: 22,
+  appearances: [DEFAULT_APPEARANCE],
 };
 
 function customerSession(packId: LanguageCode, step: ProficiencyStep = 'A1', customer = WANTS_A_LATTE) {

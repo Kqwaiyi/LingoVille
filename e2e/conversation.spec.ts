@@ -14,8 +14,10 @@ test('pressing E near the barista opens the chat column, and the barista speaks 
   await expect(column(page).getByRole('tab', { name: 'Chat', selected: true })).toBeVisible();
   await expect(column(page).getByRole('button', { name: /Leave/ })).toBeVisible();
   await expect(page.getByText('Press E to talk')).toBeHidden();
+  // The barista's own face, in a little view of its own in the header.
+  await expect(column(page).getByRole('img', { name: 'The barista looks relaxed' }).locator('canvas')).toBeVisible();
   // The scene and the dock stay on screen left of the column.
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
   await expect(dock(page)).toBeVisible();
   const dockBox = (await dock(page).boundingBox())!;
   const columnBox = (await column(page).boundingBox())!;

@@ -10,6 +10,7 @@ import {
   selectClosingCard,
   selectConversation,
   selectNpcExpression,
+  selectNpcLook,
   selectTyping,
 } from './index.ts';
 
@@ -178,6 +179,11 @@ describe('ordering a drink', () => {
 });
 
 describe('Patience', () => {
+  it('shows on the face of the NPC the Player is talking to: the barista as the pack dresses them', () => {
+    const { store } = orderingADrink();
+    expect(selectNpcLook(store.getState())).toEqual({ body: 'body-2', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' });
+  });
+
   it('starts relaxed and drops when the NPC cannot make sense of a turn', () => {
     const { store, fake } = orderingADrink();
     expect(selectNpcExpression(store.getState())).toBe('relaxed');
