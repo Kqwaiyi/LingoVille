@@ -405,3 +405,134 @@ Write every explanation in British English, never in Mandarin Chinese. Write exa
   },
 }
 `;
+
+exports[`buildRecapRequest > notes a friend offering the casual register, in Small Talk 1`] = `
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "THE CHAT
+Small Talk with the barista at Café Stern.
+1. NPC: Sag mal, wollen wir uns nicht duzen? Ich bin Lena.
+2. PLAYER (heard as, may be misheard): Gern! Ich bin Sam.
+Help used: none.",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "generationConfig": {
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "properties": {
+        "cefrEstimate": {
+          "description": "The CEFR level this conversation's evidence suggests.",
+          "enum": [
+            "A1",
+            "A2",
+            "B1",
+            "B2",
+            "C1",
+            "C2",
+          ],
+          "type": "STRING",
+        },
+        "corrections": {
+          "items": {
+            "properties": {
+              "natural": {
+                "description": "A more natural way to say it, in the Target Language.",
+                "type": "STRING",
+              },
+              "said": {
+                "description": "What the learner said, as heard, in the Target Language.",
+                "type": "STRING",
+              },
+              "why": {
+                "description": "One line on why, in the Native Language.",
+                "type": "STRING",
+              },
+            },
+            "required": [
+              "said",
+              "natural",
+              "why",
+            ],
+            "type": "OBJECT",
+          },
+          "maxItems": 1,
+          "type": "ARRAY",
+        },
+        "lastTopic": {
+          "description": "What the conversation was about, in a few words of English.",
+          "type": "STRING",
+        },
+        "newWords": {
+          "items": {
+            "properties": {
+              "base": {
+                "description": "The word or phrase, in the Target Language.",
+                "type": "STRING",
+              },
+              "gloss": {
+                "description": "Its meaning, in the Native Language.",
+                "type": "STRING",
+              },
+              "reading": {
+                "description": "Pinyin with tone marks for Chinese, hiragana for Japanese, otherwise empty.",
+                "type": "STRING",
+              },
+            },
+            "required": [
+              "base",
+              "reading",
+              "gloss",
+            ],
+            "type": "OBJECT",
+          },
+          "maxItems": 3,
+          "type": "ARRAY",
+        },
+        "outcome": {
+          "description": "One line on how it went, in the Native Language.",
+          "type": "STRING",
+        },
+      },
+      "required": [
+        "outcome",
+        "corrections",
+        "newWords",
+        "cefrEstimate",
+      ],
+      "type": "OBJECT",
+    },
+  },
+  "systemInstruction": {
+    "parts": [
+      {
+        "text": "WHO YOU ARE
+You are a warm, encouraging language coach. Your learner speaks Japanese and is learning German by living in a small town in Germany. Their level is about CEFR B1.
+Write a short Recap of one Small Talk chat: a casual conversation with no goal, which cannot fail, for them to read straight afterwards and keep in their Journal.
+
+HOW TO READ THE TRANSCRIPT
+- NPC lines are exactly what the NPC said.
+- "PLAYER (heard as, may be misheard)" lines are what speech recognition heard the learner say. They may be wrong.
+- "PLAYER (typed)" lines were typed by the learner, exactly as written.
+- When a heard line has a word that sounds close to what the learner most likely meant but is wrong in context (for example yī bǎi, "a hundred", where yī bēi, "a cup", was meant), treat it as a pronunciation point: a correction whose "said" is what was heard, whose "natural" is what they meant, and whose "why" says how to say it so it is heard right. Never blame them for a typo-like word they probably said correctly.
+- The Help log lists the hints, phrasebook entries and translations the learner used. Using Help is never evidence of a lower level, and the game already gives helped turns less weight, so never lower cefrEstimate because Help was used: give the level the transcript would show if they had used no Help.
+
+WHAT TO WRITE
+- outcome: one friendly line in Japanese on how it went.
+- corrections: at most 1, the most useful only. "said" is the learner's words and "natural" a more natural way to say it at their level, both in German. "why" is one short line in Japanese. If nothing needs correcting, give none.
+- newWords: at most 3 words or phrases from the conversation worth keeping, mostly ones the NPC used. "base" in German, "reading" as pinyin with tone marks for Chinese or hiragana for Japanese (otherwise empty), "gloss" in Japanese.
+- cefrEstimate: the CEFR level the learner showed in this conversation.
+- lastTopic: what the conversation was about, in a few words of English, if it had a topic worth remembering.
+Write every explanation in Japanese, never in German. Write examples only in German.
+Keep it light: this was a chat, not a lesson. Correct only what would really help, and celebrate what went well.
+In this conversation the barista, now a friend, offered to switch from Sie to du: a real cultural milestone. Say so warmly in the outcome line, and say in a few words of Japanese what changes from now on.",
+      },
+    ],
+  },
+}
+`;

@@ -280,6 +280,10 @@ export const FAMILIARITY = {
   giftCooldownDays: 7,
   usualOrderAfterIdenticalOrders: 3,
   friendPatienceBonus: 1,
+  /** The chance a friend adds a little something "on the house" to an order: flavour only, never a discount. */
+  onTheHouseChance: 0.2,
+  /** At most once in this many days from each NPC. */
+  onTheHouseCooldownDays: 7,
 } as const;
 
 // --- Small Talk -------------------------------------------------------------

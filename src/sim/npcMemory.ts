@@ -10,9 +10,11 @@ export function memoryOf(state: GameState, npcId: NamedNpcId): NpcMemory {
       timesMet: 0,
       knowsName: false,
       usualOrder: null,
+      lastOrder: null,
       lastTopic: null,
       favouriteKnown: false,
       lastGiftDay: null,
+      lastOnTheHouseDay: null,
       registerOffered: false,
     }
   );

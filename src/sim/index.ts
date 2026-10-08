@@ -3,7 +3,16 @@ export { gameMinutesFor, isOpen, weekdayOf, WEEKDAYS, type OpeningHours, type We
 export { weighRecapEvidence, type EvidenceLine, type HelpShown, type RecapEvidence } from './helpEvidence.ts';
 export { applyInteractionOutcome, type InteractionOutcome, type OutcomeResult } from './interactionOutcome.ts';
 export { addToBasket, putBackFromBasket, type Basket } from './basket.ts';
-export { APPROACH_IDS, approachDue, hallwayApproach, hallwayApproachMade, type ApproachId, type HallwayApproachId } from './approaches.ts';
+export {
+  APPROACH_IDS,
+  approachDue,
+  hallwayApproach,
+  hallwayApproachMade,
+  parkWaveDue,
+  parkWaveMade,
+  type ApproachId,
+  type HallwayApproachId,
+} from './approaches.ts';
 export { cook } from './cook.ts';
 export { faint, faintedBetween } from './faint.ts';
 export { jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
@@ -31,6 +40,7 @@ export {
   type FamiliarityTier,
 } from './familiarity.ts';
 export { memoryOf } from './npcMemory.ts';
+export { casualRegisterDue, casualRegisterOffered, onTheHouseGiven, rollOnTheHouse, usualOffered } from './regulars.ts';
 export {
   isOutOfPatience,
   isUnreadableTranscript,

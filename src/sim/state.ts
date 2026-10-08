@@ -48,9 +48,13 @@ export type NpcMemory = {
   knowsName: boolean;
   /** The interaction and completion arguments ordered the same way enough times in a row. */
   usualOrder: { interactionId: string; args: unknown } | null;
+  /** The latest order from this NPC, and how many times in a row it has been ordered just so, toward `usualOrder`. */
+  lastOrder: { interactionId: string; args: unknown; inARow: number } | null;
   lastTopic: string | null;
   favouriteKnown: boolean;
   lastGiftDay: number | null;
+  /** The day the NPC last gave the Character a little something "on the house": once a week at most. */
+  lastOnTheHouseDay: number | null;
   registerOffered: boolean;
 };
 
@@ -181,6 +185,8 @@ export type GameState = {
   paymentPlans: PaymentPlan[];
   /** The day the Character last woke in the ward after Fainting, or null if they never have fainted. Each Fainting wakes on a new day. */
   wokeInWardOnDay: number | null;
+  /** The day a park regular last waved the Character over: once a day at most. */
+  parkWavedOnDay: number | null;
   /** The current step, read from the hidden score with a buffer at boundaries. */
   proficiencyStep: ProficiencyStep;
   progression: {
@@ -251,6 +257,7 @@ export function createSave(setup: NewGameSetup): GameState {
     debts: [],
     paymentPlans: [],
     wokeInWardOnDay: null,
+    parkWavedOnDay: null,
     proficiencyStep: setup.startingStep,
     progression: {
       proficiencyScore: PROFICIENCY.stepCentre[setup.startingStep],

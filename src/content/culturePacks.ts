@@ -75,6 +75,11 @@ export type CulturePack = {
   townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses }>;
   /** Persona localisations: each Named NPC's local name, and their favourite gift (the persona's `favouriteGift`) as a local would put it (in English, as the prompt reads it). */
   personas: Record<NamedNpcId, { name: string; favouriteGift: string }>;
+  /**
+   * The casual register a friend offers to switch to, once: `formal` and `casual` as the Target Language names them
+   * (for the Recap), `offer` what the NPC offers and `inUse` how they speak once they have (in English, as the prompt reads them).
+   */
+  casualRegister: { formal: string; casual: string; offer: string; inUse: string };
   appearances: {
     /** Persona × pack → Appearance Preset. */
     npcs: Record<NamedNpcId, AppearancePresetId>;
@@ -139,6 +144,7 @@ export function culturePackSchema(packId: LanguageCode) {
     apartments: z.object({ name: text, nameGlosses: glosses }),
     townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses })),
     personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
+    casualRegister: z.object({ formal: text, casual: text, offer: text, inUse: text }),
     appearances: z.object({
       npcs: z.record(z.string(), z.enum(APPEARANCE_PRESET_IDS)),
       customerWeights: z.partialRecord(z.enum(APPEARANCE_PRESET_IDS), z.number().positive()),
@@ -257,6 +263,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       bookshop: { name: 'ひだまり書店', nameGlosses: { zh: '向阳书店', en: 'Hidamari Books', de: 'Buchhandlung Hidamari' } },
       bathhouse: { name: '松の湯', nameGlosses: { zh: '松之汤', en: 'Matsu-no-yu Bathhouse', de: 'Badehaus Matsu-no-yu' } },
       'town-office': { name: '南町役場', nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' } },
+    },
+    casualRegister: {
+      formal: '敬語',
+      casual: 'タメ口',
+      offer: 'suggest that the two of you drop the polite です/ます forms (keigo) and talk in タメ口, the plain casual forms friends use',
+      inUse: 'You talk to each other in タメ口 now: use the plain casual forms friends use, not です/ます.',
     },
     personas: {
       landlord: { name: '山本', favouriteGift: 'flowers for the hallway, seasonal ones like cosmos or chrysanthemums' },
@@ -403,6 +415,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       bookshop: { name: '书香书店', nameGlosses: { ja: '書香書店', en: 'Book Fragrance Bookshop', de: 'Buchhandlung Bücherduft' } },
       bathhouse: { name: '清泉浴池', nameGlosses: { ja: '清泉浴場', en: 'Clear Spring Bathhouse', de: 'Badehaus Klarquelle' } },
       'town-office': { name: '街道办事处', nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' } },
+    },
+    casualRegister: {
+      formal: '您',
+      casual: '你',
+      offer: 'tell them there is no need for the polite 您 or for titles between you: they can just say 你 and use your given name, as friends do',
+      inUse: 'You talk to each other as friends now: say 你, never 您, and no titles.',
     },
     personas: {
       landlord: { name: '刘阿姨', favouriteGift: 'flowers for the stairwell, something bright like peonies' },
@@ -551,6 +569,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       bookshop: { name: 'The Book Nook', nameGlosses: { ja: 'ブック・ヌック', zh: '书角书店', de: 'Bücherecke' } },
       bathhouse: { name: 'Riverside Baths', nameGlosses: { ja: 'リバーサイド浴場', zh: '河畔浴场', de: 'Flussbad' } },
       'town-office': { name: 'Town Hall', nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' } },
+    },
+    casualRegister: {
+      formal: 'Mr / Ms',
+      casual: 'first names',
+      offer: 'tell them to drop the "sir", "madam" and surnames and call you by your first name, as friends do',
+      inUse: 'You are on first-name terms now: talk to them casually, as friends do, with nothing formal.',
     },
     personas: {
       landlord: { name: 'Mrs Hughes', favouriteGift: 'flowers for the hallway, sweet peas if you can find them' },
@@ -707,6 +731,12 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       bookshop: { name: 'Buchhandlung Seitenweise', nameGlosses: { ja: 'ザイテンヴァイゼ書店', zh: '页页书店', en: 'Seitenweise Bookshop' } },
       bathhouse: { name: 'Stadtbad', nameGlosses: { ja: '市営浴場', zh: '市立浴场', en: 'Town Baths' } },
       'town-office': { name: 'Bürgeramt', nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' } },
+    },
+    casualRegister: {
+      formal: 'Sie',
+      casual: 'du',
+      offer: 'offer them the du ("Wollen wir uns duzen?"): to say du to each other instead of Sie, as friends do',
+      inUse: 'You say du to each other now: never Sie.',
     },
     personas: {
       landlord: { name: 'Frau Becker', favouriteGift: 'flowers for the stairwell, ideally tulips' },

@@ -96,13 +96,17 @@ const shared = {
   nativeLanguage: LanguageSchema,
 };
 
+/** A friend offered, in this conversation, to switch to the casual register (Sie→du, keigo→タメ口): the Recap notes it. */
+const registerOffered = z.literal(true).optional();
+
 /** What `/api/recap` takes. The gateway validates requests with it, and builds the prompt from them. */
 export const RecapRequestSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('goal'), ...shared, conversation: RecapConversationSchema }),
+  z.object({ kind: z.literal('goal'), ...shared, conversation: RecapConversationSchema, registerOffered }),
   z.object({
     kind: z.literal('smallTalk'),
     ...shared,
     npcId: z.enum(NPC_IDS),
+    registerOffered,
     transcript: z.array(RecapLineSchema),
     helpLog: z.array(HelpLogEntrySchema),
   }),
@@ -307,6 +311,14 @@ function writeBlock(request: RecapRequest, pack: CulturePack) {
   }
   if (request.kind === 'shift') {
     lines.push('Write one combined Recap for the whole Shift: the outcome line sums up how the customers went.');
+  }
+  if (request.kind !== 'shift' && request.registerOffered) {
+    const { role } = NAMED_NPCS[request.kind === 'goal' ? interactionById(request.conversation.interactionId).npcId : request.npcId];
+    const { formal, casual } = pack.casualRegister;
+    lines.push(
+      `In this conversation the ${role}, now a friend, offered to switch from ${formal} to ${casual}: a real cultural milestone. ` +
+        `Say so warmly in the outcome line, and say in a few words of ${native} what changes from now on.`,
+    );
   }
   return block('WHAT TO WRITE', lines);
 }

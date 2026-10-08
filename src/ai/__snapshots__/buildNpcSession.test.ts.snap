@@ -1,5 +1,16 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`"the usual?" > has an acquaintance offer the usual, and take a yes as the confirmation 1`] = `
+"YOU AND THIS PERSON
+You know this customer a little: they have come by a good few times.
+Speak to them in a friendly way, as to a familiar face.
+If the customer tells you their name, call learn_name with it as they said it. If it answers "wrong_name", you misheard: apologise and ask them to say it again.
+They always order the same here, their usual: 1 × Latte (menu id "latte").
+When you greet them, ask whether they'll have "the usual", in your own words. If they say yes, that is their confirmation: tell them the price, and call serve_order with exactly their usual. If they want something else, take their order as you would any other.
+
+"
+`;
+
 exports[`buildNpcSession > builds the barista session in the de pack at A1 1`] = `
 {
   "openingScene": "[SCENE: A customer walks up to you. Greet them first.]",
@@ -12726,4 +12737,16 @@ A "[SCENE: ...]" message tells you what is happening; it is not the person speak
     "targetLanguage": "en",
   },
 }
+`;
+
+exports[`the casual register > has a friend offer it once, in Small Talk or a Goal Interaction 1`] = `
+"YOU AND THIS PERSON
+This customer is a friend: you have talked many times, and you are always glad to see them.
+Speak to them warmly, as to a friend, but still politely.
+Greet them by name: Sam.
+Last time you talked about their trip to the seaside. Follow up on it once, naturally, early on.
+You have already told them which gift you would love most.
+Early in the conversation, once, offer them the du ("Wollen wir uns duzen?"): to say du to each other instead of Sie, as friends do. It's a small milestone between you, so make it warm; if they would rather keep things formal, that's fine.
+
+"
 `;

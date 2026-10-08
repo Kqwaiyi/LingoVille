@@ -14,7 +14,7 @@ import {
   type ToolResponse,
 } from '../ai/index.ts';
 import { CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction } from '../content/index.ts';
-import { LANGUAGE_CODES, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
+import { FAMILIARITY, LANGUAGE_CODES, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
@@ -616,9 +616,11 @@ const STRANGER: NpcMemory = {
   timesMet: 0,
   knowsName: false,
   usualOrder: null,
+  lastOrder: null,
   lastTopic: null,
   favouriteKnown: false,
   lastGiftDay: null,
+  lastOnTheHouseDay: null,
   registerOffered: false,
 };
 
@@ -1092,5 +1094,52 @@ describe('mock VoiceSession: the restaurant (#8, #9, #10, #11)', () => {
     const { turns } = await open(session);
 
     expect(turns[0]).toContain(formatLocalMoney(owed, packId));
+  });
+});
+
+describe('mock VoiceSession: "the usual?"', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const USUAL = { items: [{ item: 'tea', quantity: 2 }] };
+
+  async function regular(packId: LanguageCode) {
+    const heard = listen();
+    const memory: NpcMemory = {
+      ...STRANGER,
+      familiarity: FAMILIARITY.tierThresholds.acquaintance,
+      usualOrder: { interactionId: INTERACTIONS.orderDrink.id, args: USUAL },
+    };
+    const npcSession = buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.barista, {
+      clock: { day: 2, minuteOfDay: 600 },
+      relationship: { memory, characterName: 'Sam' },
+    });
+    const session = openMockVoiceSession(npcSession, heard.events);
+    await session.connect();
+    await vi.runAllTimersAsync();
+    const say = async (text: string) => {
+      session.sendText(text);
+      await vi.runAllTimersAsync();
+    };
+    return { ...heard, say };
+  }
+
+  it.each(LANGUAGE_CODES)('offers the usual in the %s pack, and serves it on a yes', async (packId) => {
+    const { turns, toolCalls, say } = await regular(packId);
+    const yes = { ja: 'はい、お願いします', zh: '好', en: 'Yes please', de: 'Ja, gerne' }[packId];
+
+    expect(turns[0]).toBe({ ja: 'いらっしゃいませ！いつものでいいですか？', zh: '欢迎光临！还是老样子吗？', en: 'Hiya! The usual?', de: 'Hallo! Wie immer?' }[packId]);
+    await say(yes);
+
+    expect(toolCalls).toMatchObject([{ name: 'serve_order', args: USUAL }]);
+  });
+
+  it('takes an order as usual when the Player wants something else', async () => {
+    const { turns, toolCalls, say } = await regular('en');
+
+    await say('A latte, please');
+
+    expect(turns.at(-1)).toMatch(/latte.*Is that right\?/i);
+    expect(toolCalls).toEqual([]);
   });
 });

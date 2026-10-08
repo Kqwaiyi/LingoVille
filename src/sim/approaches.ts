@@ -1,14 +1,17 @@
 import { isOpen, type OpeningHours } from './clock.ts';
 import { faintedBetween } from './faint.ts';
 import { announceNewcomerDiscount, newcomerDiscountStepDownDue } from './newcomerDiscount.ts';
+import type { NamedNpcId } from '../content/index.ts';
 import { rentDebt } from './rent.ts';
+import { randomInt } from './rng.ts';
 import type { GameState } from './state.ts';
 
 /**
  * The times an NPC starts a conversation with the Character by themselves,
  * without the Player pressing E: the nurse when the Character wakes from
  * Fainting, and the landlord in the hallway about rent or the Newcomer
- * Discount. Later: the doctor calling the Character's name, park regulars waving them over.
+ * Discount. Park regulars waving the Character over open Small Talk instead (`parkWaveDue`).
+ * Later: the doctor calling the Character's name.
  */
 export const APPROACH_IDS = ['nurseOnWaking', 'landlordRentDue', 'landlordDiscountStepDown'] as const;
 export type ApproachId = (typeof APPROACH_IDS)[number];
@@ -50,4 +53,15 @@ export function hallwayApproach(state: GameState, landlordHours: OpeningHours): 
 export function hallwayApproachMade(state: GameState, approachId: HallwayApproachId): GameState {
   if (approachId === 'landlordDiscountStepDown') return announceNewcomerDiscount(state);
   return { ...state, rent: { ...state.rent, remindedOnDay: state.clock.day } };
+}
+
+/** The Character has just come into the park, and no park regular has waved them over yet today. */
+export function parkWaveDue(before: GameState, after: GameState): boolean {
+  return before.placeId !== 'park' && after.placeId === 'park' && after.parkWavedOnDay !== after.clock.day;
+}
+
+/** One of the park `regulars`, drawn from the save's RNG, waves the Character over: that's today's wave. */
+export function parkWaveMade(state: GameState, regulars: readonly NamedNpcId[]): { state: GameState; npcId: NamedNpcId } {
+  const draw = randomInt(state.rngState, 0, regulars.length - 1);
+  return { state: { ...state, rngState: draw.rngState, parkWavedOnDay: state.clock.day }, npcId: regulars[draw.value]! };
 }

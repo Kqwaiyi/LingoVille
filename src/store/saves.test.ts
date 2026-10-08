@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { createStore, get, keys, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
 import { menuPrice } from '../content/index.ts';
-import { createSave, weeklyRent, type GameState, type ShiftCustomer } from '../sim/index.ts';
+import { createSave, weeklyRent, type GameState, type NpcMemory, type ShiftCustomer } from '../sim/index.ts';
 import { createSaves, DEV_SETUP, SAVE_SCHEMA_VERSION, SLOT_IDS } from './index.ts';
 
 let databases = 0;
@@ -70,9 +70,11 @@ function lived(): GameState {
         timesMet: 3,
         knowsName: true,
         usualOrder: { interactionId: 'order-drink', args: { items: [{ item: 'latte', quantity: 1 }] } },
+        lastOrder: null,
         lastTopic: 'the house blend',
         favouriteKnown: false,
         lastGiftDay: null,
+        lastOnTheHouseDay: null,
         registerOffered: false,
       },
     },
@@ -93,11 +95,26 @@ function beforeShifts() {
   return { ...game, progression, possessions: { ...game.possessions, shift: null } };
 }
 
+/** The game before regulars: version 14. No order run or "on the house" day in NPC Memory, and no park wave. */
+function beforeRegulars() {
+  const game: Partial<GameState> = { ...lived() };
+  delete game.parkWavedOnDay;
+  const people = Object.fromEntries(
+    Object.entries(game.people!).map(([npcId, memory]) => {
+      const old: Partial<NpcMemory> = { ...memory };
+      delete old.lastOrder;
+      delete old.lastOnTheHouseDay;
+      return [npcId, old];
+    }),
+  );
+  return { ...game, people } as Omit<GameState, 'parkWavedOnDay'>;
+}
+
 /** The game before the Character could eat at the restaurant: version 12. No table, no bill. */
 function beforeRestaurantBills() {
-  const game: Partial<GameState> = { ...lived() };
+  const game: Partial<ReturnType<typeof beforeRegulars>> = { ...beforeRegulars() };
   delete game.restaurant;
-  return game as Omit<GameState, 'restaurant'>;
+  return game as Omit<ReturnType<typeof beforeRegulars>, 'restaurant'>;
 }
 
 /** The game before restaurant tables: version 11. A Shift Customer had no table. */
@@ -405,6 +422,28 @@ describe('saves', () => {
     await saves.write('slot-1', game);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(game);
+  });
+
+  it('upgrades a save from before regulars with no order run, no "on the house" yet and no park wave today', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 14, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeRegulars() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('keeps being a regular as it was: the order run, the last "on the house", the casual register and the park wave', async () => {
+    const { saves } = freshSaves();
+    const game = lived();
+    const barista: NpcMemory = {
+      ...game.people.barista!,
+      lastOrder: { interactionId: 'order-drink', args: { items: [{ item: 'latte', quantity: 1 }] }, inARow: 4 },
+      lastOnTheHouseDay: 2,
+      registerOffered: true,
+    };
+    const regular: GameState = { ...game, parkWavedOnDay: 3, people: { barista } };
+    await saves.write('slot-1', regular);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(regular);
   });
 
   it("keeps a restaurant table as it was: each diner's dish, drink and dietary need", async () => {

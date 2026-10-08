@@ -11,7 +11,7 @@ import {
   type ToolResponse,
 } from '../ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, placeHours, type ItemId, type TownNpcId } from '../content/index.ts';
-import { createSave, FAMILIARITY, memoryOf, MOOD, type GameState, type NpcMemory } from '../sim/index.ts';
+import { createSave, FAMILIARITY, memoryOf, MOOD, rollOnTheHouse, type GameState, type NpcMemory } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
   createGameStore,
@@ -73,8 +73,9 @@ function town(game: GameState = createSave(DEV_SETUP)) {
   return { store, npc, recaps, journal };
 }
 
-function nextTo(npcId: TownNpcId, placeId: GameState['placeId'], game?: GameState) {
-  const setup = town(game);
+function nextTo(npcId: TownNpcId, placeId: GameState['placeId'], game: GameState = createSave(DEV_SETUP)) {
+  // In the park, a regular has already waved the Character over today, so it's the Player who starts any chat.
+  const setup = town(placeId === 'park' ? { ...game, parkWavedOnDay: game.clock.day } : game);
   setup.store.getState().enterPlace(placeId);
   setup.store.getState().setInteractable(npcId);
   return setup;
@@ -456,5 +457,167 @@ describe('what the NPC remembers, in the session', () => {
 
     const patience = (s: typeof stranger) => selectConversation(s.store.getState())!.patience.starting;
     expect(patience(friend)).toBe(patience(stranger) + FAMILIARITY.friendPatienceBonus);
+  });
+});
+
+describe('park regulars waving the Player over', () => {
+  /** Out at the tram stop on `day`, about to walk into the park. */
+  function atTheTramStop(day = 3) {
+    const game = createSave(DEV_SETUP);
+    const setup = town({ ...game, placeId: 'tram-stop', clock: { day, minuteOfDay: 10 * 60 } });
+    return setup;
+  }
+
+  it('has a park regular wave the Character over as they come into the park, and speak first', () => {
+    const { store, npc } = atTheTramStop();
+
+    store.getState().enterPlace('park');
+
+    const conversation = selectConversation(store.getState());
+    expect(conversation?.smallTalk).not.toBeNull();
+    expect(NAMED_NPCS[conversation!.npcId!].placeId).toBe('park');
+    expect(npc.session?.openingScene).toMatch(/^\[SCENE: .*wave them over.*\]$/);
+    expect(store.getState().heldStill).toBe(true);
+  });
+
+  it('waves at most once a day', () => {
+    const { store } = atTheTramStop();
+    store.getState().enterPlace('park');
+    store.getState().leaveConversation();
+
+    store.getState().enterPlace('tram-stop');
+    store.getState().enterPlace('park');
+    expect(selectConversation(store.getState())).toBeNull();
+
+    const game = store.getState().game;
+    store.setState({ game: { ...game, clock: { day: game.clock.day + 1, minuteOfDay: 9 * 60 } } });
+    store.getState().enterPlace('tram-stop');
+    store.getState().enterPlace('park');
+    expect(selectConversation(store.getState())?.smallTalk).not.toBeNull();
+  });
+});
+
+/** The barista, a friend who knows the Character's name, as `memory` changes. */
+function friendlyBarista(change: Partial<NpcMemory> = {}, game = createSave(DEV_SETUP)): GameState {
+  const friend: NpcMemory = { ...memoryOf(game, 'barista'), familiarity: FAMILIARITY.tierThresholds.friend, knowsName: true, ...change };
+  return { ...game, people: { barista: friend } };
+}
+
+/** Small Talk with the barista, who has greeted the Character. */
+function chattingAtTheCafe(game: GameState) {
+  const setup = nextTo('barista', 'cafe', game);
+  setup.store.getState().talk('T');
+  setup.npc.says('あ、こんにちは！');
+  return setup;
+}
+
+describe('the casual register', () => {
+  it('is offered by a friend, and noted in the Recap once the chat is over', () => {
+    const setup = chattingAtTheCafe(friendlyBarista());
+    expect(setup.npc.session?.systemInstruction).toContain(CULTURE_PACKS.ja.casualRegister.offer);
+
+    chatToTheEnd(setup);
+
+    expect(memoryOf(setup.store.getState().game, 'barista').registerOffered).toBe(true);
+    expect(setup.recaps[0]!.request).toMatchObject({ kind: 'smallTalk', registerOffered: true });
+  });
+
+  it('is offered only once', () => {
+    const offered = chattingAtTheCafe(friendlyBarista());
+    chatToTheEnd(offered);
+    offered.store.getState().leaveConversation();
+
+    offered.store.getState().talk('T');
+
+    expect(offered.npc.session?.systemInstruction).not.toContain(CULTURE_PACKS.ja.casualRegister.offer);
+    expect(offered.npc.session?.systemInstruction).toContain(CULTURE_PACKS.ja.casualRegister.inUse);
+  });
+
+  it('is offered again next time when the Player left before the chat was over', () => {
+    const setup = chattingAtTheCafe(friendlyBarista());
+
+    setup.store.getState().leaveConversation();
+
+    expect(memoryOf(setup.store.getState().game, 'barista').registerOffered).toBe(false);
+  });
+
+  it('is noted in the Recap of a Goal Interaction too, and not when it was offered before', () => {
+    const recapOf = (game: GameState) => {
+      const { store, npc, recaps } = nextTo('barista', 'cafe', game);
+      store.getState().talk('E');
+      npc.says('いらっしゃいませ！');
+      npc.calls('serve_order', { items: [{ item: 'latte', quantity: 1 }] });
+      npc.says('ありがとうございました！');
+      return recaps[0]!.request;
+    };
+    const withMoney = (game: GameState): GameState => ({ ...game, character: { ...game.character, moneyInShifts: 5 } });
+
+    expect(recapOf(withMoney(friendlyBarista()))).toMatchObject({ kind: 'goal', registerOffered: true });
+    expect(recapOf(withMoney(friendlyBarista({ registerOffered: true })))).not.toHaveProperty('registerOffered');
+  });
+});
+
+describe('the casual register, when the NPC came over', () => {
+  it('is not offered by a friend who came over with something to say: the landlord about rent', () => {
+    const game = createSave(DEV_SETUP);
+    const landlord: NpcMemory = { ...memoryOf(game, 'landlord'), familiarity: FAMILIARITY.tierThresholds.friend };
+    const rentDay: GameState = { ...game, clock: { day: game.rent.dueDay, minuteOfDay: 9 * 60 }, people: { landlord } };
+    const { store, npc } = town(rentDay);
+
+    store.getState().setInteractable('landlord');
+
+    expect(selectConversation(store.getState())?.npcId).toBe('landlord');
+    expect(npc.session?.systemInstruction).not.toContain(CULTURE_PACKS.ja.casualRegister.offer);
+  });
+});
+
+describe('"on the house"', () => {
+  /** A friendly barista on a day whose roll gives something on the house, or (`given: false`) doesn't. */
+  function friendWhoRolls(given: boolean): GameState {
+    for (let seed = 1; ; seed++) {
+      const game = friendlyBarista({}, createSave({ ...DEV_SETUP, rngSeed: seed }));
+      if (rollOnTheHouse(game, INTERACTIONS.orderDrink).onTheHouse === given) return game;
+    }
+  }
+
+  it("has a friend add a little something to the order now and then, as the save's RNG draws it", () => {
+    const lucky = nextTo('barista', 'cafe', friendWhoRolls(true));
+    const unlucky = nextTo('barista', 'cafe', friendWhoRolls(false));
+    lucky.store.getState().talk('E');
+    unlucky.store.getState().talk('E');
+
+    expect(lucky.npc.session?.systemInstruction).toMatch(/on the house/);
+    expect(unlucky.npc.session?.systemInstruction).not.toMatch(/on the house/);
+  });
+
+  /** Orders a latte from the barista, who serves it. */
+  function orderALatte({ store, npc }: ReturnType<typeof nextTo>) {
+    store.getState().talk('E');
+    npc.says('いらっしゃいませ！');
+    npc.calls('serve_order', { items: [{ item: 'latte', quantity: 1 }] });
+    npc.says('ありがとうございました！');
+    store.getState().leaveConversation();
+  }
+
+  it('comes at most once a week, counted from the order it came with', () => {
+    const lucky = friendWhoRolls(true);
+    const setup = nextTo('barista', 'cafe', { ...lucky, character: { ...lucky.character, moneyInShifts: 50 } });
+    orderALatte(setup);
+    expect(setup.npc.session?.systemInstruction).toMatch(/on the house/);
+
+    for (let i = 0; i < 30; i++) {
+      setup.store.getState().talk('E');
+      expect(setup.npc.session?.systemInstruction).not.toMatch(/on the house/);
+      setup.store.getState().leaveConversation();
+    }
+  });
+
+  it('uses up nothing when the Player leaves before the order is served', () => {
+    const { store } = nextTo('barista', 'cafe', friendWhoRolls(true));
+    store.getState().talk('E');
+
+    store.getState().leaveConversation();
+
+    expect(memoryOf(store.getState().game, 'barista').lastOnTheHouseDay).toBeNull();
   });
 });

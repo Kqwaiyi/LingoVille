@@ -33,7 +33,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 14;
+export const SAVE_SCHEMA_VERSION = 15;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -48,9 +48,11 @@ const NpcMemorySchema = z.object({
   timesMet: z.int().min(0),
   knowsName: z.boolean(),
   usualOrder: z.object({ interactionId: z.enum(INTERACTION_IDS), args: z.unknown() }).nullable(),
+  lastOrder: z.object({ interactionId: z.enum(INTERACTION_IDS), args: z.unknown(), inARow: z.int().min(1) }).nullable(),
   lastTopic: z.string().nullable(),
   favouriteKnown: z.boolean(),
   lastGiftDay: day.nullable(),
+  lastOnTheHouseDay: day.nullable(),
   registerOffered: z.boolean(),
 });
 
@@ -109,6 +111,7 @@ const GameStateSchema = z.object({
     z.object({ debtKind: z.enum(DEBT_KINDS), instalmentInShifts: z.number().min(0), nextDueDay: day }),
   ),
   wokeInWardOnDay: day.nullable(),
+  parkWavedOnDay: day.nullable(),
   proficiencyStep: z.enum(PROFICIENCY_STEPS),
   progression: z.object({
     proficiencyScore: z.number().min(0),
@@ -285,6 +288,13 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       ITEM_IDS.includes(line.itemId) ? { ...line, priceInShifts: menuPrice(line.itemId, identity.culturePackId) } : line,
     );
     return { ...save, schemaVersion: 14, game: { ...save.game, restaurant: { ...restaurant, bill } } };
+  },
+  // 14 → 15: regulars. No order run toward a usual was counted, no one gave anything on the house, and no park regular waved today.
+  (save) => {
+    const people = Object.fromEntries(
+      Object.entries(save.game.people as Record<string, object>).map(([npcId, memory]) => [npcId, { ...memory, lastOrder: null, lastOnTheHouseDay: null }]),
+    );
+    return { ...save, schemaVersion: 15, game: { ...save.game, people, parkWavedOnDay: null } };
   },
 ];
 

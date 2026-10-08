@@ -69,6 +69,30 @@ describe('buildRecapRequest', () => {
     ).toMatchSnapshot();
   });
 
+  it('notes a friend offering the casual register, in Small Talk', () => {
+    const offered: RecapRequest = {
+      kind: 'smallTalk',
+      culturePackId: 'de',
+      step: 'B1',
+      nativeLanguage: 'ja',
+      npcId: 'barista',
+      registerOffered: true,
+      transcript: [
+        { speaker: 'npc', text: 'Sag mal, wollen wir uns nicht duzen? Ich bin Lena.' },
+        { speaker: 'player', text: 'Gern! Ich bin Sam.' },
+      ],
+      helpLog: [],
+    };
+
+    expect(buildRecapRequest(offered)).toMatchSnapshot();
+    expect(text(offered)).toMatch(/offered to switch from Sie to du/);
+  });
+
+  it('notes a friend offering the casual register in a Goal Interaction too, and only when they did', () => {
+    expect(text({ ...goal, registerOffered: true })).toMatch(/offered to switch from 您 to 你/);
+    expect(text(goal)).not.toMatch(/offered to switch/);
+  });
+
   it('builds one combined Recap for a whole Shift', () => {
     expect(buildRecapRequest(shift)).toMatchSnapshot();
   });

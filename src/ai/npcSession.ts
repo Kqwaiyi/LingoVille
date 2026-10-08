@@ -13,6 +13,7 @@ import {
 import {
   familiarityTier,
   isFamiliarAtLeast,
+  usualOffered,
   weekdayOf,
   type ApproachId,
   type Basket,
@@ -52,12 +53,20 @@ export type NpcSessionContext = {
   restaurantDebt?: number;
   /** What the NPC remembers of the Character, and the Character's name for when they know it. With none, they are strangers. */
   relationship?: Relationship;
+  /** A friend adds a little something "on the house" to this order: flavour only, the game drew it. */
+  onTheHouse?: true;
+  /** A friend offers, this once, to switch to the casual register (Sie→du, keigo→タメ口). The game decides when. */
+  offersCasualRegister?: true;
 };
 
 export type Relationship = { memory: NpcMemory; characterName: string };
 
 /** What the context of a Small Talk session holds: no goal, so no basket, rent, bill or approach, and always what the NPC remembers. */
-export type SmallTalkContext = Pick<NpcSessionContext, 'clock'> & { relationship: Relationship };
+export type SmallTalkContext = Pick<NpcSessionContext, 'clock' | 'offersCasualRegister'> & {
+  relationship: Relationship;
+  /** A park regular saw the Character come into the park and waved them over, so they speak first. */
+  wavedOver?: true;
+};
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
 export const LEARN_NAME_TOOL = 'learn_name';
@@ -285,11 +294,22 @@ const learnNameLine = (who: string) =>
 const KNOWN_NAME_UNUSED = "They have told you their name, but you don't know them well enough to use it yet.";
 
 /** What the NPC remembers of the Character from NPC Memory: how well they know them, by what name, and what they talked about last. */
-function rememberedLines({ memory, characterName }: Relationship, who: string, unknownName = learnNameLine(who)): string[] {
+function rememberedLines(
+  { memory, characterName }: Relationship,
+  who: string,
+  { casualRegister }: CulturePack,
+  offersCasualRegister: boolean,
+  unknownName = learnNameLine(who),
+): string[] {
   const tier = familiarityTier(memory);
   const lines =
     tier === 'friend'
-      ? [`This ${who} is a friend: you have talked many times, and you are always glad to see them.`, 'Speak to them warmly, as to a friend, but still politely.']
+      ? [
+          `This ${who} is a friend: you have talked many times, and you are always glad to see them.`,
+          memory.registerOffered
+            ? `Speak to them warmly, as to a friend. ${casualRegister.inUse} If they would still rather keep it formal, follow their lead.`
+            : 'Speak to them warmly, as to a friend, but still politely.',
+        ]
       : tier === 'acquaintance'
         ? [`You know this ${who} a little: they have come by a good few times.`, 'Speak to them in a friendly way, as to a familiar face.']
         : [`This ${who} is a stranger: you don't really know them yet.`, `Speak to them politely, as you would to any ${who}.`];
@@ -299,16 +319,54 @@ function rememberedLines({ memory, characterName }: Relationship, who: string, u
     lines.push(`Last time you talked about ${memory.lastTopic}. Follow up on it once, naturally, early on.`);
   }
   if (memory.favouriteKnown) lines.push('You have already told them which gift you would love most.');
+  if (offersCasualRegister) {
+    lines.push(
+      `Early in the conversation, once, ${casualRegister.offer}. It's a small milestone between you, so make it warm; ` +
+        "if they would rather keep things formal, that's fine.",
+    );
+  }
   return lines;
 }
 
-function youAndThisPersonBlock(interaction: Interaction, who: string, relationship: Relationship | undefined) {
+/**
+ * "The usual?": what the Character always orders in this interaction, which the NPC offers, and takes a yes to as
+ * the confirmation. None unless the NPC knows them well enough and this is where they order it.
+ */
+function usualLines(interaction: Interaction, memory: NpcMemory, pack: CulturePack): string[] {
+  const usual = usualOffered(memory, interaction);
+  const completion = usual === null ? null : interaction.resolveCompletion(usual, pack.id);
+  if (!completion?.success) return [];
+  const order = completion.lines.map(({ itemId, name, quantity }) => `${quantity} × ${name} (menu id "${itemId}")`).join(', ');
+  const { name } = interaction.completion;
+  return [
+    `They always order the same here, their usual: ${order}.`,
+    `When you greet them, ask whether they'll have "the usual", in your own words. If they say yes, that is their confirmation: ` +
+      `tell them the price, and call ${name} with exactly their usual. If they want something else, take their order as you would any other.`,
+  ];
+}
+
+/** A friend's little something "on the house" with the order. It is a gift, so the order and its price stay as they are. */
+const onTheHouseLine = (interaction: Interaction) =>
+  'Today, because they are a friend, add a little something on the house when you hand over their order (a biscuit with a coffee, say, ' +
+  `or whatever suits what they ordered), and mention it once, warmly. It is a gift from you: it changes nothing about the order you call ` +
+  `${interaction.completion.name} with, or its price.`;
+
+function youAndThisPersonBlock(
+  interaction: Interaction,
+  who: string,
+  { relationship, onTheHouse, offersCasualRegister }: Pick<NpcSessionContext, 'relationship' | 'onTheHouse' | 'offersCasualRegister'>,
+  pack: CulturePack,
+) {
   // Someone the NPC has got to know is met as such, whatever the conversation.
   // Hiring asks for the name itself, so there's no learn_name to call.
   const hiring = interaction.effect.kind === 'hire';
   if (relationship && familiarityTier(relationship.memory) !== 'stranger') {
     const unknownName = hiring ? "You don't know their name yet; asking for it is part of hiring them." : learnNameLine(who);
-    return block('YOU AND THIS PERSON', rememberedLines(relationship, who, unknownName));
+    return block('YOU AND THIS PERSON', [
+      ...rememberedLines(relationship, who, pack, offersCasualRegister === true, unknownName),
+      ...usualLines(interaction, relationship.memory, pack),
+      ...(onTheHouse ? [onTheHouseLine(interaction)] : []),
+    ]);
   }
   if (hiring) {
     return block('YOU AND THIS PERSON', [
@@ -450,9 +508,9 @@ function goalBlock(interaction: Interaction, who: string) {
   ]);
 }
 
-function situationBlock(context: NpcSessionContext, who: string) {
-  const { day, minuteOfDay } = context.clock;
-  const first = context.approach
+function situationBlock({ clock }: Pick<NpcSessionContext, 'clock'>, who: string, approached: boolean) {
+  const { day, minuteOfDay } = clock;
+  const first = approached
     ? 'The first one tells you why you are speaking to them: you speak first.'
     : `The first one means a ${who} has just walked up to you: greet them first.`;
   return block('THE SITUATION', [
@@ -476,12 +534,12 @@ export function buildNpcSession(
   const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    youAndThisPersonBlock(interaction, who, context.relationship),
+    youAndThisPersonBlock(interaction, who, context, culturePack),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
     factsBlock(interaction, culturePack, context),
     goalBlock(interaction, who),
-    situationBlock(context, who),
+    situationBlock(context, who, context.approach !== undefined),
   ].join('\n\n');
 
   return {
@@ -521,17 +579,19 @@ export function buildSmallTalkSession(culturePack: CulturePack, proficiencyStep:
   const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    block('YOU AND THIS PERSON', rememberedLines(context.relationship, who)),
+    block('YOU AND THIS PERSON', rememberedLines(context.relationship, who, culturePack, context.offersCasualRegister === true)),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
     smallTalkGoalBlock(npc, who),
-    situationBlock(context, who),
+    situationBlock(context, who, context.wavedOver === true),
   ].join('\n\n');
 
   return {
     systemInstruction,
     tools: [learnNameTool(who), revealFavouriteTool(who), notUnderstoodTool(who)],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
-    openingScene: `[SCENE: A ${who} you might chat with comes up to you. Greet them first.]`,
+    openingScene: context.wavedOver
+      ? `[SCENE: You see a ${who} you might chat with coming into the park, and wave them over. Speak to them first.]`
+      : `[SCENE: A ${who} you might chat with comes up to you. Greet them first.]`,
   };
 }

@@ -214,9 +214,11 @@ describe('the Recap', () => {
       timesMet: 3,
       knowsName: true,
       usualOrder: null,
+      lastOrder: null,
       lastTopic: null,
       favouriteKnown: false,
       lastGiftDay: null,
+      lastOnTheHouseDay: null,
       registerOffered: false,
     };
     regular.store.setState({ game: { ...game, people: { barista: memory } } });

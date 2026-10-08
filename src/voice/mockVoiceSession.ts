@@ -1417,6 +1417,45 @@ const SMALL_TALK_SCRIPT: Record<LanguageCode, SmallTalkScript> = {
   },
 };
 
+/** How a regular is asked whether they'll have their usual. */
+const USUAL_GREETING: Record<LanguageCode, string> = {
+  ja: 'いらっしゃいませ！いつものでいいですか？',
+  zh: '欢迎光临！还是老样子吗？',
+  en: 'Hiya! The usual?',
+  de: 'Hallo! Wie immer?',
+};
+
+/** The Character's usual, as the session's "You and this person" block names it, or null if the NPC doesn't offer one. */
+function readUsual(systemInstruction: string): { items: { item: string; quantity: number }[] } | null {
+  const usual = /their usual: (.+)\.$/m.exec(systemInstruction)?.[1];
+  if (!usual) return null;
+  return { items: [...usual.matchAll(/(\d+) × [^(]+ \(menu id "([a-z-]+)"\)/g)].map(([, quantity, item]) => ({ item: item!, quantity: Number(quantity) })) };
+}
+
+/**
+ * A regular's order: the NPC greets them with "the usual?" and serves it on a yes, completing with `toolName`. Anything
+ * else is an order taken as usual by `npc`.
+ */
+function offeringTheUsual(npc: Npc, usual: ReturnType<typeof readUsual>, script: OrderScript, packId: LanguageCode, act: Act, toolName = SERVE_ORDER): Npc {
+  if (!usual) return npc;
+  let offered = true;
+  return {
+    ...npc,
+    greeting: USUAL_GREETING[packId],
+    hear: (line) => {
+      const { yes, no } = script.words;
+      const accepted = offered && mentions(line, yes) && !mentions(line, no);
+      offered = false;
+      if (!accepted) return npc.hear(line);
+      act.call(toolName, usual, (response) => {
+        if (response.result === 'served') act.say(script.served);
+        else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
+        else act.say(script.askAgain);
+      });
+    },
+  };
+}
+
 /** Small Talk: a reply to each line it understands, in turn; a name it's told goes to learn_name. */
 function smallTalkNpc(script: SmallTalkScript, introductions: readonly string[], act: Act): Npc {
   let replies = 0;
@@ -1735,6 +1774,7 @@ function castNpc(session: NpcSession, act: Act): Npc {
   }
   if (offers(DISCHARGE_PATIENT)) return wardNpc(WARD_SCRIPT[packId], act);
   const isShopkeeper = 'npcId' in session.voice && session.voice.npcId === 'shopkeeper';
+  const usual = readUsual(session.systemInstruction);
   const { words } = SCRIPT[packId];
   if (offers(ACCEPT_RENT)) return rentNpc(LANDLORD_SCRIPT[packId], words, session, act);
   if (offers(GRANT_EXTENSION)) return extensionNpc(LANDLORD_SCRIPT[packId], words, act);
@@ -1746,18 +1786,19 @@ function castNpc(session: NpcSession, act: Act): Npc {
     const recommending = session.tools.find((tool) => tool.name === SERVE_ORDER)?.parameters?.properties?.restriction !== undefined;
     const menu = itemsIn(session, SERVE_ORDER);
     if (recommending) return recommendNpc(SERVER_SCRIPT[packId], SERVER_ORDER_SCRIPT[packId], menu, packId, act);
-    return orderNpc(SERVER_ORDER_SCRIPT[packId], menu, packId, act);
+    return offeringTheUsual(orderNpc(SERVER_ORDER_SCRIPT[packId], menu, packId, act), usual, SERVER_ORDER_SCRIPT[packId], packId, act);
   }
   if (isShopkeeper && offers(COMPLETE_PURCHASE)) {
     const items = itemsIn(session, COMPLETE_PURCHASE);
     const wraps = session.tools.find((tool) => tool.name === COMPLETE_PURCHASE)?.parameters?.properties?.wrap !== undefined;
     if (wraps) return giftNpc(GIFT_SCRIPT[packId], SCRIPT[packId], items, packId, act);
-    return orderNpc(BOOKSHOP_SCRIPT[packId], items, packId, act, COMPLETE_PURCHASE);
+    const bookshop = orderNpc(BOOKSHOP_SCRIPT[packId], items, packId, act, COMPLETE_PURCHASE);
+    return offeringTheUsual(bookshop, usual, BOOKSHOP_SCRIPT[packId], packId, act, COMPLETE_PURCHASE);
   }
   if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
   const script = 'npcId' in session.voice && session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
-  return orderNpc(script, itemsIn(session, SERVE_ORDER), packId, act);
+  return offeringTheUsual(orderNpc(script, itemsIn(session, SERVE_ORDER), packId, act), usual, script, packId, act);
 }
 
 /**
@@ -1778,7 +1819,8 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * (bag, points card, anything from behind the counter, the cash it hands over); one at a restaurant table orders
  * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. The server
  * asks how many and where to sit and seats the guest, takes a meal order the barista's way, recommends a dish that
- * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. In Small Talk it
+ * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. Taking a regular's order, it
+ * greets them with "the usual?" and serves it on a yes. In Small Talk it
  * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Any Named NPC,
  * in any conversation, thanks the Character for a gift (more warmly for their favourite), and asked what gift they
  * would like, calls reveal_favourite and says their favourite by its local name. Each calls

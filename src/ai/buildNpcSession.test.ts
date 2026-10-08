@@ -311,9 +311,11 @@ const STRANGER: NpcMemory = {
   timesMet: 0,
   knowsName: false,
   usualOrder: null,
+  lastOrder: null,
   lastTopic: null,
   favouriteKnown: false,
   lastGiftDay: null,
+  lastOnTheHouseDay: null,
   registerOffered: false,
 };
 const FRIEND: NpcMemory = {
@@ -392,6 +394,101 @@ describe('buildNpcSession: you and this person', () => {
   });
 });
 
+const LATTE = { items: [{ item: 'latte', quantity: 1 }] };
+const ACQUAINTANCE_WITH_A_USUAL: NpcMemory = {
+  ...STRANGER,
+  familiarity: FAMILIARITY.tierThresholds.acquaintance,
+  usualOrder: { interactionId: 'order-drink', args: LATTE },
+};
+
+describe('"the usual?"', () => {
+  it('has an acquaintance offer the usual, and take a yes as the confirmation', () => {
+    expect(youAndThisPerson(baristaWho(ACQUAINTANCE_WITH_A_USUAL))).toMatchSnapshot();
+  });
+
+  it('names the usual by its local name and menu id, for the completion call', () => {
+    const lines = youAndThisPerson(baristaWho(ACQUAINTANCE_WITH_A_USUAL));
+
+    expect(lines).toContain(`1 × ${CULTURE_PACKS.en.goods.latte.name} (menu id "latte")`);
+    expect(lines).toMatch(/call serve_order with exactly their usual/);
+  });
+
+  it('is not offered by a stranger, or in another interaction with the same NPC', () => {
+    const stranger = { ...ACQUAINTANCE_WITH_A_USUAL, familiarity: 0 };
+    const hiring = buildNpcSession(INTERACTIONS.askBaristaForWork, CULTURE_PACKS.en, 'B1', NAMED_NPCS.barista, {
+      clock: FIRST_MORNING_CLOCK,
+      relationship: { memory: ACQUAINTANCE_WITH_A_USUAL, characterName: 'Sam' },
+    });
+
+    expect(baristaWho(stranger)).not.toMatch(/the usual/);
+    expect(hiring.systemInstruction).not.toMatch(/the usual/);
+    expect(smallTalk('barista', ACQUAINTANCE_WITH_A_USUAL).systemInstruction).not.toMatch(/the usual/);
+  });
+});
+
+describe('"on the house"', () => {
+  function friendlyBarista(onTheHouse: boolean) {
+    return buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS.en, 'B1', NAMED_NPCS.barista, {
+      clock: FIRST_MORNING_CLOCK,
+      relationship: { memory: FRIEND, characterName: 'Sam' },
+      ...(onTheHouse && { onTheHouse }),
+    }).systemInstruction;
+  }
+
+  it('has a friend add a little something on the house, without changing the order or its price', () => {
+    const lines = youAndThisPerson(friendlyBarista(true));
+
+    expect(lines).toMatch(/on the house/);
+    expect(lines).toMatch(/changes nothing about the order you call serve_order with, or its price/);
+  });
+
+  it('is only there when the game says so', () => {
+    expect(friendlyBarista(false)).not.toMatch(/on the house/);
+  });
+});
+
+describe('the casual register', () => {
+  /** Small Talk with the barista, a friend, offering the casual register when the game says to. */
+  const offering = (packId: LanguageCode = 'de', memory: NpcMemory = FRIEND) =>
+    youAndThisPerson(
+      buildSmallTalkSession(CULTURE_PACKS[packId], 'A2', NAMED_NPCS.barista, {
+        clock: FIRST_MORNING_CLOCK,
+        relationship: { memory, characterName: 'Sam' },
+        offersCasualRegister: true,
+      }).systemInstruction,
+    );
+
+  it('has a friend offer it once, in Small Talk or a Goal Interaction', () => {
+    const goal = buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS.en, 'B1', NAMED_NPCS.barista, {
+      clock: FIRST_MORNING_CLOCK,
+      relationship: { memory: FRIEND, characterName: 'Sam' },
+      offersCasualRegister: true,
+    });
+
+    expect(offering()).toMatchSnapshot();
+    expect(youAndThisPerson(goal.systemInstruction)).toMatch(/Early in the conversation, once, tell them to drop the "sir"/);
+  });
+
+  it('offers what each pack calls casual: du, タメ口, 你, first names', () => {
+    expect(offering('de')).toContain('du');
+    expect(offering('ja')).toContain('タメ口');
+    expect(offering('zh')).toContain('你');
+    expect(offering('en')).toContain('first name');
+  });
+
+  it('is offered only when the game says so', () => {
+    expect(youAndThisPerson(smallTalk('barista', FRIEND, 'de').systemInstruction)).not.toMatch(/Early in the conversation, once/);
+    expect(youAndThisPerson(baristaWho(FRIEND))).not.toMatch(/Early in the conversation, once/);
+  });
+
+  it('once offered, is how the friend speaks from then on, unless the Character keeps it formal', () => {
+    const lines = youAndThisPerson(smallTalk('barista', { ...FRIEND, registerOffered: true }, 'de').systemInstruction);
+
+    expect(lines).toContain(CULTURE_PACKS.de.casualRegister.inUse);
+    expect(lines).toContain('If they would still rather keep it formal, follow their lead.');
+  });
+});
+
 describe('the favourite gift', () => {
   it('has the NPC tell it only when asked, and call reveal_favourite as they do', () => {
     const { systemInstruction } = smallTalk('park-regular-1');
@@ -467,5 +564,16 @@ describe('buildSmallTalkSession', () => {
 
   it('opens with the Character walking up, so the NPC speaks first', () => {
     expect(smallTalk('shopkeeper').openingScene).toMatch(/^\[SCENE: /);
+  });
+
+  it('opens with a park regular waving the Character over, when they did', () => {
+    const waved = buildSmallTalkSession(CULTURE_PACKS.en, 'A2', NAMED_NPCS['park-regular-2'], {
+      clock: FIRST_MORNING_CLOCK,
+      relationship: { memory: STRANGER, characterName: 'Sam' },
+      wavedOver: true,
+    });
+
+    expect(waved.openingScene).toBe('[SCENE: You see a person you might chat with coming into the park, and wave them over. Speak to them first.]');
+    expect(waved.systemInstruction).toContain('The first one tells you why you are speaking to them: you speak first.');
   });
 });

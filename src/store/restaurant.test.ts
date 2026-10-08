@@ -84,7 +84,7 @@ describe('the restaurant', () => {
     const money = store.getState().game.character.moneyInShifts;
     const owed = menuPrice('pork-dish', 'ja');
 
-    store.getState().enterPlace('park');
+    store.getState().enterPlace('tram-stop');
     store.getState().enterPlace('restaurant');
     store.getState().setInteractable('server');
     expect(store.getState().game.debts).toEqual([{ kind: 'restaurant', amountInShifts: owed }]);

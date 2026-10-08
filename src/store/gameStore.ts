@@ -80,6 +80,8 @@ import {
   applyShiftCustomer,
   cancelShift,
   approachDue,
+  casualRegisterDue,
+  casualRegisterOffered,
   applyRecapEvidence,
   applyShiftEvidence,
   bedUsable,
@@ -96,6 +98,8 @@ import {
   enterPlace,
   hallwayApproach,
   hallwayApproachMade,
+  parkWaveDue,
+  parkWaveMade,
   gameMinutesFor,
   giveGift,
   isGoneOff,
@@ -115,6 +119,8 @@ import {
   npcExpression,
   putBackFromBasket,
   rememberTopic,
+  onTheHouseGiven,
+  rollOnTheHouse,
   rentStatement,
   revealFavourite,
   restaurantDebt,
@@ -491,7 +497,14 @@ type ConversationState = {
   readings: Partial<Record<number, LineReading>>;
   /** The Help used so far, in order, placed relative to the turns. It goes to the Recap. */
   helpLog: HelpLogEntry[];
+  /** A friend offers to switch to the casual register in this conversation: once it reaches its outcome, they have, and the Recap notes it. */
+  offersCasualRegister: boolean;
+  /** A friend adds a little something on the house to this order: once it's served, that's the week's. */
+  onTheHouse: boolean;
 };
+
+/** What a conversation brings with it: the shopping on the counter, and a friend's casual-register offer or little something on the house. */
+type Extras = Partial<Pick<ConversationState, 'basket' | 'offersCasualRegister' | 'onTheHouse'>>;
 
 export type GameStoreDeps = {
   /** How a conversation reaches its NPC. In mock mode the gateway hands it the scripted fake NPC. */
@@ -857,6 +870,9 @@ const relationshipWith = (game: GameState, npcId: NamedNpcId): Relationship => (
 const isAtWork = (npcId: TownNpcId, game: GameState) =>
   isOpen(placeHours(TOWN_NPCS[npcId].hoursId, game.identity.culturePackId), game.clock);
 
+/** The Named NPCs who are regulars at the park, any of whom may wave the Character over. */
+const PARK_REGULARS = Object.values(NAMED_NPCS).flatMap((npc) => (npc.placeId === 'park' ? [npc.id] : []));
+
 /** The trams run now: the tram stop's hours are theirs. */
 const tramsRunning = (game: GameState) => isPlaceOpen('tram-stop', game);
 
@@ -1123,8 +1139,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (conversation) set({ conversation: { ...conversation, ...change } });
     };
 
-    /** The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. */
+    /**
+     * The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. A friend who
+     * offered the casual register in it has now offered it, and an order served with something on the house has had it.
+     */
     const settleOutcome = (game: GameState, outcome: ClosingCard) => {
+      const conversation = get().conversation;
+      const npcId = conversation?.npcId;
+      if (npcId && conversation.offersCasualRegister) game = casualRegisterOffered(game, npcId);
+      if (npcId && conversation.onTheHouse && outcome.kind === 'success') game = onTheHouseGiven(game, npcId);
       set({ game });
       updateConversation({ outcome });
       save();
@@ -1178,6 +1201,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const step = game.proficiencyStep;
       // A Goal Interaction's Recap reads it against its goal; Small Talk gets a lighter one.
       const goal = interaction && outcome.kind !== 'smallTalk' ? { interaction, outcome: outcome.kind } : null;
+      const registerOffered = conversation.offersCasualRegister && { registerOffered: true as const };
       const request: RecapRequest = goal
         ? {
             kind: 'goal',
@@ -1185,8 +1209,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             step,
             nativeLanguage,
             conversation: { interactionId: goal.interaction.id, outcome: goal.outcome, transcript, helpLog },
+            ...registerOffered,
           }
-        : { kind: 'smallTalk', culturePackId, step, nativeLanguage, npcId, transcript, helpLog };
+        : { kind: 'smallTalk', culturePackId, step, nativeLanguage, npcId, transcript, helpLog, ...registerOffered };
       const entry = (recap: Recap | null): NewJournalEntry => {
         const page = {
           npcId,
@@ -1788,10 +1813,16 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       noticeApproach(before, after);
     };
 
-    /** Opens a conversation with a Named NPC, who speaks first: greeting the Character, or saying why they have come over. */
+    /**
+     * Opens a conversation with a Named NPC, who speaks first: greeting the Character, or saying why they have come over.
+     * A friend taking an order may add a little something on the house, drawn now. A friend the Player went up to may
+     * offer the casual register; one who came over with something to say (the landlord about rent) doesn't.
+     */
     const startConversation = (interaction: Interaction, approach: ApproachId | null) => {
-      const { game } = get();
+      const { state: game, onTheHouse } = rollOnTheHouse(get().game, interaction);
+      set({ game });
       const npc = NAMED_NPCS[interaction.npcId];
+      const offersCasualRegister = !approach && casualRegisterDue(memoryOf(game, npc.id));
       const sessionFor: SessionFor = (onCounter) =>
         buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
           clock: game.clock,
@@ -1800,33 +1831,46 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
           ...(interaction.effect.kind === 'settleBill' && { bill: game.restaurant.bill, restaurantDebt: restaurantDebt(game) }),
           relationship: relationshipWith(game, npc.id),
+          ...(onTheHouse && { onTheHouse }),
+          ...(offersCasualRegister && { offersCasualRegister }),
         });
       // An NPC who comes up to the Character stops them where they are.
       if (approach) set({ heldStill: true });
       // At the till, the cashier rings up the basket as it is now.
-      openConversation(
-        { npcId: npc.id, interaction, shiftCustomer: null, smallTalk: null },
-        sessionFor,
-        interaction.effect.kind === 'purchase' ? get().basket : [],
-      );
+      openConversation({ npcId: npc.id, interaction, shiftCustomer: null, smallTalk: null }, sessionFor, {
+        basket: interaction.effect.kind === 'purchase' ? get().basket : [],
+        offersCasualRegister,
+        onTheHouse,
+      });
     };
 
-    /** Opens Small Talk with a Named NPC, who greets the Character first. How long it goes on is drawn now. */
-    const startSmallTalkWith = (npcId: NamedNpcId) => {
+    /**
+     * Opens Small Talk with a Named NPC, who greets the Character first, or (`wavedOver`) has waved them over and speaks
+     * to them first. How long it goes on is drawn now.
+     */
+    const startSmallTalkWith = (npcId: NamedNpcId, wavedOver = false) => {
       const started = startSmallTalk(get().game);
       const game = started.state;
       set({ game });
+      const offersCasualRegister = casualRegisterDue(memoryOf(game, npcId));
       const sessionFor: SessionFor = () =>
         buildSmallTalkSession(CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, NAMED_NPCS[npcId], {
           clock: game.clock,
           relationship: relationshipWith(game, npcId),
+          ...(wavedOver && { wavedOver }),
+          ...(offersCasualRegister && { offersCasualRegister }),
         });
+      // Waved over, the Character stops where they are.
+      if (wavedOver) set({ heldStill: true });
       const smallTalk: SmallTalk = { exchanges: started.exchanges, turns: 0, countedLines: 0, moodChange: 0 };
-      openConversation({ npcId, interaction: null, shiftCustomer: null, smallTalk }, sessionFor);
+      openConversation({ npcId, interaction: null, shiftCustomer: null, smallTalk }, sessionFor, { offersCasualRegister });
     };
 
-    /** Opens a conversation with `partner`, whose session `sessionFor` builds for the shopping on the counter (`basket`). They speak first. */
-    const openConversation = (partner: Partner, sessionFor: SessionFor, basket: Basket = []) => {
+    /**
+     * Opens a conversation with `partner`, whose session `sessionFor` builds for the shopping on the counter (`basket`),
+     * and with a friend's casual-register offer or little something on the house. They speak first.
+     */
+    const openConversation = (partner: Partner, sessionFor: SessionFor, { basket = [], offersCasualRegister = false, onTheHouse = false }: Extras = {}) => {
       gameBeforeConversation = get().game;
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
@@ -1855,6 +1899,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           translated: [],
           readings: {},
           helpLog: [],
+          offersCasualRegister,
+          onTheHouse,
         },
       });
       openSession(sessionFor);
@@ -1882,6 +1928,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (!approach) return;
       set({ game: hallwayApproachMade(game, approach) });
       startConversation(approachInteraction(approach), approach);
+    };
+
+    /**
+     * The Character has just come into the park: the first time today, a park regular waves them over for Small Talk.
+     * Only then and there, so a Player who is busy is let by.
+     */
+    const waveOverInThePark = (before: GameState, after: GameState) => {
+      const { conversation, fainting, journal, screen } = get();
+      if (!parkWaveDue(before, after) || conversation || fainting || journal || screen !== 'playing') return;
+      const waved = parkWaveMade(get().game, PARK_REGULARS);
+      set({ game: waved.state });
+      startSmallTalkWith(waved.npcId, true);
     };
 
     /** Whether this change to the game brings an NPC over to the Character. */
@@ -2060,6 +2118,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // Through a door.
         save();
         noticeApproach(before, game);
+        waveOverInThePark(before, game);
       },
       setInteractable: (interactable) => {
         if (get().interactable === interactable) return;
