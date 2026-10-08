@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { startNewGame } from './title.ts';
 
 const dock = (page: Page) => page.getByRole('region', { name: 'Dock' });

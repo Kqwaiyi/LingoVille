@@ -9,3 +9,5 @@ Offline asset builds, run by hand. Their output is committed, and the game never
 **Testing**: no unit tests. Run the script, then look at the result in the running game (`npm run dev`) and run the Playwright smoke.
 
 `npm run build:characters -- <folder with the unzipped Quaternius packs>`
+
+`npx tsx scripts/fetch-itch.ts <page url> <part of the upload's file name> <out file>` downloads a free itch.io pack (Kenney, Quaternius) without a browser.

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { dock } from './barista.ts';
 import { reloadAndContinue, startNewGame } from './title.ts';
 

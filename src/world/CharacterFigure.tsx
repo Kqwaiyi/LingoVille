@@ -3,17 +3,13 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
 import { AnimationClip, AnimationMixer, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { BODY_PRESETS, HAIR_COLOURS, SKIN_TONES, type AppearancePreset, type HairStyleId } from '../content/index.ts';
+import { BODY_PRESETS, HAIR_COLOURS, SKIN_TONES, type AppearancePreset } from '../content/index.ts';
+import { CHARACTER_ART_URLS, OPTIONAL_PART, partsOf, type CharacterClip } from './characterArt.ts';
 
 // The shared character rig: Quaternius's base characters and animation library, built by `npm run build:characters`.
 // The Character, Named NPCs and Shift Customers all wear it.
-const CHARACTERS_URL = '/characters/characters.glb';
-const ANIMATIONS_URL = '/characters/animations.glb';
-useGLTF.preload(CHARACTERS_URL);
-useGLTF.preload(ANIMATIONS_URL);
-
-/** The clips in the shared animation library. */
-export type CharacterClip = 'idle' | 'walk' | 'jog' | 'talk' | 'sit' | 'interact';
+useGLTF.preload(CHARACTER_ART_URLS.characters);
+useGLTF.preload(CHARACTER_ART_URLS.animations);
 
 /** How fast the jog carries a figure across the ground at its own pace, in metres per second, so its feet keep up. */
 export const JOG_METRES_PER_SECOND = 3.1;
@@ -21,34 +17,15 @@ export const JOG_METRES_PER_SECOND = 3.1;
 /** How long one clip blends into the next, in seconds. */
 const BLEND_SECONDS = 0.2;
 
-/** The hair parts each style shows. A part ending in `-` is cut to fit each face, and takes the face's letter. */
-const HAIR: Record<HairStyleId, string[]> = {
-  short: ['hair-parted'],
-  long: ['hair-long'],
-  buns: ['hair-buns'],
-  buzzed: ['hair-buzzed-'],
-  bearded: ['hair-parted', 'beard'],
-  bald: [],
-};
-
-/** Parts that only some looks show. Everything else (the outfit) every look of a build wears. */
-const OPTIONAL_PART = /^(head|brows|eyes|hair|beard)/;
-
 const isMesh = (object: Object3D): object is Mesh => (object as Mesh).isMesh === true;
-
-/** The optional parts a look shows: its face, and its hair cut to fit that face. */
-function partsOf({ body, hairStyle }: AppearancePreset) {
-  const { face } = BODY_PRESETS[body];
-  return new Set([`head-${face}`, `brows-${face}`, `eyes-${face}`, ...HAIR[hairStyle].map((part) => (part.endsWith('-') ? part + face : part))]);
-}
 
 /**
  * Someone on the shared rig, wearing an Appearance Preset and playing a clip from the shared library. Stands on its
  * origin, facing +z.
  */
 export function CharacterFigure({ appearance, clip = 'idle', speed = 1 }: { appearance: AppearancePreset; clip?: CharacterClip; speed?: number }) {
-  const { scene } = useGLTF(CHARACTERS_URL);
-  const { animations } = useGLTF(ANIMATIONS_URL);
+  const { scene } = useGLTF(CHARACTER_ART_URLS.characters);
+  const { animations } = useGLTF(CHARACTER_ART_URLS.animations);
   // Each build is a scene root of the art, by name; each face a letter on its parts.
   const { build } = BODY_PRESETS[appearance.body];
 

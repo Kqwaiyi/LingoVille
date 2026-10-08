@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test.ts';
 import { startNewGame } from './title.ts';
 
 test('the game page loads and reaches the gateway in mock mode', async ({ page }) => {

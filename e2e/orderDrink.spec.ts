@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { PROFICIENCY_STEP_TABLE } from '../src/sim/index.ts';
 import { column, dock, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 

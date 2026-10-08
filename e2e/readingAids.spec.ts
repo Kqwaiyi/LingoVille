@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { chat, GREETING, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 import { titleMenu } from './title.ts';
 

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test.ts';
 import { chat, column, dock, field, npcLine, talkToTheBarista } from './barista.ts';
 
 // The fake barista reads back an order it recognises, even typed in romaji with a loanword.

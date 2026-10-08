@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { column, npcLine, typeLine, walkToTheBarista } from './barista.ts';
 
 // What the scripted fake barista says in the ja pack (mock mode) when asked for work. The Character is named Sam at setup.

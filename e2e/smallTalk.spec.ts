@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test.ts';
 import { chat, column, npcLine, typeLine, walkToTheBarista } from './barista.ts';
 
 // What the scripted fake says in Small Talk in the ja pack (mock mode).

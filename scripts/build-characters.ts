@@ -5,7 +5,8 @@
  *   head, eye, eyebrow and hair part bound to it. The game shows the parts an Appearance Preset names and hides the rest.
  * - `animations.glb`: the shared animation library, by our clip names, for any of those skeletons.
  *
- * The packs are free downloads, too big to keep in the repo. Unzip each into one folder and pass it:
+ * The packs are free downloads, too big to keep in the repo. Fetch each (`scripts/fetch-itch.ts`, the Standard upload),
+ * unzip them into one folder and pass it:
  * - Universal Base Characters [Standard]: https://quaternius.itch.io/universal-base-characters
  * - Modular Character Outfits - Fantasy [Standard]: https://quaternius.itch.io/modular-character-outfits-fantasy
  * - Universal Animation Library [Standard]: https://quaternius.itch.io/universal-animation-library
@@ -19,6 +20,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import sharp, { type Sharp } from 'sharp';
+import type { CharacterClip } from '../src/world/characterArt.ts';
 
 const source = process.argv[2];
 if (!source) throw new Error('Pass the folder the Quaternius packs were unzipped into.');
@@ -53,7 +55,7 @@ const HEAD_CUT = 0.2;
 /** Texture sizes in pixels, square. */
 const SIZES = { skin: 1024, hair: 512, eyes: 256, other: 1024 } as const;
 /** Our clip names → the library's. */
-const CLIPS = { idle: 'Idle_Loop', walk: 'Walk_Loop', jog: 'Jog_Fwd_Loop', talk: 'Idle_Talking_Loop', sit: 'Sitting_Idle_Loop', interact: 'Interact' } as const;
+const CLIPS: Record<CharacterClip, string> = { idle: 'Idle_Loop', walk: 'Walk_Loop', jog: 'Jog_Fwd_Loop', talk: 'Idle_Talking_Loop', sit: 'Sitting_Idle_Loop', interact: 'Interact' };
 /** Clips keep moving these bones; every other bone keeps the length its own skeleton gives it. */
 const MOVING_BONES = new Set(['root', 'pelvis']);
 

@@ -51,6 +51,11 @@ describe('import boundaries', { timeout: 30_000 }, () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('makes smoke tests use the test that fails on an uncaught page error', async () => {
+    expect(await boundaryErrors('e2e/violation.spec.ts', "import { test } from '@playwright/test';")).toHaveLength(1);
+    expect(await boundaryErrors('e2e/fine.spec.ts', "import { test } from './test.ts';")).toEqual([]);
+  });
+
   it('keeps evals out of shipped code', async () => {
     const errors = await boundaryErrors('src/store/violation.ts', "export * from '../../evals/index.ts';");
     expect(errors).toHaveLength(1);

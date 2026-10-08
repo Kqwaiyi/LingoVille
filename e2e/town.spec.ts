@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { tramTripMinutes } from '../src/sim/index.ts';
 import { dock } from './barista.ts';
 import { startNewGame } from './title.ts';

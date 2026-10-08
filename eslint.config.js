@@ -44,6 +44,22 @@ export default tseslint.config(
     },
   },
   {
+    files: ['e2e/**/*.spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              message: "Import from './test.ts', whose test fails on an uncaught error in the page.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/sim/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.ts';
 import { column, dock, field, GREETING, npcLine, talkToTheBarista, typeLine, walkToTheBarista } from './barista.ts';
 
 // Typed to the fake barista, this drops its connection (mock mode only).
