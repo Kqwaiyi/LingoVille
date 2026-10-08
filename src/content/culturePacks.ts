@@ -71,8 +71,8 @@ export type CulturePack = {
   hospital: { name: string; nameGlosses: Glosses };
   /** The apartment block the Character lives in, by its local name: where the landlord is. */
   apartments: { name: string; nameGlosses: Glosses };
-  /** The other places Named NPCs are found, by their local names. */
-  townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses }>;
+  /** The other places Named NPCs are found, by their local names, and any facts their staff know (in English). */
+  townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses; facts?: string[] }>;
   /** Persona localisations: each Named NPC's local name, and their favourite gift (the persona's `favouriteGift`) as a local would put it (in English, as the prompt reads it). */
   personas: Record<NamedNpcId, { name: string; favouriteGift: string }>;
   /**
@@ -142,7 +142,7 @@ export function culturePackSchema(packId: LanguageCode) {
     restaurant: shop,
     hospital: z.object({ name: text, nameGlosses: glosses }),
     apartments: z.object({ name: text, nameGlosses: glosses }),
-    townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses })),
+    townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses, facts: z.array(text).optional() })),
     personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
     casualRegister: z.object({ formal: text, casual: text, offer: text, inUse: text }),
     appearances: z.object({
@@ -200,6 +200,8 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       flowers: { name: '花束', glosses: { zh: '花束', en: 'Bouquet of flowers', de: 'Blumenstrauß' } },
       chocolates: { name: 'チョコレートの詰め合わせ', glosses: { zh: '巧克力礼盒', en: 'Box of chocolates', de: 'Pralinenschachtel' } },
       'scented-candle': { name: 'アロマキャンドル', glosses: { zh: '香薰蜡烛', en: 'Scented candle', de: 'Duftkerze' } },
+      'bath-entry': { name: '入浴券', glosses: { zh: '洗浴票', en: 'Bath entry ticket', de: 'Eintrittskarte fürs Bad' } },
+      'gym-membership': { name: 'ジムの会員', glosses: { zh: '健身房会员', en: 'Gym membership', de: 'Mitgliedschaft im Fitnessstudio' } },
     },
     drinkOptions: {
       small: { name: 'Sサイズ', glosses: { zh: '小杯', en: 'Small', de: 'Klein' } },
@@ -261,7 +263,16 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: '桜ヶ丘公園', nameGlosses: { zh: '樱丘公园', en: 'Sakuragaoka Park', de: 'Sakuragaoka-Park' } },
       bookshop: { name: 'ひだまり書店', nameGlosses: { zh: '向阳书店', en: 'Hidamari Books', de: 'Buchhandlung Hidamari' } },
-      bathhouse: { name: '松の湯', nameGlosses: { zh: '松之汤', en: 'Matsu-no-yu Bathhouse', de: 'Badehaus Matsu-no-yu' } },
+      bathhouse: {
+        name: '松の湯',
+        nameGlosses: { zh: '松之汤', en: 'Matsu-no-yu Bathhouse', de: 'Badehaus Matsu-no-yu' },
+        facts: [
+          'Shoes go in the wooden shoe lockers at the entrance.',
+          'Wash and rinse at the taps before getting into the bath, and keep towels out of the bathwater.',
+          'The gym is a corner just inside the entrance with a running machine. Members wipe it down after use.',
+          'After the bath, many people buy a bottle of cold milk from the fridge by the desk.',
+        ],
+      },
       'town-office': { name: '南町役場', nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' } },
     },
     casualRegister: {
@@ -352,6 +363,8 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       flowers: { name: '鲜花', glosses: { ja: '生花', en: 'Fresh flowers', de: 'Frische Blumen' } },
       chocolates: { name: '巧克力礼盒', glosses: { ja: 'チョコレートのギフトボックス', en: 'Gift box of chocolates', de: 'Pralinen-Geschenkbox' } },
       'scented-candle': { name: '香薰蜡烛', glosses: { ja: 'アロマキャンドル', en: 'Scented candle', de: 'Duftkerze' } },
+      'bath-entry': { name: '洗浴票', glosses: { ja: '入浴券', en: 'Bath entry ticket', de: 'Eintrittskarte fürs Bad' } },
+      'gym-membership': { name: '健身卡', glosses: { ja: 'ジムの会員証', en: 'Gym pass', de: 'Karte fürs Fitnessstudio' } },
     },
     drinkOptions: {
       small: { name: '小杯', glosses: { ja: 'Sサイズ', en: 'Small', de: 'Klein' } },
@@ -413,7 +426,16 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: '人民公园', nameGlosses: { ja: '人民公園', en: 'People’s Park', de: 'Volkspark' } },
       bookshop: { name: '书香书店', nameGlosses: { ja: '書香書店', en: 'Book Fragrance Bookshop', de: 'Buchhandlung Bücherduft' } },
-      bathhouse: { name: '清泉浴池', nameGlosses: { ja: '清泉浴場', en: 'Clear Spring Bathhouse', de: 'Badehaus Klarquelle' } },
+      bathhouse: {
+        name: '清泉浴池',
+        nameGlosses: { ja: '清泉浴場', en: 'Clear Spring Bathhouse', de: 'Badehaus Klarquelle' },
+        facts: [
+          'The desk hands out flip-flops and a wristband with a locker key.',
+          'Shower before going into the pools.',
+          'The gym is a corner just inside the entrance with a running machine. Members show their pass at the desk.',
+          'Many people rest in the lounge after bathing, with a pot of tea.',
+        ],
+      },
       'town-office': { name: '街道办事处', nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' } },
     },
     casualRegister: {
@@ -506,6 +528,8 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       flowers: { name: 'Bunch of flowers', glosses: { ja: '花束', zh: '一束花', de: 'Blumenstrauß' } },
       chocolates: { name: 'Box of chocolates', glosses: { ja: 'チョコレートの箱', zh: '一盒巧克力', de: 'Pralinenschachtel' } },
       'scented-candle': { name: 'Scented candle', glosses: { ja: 'アロマキャンドル', zh: '香薰蜡烛', de: 'Duftkerze' } },
+      'bath-entry': { name: 'Swim and steam entry', glosses: { ja: 'プールとスチームルームの入場券', zh: '游泳和蒸汽房门票', de: 'Eintritt Schwimmbad und Dampfbad' } },
+      'gym-membership': { name: 'Gym membership', glosses: { ja: 'ジムの会員', zh: '健身房会员', de: 'Mitgliedschaft im Fitnessstudio' } },
     },
     drinkOptions: {
       small: { name: 'Small', glosses: { ja: 'スモール', zh: '小杯', de: 'Klein' } },
@@ -567,7 +591,16 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: 'Victoria Park', nameGlosses: { ja: 'ヴィクトリア公園', zh: '维多利亚公园', de: 'Victoria Park' } },
       bookshop: { name: 'The Book Nook', nameGlosses: { ja: 'ブック・ヌック', zh: '书角书店', de: 'Bücherecke' } },
-      bathhouse: { name: 'Riverside Baths', nameGlosses: { ja: 'リバーサイド浴場', zh: '河畔浴场', de: 'Flussbad' } },
+      bathhouse: {
+        name: 'Riverside Baths',
+        nameGlosses: { ja: 'リバーサイド浴場', zh: '河畔浴场', de: 'Flussbad' },
+        facts: [
+          'The baths are Victorian: a pool and a steam room. Swimwear is worn everywhere.',
+          'Please shower before using the pool or the steam room.',
+          'Lockers take a £1 coin, which comes back when you open them again.',
+          'The gym is a corner just inside the entrance with a running machine. Members sign in at the desk first.',
+        ],
+      },
       'town-office': { name: 'Town Hall', nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' } },
     },
     casualRegister: {
@@ -668,6 +701,8 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       flowers: { name: 'Blumenstrauß', glosses: { ja: '花束', zh: '花束', en: 'Bunch of flowers' } },
       chocolates: { name: 'Pralinen', glosses: { ja: 'プラリネ（チョコレート菓子）', zh: '果仁夹心巧克力', en: 'Chocolates' } },
       'scented-candle': { name: 'Duftkerze', glosses: { ja: 'アロマキャンドル', zh: '香薰蜡烛', en: 'Scented candle' } },
+      'bath-entry': { name: 'Eintritt Bad und Sauna', glosses: { ja: 'プールとサウナの入場券', zh: '浴场和桑拿门票', en: 'Entry to the pool and sauna' } },
+      'gym-membership': { name: 'Fitness-Mitgliedschaft', glosses: { ja: 'ジムの会員', zh: '健身房会员', en: 'Gym membership' } },
     },
     drinkOptions: {
       small: { name: 'Klein', glosses: { ja: 'スモール', zh: '小杯', en: 'Small' } },
@@ -729,7 +764,16 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: 'Stadtpark', nameGlosses: { ja: '市立公園', zh: '城市公园', en: 'City Park' } },
       bookshop: { name: 'Buchhandlung Seitenweise', nameGlosses: { ja: 'ザイテンヴァイゼ書店', zh: '页页书店', en: 'Seitenweise Bookshop' } },
-      bathhouse: { name: 'Stadtbad', nameGlosses: { ja: '市営浴場', zh: '市立浴场', en: 'Town Baths' } },
+      bathhouse: {
+        name: 'Stadtbad',
+        nameGlosses: { ja: '市営浴場', zh: '市立浴场', en: 'Town Baths' },
+        facts: [
+          'Outdoor shoes stay in the changing area.',
+          'Shower before going into the pool or the sauna.',
+          'The sauna is mixed and swimwear-free: always sit on your own towel.',
+          'The gym is a corner just inside the entrance with a running machine. Members sign in at the desk first.',
+        ],
+      },
       'town-office': { name: 'Bürgeramt', nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' } },
     },
     casualRegister: {
@@ -793,6 +837,12 @@ export function localShop(placeId: PlaceId, packId: LanguageCode): Shop | null {
 export const TOWN_PLACE_IDS = ['park', 'bookshop', 'bathhouse', 'town-office'] as const satisfies readonly PlaceId[];
 export type TownPlaceId = (typeof TOWN_PLACE_IDS)[number];
 const isTownPlace = (placeId: PlaceId): placeId is TownPlaceId => (TOWN_PLACE_IDS as readonly PlaceId[]).includes(placeId);
+
+/** What the staff at a place know about it in this pack (in English): a shop's facts, or another place's, if it has any. */
+export function localPlaceFacts(placeId: PlaceId, packId: LanguageCode): string[] {
+  if (isTownPlace(placeId)) return CULTURE_PACKS[packId].townPlaces[placeId].facts ?? [];
+  return localShop(placeId, packId)?.facts ?? [];
+}
 
 /** A staffed place by its local name in this pack, as the Journal keeps it: a shop, the hospital, the apartment block, or another place Named NPCs are found. */
 export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {

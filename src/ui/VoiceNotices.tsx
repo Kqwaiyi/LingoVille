@@ -24,6 +24,7 @@ export function Toast() {
       {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'loadedBackup' && t('toast.loadedBackup')}
       {toast.kind === 'nothingToCook' && t('toast.nothingToCook')}
+      {toast.kind === 'gymRefused' && t(`toast.gymRefused.${toast.refusal}`)}
       {toast.kind === 'tooEarlyForBed' && t('toast.tooEarlyForBed', { time: formatTime(CLOCK.bedUsableFrom) })}
       {toast.kind === 'npcSteppedAway' &&
         t('toast.npcSteppedAway', { who: toast.npcId ? t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) : t('shift.customerSubject') })}

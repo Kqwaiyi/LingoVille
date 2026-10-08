@@ -3,6 +3,7 @@ import type { Basket } from './basket.ts';
 import { stockInventory } from './inventory.ts';
 import { hire, namesMatch } from './jobs.ts';
 import { goalInteractionFamiliarity } from './familiarity.ts';
+import { membershipBoughtUntil } from './gym.ts';
 import { clampMeter } from './meters.ts';
 import { metNpc } from './npcMemory.ts';
 import { recordOrder } from './regulars.ts';
@@ -177,7 +178,12 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
       const inventory = stockInventory(possessions.inventory, kept, state.clock.day);
       const paid: GameState = {
         ...state,
-        possessions: { ...possessions, inventory },
+        possessions: {
+          ...possessions,
+          inventory,
+          // Gym membership is paid for once, here: it is never charged again unless the Character renews it.
+          ...(effect.kind === 'registerMember' && { gymMembershipUntilDay: membershipBoughtUntil(state) }),
+        },
         ...(billed && { restaurant: { ...restaurant, bill: addToBill(restaurant.bill, completion.lines) } }),
         character: {
           ...character,

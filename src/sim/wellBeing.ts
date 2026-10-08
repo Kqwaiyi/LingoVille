@@ -1,15 +1,21 @@
 import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
 import { faint } from './faint.ts';
 import { throwOutSpoiled } from './inventory.ts';
+import { lifeSkillShare } from './lifeSkills.ts';
 import { clampMeter } from './meters.ts';
 import { endDaysSince } from './rent.ts';
 import { leaveTable } from './restaurant.ts';
 import type { GameState, PlaceId } from './state.ts';
-import { CLOCK, METER_MAX, MINUTES_PER_HOUR, MOOD, WELL_BEING } from './tuning.ts';
+import { CLOCK, LIFE_SKILLS, METER_MAX, MINUTES_PER_HOUR, MOOD, WELL_BEING } from './tuning.ts';
 
 const hungerPerMinute = METER_MAX / WELL_BEING.hungerFullToEmptyGameMinutes;
 const thirstPerMinute = METER_MAX / WELL_BEING.thirstFullToEmptyGameMinutes;
-const deprivedHealthPerMinute = METER_MAX / WELL_BEING.healthFullToEmptyWhileDeprivedGameMinutes;
+const deprivedHealthPerMinuteAtFitnessZero = METER_MAX / WELL_BEING.healthFullToEmptyWhileDeprivedGameMinutes;
+
+/** How fast Health falls while Hunger or Thirst is at 0: slower the fitter the Character, linearly by Fitness level. */
+function deprivedHealthPerMinute(state: GameState): number {
+  return deprivedHealthPerMinuteAtFitnessZero * (1 - (1 - LIFE_SKILLS.fitnessDeprivedDrainAtMax) * lifeSkillShare(state, 'fitness'));
+}
 
 /** Game minutes from `minuteOfDay` over the next `dtGameMinutes` that fall late at night, from about 2am until morning. */
 function lateNightMinutes(minuteOfDay: number, dtGameMinutes: number): number {
@@ -27,14 +33,15 @@ const minutesUntilDeprived = ({ hunger, thirst }: GameState['character']) =>
   Math.min(hunger / hungerPerMinute, thirst / thirstPerMinute);
 
 /** Game minutes until Health runs out at the current rates: never, while the Character's needs are met. */
-function minutesUntilFainting(character: GameState['character']): number {
+function minutesUntilFainting(state: GameState): number {
+  const { character } = state;
   if (character.health <= 0) return 0;
-  return minutesUntilDeprived(character) + character.health / deprivedHealthPerMinute;
+  return minutesUntilDeprived(character) + character.health / deprivedHealthPerMinute(state);
 }
 
 /**
  * Advances the game by `dtGameMinutes`. Hunger and Thirst empty steadily, and
- * Health falls only from the moment one of them reaches 0, so one long tick
+ * Health falls only from the moment one of them reaches 0 (slower with Fitness), so one long tick
  * gives the same result as many short ones. Mood falls while a need is unmet
  * and, faster, while the Character is up late at night. The moment Health
  * reaches 0, the Character faints, and the rest of the tick is lost.
@@ -43,7 +50,7 @@ function minutesUntilFainting(character: GameState['character']): number {
  */
 export function tick(state: GameState, dtGameMinutes: number): GameState {
   if (dtGameMinutes <= 0) return state;
-  const untilFainting = minutesUntilFainting(state.character);
+  const untilFainting = minutesUntilFainting(state);
   const { day } = state.clock;
   if (untilFainting <= dtGameMinutes) return faint(endDaysSince(day, decay(state, untilFainting)));
   return throwOutSpoiled(endDaysSince(day, decay(state, dtGameMinutes)));
@@ -64,7 +71,7 @@ function decay(state: GameState, dtGameMinutes: number): GameState {
       ...character,
       hunger: clampMeter(character.hunger - hungerPerMinute * dtGameMinutes),
       thirst: clampMeter(character.thirst - thirstPerMinute * dtGameMinutes),
-      health: clampMeter(character.health - deprivedHealthPerMinute * deprivedMinutes),
+      health: clampMeter(character.health - deprivedHealthPerMinute(state) * deprivedMinutes),
       mood: clampMeter(character.mood + moodChange),
     },
   };

@@ -19,6 +19,7 @@ import { Groceries } from './Groceries.tsx';
 import { Props } from './Props.tsx';
 import { Signs } from './Signs.tsx';
 import {
+  BATHHOUSE_GYM,
   BUILDINGS,
   FURNITURE,
   GROUND_HALF_SIZE,
@@ -292,6 +293,7 @@ export function Town() {
       <Block position={HOME_STOVE} size={[1.2, 1, 0.6]} colour="#5b6170" />
       <Block position={HOME_BED} size={[1.4, 0.5, 2.2]} colour="#d8a7b1" />
       <Block position={WARD_BED} size={[1.4, 0.5, 2.2]} colour="#f4f6f7" />
+      <Block position={BATHHOUSE_GYM} size={[1, 1, 2]} colour="#4d5a66" />
       {/* The staff doors at the café, the supermarket and the restaurant: each a door set flat against the inside of the west wall. */}
       {Object.values(WORKPLACES).map(({ door }) => (
         <mesh key={door.join()} position={door}>

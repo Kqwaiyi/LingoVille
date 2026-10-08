@@ -354,3 +354,40 @@ describe('the restaurant interactions', () => {
     ]);
   });
 });
+
+describe('Goal Interactions #21 and #22: the bathhouse', () => {
+  const { buyBathEntry, joinTheGym, renewGymMembership } = INTERACTIONS;
+
+  it('are #21 admit(options) (B) and #22 register_member (I), with a renewal path, all with the attendant', () => {
+    expect([buyBathEntry, joinTheGym, renewGymMembership].map((i) => [i.npcId, i.placeId, i.toolDeclaration.name, i.band])).toEqual([
+      ['attendant', 'bathhouse', 'admit', 'B'],
+      ['attendant', 'bathhouse', 'register_member', 'I'],
+      ['attendant', 'bathhouse', 'register_member', 'I'],
+    ]);
+    expect(buyBathEntry.parseArgs({ options: ['towel', 'sauna'] }).success).toBe(true);
+    expect(buyBathEntry.parseArgs({ options: ['massage'] }).success).toBe(false);
+    expect(joinTheGym.parseArgs({ kind: 'join' }).success).toBe(true);
+    expect(renewGymMembership.parseArgs({}).success).toBe(false);
+  });
+
+  it.each(LANGUAGE_CODES)('resolves %s bath entry to a bathhouse Comfort Purchase, and membership to its price', (packId) => {
+    expect(buyBathEntry.resolveCompletion({ options: [] }, packId)).toMatchObject({
+      success: true,
+      lines: [{ itemId: 'bath-entry', quantity: 1, gift: false, comfort: 'bathhouse', name: CULTURE_PACKS[packId].goods['bath-entry'].name }],
+    });
+    expect(renewGymMembership.resolveCompletion({ kind: 'renew' }, packId)).toMatchObject({
+      success: true,
+      lines: [{ itemId: 'gym-membership', quantity: 1, comfort: null, priceInShifts: menuPrice('gym-membership', packId) }],
+    });
+  });
+
+  it.each(LANGUAGE_CODES)('tells the %s attendant both prices, how long membership lasts, and the bathhouse’s own facts', (packId) => {
+    const facts = interactionFacts(joinTheGym, packId);
+    for (const id of ['bath-entry', 'gym-membership'] as const) {
+      expect(facts.join('\n')).toContain(`${CULTURE_PACKS[packId].goods[id].name}, ${formatLocalMoney(menuPrice(id, packId), packId)}`);
+    }
+    expect(facts.join('\n')).toContain(`${ECONOMY.gymMembershipDays} days`);
+    expect(facts.join('\n')).toMatch(/never renewed automatically/);
+    expect(facts).toEqual(expect.arrayContaining(CULTURE_PACKS[packId].townPlaces.bathhouse.facts!));
+  });
+});

@@ -102,6 +102,9 @@ import {
   parkWaveMade,
   gameMinutesFor,
   giveGift,
+  gymMembership,
+  gymRefusal,
+  gymSession,
   isGoneOff,
   isOpen,
   isOutOfPatience,
@@ -173,6 +176,7 @@ import {
   type JobId,
   type PlaceId,
   type Shift,
+  type GymRefusal,
   type ShiftRefusal,
   type StartingStep,
 } from '../sim/index.ts';
@@ -306,8 +310,8 @@ export type TitleView =
 /** How the Character arrived in the world: the First Morning, or back from a save. The world picks the spawn point from it. */
 export type Arrival = 'newGame' | 'continued';
 
-/** Something in the world the Character is close enough to use with E: the tap, an NPC to talk to, or a tram stop. */
-export type Interactable = 'tap' | 'stove' | 'bed' | 'staff-door' | TownNpcId | TramStopId | GroceryId;
+/** Something in the world the Character is close enough to use with E: the tap, the gym, an NPC to talk to, or a tram stop. */
+export type Interactable = 'tap' | 'stove' | 'bed' | 'gym' | 'staff-door' | TownNpcId | TramStopId | GroceryId;
 
 /** One thing in the inventory, and whether it has gone off yet. */
 export type InventoryLine = InventoryItem & { goneOff: boolean };
@@ -331,6 +335,8 @@ export type Toast =
   | { kind: 'tooEarlyForBed' }
   /** The stove is used with no groceries in the inventory. */
   | { kind: 'nothingToCook' }
+  /** The gym can't be used now: no membership, one that has run out, today's session done, or the bathhouse shut. */
+  | { kind: 'gymRefused'; refusal: GymRefusal }
   /** Staff standing in for a conversation that a later ticket brings. */
   | { kind: 'nothingToSay'; npcId: TownNpcId };
 
@@ -748,6 +754,8 @@ export type GameStore = {
   drinkWater: () => void;
   /** E at the stove: cooks a grocery into a meal, or says there's nothing to cook. */
   cook: () => void;
+  /** E at the gym: the day's workout for a member, or why there can't be one. */
+  workOut: () => void;
   /** E at a supermarket shelf: one of its grocery into the basket. */
   takeFromShelf: () => void;
   /** Puts one of an item in the basket back on its shelf. */
@@ -2156,6 +2164,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (after === game) return set({ toast: { kind: 'nothingToCook' } });
         set({ game: after });
       },
+      workOut: () => {
+        const { interactable, conversation, game } = get();
+        if (conversation || interactable !== 'gym') return;
+        const hours = placeHours('bathhouse', game.identity.culturePackId);
+        const refusal = gymRefusal(game, hours);
+        if (refusal) return set({ toast: { kind: 'gymRefused', refusal } });
+        const after = gymSession(game, hours);
+        set({ game: after });
+        // Health can run out during the workout, and then the Character wakes in the ward.
+        if (faintedBetween(game, after)) return fainted(game, after);
+        noticeApproach(game, after);
+      },
       takeFromShelf: () => {
         const { interactable, conversation, basket, shelfMarker, game } = get();
         if (conversation || !isShelf(interactable) || !isPlaceOpen('supermarket', game)) return;
@@ -2520,7 +2540,14 @@ const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): In
   if (!isNamedNpc(npcId)) return null;
   const { possessions, proficiencyStep, restaurant } = s.game;
   const owesRestaurant = restaurantDebt(s.game) > 0;
-  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: possessions.jobsHired, step: proficiencyStep, restaurant, owesRestaurant });
+  return startedWith(npcId, {
+    shopping: s.basket.length > 0,
+    jobsHired: possessions.jobsHired,
+    step: proficiencyStep,
+    restaurant,
+    owesRestaurant,
+    gymMembership: gymMembership(s.game),
+  });
 };
 /**
  * The key that starts Small Talk with the Named NPC the Character is next to: E with someone who has no other

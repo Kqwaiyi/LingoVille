@@ -134,6 +134,9 @@ export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
 /** The stove at home, along the back wall to the right of the tap. */
 export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
 
+/** The gym at the bathhouse: a running machine against the west wall beside the door, out of talking range of the attendant. */
+export const BATHHOUSE_GYM: Vec3 = [20.5, 0.5, 13];
+
 /**
  * Where each Job is worked: its staff door, set in its place's west wall (and where the Character stands to use it);
  * where the Character stands through a Shift, behind the counter beside its staff; and where a Shift Customer stands,

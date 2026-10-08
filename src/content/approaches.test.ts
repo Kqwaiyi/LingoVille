@@ -106,3 +106,17 @@ describe('the server at the restaurant', () => {
     expect(interactionStartedWithF('server', { shopping: false, restaurant: NO_TABLE, jobsHired: ['server'] })).toBeNull();
   });
 });
+
+describe('the attendant at the bathhouse', () => {
+  it('buys a bath with E, whatever the gym membership', () => {
+    for (const gymMembership of ['none', 'active', 'expired'] as const) {
+      expect(interactionStartedWithE('attendant', { shopping: false, gymMembership })).toBe(INTERACTIONS.buyBathEntry);
+    }
+  });
+
+  it('joins the gym with F, renews it with F once it has run out, and has nothing on F while it runs', () => {
+    expect(interactionStartedWithF('attendant', { shopping: false, gymMembership: 'none' })).toBe(INTERACTIONS.joinTheGym);
+    expect(interactionStartedWithF('attendant', { shopping: false, gymMembership: 'expired' })).toBe(INTERACTIONS.renewGymMembership);
+    expect(interactionStartedWithF('attendant', { shopping: false, gymMembership: 'active' })).toBeNull();
+  });
+});

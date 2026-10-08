@@ -1,5 +1,5 @@
 import { ECONOMY, weekdayOf, WEEKDAYS, type Basket, type LanguageCode, type OpeningHours, type RentStatement } from '../sim/index.ts';
-import { CULTURE_PACKS, localPlaceName, localShop } from './culturePacks.ts';
+import { CULTURE_PACKS, localPlaceFacts, localPlaceName } from './culturePacks.ts';
 import { chargeInShifts, formatLocalMoney, menuPrice } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
 import { DIETARY_NOTE_IDS, DIETARY_NOTES, dishContents, dishFits, isDish, ITEMS, type ItemId } from './items.ts';
@@ -63,6 +63,17 @@ function dietaryFact(id: ItemId, packId: LanguageCode): string {
   const suits = DIETARY_NOTE_IDS.filter((note) => dishFits(id, note)).map((note) => DIETARY_NOTES[note].means);
   const who = suits.length > 0 ? `It suits a diner who ${suits.join(', or who ')}.` : 'It suits none of the usual dietary needs.';
   return `${CULTURE_PACKS[packId].goods[id].name} (menu id "${id}") ${has}. ${who}`;
+}
+
+/** What the bathhouse desk sells, and how gym membership works. */
+function bathhouseFacts(packId: LanguageCode): string[] {
+  const { goods } = CULTURE_PACKS[packId];
+  const price = (id: ItemId) => formatLocalMoney(menuPrice(id, packId), packId);
+  return [
+    `Bath entry: ${goods['bath-entry'].name}, ${price('bath-entry')}. A towel to borrow and the sauna or steam room come with it at no extra charge.`,
+    `Gym membership: ${goods['gym-membership'].name}, ${price('gym-membership')}. It gives ${ECONOMY.gymMembershipDays} days at the gym, and members may work out once a day.`,
+    'Membership is never renewed automatically. Once it runs out, the member renews it here, with you, and pays again.',
+  ];
 }
 
 /** A day the rent is due, as the landlord would say it. */
@@ -155,7 +166,7 @@ export function interactionFacts(
       case 'bill':
         return billFacts(bill, restaurantDebt, packId);
       case 'placeFacts':
-        return localShop(placeId, packId)?.facts ?? [];
+        return localPlaceFacts(placeId, packId);
       case 'customs':
         return customs;
       case 'ward': {
@@ -167,6 +178,8 @@ export function interactionFacts(
           'Patients who faint have usually gone too long without eating or drinking.',
         ];
       }
+      case 'bathhouse':
+        return bathhouseFacts(packId);
       case 'rent':
         return rent ? rentFacts(rent, packId) : [];
       case 'newcomerDiscount':

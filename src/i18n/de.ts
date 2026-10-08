@@ -242,6 +242,7 @@ export const de: UiStrings = {
   prompt: {
     drink: '<kbd>E</kbd> drücken, um Leitungswasser zu trinken',
     cook: '<kbd>E</kbd> drücken, um eine Mahlzeit zu kochen',
+    workOut: '<kbd>E</kbd> drücken, um zu trainieren',
     sleep: '<kbd>E</kbd> drücken, um ins Bett zu gehen',
     talk: '<kbd>E</kbd> drücken, um zu sprechen — {{role}}',
     /** Small Talk with someone who has no other conversation. */
@@ -257,6 +258,8 @@ export const de: UiStrings = {
     askForWork: '<kbd>F</kbd> drücken, um nach Arbeit zu fragen',
     buyGift: '<kbd>F</kbd> drücken, um ein Geschenk zu kaufen',
     askRecommendation: '<kbd>F</kbd> drücken, um nach einer Empfehlung zu fragen',
+    joinGym: '<kbd>F</kbd> drücken, um nach dem Fitnessstudio zu fragen',
+    renewGym: '<kbd>F</kbd> drücken, um die Mitgliedschaft zu verlängern',
     startShift: '<kbd>E</kbd> drücken, um eine Schicht anzufangen — {{job}}',
     staffOnly: 'Personaltür · Nur für Personal',
     workedToday: 'Personaltür · Du hast heute schon eine Schicht gearbeitet',
@@ -456,6 +459,12 @@ export const de: UiStrings = {
     loadedBackup: 'Spielstand von heute Morgen geladen',
     tooEarlyForBed: 'Es ist noch zu früh fürs Bett. Schlafen geht ab {{time}}.',
     nothingToCook: 'Nichts zum Kochen da. Lebensmittel aus dem Supermarkt kann man hier kochen.',
+    gymRefused: {
+      notMember: 'Das Fitnessstudio ist nur für Mitglieder. Am Empfang des Badehauses kannst du Mitglied werden.',
+      expired: 'Deine Mitgliedschaft im Fitnessstudio ist abgelaufen. Am Empfang des Badehauses kannst du sie verlängern.',
+      doneToday: 'Du hast heute schon trainiert. Komm morgen wieder.',
+      closed: 'Das Fitnessstudio ist geschlossen. Es hat die Öffnungszeiten des Badehauses.',
+    },
     npcSteppedAway: '{{who}} musste kurz weg. Nichts ist verloren.',
     nothingToSay: '{{who}} lächelt und nickt. Hier gibt es noch nichts zu besprechen.',
   },

@@ -35,3 +35,16 @@ export function todaysCounters(state: GameState): GameState['progression']['toda
   const { today } = state.progression;
   return today.day === state.clock.day ? today : { day: state.clock.day, homeMeals: 0, gymSessions: 0 };
 }
+
+/** How far up a Life Skill the Character is: 0 at level 0, 1 at max level. Its effects scale linearly with it. */
+export function lifeSkillShare(state: GameState, skill: LifeSkillId): number {
+  return lifeSkillLevel(state.progression.lifeSkillXp[skill]) / LIFE_SKILLS.maxLevel;
+}
+
+/**
+ * What Fitness multiplies the chance of falling ill by: 1 at level 0, down linearly to
+ * 1 − `fitnessIllnessReductionAtMax` at max level. Recorded here for Illness to roll against.
+ */
+export function fitnessIllnessFactor(state: GameState): number {
+  return 1 - LIFE_SKILLS.fitnessIllnessReductionAtMax * lifeSkillShare(state, 'fitness');
+}

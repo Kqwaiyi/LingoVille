@@ -20,7 +20,7 @@ const HOUR = 60;
 const MONDAY = 1;
 const TRAMS = placeHours('tram-stop', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
 const SUPERMARKET = placeHours('supermarket', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
-const BATHHOUSE = placeHours('bathhouse', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
+const TOWN_OFFICE = placeHours('town-office', DEV_SETUP.culturePackId) as Exclude<OpeningHours, null>;
 const [WEST, CENTRAL, EAST] = TRAM_LINE as readonly TramStopId[];
 
 /** A game at `minuteOfDay` on Monday, the Character standing wherever `placeId` says. */
@@ -54,11 +54,11 @@ describe('walking around town', () => {
   });
 
   it('chats with staff who have nothing else to talk about yet', () => {
-    const store = playingAt(BATHHOUSE.opensAt, 'bathhouse');
-    store.getState().setInteractable('attendant');
+    const store = playingAt(TOWN_OFFICE.opensAt, 'town-office');
+    store.getState().setInteractable('office-clerk');
     store.getState().talk();
     expect(selectToast(store.getState())).toBeNull();
-    expect(store.getState().conversation).toMatchObject({ npcId: 'attendant', interaction: null });
+    expect(store.getState().conversation).toMatchObject({ npcId: 'office-clerk', interaction: null });
   });
 });
 

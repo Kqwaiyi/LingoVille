@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { JOB_IDS, type Basket, type ComfortKind, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { menuPrice } from './currency.ts';
-import { DIETARY_NOTES, dishContents, dishFits, ITEM_IDS, ITEMS, type DietaryNoteId, type ItemId, type Restores } from './items.ts';
+import { BATH_OPTIONS, DIETARY_NOTES, dishContents, dishFits, ITEM_IDS, ITEMS, type DietaryNoteId, type ItemId, type Restores } from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
 import { PLACE_HOURS } from './places.ts';
 import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.ts';
@@ -22,6 +22,7 @@ export const FACT_SOURCES = [
   'placeFacts',
   'customs',
   'ward',
+  'bathhouse',
   'rent',
   'newcomerDiscount',
 ] as const;
@@ -45,6 +46,10 @@ type SeatGuestArgs = { party: number; seating: string };
 type OrderMealArgs = ServeOrderArgs & { restriction?: DietaryNoteId };
 /** The arguments a `settleBill` effect's completion carries: how the guest pays. */
 type SettleBillArgs = { method: string };
+/** The arguments an `admit` effect's completion carries: what the bather asked for at the desk (flavour only). */
+type AdmitArgs = { options: (typeof BATH_OPTIONS)[number][] };
+/** The arguments a `registerMember` effect's completion carries: joining or renewing (flavour only: the sim knows which). */
+type RegisterMemberArgs = { kind: 'join' | 'renew' };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
@@ -53,9 +58,22 @@ type SettleBillArgs = { method: string };
  * `pointTo` marks where an item is. `payRent` pays the landlord, and `extendRent`
  * gives the Character more time to pay. `hire` gives the Character its Job, once the sim
  * has checked the name. At the restaurant, `seatGuest` gives the Character a table, `orderMeal` serves a meal there and
- * puts it on the bill (keeping to a stated dietary need), and `settleBill` charges the bill. `none` is flavour only.
+ * puts it on the bill (keeping to a stated dietary need), and `settleBill` charges the bill. At the bathhouse, `admit`
+ * charges a bath, and `registerMember` charges gym membership and gives `ECONOMY.gymMembershipDays` at the gym. `none` is flavour only.
  */
-export type EffectKind = 'none' | 'serveOrder' | 'purchase' | 'pointTo' | 'payRent' | 'extendRent' | 'hire' | 'seatGuest' | 'orderMeal' | 'settleBill';
+export type EffectKind =
+  | 'none'
+  | 'serveOrder'
+  | 'purchase'
+  | 'pointTo'
+  | 'payRent'
+  | 'extendRent'
+  | 'hire'
+  | 'seatGuest'
+  | 'orderMeal'
+  | 'settleBill'
+  | 'admit'
+  | 'registerMember';
 type EffectFor<Args> =
   | { kind: 'none' }
   | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
@@ -66,7 +84,9 @@ type EffectFor<Args> =
   | (Args extends HireArgs ? { kind: 'hire'; jobId: JobId } : never)
   | (Args extends SeatGuestArgs ? { kind: 'seatGuest' } : never)
   | (Args extends OrderMealArgs ? { kind: 'orderMeal' } : never)
-  | (Args extends SettleBillArgs ? { kind: 'settleBill' } : never);
+  | (Args extends SettleBillArgs ? { kind: 'settleBill' } : never)
+  | (Args extends AdmitArgs ? { kind: 'admit' } : never)
+  | (Args extends RegisterMemberArgs ? { kind: 'registerMember' } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -139,7 +159,9 @@ const definitionSchema = z.object({
   }),
   band: z.enum(['B', 'I', 'A']),
   effect: z.discriminatedUnion('kind', [
-    z.object({ kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent', 'seatGuest', 'orderMeal', 'settleBill']) }),
+    z.object({
+      kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent', 'seatGuest', 'orderMeal', 'settleBill', 'admit', 'registerMember']),
+    }),
     z.object({ kind: z.literal('hire'), jobId: z.enum(JOB_IDS) }),
   ]),
 });
@@ -203,6 +225,10 @@ function resolveEffect(effect: Interaction['effect'], args: Record<string, unkno
     }
     case 'settleBill':
       return { success: true, lines: [] };
+    case 'admit':
+      return { success: true, lines: orderLines([{ itemId: 'bath-entry', quantity: 1 }], packId) };
+    case 'registerMember':
+      return { success: true, lines: orderLines([{ itemId: 'gym-membership', quantity: 1 }], packId) };
   }
 }
 

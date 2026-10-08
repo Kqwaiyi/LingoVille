@@ -242,6 +242,7 @@ export const ja: UiStrings = {
   prompt: {
     drink: '<kbd>E</kbd> で水道水を飲む',
     cook: '<kbd>E</kbd> で料理する',
+    workOut: '<kbd>E</kbd> でトレーニングする',
     sleep: '<kbd>E</kbd> で寝る',
     talk: '<kbd>E</kbd> で話しかける — {{role}}',
     /** Small Talk with someone who has no other conversation. */
@@ -257,6 +258,8 @@ export const ja: UiStrings = {
     askForWork: '<kbd>F</kbd> で仕事について聞く',
     buyGift: '<kbd>F</kbd> で贈り物を買う',
     askRecommendation: '<kbd>F</kbd> でおすすめを聞く',
+    joinGym: '<kbd>F</kbd> でジムについて聞く',
+    renewGym: '<kbd>F</kbd> でジムの会員を更新する',
     startShift: '<kbd>E</kbd> でシフトを始める — {{job}}',
     staffOnly: 'スタッフ用ドア · 関係者以外立入禁止',
     workedToday: 'スタッフ用ドア · 今日はもうシフトに入りました',
@@ -456,6 +459,12 @@ export const ja: UiStrings = {
     loadedBackup: '今朝のセーブを読み込みました',
     tooEarlyForBed: '寝るにはまだ早いです。{{time}}から寝られます。',
     nothingToCook: '料理する食材がありません。スーパーで買った食材をここで料理できます。',
+    gymRefused: {
+      notMember: 'ジムは会員専用です。銭湯の受付で入会できます。',
+      expired: 'ジムの会員期限が切れています。銭湯の受付で更新できます。',
+      doneToday: '今日はもうトレーニングしました。また明日どうぞ。',
+      closed: 'ジムは閉まっています。銭湯の営業時間に開いています。',
+    },
     npcSteppedAway: '{{who}}は席を外しました。何も失われていません。',
     nothingToSay: '{{who}}はにっこり会釈しました。ここではまだ話すことがありません。',
   },

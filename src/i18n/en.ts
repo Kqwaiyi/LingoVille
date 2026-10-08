@@ -245,6 +245,7 @@ export const en = {
   prompt: {
     drink: 'Press <kbd>E</kbd> to drink tap water',
     cook: 'Press <kbd>E</kbd> to cook a meal',
+    workOut: 'Press <kbd>E</kbd> to work out',
     sleep: 'Press <kbd>E</kbd> to go to bed',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
     /** Small Talk with someone who has no other conversation. */
@@ -260,6 +261,8 @@ export const en = {
     askForWork: 'Press <kbd>F</kbd> to ask for work',
     buyGift: 'Press <kbd>F</kbd> to buy a gift',
     askRecommendation: 'Press <kbd>F</kbd> to ask for a recommendation',
+    joinGym: 'Press <kbd>F</kbd> to ask about the gym',
+    renewGym: 'Press <kbd>F</kbd> to renew your gym membership',
     startShift: 'Press <kbd>E</kbd> to start a shift — {{job}}',
     staffOnly: 'Staff door · Staff only',
     workedToday: 'Staff door · You’ve already worked a shift today',
@@ -464,6 +467,12 @@ export const en = {
     loadedBackup: 'Loaded this morning’s save',
     tooEarlyForBed: 'It’s too early for bed. You can sleep from {{time}}.',
     nothingToCook: 'Nothing to cook. Groceries from the supermarket can be cooked here.',
+    gymRefused: {
+      notMember: 'The gym is for members. Ask at the bathhouse desk to join.',
+      expired: 'Your gym membership has run out. Renew it at the bathhouse desk.',
+      doneToday: 'You’ve already worked out today. Come back tomorrow.',
+      closed: 'The gym is closed. It opens with the bathhouse.',
+    },
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
     nothingToSay: '{{who}} smiles and nods. There’s nothing to talk about here yet.',
   },

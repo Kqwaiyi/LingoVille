@@ -242,6 +242,7 @@ export const zh: UiStrings = {
   prompt: {
     drink: '按 <kbd>E</kbd> 喝自来水',
     cook: '按 <kbd>E</kbd> 做饭',
+    workOut: '按 <kbd>E</kbd> 健身',
     sleep: '按 <kbd>E</kbd> 上床睡觉',
     talk: '按 <kbd>E</kbd> 交谈 — {{role}}',
     /** Small Talk with someone who has no other conversation. */
@@ -257,6 +258,8 @@ export const zh: UiStrings = {
     askForWork: '按 <kbd>F</kbd> 问工作的事',
     buyGift: '按 <kbd>F</kbd> 买礼物',
     askRecommendation: '按 <kbd>F</kbd> 请服务员推荐',
+    joinGym: '按 <kbd>F</kbd> 咨询健身房',
+    renewGym: '按 <kbd>F</kbd> 续办健身房会员',
     startShift: '按 <kbd>E</kbd> 开始上班 — {{job}}',
     staffOnly: '员工门 · 员工专用',
     workedToday: '员工门 · 你今天已经上过班了',
@@ -456,6 +459,12 @@ export const zh: UiStrings = {
     loadedBackup: '已读取今天早上的存档',
     tooEarlyForBed: '现在睡觉还太早。{{time}}以后才能睡。',
     nothingToCook: '没有可以做的食材。超市买的食材可以在这里做饭。',
+    gymRefused: {
+      notMember: '健身房只对会员开放。可以在澡堂前台办会员。',
+      expired: '你的健身房会员已经到期了。可以在澡堂前台续办。',
+      doneToday: '你今天已经健过身了。明天再来吧。',
+      closed: '健身房已经关门了。它和澡堂同时营业。',
+    },
     npcSteppedAway: '{{who}}临时走开了。什么都没有丢失。',
     nothingToSay: '{{who}}微笑着点点头。这里暂时还没什么可聊的。',
   },

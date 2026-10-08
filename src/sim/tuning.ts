@@ -215,9 +215,11 @@ export const MOOD = {
     /** Per understood Small Talk exchange, by Familiarity tier: more the better the NPC knows the Character. */
     smallTalkExchange: { stranger: 2, acquaintance: 3, friend: 4 },
     sleep: 5,
-    bathhouse: 8,
-    /** A Comfort Purchase, by kind, on top of the conversation's success. Once per kind per purchase, however many are bought. */
-    comfortPurchase: { cafe: 3, reading: 5, gift: 3, meal: 5 },
+    /**
+     * A Comfort Purchase, by kind, on top of the conversation's success. Once per kind per purchase, however many are bought.
+     * The bathhouse is the big one.
+     */
+    comfortPurchase: { cafe: 3, reading: 5, gift: 3, meal: 5, bathhouse: 8 },
     gymSession: 4,
     goodHomeMeal: 2,
     unmetNeedPerGameHour: -1,
@@ -253,6 +255,8 @@ export const LIFE_SKILLS = {
   cookingFoodPoisoningReductionAtMax: 0.8,
   xpPerGymSession: 15,
   gymSessionsPerDay: 1,
+  /** How long a workout at the gym takes. */
+  gymSessionGameMinutes: MINUTES_PER_HOUR,
   xpPerShiftCustomer: 3,
   /**
    * The level of a Job's Life Skill that unlocks each of its aids. They only ever help with the mechanics, never with

@@ -498,6 +498,26 @@ function goalBlock(interaction: Interaction, who: string) {
       `- If ${name} answers "done", thank them, say you hope to see them again, and say goodbye.`,
     ]);
   }
+  if (interaction.effect.kind === 'admit') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take payment, read back the entry with its price from FACTS and whether they want a towel, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with what they asked for. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for entry. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again what they would like.`,
+      `- If ${name} answers "done", hand them their locker key (and a towel, if they wanted one), wish them a nice bath and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'registerMember') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take payment, read back the membership, how long it lasts and its price from FACTS, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name}. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for it today, and that they can come back any time: nothing is charged unless they ask. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again whether they would like the membership.`,
+      `- If ${name} answers "done", tell them they can use the gym from today until it runs out, and say goodbye.`,
+    ]);
+  }
   return block('YOUR GOAL', [
     interaction.goal,
     '- Before you act on it, read back what you understood, with the price, and wait for the customer to confirm. If they correct you, read it back again.',

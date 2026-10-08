@@ -42,8 +42,8 @@ const REPLY_DELAY_MS = 600;
 
 // The completions the fake knows how to script: an order over a counter, paying at the till or the bookshop,
 // pointing to an item on the shelves, the nurse letting the patient go home, and the landlord
-// taking rent, giving more time, or telling the tenant their new rent, the barista hiring, and the server seating
-// a guest and taking the bill.
+// taking rent, giving more time, or telling the tenant their new rent, the barista hiring, the server seating
+// a guest and taking the bill, and the bathhouse attendant letting a bather in and signing up a gym member.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
 const COMPLETE_PURCHASE = INTERACTIONS.payForGroceries.completion.name;
 const POINT_TO = INTERACTIONS.findAnItem.completion.name;
@@ -54,6 +54,8 @@ const FINISH_RENT_NEWS = INTERACTIONS.newcomerDiscountNews.completion.name;
 const HIRE_APPLICANT = INTERACTIONS.askBaristaForWork.completion.name;
 const SEAT_GUEST = INTERACTIONS.getATable.completion.name;
 const SETTLE_BILL = INTERACTIONS.payTheBill.completion.name;
+const ADMIT = INTERACTIONS.buyBathEntry.completion.name;
+const REGISTER_MEMBER = INTERACTIONS.joinTheGym.completion.name;
 /** How many more days the fake landlord gives. */
 const EXTENSION_DAYS = 3;
 
@@ -96,6 +98,8 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     flowers: ['花束', 'はなたば', '花'],
     chocolates: ['チョコ'],
     'scented-candle': ['キャンドル', 'ろうそく'],
+    'bath-entry': ['お風呂', '風呂', 'ふろ', '入浴', '銭湯'],
+    'gym-membership': ['ジム', 'じむ', 'トレーニング', '会員'],
   },
   zh: {
     latte: ['拿铁', 'latte'],
@@ -125,6 +129,8 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     flowers: ['鲜花', '花'],
     chocolates: ['巧克力'],
     'scented-candle': ['蜡烛', '香薰'],
+    'bath-entry': ['洗澡', '泡澡', '澡', '浴'],
+    'gym-membership': ['健身', '会员'],
   },
   en: {
     latte: ['latte'],
@@ -154,6 +160,8 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     flowers: ['flowers', 'bouquet'],
     chocolates: ['chocolates'],
     'scented-candle': ['candle'],
+    'bath-entry': ['bath', 'baths', 'swim', 'steam', 'pool'],
+    'gym-membership': ['gym', 'membership', 'join'],
   },
   de: {
     latte: ['latte', 'milchkaffee'],
@@ -183,6 +191,8 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     flowers: ['blumenstrauß', 'blumen'],
     chocolates: ['pralinen'],
     'scented-candle': ['duftkerze', 'kerze'],
+    'bath-entry': ['bad', 'baden', 'sauna', 'schwimmen'],
+    'gym-membership': ['fitnessstudio', 'fitness', 'mitglied', 'mitgliedschaft', 'training'],
   },
 };
 
@@ -1038,6 +1048,165 @@ function giftNpc(script: GiftScript, common: OrderScript, gifts: ItemId[], packI
   };
 }
 
+/** The bathhouse attendant: lets a bather in (#21), asking about a towel first, or signs up or renews a gym member (#22). */
+type AttendantScript = {
+  bathGreeting: string;
+  joinGreeting: string;
+  /** Renewing, the attendant reads the membership back as it greets. */
+  renewGreeting: (membership: string, price: string) => string;
+  resume: string;
+  askTowel: string;
+  readBackBath: (entry: string, price: string, towel: boolean) => string;
+  admitted: string;
+  clarifyBath: string;
+  readBackMembership: (membership: string, price: string) => string;
+  registered: string;
+  clarifyGym: string;
+  cannotAfford: string;
+};
+
+const ATTENDANT_SCRIPT: Record<LanguageCode, AttendantScript> = {
+  ja: {
+    bathGreeting: 'いらっしゃいませ。お風呂ですか？',
+    joinGreeting: 'いらっしゃいませ。ジムのご案内ですか？',
+    renewGreeting: (membership, price) => `いらっしゃいませ。ジムの会員期限が切れていますね。${membership}、${price}で更新なさいますか？`,
+    resume: 'お待たせしました。ご用件をどうぞ。',
+    askTowel: 'タオルはお使いになりますか？',
+    readBackBath: (entry, price, towel) => `${entry}、${price}、タオル${towel ? 'あり' : 'なし'}ですね。よろしいですか？`,
+    admitted: 'ありがとうございます。どうぞごゆっくり。',
+    clarifyBath: 'お風呂になさいますか？',
+    readBackMembership: (membership, price) => `${membership}は${price}です。ジムは一日一回ご利用いただけます。よろしいですか？`,
+    registered: 'ご登録ありがとうございます。今日からジムをご利用いただけます。',
+    clarifyGym: 'ジムの会員になさいますか？',
+    cannotAfford: '申し訳ございません、お支払いが足りないようです。',
+  },
+  zh: {
+    bathGreeting: '欢迎光临！您要洗澡吗？',
+    joinGreeting: '欢迎光临！您想了解健身房吗？',
+    renewGreeting: (membership, price) => `欢迎光临！您的健身房会员到期了。${membership}，${price}，要续办吗？`,
+    resume: '让您久等了。您需要什么？',
+    askTowel: '需要毛巾吗？',
+    readBackBath: (entry, price, towel) => `${entry}，${price}，${towel ? '要毛巾' : '不要毛巾'}，对吗？`,
+    admitted: '好的，请进。祝您泡得舒服！',
+    clarifyBath: '您要洗澡吗？',
+    readBackMembership: (membership, price) => `${membership}，${price}。每天可以健身一次。对吗？`,
+    registered: '办好了！今天就可以去健身房了。',
+    clarifyGym: '您要办健身卡吗？',
+    cannotAfford: '不好意思，您的钱好像不够。',
+  },
+  en: {
+    bathGreeting: 'Hiya! Here for a swim and a steam?',
+    joinGreeting: 'Hiya! Interested in the gym?',
+    renewGreeting: (membership, price) => `Hiya! Your gym membership has run out, I'm afraid. ${membership} is ${price}. Shall I renew it?`,
+    resume: 'Sorry about that! What can I do for you?',
+    askTowel: 'Would you like to borrow a towel?',
+    readBackBath: (entry, price, towel) => `${entry}, that's ${price}, ${towel ? 'with a towel' : 'no towel'}. Is that right?`,
+    admitted: 'Lovely. Enjoy your swim!',
+    clarifyBath: 'Are you here for a swim and a steam?',
+    readBackMembership: (membership, price) => `${membership} is ${price}, and you can use the gym once a day. Shall I sign you up?`,
+    registered: "You're all signed up. The gym's just by the door!",
+    clarifyGym: 'Would you like to join the gym?',
+    cannotAfford: "Sorry, it looks like that's not enough.",
+  },
+  de: {
+    bathGreeting: 'Hallo! Einmal Bad und Sauna?',
+    joinGreeting: 'Hallo! Interessieren Sie sich für das Fitnessstudio?',
+    renewGreeting: (membership, price) => `Hallo! Ihre Mitgliedschaft ist leider abgelaufen. ${membership} kostet ${price}. Soll ich sie verlängern?`,
+    resume: 'Entschuldigung! Was kann ich für Sie tun?',
+    askTowel: 'Möchten Sie ein Handtuch leihen?',
+    readBackBath: (entry, price, towel) => `${entry} für ${price}, ${towel ? 'mit Handtuch' : 'ohne Handtuch'}, richtig?`,
+    admitted: 'Bitte schön! Viel Spaß beim Entspannen!',
+    clarifyBath: 'Möchten Sie ins Bad?',
+    readBackMembership: (membership, price) => `${membership} für ${price}, Training einmal am Tag. Soll ich Sie anmelden?`,
+    registered: 'Sie sind angemeldet! Das Fitnessstudio ist gleich am Eingang.',
+    clarifyGym: 'Möchten Sie Mitglied werden?',
+    cannotAfford: 'Oh, das reicht leider nicht.',
+  },
+};
+
+/** The local name and price of what the attendant sells, as it reads them back. */
+function soldAtTheDesk(itemId: ItemId, common: OrderScript, packId: LanguageCode) {
+  return { name: CULTURE_PACKS[packId].goods[itemId].name, price: common.price(localPrice(ITEMS[itemId].priceInShifts, packId)) };
+}
+
+/** #21: a yes or the bath asked for gets the towel question, its answer the read-back, and a yes to that lets the bather in. */
+function bathNpc(script: AttendantScript, common: OrderScript, packId: LanguageCode, act: Act): Npc {
+  let bath = false;
+  let towel: boolean | null = null;
+  const { yes, no, known } = common.words;
+  const entry = soldAtTheDesk('bath-entry', common, packId);
+  /** Asks again whatever is still to be answered, or reads everything back. */
+  const currentQuestion = () => (!bath ? script.clarifyBath : towel === null ? script.askTowel : script.readBackBath(entry.name, entry.price, towel));
+  return {
+    ...common,
+    greeting: script.bathGreeting,
+    resume: script.resume,
+    hear: (line) => {
+      if (!bath && mentions(line, ITEM_WORDS[packId]['bath-entry'])) {
+        bath = true;
+        return act.say(script.askTowel);
+      }
+      // "No" first: "不要" holds "要", and "no thanks" holds "thanks".
+      const answer = mentions(line, no) ? false : mentions(line, yes) ? true : null;
+      if (answer === null) return mentions(line, known) ? act.say(currentQuestion()) : act.notUnderstood();
+      if (!bath) {
+        if (!answer) return act.say(script.clarifyBath);
+        bath = true;
+        return act.say(script.askTowel);
+      }
+      if (towel === null) {
+        towel = answer;
+        return act.say(currentQuestion());
+      }
+      if (!answer) {
+        [bath, towel] = [false, null];
+        return act.say(script.clarifyBath);
+      }
+      const options = towel ? ['towel'] : [];
+      [bath, towel] = [false, null];
+      act.call(ADMIT, { options }, (response) => {
+        if (response.result === 'done') act.say(script.admitted);
+        else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
+        else act.say(script.clarifyBath);
+      });
+    },
+  };
+}
+
+/** #22: reads back the membership and its price, and signs up or renews on a yes. Renewing, the greeting is the read-back. */
+function memberNpc(script: AttendantScript, common: OrderScript, packId: LanguageCode, renewing: boolean, act: Act): Npc {
+  let readBack = renewing;
+  const { yes, no, known } = common.words;
+  const membership = soldAtTheDesk('gym-membership', common, packId);
+  const readBackLine = script.readBackMembership(membership.name, membership.price);
+  return {
+    ...common,
+    greeting: renewing ? script.renewGreeting(membership.name, membership.price) : script.joinGreeting,
+    resume: script.resume,
+    hear: (line) => {
+      const answer = mentions(line, no) ? false : mentions(line, yes) ? true : null;
+      if (answer === false) {
+        readBack = false;
+        return act.say(script.clarifyGym);
+      }
+      if (!readBack && (answer || mentions(line, ITEM_WORDS[packId]['gym-membership']))) {
+        readBack = true;
+        return act.say(readBackLine);
+      }
+      if (answer) {
+        readBack = renewing;
+        return act.call(REGISTER_MEMBER, { kind: renewing ? 'renew' : 'join' }, (response) => {
+          if (response.result === 'done') act.say(script.registered);
+          else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
+          else act.say(script.clarifyGym);
+        });
+      }
+      if (mentions(line, known)) return act.say(readBack ? readBackLine : script.clarifyGym);
+      act.notUnderstood();
+    },
+  };
+}
+
 function tillNpc(script: TillScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
   let bag: boolean | null = null;
   let card: boolean | null = null;
@@ -1782,6 +1951,11 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if (offers(HIRE_APPLICANT)) return hiringNpc(HIRING_SCRIPT[packId], SCRIPT[packId], act);
   if (offers(SEAT_GUEST)) return tableNpc(SERVER_SCRIPT[packId], SCRIPT[packId], act);
   if (offers(SETTLE_BILL)) return billNpc(SERVER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
+  if (offers(ADMIT)) return bathNpc(ATTENDANT_SCRIPT[packId], SCRIPT[packId], packId, act);
+  if (offers(REGISTER_MEMBER)) {
+    const renewing = session.systemInstruction.includes(INTERACTIONS.renewGymMembership.goal);
+    return memberNpc(ATTENDANT_SCRIPT[packId], SCRIPT[packId], packId, renewing, act);
+  }
   if ('npcId' in session.voice && session.voice.npcId === 'server') {
     const recommending = session.tools.find((tool) => tool.name === SERVE_ORDER)?.parameters?.properties?.restriction !== undefined;
     const menu = itemsIn(session, SERVE_ORDER);
@@ -1819,7 +1993,9 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * (bag, points card, anything from behind the counter, the cash it hands over); one at a restaurant table orders
  * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. The server
  * asks how many and where to sit and seats the guest, takes a meal order the barista's way, recommends a dish that
- * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. Taking a regular's order, it
+ * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. The bathhouse attendant asks
+ * whether a bather wants a towel and reads back the bath with its price before calling admit, and reads back gym
+ * membership and its price before calling register_member (renewing, it reads it back as it greets). Taking a regular's order, it
  * greets them with "the usual?" and serves it on a yes. In Small Talk it
  * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Any Named NPC,
  * in any conversation, thanks the Character for a gift (more warmly for their favourite), and asked what gift they

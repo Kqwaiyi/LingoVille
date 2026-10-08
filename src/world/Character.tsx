@@ -26,6 +26,7 @@ import {
 } from '../store/index.ts';
 import type { Control } from './controls.ts';
 import {
+  BATHHOUSE_GYM,
   HOME_BED,
   HOME_STOVE,
   HOME_TAP,
@@ -55,7 +56,7 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: the tap, the stove or the bed, a workplace's staff door, the nearest
+ * What the Character standing here could use with E: the tap, the stove or the bed, the gym, a workplace's staff door, the nearest
  * person in talking range, the nearest supermarket shelf, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
@@ -64,6 +65,7 @@ function interactableAt(x: number, z: number, tramRunning: boolean): Interactabl
   if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
   if (placeId === 'home' && distanceTo(x, z, HOME_STOVE) <= MOVEMENT.interactRangeMetres) return 'stove';
   if (placeId === 'home' && distanceTo(x, z, HOME_BED) <= MOVEMENT.interactRangeMetres) return 'bed';
+  if (placeId === 'bathhouse' && distanceTo(x, z, BATHHOUSE_GYM) <= MOVEMENT.interactRangeMetres) return 'gym';
   const job = placeId && jobAt(placeId);
   const workplace = job ? WORKPLACES[job] : undefined;
   if (workplace && distanceTo(x, z, workplace.usedFrom) <= MOVEMENT.interactRangeMetres) return 'staff-door';

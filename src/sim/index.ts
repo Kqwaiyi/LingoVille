@@ -15,7 +15,8 @@ export {
 } from './approaches.ts';
 export { cook } from './cook.ts';
 export { faint, faintedBetween } from './faint.ts';
-export { jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
+export { gymMembership, gymRefusal, gymSession, type GymMembership, type GymRefusal } from './gym.ts';
+export { fitnessIllnessFactor, jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';
 export { hire, namesMatch } from './jobs.ts';
 export { applyShiftCustomer, cancelShift, endShift, nextShiftCustomer, shiftRefusal, startShift, type ShiftRefusal } from './shift.ts';

@@ -37,13 +37,20 @@ const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askFor
   hire: 'prompt.askForWork',
 };
 
-/** What F offers with this conversation: at the bookshop, buying a gift, at a restaurant table, a recommendation, and otherwise by its effect. */
+/** What F offers by the conversation itself, where its effect doesn't say. */
+const F_PROMPTS_BY_INTERACTION = new Map<Interaction, 'prompt.buyGift' | 'prompt.askRecommendation' | 'prompt.joinGym' | 'prompt.renewGym'>([
+  [INTERACTIONS.buyAGift, 'prompt.buyGift'],
+  [INTERACTIONS.recommendAMeal, 'prompt.askRecommendation'],
+  [INTERACTIONS.joinTheGym, 'prompt.joinGym'],
+  [INTERACTIONS.renewGymMembership, 'prompt.renewGym'],
+]);
+
+/**
+ * What F offers with this conversation: at the bookshop, buying a gift, at a restaurant table, a recommendation, at the
+ * bathhouse, joining or renewing at the gym, and otherwise by its effect.
+ */
 const fPrompt = (interaction: Interaction) =>
-  interaction === INTERACTIONS.buyAGift
-    ? 'prompt.buyGift'
-    : interaction === INTERACTIONS.recommendAMeal
-      ? 'prompt.askRecommendation'
-      : (F_PROMPTS[interaction.effect.kind] ?? 'prompt.ask');
+  F_PROMPTS_BY_INTERACTION.get(interaction) ?? F_PROMPTS[interaction.effect.kind] ?? 'prompt.ask';
 
 /** E pays at the till for shopping, and for the bill at the restaurant. */
 const PAYS: readonly EffectKind[] = ['purchase', 'settleBill'];
@@ -69,6 +76,7 @@ export function InteractionPrompt() {
   const keysOff = useGame(selectWorldKeysOff);
   const drinkWater = useGame((s) => s.drinkWater);
   const cook = useGame((s) => s.cook);
+  const workOut = useGame((s) => s.workOut);
   const sleep = useGame((s) => s.sleep);
   const talk = useGame((s) => s.talk);
   const openTram = useGame((s) => s.openTram);
@@ -89,6 +97,7 @@ export function InteractionPrompt() {
       if (interactable === 'tap') drinkWater();
       else if (interactable === 'stove') cook();
       else if (interactable === 'bed') sleep();
+      else if (interactable === 'gym') workOut();
       else if (tramStop) openTram();
       else if (shelf) takeFromShelf();
       else if (staffDoor) startShift();
@@ -96,7 +105,7 @@ export function InteractionPrompt() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, smallTalkKey, drinkWater, cook, sleep, openTram, takeFromShelf, startShift, talk]);
+  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, smallTalkKey, drinkWater, cook, sleep, workOut, openTram, takeFromShelf, startShift, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -122,6 +131,8 @@ export function InteractionPrompt() {
         <Trans i18nKey="prompt.cook" components={{ kbd: <kbd /> }} />
       ) : interactable === 'bed' ? (
         <Trans i18nKey="prompt.sleep" components={{ kbd: <kbd /> }} />
+      ) : interactable === 'gym' ? (
+        <Trans i18nKey="prompt.workOut" components={{ kbd: <kbd /> }} />
       ) : tramStop ? (
         <Trans i18nKey="prompt.tram" components={{ kbd: <kbd /> }} />
       ) : staffDoor ? (

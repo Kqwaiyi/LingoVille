@@ -989,6 +989,83 @@ describe('mock VoiceSession: the bookshop (#18, #19, #20)', () => {
   });
 });
 
+const atTheBathhouse = (packId: LanguageCode, interaction: Interaction = INTERACTIONS.buyBathEntry) =>
+  open(buildNpcSession(interaction, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.attendant, CLOCK_10AM));
+
+/** What the Player asks the attendant for, in each pack: a bath, and to join the gym. */
+const BATHHOUSE_ASKED = {
+  ja: { bath: 'お風呂に入りたいです', gym: 'ジムに入会したいです' },
+  zh: { bath: '我想洗澡', gym: '我想办健身卡' },
+  en: { bath: 'one for the baths please', gym: 'I want to join the gym' },
+  de: { bath: 'einmal ins Bad bitte', gym: 'ich möchte ins Fitnessstudio' },
+} as const;
+
+/** The local name of something the attendant sells, as the mock reads it back. */
+const deskGoodName = (packId: LanguageCode, itemId: 'bath-entry' | 'gym-membership') => CULTURE_PACKS[packId].goods[itemId].name.toLowerCase();
+
+describe('mock VoiceSession: the bathhouse (#21, #22)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('asks about a towel, reads back the bath with its price, then calls admit (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheBathhouse(packId);
+
+    await say(BATHHOUSE_ASKED[packId].bath);
+    await say(yes);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)!.toLowerCase()).toContain(deskGoodName(packId, 'bath-entry'));
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'admit', args: { options: ['towel'] } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(4);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('lets the Player in without a towel when they say no to one', async () => {
+    const { toolCalls, say } = await atTheBathhouse('zh');
+    await say('我想洗澡');
+    await say(PLAYER.zh.no);
+    await say(PLAYER.zh.yes);
+    expect(toolCalls.at(-1)!.args).toEqual({ options: [] });
+  });
+
+  it.each(LANGUAGE_CODES)('reads back gym membership with its price, then calls register_member to join (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheBathhouse(packId, INTERACTIONS.joinTheGym);
+
+    await say(BATHHOUSE_ASKED[packId].gym);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)!.toLowerCase()).toContain(deskGoodName(packId, 'gym-membership'));
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'register_member', args: { kind: 'join' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)('renews a membership that has run out in one yes: the greeting reads it back (%s)', async (packId) => {
+    const { turns, toolCalls, say } = await atTheBathhouse(packId, INTERACTIONS.renewGymMembership);
+    expect(turns[0]!.toLowerCase()).toContain(deskGoodName(packId, 'gym-membership'));
+
+    await say(PLAYER[packId].yes);
+
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'register_member', args: { kind: 'renew' } }]);
+  });
+
+  it('says so when the Player cannot afford it, and greets as the attendant, not the shopkeeper', async () => {
+    const { turns, say, answer } = await atTheBathhouse('en', INTERACTIONS.renewGymMembership);
+    await say('yes');
+    await answer({ result: 'cannot_afford' });
+    expect(turns.at(-1)).toMatch(/not enough/);
+
+    const shopkeeper = await atTheBookshop('en');
+    expect(turns[0]).not.toBe(shopkeeper.turns[0]);
+  });
+});
+
 const LUNCH = { clock: { day: 2, minuteOfDay: 12 * 60 } };
 const BILL = [
   { itemId: 'fish-dish', quantity: 1 },

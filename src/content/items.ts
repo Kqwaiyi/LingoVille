@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WELL_BEING, type ComfortKind } from '../sim/index.ts';
+import { ECONOMY, WELL_BEING, type ComfortKind } from '../sim/index.ts';
 
 // The shared catalogue of things the town sells. What an item does and what it
 // costs are authored once, here; each Culture Pack gives it a local name and
@@ -33,6 +33,8 @@ export const ITEM_IDS = [
   'flowers',
   'chocolates',
   'scented-candle',
+  'bath-entry',
+  'gym-membership',
 ] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 
@@ -95,6 +97,12 @@ export const READING_SOLD = ['mystery-novel', 'cookbook', 'travel-book', 'magazi
 
 /** The gifts the bookshop sells, in every pack. They go into the inventory, ready to give. */
 export const GIFTS_SOLD = ['flowers', 'chocolates', 'scented-candle'] as const satisfies readonly ItemId[];
+
+/** What the bathhouse's attendant sells: a bath (a Comfort Purchase) and gym membership, in every pack. */
+export const BATHHOUSE_COUNTER = ['bath-entry', 'gym-membership'] as const satisfies readonly ItemId[];
+
+/** What a bather can ask for at the bathhouse desk. Flavour only: both come with the entry price. */
+export const BATH_OPTIONS = ['towel', 'sauna'] as const;
 
 /** What a dish can have in it that some diners don't eat. */
 export const INGREDIENTS = ['meat', 'pork', 'seafood'] as const;
@@ -199,7 +207,10 @@ export const ITEMS: Record<ItemId, Item> = {
   flowers: { priceInShifts: 0.2, restores: {}, comfort: 'gift', gift: true },
   chocolates: { priceInShifts: 0.15, restores: {}, comfort: 'gift', gift: true },
   'scented-candle': { priceInShifts: 0.25, restores: {}, comfort: 'gift', gift: true },
+  'bath-entry': { priceInShifts: 0.1, restores: {}, comfort: 'bathhouse' },
+  // Gym membership is sold like an item so each pack prices it, but what it buys is 30 days at the gym.
+  'gym-membership': { priceInShifts: ECONOMY.gymMembershipInShifts, restores: {} },
 };
 
-/** Every Comfort Purchase the town sells: a restaurant meal by its dish (the bathhouse comes with its own ticket). */
+/** Every Comfort Purchase the town sells: a restaurant meal by its dish, and the bathhouse by its entry ticket. */
 export const COMFORT_PURCHASES = ITEM_IDS.filter((id) => ITEMS[id].comfort !== undefined);

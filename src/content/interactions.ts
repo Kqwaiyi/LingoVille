@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ECONOMY } from '../sim/index.ts';
 import { defineInteraction, type Interaction } from './defineInteraction.ts';
 import {
+  BATH_OPTIONS,
   BILL_METHODS,
   CAFE_COUNTER,
   CONVENIENCE_MENU,
@@ -50,6 +51,17 @@ const serveMeal = {
     'Serve the guest exactly the meal they confirmed after your read-back. It goes on their bill, which they pay later. ' +
     'Answers "served", "cannot_afford" (they could not pay for it) or "invalid_arguments".',
   args: z.object({ items: orderItems(RESTAURANT_MENU) }),
+};
+
+/** `register_member()` at the bathhouse desk: joining the gym, or renewing a membership that has run out (#22). */
+const registerMember = {
+  name: 'register_member',
+  description:
+    `Register the customer as a gym member for ${ECONOMY.gymMembershipDays} days and take payment, once they have confirmed your ` +
+    'read-back of the membership and its price. Answers "done", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
+  args: z.object({
+    kind: z.enum(['join', 'renew']).describe('Whether they are joining for the first time, or renewing a membership that has run out.'),
+  }),
 };
 
 /** When a hired applicant says they can start. Shifts have no schedule, so it is only what was agreed. */
@@ -309,6 +321,58 @@ export const INTERACTIONS = {
     },
     band: 'B',
     effect: { kind: 'settleBill' },
+  }),
+  // #21. A bath at the bathhouse: a Comfort Purchase, and the biggest Mood lift. E at the attendant.
+  buyBathEntry: defineInteraction({
+    id: 'buy-bath-entry',
+    placeId: 'bathhouse',
+    npcId: 'attendant',
+    goal:
+      'Sell the customer entry to the bath. Ask whether they would like to borrow a towel, and answer anything they ask about ' +
+      'the bath and how to use it.',
+    facts: ['openingHours', 'bathhouse', 'placeFacts'],
+    items: ['bath-entry'],
+    completion: {
+      name: 'admit',
+      description:
+        'Let the customer into the bath and take payment, once they have confirmed your read-back of the entry and its price. ' +
+        'Answers "done", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
+      args: z.object({
+        options: z
+          .array(z.enum(BATH_OPTIONS))
+          .describe('What they asked for: "towel" to borrow a towel, "sauna" for the sauna or steam room. Both come with entry. Empty if neither.'),
+      }),
+    },
+    band: 'B',
+    effect: { kind: 'admit' },
+  }),
+  // #22. Joining the gym at the bathhouse desk, and asking about the rules. F at the attendant, until the Character is a member.
+  joinTheGym: defineInteraction({
+    id: 'join-the-gym',
+    placeId: 'bathhouse',
+    npcId: 'attendant',
+    goal:
+      'The customer is asking about the gym. Explain how membership works and any gym rules they ask about, and sign them up ' +
+      'if they want to join.',
+    facts: ['openingHours', 'bathhouse', 'placeFacts'],
+    items: ['gym-membership'],
+    completion: registerMember,
+    band: 'I',
+    effect: { kind: 'registerMember' },
+  }),
+  // #22's short renewal path. F at the attendant once the Character's membership has run out: it is never renewed automatically.
+  renewGymMembership: defineInteraction({
+    id: 'renew-gym-membership',
+    placeId: 'bathhouse',
+    npcId: 'attendant',
+    goal:
+      "This customer is a gym member whose membership has run out, and the gym won't let them in until it is renewed. " +
+      `They have come to the desk about it. Offer to renew it for another ${ECONOMY.gymMembershipDays} days, tell them the price, and renew it if they agree.`,
+    facts: ['openingHours', 'bathhouse', 'placeFacts'],
+    items: ['gym-membership'],
+    completion: registerMember,
+    band: 'I',
+    effect: { kind: 'registerMember' },
   }),
   // Not one the Player starts: the nurse begins it when the Character wakes from Fainting.
   wakeInWard: defineInteraction({

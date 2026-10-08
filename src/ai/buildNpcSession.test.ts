@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction } from '../content/index.ts';
 import {
   CLOCK,
   FAMILIARITY,
@@ -177,6 +177,27 @@ describe('buildNpcSession: the bookshop', () => {
   it('has the shopkeeper ask about wrapping a gift, and recommend by taste', () => {
     expect(shopkeeperSession(INTERACTIONS.buyAGift, 'de').systemInstruction).toMatch(/gift-wrapped/);
     expect(shopkeeperSession(INTERACTIONS.recommendABook, 'de', 'C1').systemInstruction).toMatch(/recommend.*taste/);
+  });
+});
+
+describe('buildNpcSession: the bathhouse', () => {
+  const NOON = { day: 2, minuteOfDay: 12 * 60 };
+  const attendantSession = (interaction: Interaction, packId: LanguageCode, step: ProficiencyStep = 'A1') =>
+    buildNpcSession(interaction, CULTURE_PACKS[packId], step, NAMED_NPCS.attendant, { clock: NOON });
+
+  it.each(LANGUAGE_CODES)('builds the attendant selling a bath, joining the gym and renewing it in the %s pack', (packId) => {
+    expect(attendantSession(INTERACTIONS.buyBathEntry, packId)).toMatchSnapshot();
+    expect(attendantSession(INTERACTIONS.joinTheGym, packId, 'B1')).toMatchSnapshot();
+    expect(attendantSession(INTERACTIONS.renewGymMembership, packId, 'B1')).toMatchSnapshot();
+  });
+
+  it('works at the bathhouse by its local name, with its prices and its own facts, completing with admit or register_member', () => {
+    const bath = attendantSession(INTERACTIONS.buyBathEntry, 'de');
+    expect(bath.systemInstruction).toContain('Stadtbad');
+    expect(bath.systemInstruction).toContain(`Bath entry: Eintritt Bad und Sauna, ${formatLocalMoney(menuPrice('bath-entry', 'de'), 'de')}.`);
+    expect(bath.systemInstruction).toContain('swimwear-free');
+    expect(bath.tools.map((tool) => tool.name)).toEqual(['admit', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
+    expect(attendantSession(INTERACTIONS.renewGymMembership, 'de').tools[0]!.name).toBe('register_member');
   });
 });
 
