@@ -223,6 +223,9 @@ export const WARD_BED: Vec3 = [-21.2, 0.25, 19.4];
 /** After Fainting, the Character wakes up in the ward bed. */
 export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
 
+/** In front of the doctor: where the Character goes when the doctor calls their name from the waiting room. */
+export const BEFORE_THE_DOCTOR: Vec3 = [NPC_SPOTS.doctor[0], 1.5, NPC_SPOTS.doctor[2] - 1.8];
+
 /**
  * Where the Character appears. A new game starts the First Morning at home
  * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the

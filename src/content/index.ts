@@ -23,6 +23,7 @@ export {
   defineInteraction,
   FACT_SOURCES,
   type Band,
+  type Diagnosis,
   type EffectKind,
   type FactSource,
   type Interaction,
@@ -33,8 +34,19 @@ export {
   type RentChange,
   type ResolvedCompletion,
   type ServedItem,
+  type Treatment,
 } from './defineInteraction.ts';
-export { basketFacts, interactionFacts, readBasketTotal, readBillTotal, readNewWeeklyRent, readRentOwed, type FactsContext } from './facts.ts';
+export {
+  basketFacts,
+  interactionFacts,
+  readBasketTotal,
+  readBillTotal,
+  readHospitalOwed,
+  readNewWeeklyRent,
+  readPrescription,
+  readRentOwed,
+  type FactsContext,
+} from './facts.ts';
 export { INTERACTIONS, START_WHEN } from './interactions.ts';
 export {
   DEFAULT_DRINK,
@@ -89,7 +101,7 @@ export {
   type ItemId,
   type Restores,
 } from './items.ts';
-export { ILLNESSES, illnessSchema, MEDICINE_IDS, SYMPTOM_IDS, type Illness, type MedicineId, type SymptomId } from './illnesses.ts';
+export { illnessCuredBy, ILLNESSES, illnessSchema, MEDICINE_IDS, SYMPTOM_IDS, type Illness, type MedicineId, type SymptomId } from './illnesses.ts';
 export { NAMED_NPC_IDS, NAMED_NPCS, namedNpcSchema, type NamedNpc, type NamedNpcId } from './npcs.ts';
 export { PLACE_PHRASEBOOKS, placePhrasebook, placePhrasebookSchema, type PlacePhrase } from './phrasebooks.ts';
 export { placeHours } from './openingHours.ts';

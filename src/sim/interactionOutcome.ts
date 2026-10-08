@@ -1,5 +1,6 @@
-import type { Interaction, JobApplication, OrderLine, RentChange, ServedItem } from '../content/index.ts';
+import type { Interaction, JobApplication, OrderLine, RentChange, ServedItem, Treatment } from '../content/index.ts';
 import type { Basket } from './basket.ts';
+import { checkIn, diagnose, dispense, settleHospitalBill } from './clinic.ts';
 import { stockInventory } from './inventory.ts';
 import { hire, namesMatch } from './jobs.ts';
 import { goalInteractionFamiliarity } from './familiarity.ts';
@@ -111,6 +112,19 @@ function applyJobApplication(state: GameState, { jobId, name }: JobApplication):
   return { state: hired.state, result: { kind: 'success', served: [], paidInShifts: 0, moodChange: hired.moodChange, hired: jobId } };
 }
 
+/** The pharmacist's completion: the prescribed medicine, paid for and taken on the spot. */
+function applyTreatment(state: GameState, treatment: Treatment, lines: OrderLine[]): { state: GameState; result: OutcomeResult } {
+  const { costInShifts } = orderTotals(lines);
+  const dispensed = dispense(state, treatment, costInShifts);
+  if (dispensed.kind === 'cannot_afford') return { state, result: { kind: 'cannot_afford' } };
+  if (dispensed.kind === 'not_prescribed') {
+    return { state, result: { kind: 'invalid_arguments', error: 'That is not the medicine on the prescription in FACTS.' } };
+  }
+  const lifted = changeMood(dispensed.state, MOOD.changes.goalInteractionSuccess);
+  const served = lines.map(({ itemId, name, glosses, quantity }) => ({ itemId, name, glosses, quantity }));
+  return { state: lifted.state, result: { kind: 'success', served, paidInShifts: costInShifts, moodChange: lifted.moodChange } };
+}
+
 /**
  * Applies the end of a Goal Interaction. Success validates the completion
  * arguments and checks the Character can afford them (money is never in the
@@ -151,6 +165,18 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
       if (completion.rent) return applyRentChange(state, completion.rent);
       if (completion.application) return applyJobApplication(state, completion.application);
+      if (completion.checkIn) return succeeded(checkIn(state));
+      if (completion.diagnosis) {
+        const diagnosed = diagnose(state, completion.diagnosis);
+        return succeeded(diagnosed, state.character.moneyInShifts - diagnosed.character.moneyInShifts);
+      }
+      if (completion.treatment) return applyTreatment(state, completion.treatment, completion.lines);
+      if (completion.paymentPlanWeeks !== undefined) {
+        const settled = settleHospitalBill(state, completion.paymentPlanWeeks);
+        if (settled.kind === 'nothing_owed') return { state, result: { kind: 'invalid_arguments', error: 'The patient owes the hospital nothing.' } };
+        if (settled.kind === 'cannot_afford') return { state, result: { kind: 'cannot_afford' } };
+        return succeeded(settled.state, settled.paidInShifts);
+      }
       if (effect.kind === 'seatGuest') return succeeded({ ...state, restaurant: { ...restaurant, seated: true } });
       if (effect.kind === 'orderMeal' && !restaurant.seated) {
         return { state, result: { kind: 'invalid_arguments', error: 'The customer has no table yet: they must be seated before they order.' } };

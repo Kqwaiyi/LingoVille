@@ -31,10 +31,11 @@ import { itemLabel } from './itemLabel.ts';
 /** What the staff door says when E can't start a Shift there now. */
 const STAFF_DOOR_REFUSALS = { notHired: 'prompt.staffOnly', workedToday: 'prompt.workedToday', closed: 'prompt.shiftClosed' } as const;
 
-/** What F offers, by the second conversation's effect: asking where something is, for more time, or for work. */
-const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askForWork'>> = {
+/** What F offers, by the second conversation's effect: asking where something is, for more time or for work, or settling the hospital bill. */
+const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askForWork' | 'prompt.settleHospitalBill'>> = {
   extendRent: 'prompt.askForTime',
   hire: 'prompt.askForWork',
+  setPaymentPlan: 'prompt.settleHospitalBill',
 };
 
 /** What F offers by the conversation itself, where its effect doesn't say. */

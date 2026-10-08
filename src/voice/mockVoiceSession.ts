@@ -20,6 +20,7 @@ import {
   BILL_METHODS,
   CULTURE_PACKS,
   dishFits,
+  ILLNESSES,
   INTERACTIONS,
   isDish,
   ITEMS,
@@ -27,14 +28,18 @@ import {
   NAMED_NPCS,
   readBasketTotal,
   readBillTotal,
+  readHospitalOwed,
   readNewWeeklyRent,
+  readPrescription,
   readRentOwed,
   SEATING,
   START_WHEN,
+  SYMPTOM_IDS,
   type DietaryNoteId,
   type ItemId,
+  type SymptomId,
 } from '../content/index.ts';
-import type { LanguageCode } from '../sim/index.ts';
+import { ECONOMY, ILLNESS_IDS, type IllnessId, type LanguageCode } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
 
 /** Roughly how long the real NPC takes to start answering. */
@@ -56,6 +61,10 @@ const SEAT_GUEST = INTERACTIONS.getATable.completion.name;
 const SETTLE_BILL = INTERACTIONS.payTheBill.completion.name;
 const ADMIT = INTERACTIONS.buyBathEntry.completion.name;
 const REGISTER_MEMBER = INTERACTIONS.joinTheGym.completion.name;
+const REGISTER_PATIENT = INTERACTIONS.checkIn.completion.name;
+const DIAGNOSE = INTERACTIONS.seeTheDoctor.completion.name;
+const DISPENSE = INTERACTIONS.getMedicine.completion.name;
+const SET_PAYMENT_PLAN = INTERACTIONS.settleHospitalBill.completion.name;
 /** How many more days the fake landlord gives. */
 const EXTENSION_DAYS = 3;
 
@@ -100,6 +109,10 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'scented-candle': ['キャンドル', 'ろうそく'],
     'bath-entry': ['お風呂', '風呂', 'ふろ', '入浴', '銭湯'],
     'gym-membership': ['ジム', 'じむ', 'トレーニング', '会員'],
+    'cold-medicine': ['風邪薬', 'かぜぐすり'],
+    'fever-reducer': ['解熱剤', 'げねつざい', '熱さまし'],
+    'stomach-medicine': ['胃腸薬', 'いちょうやく', '胃薬'],
+    antihistamine: ['花粉症の薬', 'アレルギーの薬'],
   },
   zh: {
     latte: ['拿铁', 'latte'],
@@ -131,6 +144,10 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'scented-candle': ['蜡烛', '香薰'],
     'bath-entry': ['洗澡', '泡澡', '澡', '浴'],
     'gym-membership': ['健身', '会员'],
+    'cold-medicine': ['感冒药'],
+    'fever-reducer': ['退烧药', '退烧'],
+    'stomach-medicine': ['肠胃药', '胃药'],
+    antihistamine: ['抗过敏药', '过敏药'],
   },
   en: {
     latte: ['latte'],
@@ -162,6 +179,10 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'scented-candle': ['candle'],
     'bath-entry': ['bath', 'baths', 'swim', 'steam', 'pool'],
     'gym-membership': ['gym', 'membership', 'join'],
+    'cold-medicine': ['cold relief', 'capsules'],
+    'fever-reducer': ['paracetamol'],
+    'stomach-medicine': ['stomach settler'],
+    antihistamine: ['hay fever tablets', 'antihistamine'],
   },
   de: {
     latte: ['latte', 'milchkaffee'],
@@ -193,6 +214,10 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     'scented-candle': ['duftkerze', 'kerze'],
     'bath-entry': ['bad', 'baden', 'sauna', 'schwimmen'],
     'gym-membership': ['fitnessstudio', 'fitness', 'mitglied', 'mitgliedschaft', 'training'],
+    'cold-medicine': ['erkältungsmittel'],
+    'fever-reducer': ['fiebersaft'],
+    'stomach-medicine': ['magentropfen'],
+    antihistamine: ['heuschnupfentabletten'],
   },
 };
 
@@ -1207,6 +1232,305 @@ function memberNpc(script: AttendantScript, common: OrderScript, packId: Languag
   };
 }
 
+/** How each pack's Player might describe each symptom. */
+const SYMPTOM_WORDS: Record<LanguageCode, Record<SymptomId, string[]>> = {
+  ja: {
+    cough: ['咳', 'せき'],
+    'sore-throat': ['喉', 'のど'],
+    'runny-nose': ['鼻水', 'はなみず'],
+    fever: ['熱', 'ねつ'],
+    'body-aches': ['節々', 'ふしぶし', '体が痛', 'からだが痛'],
+    chills: ['寒気', 'さむけ'],
+    'stomach-ache': ['お腹', 'おなか', '腹痛'],
+    nausea: ['吐き気', 'はきけ'],
+    sneezing: ['くしゃみ'],
+    'itchy-eyes': ['目がかゆ', '目が痒'],
+  },
+  zh: {
+    cough: ['咳嗽'],
+    'sore-throat': ['嗓子', '喉咙'],
+    'runny-nose': ['鼻涕'],
+    fever: ['发烧', '发热'],
+    'body-aches': ['浑身疼', '全身疼', '身上疼'],
+    chills: ['发冷'],
+    'stomach-ache': ['肚子疼', '胃疼'],
+    nausea: ['恶心', '想吐'],
+    sneezing: ['喷嚏'],
+    'itchy-eyes': ['眼睛痒'],
+  },
+  en: {
+    cough: ['cough', 'coughing'],
+    'sore-throat': ['sore throat', 'throat'],
+    'runny-nose': ['runny nose', 'nose'],
+    fever: ['fever', 'temperature'],
+    'body-aches': ['aches', 'aching'],
+    chills: ['chills', 'shivering', 'shivery'],
+    'stomach-ache': ['stomach', 'tummy'],
+    nausea: ['nausea', 'nauseous', 'throw up', 'sick'],
+    sneezing: ['sneeze', 'sneezing'],
+    'itchy-eyes': ['itchy eyes', 'eyes'],
+  },
+  de: {
+    cough: ['husten'],
+    'sore-throat': ['halsschmerzen', 'hals'],
+    'runny-nose': ['schnupfen', 'nase'],
+    fever: ['fieber'],
+    'body-aches': ['gliederschmerzen', 'glieder'],
+    chills: ['schüttelfrost', 'friere'],
+    'stomach-ache': ['bauchschmerzen', 'bauch', 'magen'],
+    nausea: ['übel', 'übelkeit'],
+    sneezing: ['niesen'],
+    'itchy-eyes': ['augen'],
+  },
+};
+
+/** The symptoms a line describes, in the order the game lists them. */
+const symptomsIn = (line: string, packId: LanguageCode) => SYMPTOM_IDS.filter((id) => mentions(line, SYMPTOM_WORDS[packId][id]));
+
+/** The fake clinic staff: reception (#12, #15), the doctor (#13) and the pharmacist (#14). */
+type ClinicScript = {
+  receptionGreeting: string;
+  /** Words for wanting to see the doctor, besides any symptom. */
+  unwell: string[];
+  readBackCheckIn: string;
+  checkedIn: string;
+  clarifyCheckIn: string;
+  doctorGreeting: string;
+  askSymptoms: string;
+  readBackDiagnosis: (illness: string) => string;
+  diagnosed: string;
+  illnesses: Record<IllnessId, string>;
+  pharmacyGreeting: (medicine: string, price: string) => string;
+  noPrescription: string;
+  dispensed: string;
+  billGreeting: (owed: string) => string;
+  /** Words for paying the whole bill now. */
+  all: string[];
+  readBackAll: (owed: string) => string;
+  readBackWeeks: (weeks: number) => string;
+  settled: string;
+  clarifyBill: string;
+  cannotAfford: string;
+  resume: string;
+};
+
+const CLINIC_SCRIPT: Record<LanguageCode, ClinicScript> = {
+  ja: {
+    receptionGreeting: 'こんにちは。今日はどうされましたか？',
+    unwell: ['診察', '先生', '具合', '医者'],
+    readBackCheckIn: '診察ですね。受付しますね。よろしいですか？',
+    checkedIn: '受付しました。待合室でお待ちください。お名前をお呼びします。',
+    clarifyCheckIn: '今日はどうされましたか？',
+    doctorGreeting: 'どうぞ、お入りください。今日はどうしましたか？',
+    askSymptoms: 'どんな症状がありますか？',
+    readBackDiagnosis: (illness) => `${illness}ですね。お薬を出しておきます。わかりましたか？`,
+    diagnosed: 'お大事に。お薬は薬局で受け取ってください。',
+    illnesses: { cold: '風邪', flu: 'インフルエンザ', 'food-poisoning': '食中毒', 'hay-fever': '花粉症' },
+    pharmacyGreeting: (medicine, price) => `こんにちは。${medicine}ですね。${price}です。よろしいですか？`,
+    noPrescription: 'すみません、処方箋がないとお薬はお出しできません。',
+    dispensed: 'こちらです。お大事にどうぞ。',
+    billGreeting: (owed) => `病院のお支払いが${owed}残っています。一括にしますか、分割にしますか？`,
+    all: ['一括', '全部', 'ぜんぶ', 'いっかつ'],
+    readBackAll: (owed) => `では、${owed}を一括でお支払いですね。よろしいですか？`,
+    readBackWeeks: (weeks) => `では、${weeks}週間の分割ですね。家賃の日に引き落とします。よろしいですか？`,
+    settled: 'ありがとうございました。お大事に。',
+    clarifyBill: '一括にしますか、分割にしますか？',
+    cannotAfford: '申し訳ございません、お支払いが足りないようです。分割もできますよ。',
+    resume: 'お待たせしました。どうぞ。',
+  },
+  zh: {
+    receptionGreeting: '您好，今天哪里不舒服？',
+    unwell: ['看病', '医生', '不舒服'],
+    readBackCheckIn: '您要看医生，对吗？我给您挂号。',
+    checkedIn: '挂好号了。请在候诊室等一下，到时候会叫您的名字。',
+    clarifyCheckIn: '您今天哪里不舒服？',
+    doctorGreeting: '请进，请坐。今天哪里不舒服？',
+    askSymptoms: '您有什么症状？',
+    readBackDiagnosis: (illness) => `您这是${illness}。我给您开点药。明白了吗？`,
+    diagnosed: '多休息。去药房拿药吧。',
+    illnesses: { cold: '感冒', flu: '流感', 'food-poisoning': '食物中毒', 'hay-fever': '花粉过敏' },
+    pharmacyGreeting: (medicine, price) => `您好。${medicine}，${price}。对吗？`,
+    noPrescription: '不好意思，没有处方我不能给您药。',
+    dispensed: '给您。祝您早日康复！',
+    billGreeting: (owed) => `您还欠医院${owed}。一次付清，还是分期付款？`,
+    all: ['全部', '一次', '付清'],
+    readBackAll: (owed) => `好的，一次付清${owed}，对吗？`,
+    readBackWeeks: (weeks) => `好的，分${weeks}周付，每周交房租那天扣款，对吗？`,
+    settled: '好的，谢谢您。多保重！',
+    clarifyBill: '您想一次付清，还是分期？',
+    cannotAfford: '不好意思，您的钱好像不够。也可以分期付。',
+    resume: '让您久等了。请说吧。',
+  },
+  en: {
+    receptionGreeting: 'Hello there. What brings you in today?',
+    unwell: ['doctor', 'unwell', 'ill', 'poorly', 'appointment'],
+    readBackCheckIn: "Right, you'd like to see the doctor about that. Shall I check you in?",
+    checkedIn: "You're checked in. Take a seat in the waiting room, and the doctor will call your name.",
+    clarifyCheckIn: 'What brings you in today?',
+    doctorGreeting: 'Come in, have a seat. What seems to be the trouble?',
+    askSymptoms: 'What symptoms have you got?',
+    readBackDiagnosis: (illness) => `It sounds like ${illness}. I'll write you a prescription. Does that make sense?`,
+    diagnosed: 'Take care. Pick your medicine up at the pharmacy.',
+    illnesses: { cold: 'a cold', flu: 'flu', 'food-poisoning': 'food poisoning', 'hay-fever': 'hay fever' },
+    pharmacyGreeting: (medicine, price) => `Hello. ${medicine}, that's ${price}. Is that right?`,
+    noPrescription: "Sorry, I can't give you anything without a prescription.",
+    dispensed: 'Here you are. Hope you feel better soon!',
+    billGreeting: (owed) => `You owe the hospital ${owed}. Would you like to pay it all now, or in weekly instalments?`,
+    all: ['all', 'in full', 'everything'],
+    readBackAll: (owed) => `So that's ${owed}, all paid now. Is that right?`,
+    readBackWeeks: (weeks) => `So that's ${weeks} weekly instalments, taken on rent day. Is that right?`,
+    settled: 'Thank you. Take care!',
+    clarifyBill: 'Would you like to pay it all now, or in weekly instalments?',
+    cannotAfford: "Sorry, it looks like that's not enough. You could pay in instalments.",
+    resume: 'Sorry about that. Go on.',
+  },
+  de: {
+    receptionGreeting: 'Guten Tag. Was führt Sie zu uns?',
+    unwell: ['arzt', 'ärztin', 'krank', 'termin'],
+    readBackCheckIn: 'Sie möchten also zum Arzt. Soll ich Sie anmelden?',
+    checkedIn: 'Sie sind angemeldet. Bitte nehmen Sie im Wartezimmer Platz, wir rufen Sie auf.',
+    clarifyCheckIn: 'Was führt Sie zu uns?',
+    doctorGreeting: 'Kommen Sie herein, setzen Sie sich. Was fehlt Ihnen?',
+    askSymptoms: 'Welche Beschwerden haben Sie?',
+    readBackDiagnosis: (illness) => `Das klingt nach ${illness}. Ich schreibe Ihnen ein Rezept. Haben Sie das verstanden?`,
+    diagnosed: 'Gute Besserung! Das Medikament bekommen Sie in der Apotheke.',
+    illnesses: { cold: 'einer Erkältung', flu: 'einer Grippe', 'food-poisoning': 'einer Lebensmittelvergiftung', 'hay-fever': 'Heuschnupfen' },
+    pharmacyGreeting: (medicine, price) => `Guten Tag. ${medicine} für ${price}, richtig?`,
+    noPrescription: 'Tut mir leid, ohne Rezept kann ich Ihnen nichts geben.',
+    dispensed: 'Bitte schön. Gute Besserung!',
+    billGreeting: (owed) => `Sie schulden dem Krankenhaus ${owed}. Möchten Sie alles sofort zahlen oder in Wochenraten?`,
+    all: ['alles', 'sofort', 'komplett'],
+    readBackAll: (owed) => `Also ${owed}, alles sofort bezahlt, richtig?`,
+    readBackWeeks: (weeks) => `Also ${weeks} Wochenraten, jeweils am Miettag abgebucht, richtig?`,
+    settled: 'Vielen Dank. Gute Besserung!',
+    clarifyBill: 'Möchten Sie alles sofort zahlen oder in Wochenraten?',
+    cannotAfford: 'Oh, das reicht leider nicht. Sie können auch in Raten zahlen.',
+    resume: 'Entschuldigung! Bitte sprechen Sie weiter.',
+  },
+};
+
+/** #12: hears why the Player has come (a symptom, or wanting the doctor), reads it back and checks them in on a yes. */
+function receptionNpc(script: ClinicScript, common: OrderScript, packId: LanguageCode, act: Act): Npc {
+  let reason: string | null = null;
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: script.receptionGreeting,
+    resume: script.resume,
+    hear: (line) => {
+      const symptoms = symptomsIn(line, packId);
+      if (symptoms.length > 0 || mentions(line, script.unwell)) {
+        reason = symptoms.length > 0 ? symptoms.map((id) => id.replaceAll('-', ' ')).join(', ') : 'feeling unwell';
+        return act.say(script.readBackCheckIn);
+      }
+      if (reason && mentions(line, no)) {
+        reason = null;
+        return act.say(script.clarifyCheckIn);
+      }
+      if (reason && mentions(line, yes)) {
+        const args = { reason };
+        reason = null;
+        return act.call(REGISTER_PATIENT, args, (response) => act.say(response.result === 'done' ? script.checkedIn : script.clarifyCheckIn));
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(reason ? script.readBackCheckIn : script.clarifyCheckIn);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** #13: hears symptoms, names the Illness most of them fit, and diagnoses it once the Player says they've understood. */
+function doctorNpc(script: ClinicScript, common: OrderScript, packId: LanguageCode, act: Act): Npc {
+  let found: IllnessId | null = null;
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: script.doctorGreeting,
+    resume: script.resume,
+    hear: (line) => {
+      const symptoms = symptomsIn(line, packId);
+      if (symptoms.length > 0) {
+        const fits = (id: IllnessId) => ILLNESSES[id].symptoms.filter((symptom) => symptoms.includes(symptom)).length;
+        found = ILLNESS_IDS.reduce((best, id) => (fits(id) > fits(best) ? id : best));
+        return act.say(script.readBackDiagnosis(script.illnesses[found]));
+      }
+      if (found && mentions(line, no)) {
+        found = null;
+        return act.say(script.askSymptoms);
+      }
+      if (found && mentions(line, yes)) {
+        const args = { illness: found };
+        found = null;
+        return act.call(DIAGNOSE, args, (response) => act.say(response.result === 'done' ? script.diagnosed : script.askSymptoms));
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(found ? script.readBackDiagnosis(script.illnesses[found]) : script.askSymptoms);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** #14: reads back the prescription in FACTS as it greets, and dispenses it on a yes. With none, it can only say so. */
+function pharmacyNpc(script: ClinicScript, common: OrderScript, systemInstruction: string, packId: LanguageCode, act: Act): Npc {
+  const prescription = readPrescription(systemInstruction);
+  const { yes, no, known } = common.words;
+  const medicine = prescription && { name: CULTURE_PACKS[packId].goods[prescription].name, price: common.price(localPrice(ITEMS[prescription].priceInShifts, packId)) };
+  const readBack = medicine ? script.pharmacyGreeting(medicine.name, medicine.price) : script.noPrescription;
+  return {
+    ...common,
+    greeting: readBack,
+    resume: script.resume,
+    hear: (line) => {
+      if (prescription && mentions(line, yes) && !mentions(line, no)) {
+        return act.call(DISPENSE, { medicine: prescription }, (response) => {
+          if (response.result === 'served') act.say(script.dispensed);
+          else if (response.result === 'cannot_afford') act.say(common.cannotAfford);
+          else act.say(readBack);
+        });
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(readBack);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** #15: says what is owed as it greets, hears "all now" or a number of weeks, reads it back and settles it on a yes. */
+function hospitalBillNpc(script: ClinicScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
+  const owed = readHospitalOwed(systemInstruction) ?? '';
+  let weeks: number | null = null;
+  const { yes, no, known } = common.words;
+  const readBack = (n: number) => (n === 0 ? script.readBackAll(owed) : script.readBackWeeks(n));
+  return {
+    ...common,
+    greeting: script.billGreeting(owed),
+    resume: script.resume,
+    hear: (line) => {
+      const inWeeks = Number(/\d+/.exec(line)?.[0] ?? NaN);
+      if (inWeeks >= 1 && inWeeks <= ECONOMY.maxPaymentPlanWeeks) {
+        weeks = inWeeks;
+        return act.say(readBack(weeks));
+      }
+      if (mentions(line, script.all)) {
+        weeks = 0;
+        return act.say(readBack(weeks));
+      }
+      if (weeks !== null && mentions(line, no)) {
+        weeks = null;
+        return act.say(script.clarifyBill);
+      }
+      if (weeks !== null && mentions(line, yes)) {
+        const args = { weeks };
+        weeks = null;
+        return act.call(SET_PAYMENT_PLAN, args, (response) => {
+          if (response.result === 'done') act.say(script.settled);
+          else if (response.result === 'cannot_afford') act.say(script.cannotAfford);
+          else act.say(script.clarifyBill);
+        });
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(weeks === null ? script.clarifyBill : readBack(weeks));
+      act.notUnderstood();
+    },
+  };
+}
+
 function tillNpc(script: TillScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
   let bag: boolean | null = null;
   let card: boolean | null = null;
@@ -1952,6 +2276,10 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if (offers(SEAT_GUEST)) return tableNpc(SERVER_SCRIPT[packId], SCRIPT[packId], act);
   if (offers(SETTLE_BILL)) return billNpc(SERVER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(ADMIT)) return bathNpc(ATTENDANT_SCRIPT[packId], SCRIPT[packId], packId, act);
+  if (offers(REGISTER_PATIENT)) return receptionNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], packId, act);
+  if (offers(DIAGNOSE)) return doctorNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], packId, act);
+  if (offers(DISPENSE)) return pharmacyNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, packId, act);
+  if (offers(SET_PAYMENT_PLAN)) return hospitalBillNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(REGISTER_MEMBER)) {
     const renewing = session.systemInstruction.includes(INTERACTIONS.renewGymMembership.goal);
     return memberNpc(ATTENDANT_SCRIPT[packId], SCRIPT[packId], packId, renewing, act);

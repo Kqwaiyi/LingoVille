@@ -1,4 +1,5 @@
 import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
+import { leaveClinic } from './clinic.ts';
 import { faint } from './faint.ts';
 import { illnessHealthPerMinute } from './illness.ts';
 import { throwOutSpoiled } from './inventory.ts';
@@ -94,8 +95,8 @@ function decay(state: GameState, dtGameMinutes: number): GameState {
 /** The Character walks into a place, given its hours in this pack. A closed place can't be entered. */
 export function enterPlace(state: GameState, placeId: PlaceId, hours: OpeningHours): GameState {
   if (state.placeId === placeId || !isOpen(hours, state.clock)) return state;
-  // Walking out of the restaurant gives up the table, and any unpaid bill becomes debt.
-  return { ...leaveTable(state), placeId };
+  // Walking out of the restaurant gives up the table, and any unpaid bill becomes debt. Walking out of the clinic gives up a place in its queue.
+  return { ...leaveClinic(leaveTable(state)), placeId };
 }
 
 /** Tap water at home: refills Thirst for free. There's no tap anywhere else. */

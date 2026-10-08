@@ -6,6 +6,8 @@ export { addToBasket, putBackFromBasket, type Basket } from './basket.ts';
 export {
   APPROACH_IDS,
   approachDue,
+  approachMade,
+  approachStillDue,
   hallwayApproach,
   hallwayApproachMade,
   parkWaveDue,
@@ -13,6 +15,17 @@ export {
   type ApproachId,
   type HallwayApproachId,
 } from './approaches.ts';
+export {
+  checkIn,
+  doctorCallDue,
+  doctorCalled,
+  hospitalDebt,
+  hospitalPaymentPlan,
+  hospitalStatement,
+  settleHospitalBill,
+  type HospitalSettlement,
+  type HospitalStatement,
+} from './clinic.ts';
 export { cook } from './cook.ts';
 export { faint, faintedBetween } from './faint.ts';
 export { gymMembership, gymRefusal, gymSession, type GymMembership, type GymRefusal } from './gym.ts';

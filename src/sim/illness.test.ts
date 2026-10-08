@@ -62,8 +62,8 @@ describe('Illness onset', () => {
 
   it('does not strike a Character who is already ill with something else', () => {
     for (let seed = 0; seed < 200; seed++) {
-      const ill = lateEvening(seed, { illness: { illnessId: 'cold', onsetDay: 2 }, foodPoisoningChance: 1 });
-      expect(pastMidnight(ill).character.illness).toEqual({ illnessId: 'cold', onsetDay: 2 });
+      const ill = lateEvening(seed, { illness: { illnessId: 'cold', onsetDay: 2, treated: false }, foodPoisoningChance: 1 });
+      expect(pastMidnight(ill).character.illness).toEqual({ illnessId: 'cold', onsetDay: 2, treated: false });
     }
   });
 
@@ -85,7 +85,7 @@ describe('Illness onset', () => {
 
 /** A Character in the middle of the morning, with a cold or well, and their needs met unless the test says otherwise. */
 function midMorning(ill: boolean, character: Partial<GameState['character']> = {}): GameState {
-  const state = lateEvening(1, { illness: ill ? { illnessId: 'cold', onsetDay: 3 } : null, ...character });
+  const state = lateEvening(1, { illness: ill ? { illnessId: 'cold', onsetDay: 3, treated: false } : null, ...character });
   return { ...state, clock: { day: 3, minuteOfDay: 10 * HOUR } };
 }
 
@@ -145,7 +145,7 @@ describe('fainting', () => {
     const ill = midMorning(true, { health: 0.01 * METER_MAX, foodPoisoningChance: 1 });
     const after = tick(ill, HOUR);
     expect(faintedBetween(ill, after)).toBe(true);
-    expect(after.character.illness).toEqual({ illnessId: 'food-poisoning', onsetDay: after.clock.day });
+    expect(after.character.illness).toEqual({ illnessId: 'food-poisoning', onsetDay: after.clock.day, treated: false });
   });
 });
 

@@ -82,6 +82,8 @@ import {
   applyShiftCustomer,
   cancelShift,
   approachDue,
+  approachMade,
+  approachStillDue,
   casualRegisterDue,
   casualRegisterOffered,
   applyRecapEvidence,
@@ -105,6 +107,8 @@ import {
   gameMinutesFor,
   giveGift,
   gymMembership,
+  hospitalDebt,
+  hospitalStatement,
   gymRefusal,
   gymSession,
   isGoneOff,
@@ -358,6 +362,9 @@ export type Fainting = { billInShifts: number; paid: boolean };
 
 /** The Character has fainted and is taken to the ward. Each Fainting is a new object, so the world moves the Character into the ward bed once per Fainting. */
 export type WardArrival = { wokeInWardOnDay: number };
+
+/** The doctor has called the Character in from the waiting room, at this game time: the world walks them to the doctor. */
+export type DoctorCall = { day: number; minuteOfDay: number };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -702,6 +709,7 @@ export type GameStore = {
   /** The Fainting screen, while it shows. Time stands still behind it. */
   fainting: Fainting | null;
   wardArrival: WardArrival | null;
+  doctorCall: DoctorCall | null;
   /** What the Shift that just ended paid, until the Player closes it. */
   shiftEnd: ShiftEnd | null;
   /** The sign the Player is pointing at, and whether the pointer is on its tooltip, which keeps it open. */
@@ -865,7 +873,7 @@ const isShelf = (interactable: Interactable | null): interactable is GroceryId =
   (GROCERIES_SOLD as readonly (Interactable | null)[]).includes(interactable);
 
 /** The completions that hand something over, and answer "served": an order, a restaurant meal, or shopping. */
-const SERVED_EFFECTS: readonly EffectKind[] = ['serveOrder', 'orderMeal', 'purchase'];
+const SERVED_EFFECTS: readonly EffectKind[] = ['serveOrder', 'orderMeal', 'purchase', 'dispense'];
 
 /** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
 const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
@@ -1094,7 +1102,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const atHour = startHour === null ? onDay : { ...onDay, clock: { ...onDay.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
       const illnessId = deps.devIllness();
       const ill =
-        illnessId === null ? atHour : { ...atHour, character: { ...atHour.character, illness: { illnessId, onsetDay: atHour.clock.day } } };
+        illnessId === null ? atHour : { ...atHour, character: { ...atHour.character, illness: { illnessId, onsetDay: atHour.clock.day, treated: false } } };
       play(
         faintSoon === null
           ? ill
@@ -1855,6 +1863,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           ...(onCounter.length > 0 && { basket: onCounter }),
           ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
           ...(interaction.effect.kind === 'settleBill' && { bill: game.restaurant.bill, restaurantDebt: restaurantDebt(game) }),
+          ...(interaction.effect.kind === 'dispense' && { prescription: game.clinic.prescription }),
+          ...(interaction.effect.kind === 'setPaymentPlan' && { hospital: hospitalStatement(game) }),
           relationship: relationshipWith(game, npc.id),
           ...(onTheHouse && { onTheHouse }),
           ...(offersCasualRegister && { offersCasualRegister }),
@@ -1938,6 +1948,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // No one comes over during a Shift: the Character is at work.
       if (!approach || conversation || fainting || journal || screen !== 'playing' || get().game.possessions.shift) return;
       pendingApproach = null;
+      if (!approachStillDue(get().game, approach)) return;
+      // Called in, the Character goes through to the doctor.
+      if (approach === 'doctorCallsName') set({ doctorCall: { ...get().game.clock } });
+      set({ game: approachMade(get().game, approach) });
       startConversation(approachInteraction(approach), approach);
     };
 
@@ -2003,6 +2017,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       journal: null,
       fainting: null,
       wardArrival: null,
+      doctorCall: null,
       shiftEnd: null,
       persistCallout: false,
       sign: null,
@@ -2570,6 +2585,8 @@ const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): In
     restaurant,
     owesRestaurant,
     gymMembership: gymMembership(s.game),
+    owesHospital: hospitalDebt(s.game) > 0,
+    holdsPrescription: s.game.clinic.prescription !== null,
   });
 };
 /**
@@ -2668,6 +2685,7 @@ export const selectRecap = (s: GameStore) => (s.conversation?.showingRecap ? s.c
 export const selectJournal = (s: GameStore) => s.journal;
 export const selectFainting = (s: GameStore) => s.fainting;
 export const selectWardArrival = (s: GameStore) => s.wardArrival;
+export const selectDoctorCall = (s: GameStore) => s.doctorCall;
 /** The NPC's face: Patience shows only like this, never as a number. */
 export const selectNpcExpression = (s: GameStore): NpcExpression | null =>
   s.conversation ? npcExpression(s.conversation.patience) : null;

@@ -95,6 +95,7 @@ export {
   selectVoiceUnavailable,
   selectWeekday,
   selectWardArrival,
+  selectDoctorCall,
   selectHeldStill,
   selectWorldKeysOff,
   useGame,
@@ -137,6 +138,7 @@ export {
   type TitleView,
   type Toast,
   type WardArrival,
+  type DoctorCall,
 } from './gameStore.ts';
 export {
   browserJournal,

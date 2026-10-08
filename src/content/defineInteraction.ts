@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { JOB_IDS, type Basket, type ComfortKind, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
+import { ECONOMY, JOB_IDS, type Basket, type ComfortKind, type IllnessId, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
-import { menuPrice } from './currency.ts';
+import { chargeInShifts, menuPrice } from './currency.ts';
+import { illnessCuredBy, ILLNESSES, type MedicineId } from './illnesses.ts';
 import { BATH_OPTIONS, DIETARY_NOTES, dishContents, dishFits, ITEM_IDS, ITEMS, type DietaryNoteId, type ItemId, type Restores } from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
 import { PLACE_HOURS } from './places.ts';
@@ -25,6 +26,10 @@ export const FACT_SOURCES = [
   'bathhouse',
   'rent',
   'newcomerDiscount',
+  'clinic',
+  'symptoms',
+  'prescription',
+  'hospitalBill',
 ] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
@@ -50,6 +55,14 @@ type SettleBillArgs = { method: string };
 type AdmitArgs = { options: (typeof BATH_OPTIONS)[number][] };
 /** The arguments a `registerMember` effect's completion carries: joining or renewing (flavour only: the sim knows which). */
 type RegisterMemberArgs = { kind: 'join' | 'renew' };
+/** The arguments a `registerPatient` effect's completion carries: why the patient has come (flavour only). */
+type RegisterPatientArgs = { reason: string };
+/** The arguments a `diagnose` effect reads: the Illness the doctor found, from the symptoms the patient described. */
+type DiagnoseArgs = { illness: IllnessId };
+/** The arguments a `dispense` effect reads: the medicine the pharmacist hands over. */
+type DispenseArgs = { medicine: MedicineId };
+/** The arguments a `setPaymentPlan` effect reads: how many weekly instalments, or 0 to pay the hospital bill in full now. */
+type PaymentPlanArgs = { weeks: number };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
@@ -59,7 +72,10 @@ type RegisterMemberArgs = { kind: 'join' | 'renew' };
  * gives the Character more time to pay. `hire` gives the Character its Job, once the sim
  * has checked the name. At the restaurant, `seatGuest` gives the Character a table, `orderMeal` serves a meal there and
  * puts it on the bill (keeping to a stated dietary need), and `settleBill` charges the bill. At the bathhouse, `admit`
- * charges a bath, and `registerMember` charges gym membership and gives `ECONOMY.gymMembershipDays` at the gym. `none` is flavour only.
+ * charges a bath, and `registerMember` charges gym membership and gives `ECONOMY.gymMembershipDays` at the gym. At the clinic,
+ * `registerPatient` checks the Character in to wait for the doctor, `diagnose` records the doctor's prescription and charges
+ * the visit, `dispense` charges the prescribed medicine and cures the Illness it treats, and `setPaymentPlan` pays hospital
+ * debt in full or spreads it over weekly instalments. `none` is flavour only.
  */
 export type EffectKind =
   | 'none'
@@ -73,7 +89,11 @@ export type EffectKind =
   | 'orderMeal'
   | 'settleBill'
   | 'admit'
-  | 'registerMember';
+  | 'registerMember'
+  | 'registerPatient'
+  | 'diagnose'
+  | 'dispense'
+  | 'setPaymentPlan';
 type EffectFor<Args> =
   | { kind: 'none' }
   | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
@@ -86,7 +106,11 @@ type EffectFor<Args> =
   | (Args extends OrderMealArgs ? { kind: 'orderMeal' } : never)
   | (Args extends SettleBillArgs ? { kind: 'settleBill' } : never)
   | (Args extends AdmitArgs ? { kind: 'admit' } : never)
-  | (Args extends RegisterMemberArgs ? { kind: 'registerMember' } : never);
+  | (Args extends RegisterMemberArgs ? { kind: 'registerMember' } : never)
+  | (Args extends RegisterPatientArgs ? { kind: 'registerPatient' } : never)
+  | (Args extends DiagnoseArgs ? { kind: 'diagnose' } : never)
+  | (Args extends DispenseArgs ? { kind: 'dispense' } : never)
+  | (Args extends PaymentPlanArgs ? { kind: 'setPaymentPlan' } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -129,13 +153,30 @@ export type RentChange = { kind: 'pay'; amountInShifts: number } | { kind: 'exte
 /** A Job asked for, under the name the NPC heard. The sim checks the name against the Character's. */
 export type JobApplication = { jobId: JobId; name: string };
 
+/** The doctor's diagnosis: the Illness found, the medicine that treats it, and the visit's fee in this pack, in Shifts. */
+export type Diagnosis = { illnessId: IllnessId; prescription: MedicineId; feeInShifts: number };
+
+/** A medicine handed over at the pharmacy, and the one Illness it cures. Its price is in the completion's lines. */
+export type Treatment = { medicineId: MedicineId; cures: IllnessId };
+
 /**
  * What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown,
- * for the landlord, the change to the rent, and for hiring, the application. Settling the bill pays nothing here: the
- * sim knows the bill, at the prices it was ordered at, and any restaurant debt.
+ * for the landlord, the change to the rent, and for hiring, the application. At the clinic, the check-in, the diagnosis,
+ * the medicine and the hospital bill's plan (in weeks, 0 to pay now). Settling the bill pays nothing here: the
+ * sim knows the bill, at the prices it was ordered at, and any restaurant debt. The sim likewise knows the hospital debt.
  */
 export type ResolvedCompletion =
-  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange; application?: JobApplication }
+  | {
+      success: true;
+      lines: OrderLine[];
+      pointedTo?: ServedItem;
+      rent?: RentChange;
+      application?: JobApplication;
+      checkIn?: true;
+      diagnosis?: Diagnosis;
+      treatment?: Treatment;
+      paymentPlanWeeks?: number;
+    }
   | { success: false; error: string };
 
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
@@ -168,7 +209,23 @@ const definitionSchema = z.object({
   band: z.enum(['B', 'I', 'A']),
   effect: z.discriminatedUnion('kind', [
     z.object({
-      kind: z.enum(['none', 'serveOrder', 'purchase', 'pointTo', 'payRent', 'extendRent', 'seatGuest', 'orderMeal', 'settleBill', 'admit', 'registerMember']),
+      kind: z.enum([
+        'none',
+        'serveOrder',
+        'purchase',
+        'pointTo',
+        'payRent',
+        'extendRent',
+        'seatGuest',
+        'orderMeal',
+        'settleBill',
+        'admit',
+        'registerMember',
+        'registerPatient',
+        'diagnose',
+        'dispense',
+        'setPaymentPlan',
+      ]),
     }),
     z.object({ kind: z.literal('hire'), jobId: z.enum(JOB_IDS) }),
   ]),
@@ -238,6 +295,19 @@ function resolveEffect(effect: Interaction['effect'], args: Record<string, unkno
       return { success: true, lines: orderLines([{ itemId: 'bath-entry', quantity: 1 }], packId) };
     case 'registerMember':
       return { success: true, lines: orderLines([{ itemId: 'gym-membership', quantity: 1 }], packId) };
+    case 'registerPatient':
+      return { success: true, lines: [], checkIn: true };
+    case 'diagnose': {
+      const { illness } = args as DiagnoseArgs;
+      const feeInShifts = chargeInShifts(ECONOMY.consultationFeeInShifts, packId);
+      return { success: true, lines: [], diagnosis: { illnessId: illness, prescription: ILLNESSES[illness].medicine, feeInShifts } };
+    }
+    case 'dispense': {
+      const { medicine } = args as DispenseArgs;
+      return { success: true, lines: orderLines([{ itemId: medicine, quantity: 1 }], packId), treatment: { medicineId: medicine, cures: illnessCuredBy(medicine) } };
+    }
+    case 'setPaymentPlan':
+      return { success: true, lines: [], paymentPlanWeeks: (args as PaymentPlanArgs).weeks };
   }
 }
 

@@ -35,6 +35,10 @@ export const ITEM_IDS = [
   'scented-candle',
   'bath-entry',
   'gym-membership',
+  'cold-medicine',
+  'fever-reducer',
+  'stomach-medicine',
+  'antihistamine',
 ] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 
@@ -212,6 +216,11 @@ export const ITEMS: Record<ItemId, Item> = {
   'bath-entry': { priceInShifts: 0.1, restores: {}, comfort: 'bathhouse' },
   // Gym membership is sold like an item so each pack prices it, but what it buys is 30 days at the gym.
   'gym-membership': { priceInShifts: ECONOMY.gymMembershipInShifts, restores: {} },
+  // Medicine from the clinic's pharmacy: taken on the spot, and a cure only for the Illness it treats.
+  'cold-medicine': { priceInShifts: ECONOMY.medicineInShifts, restores: {} },
+  'fever-reducer': { priceInShifts: ECONOMY.medicineInShifts, restores: {} },
+  'stomach-medicine': { priceInShifts: ECONOMY.medicineInShifts, restores: {} },
+  antihistamine: { priceInShifts: ECONOMY.medicineInShifts, restores: {} },
 };
 
 /** Every Comfort Purchase the town sells: a restaurant meal by its dish, and the bathhouse by its entry ticket. */

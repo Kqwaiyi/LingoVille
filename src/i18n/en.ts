@@ -279,6 +279,7 @@ export const en = {
     askRecommendation: 'Press <kbd>F</kbd> to ask for a recommendation',
     joinGym: 'Press <kbd>F</kbd> to ask about the gym',
     renewGym: 'Press <kbd>F</kbd> to renew your gym membership',
+    settleHospitalBill: 'Press <kbd>F</kbd> to settle your hospital bill',
     startShift: 'Press <kbd>E</kbd> to start a shift — {{job}}',
     staffOnly: 'Staff door · Staff only',
     workedToday: 'Staff door · You’ve already worked a shift today',

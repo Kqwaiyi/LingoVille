@@ -1,3 +1,4 @@
+import { sleepOffTreatedFlu } from './clinic.ts';
 import { throwOutSpoiled } from './inventory.ts';
 import { clampMeter } from './meters.ts';
 import { endDaysSince } from './days.ts';
@@ -12,16 +13,18 @@ export function bedUsable({ minuteOfDay }: GameState['clock']): boolean {
 /**
  * The Character goes to bed at home and wakes at 07:00 the next morning, past
  * midnight if it isn't yet, with a small Mood boost. Nothing decays while
- * asleep. Too early, or away from home, nothing happens.
+ * asleep. A flu the fever reducer has treated is slept off; the night's roll still applies.
+ * Too early, or away from home, nothing happens.
  */
 export function sleep(state: GameState): GameState {
   if (state.placeId !== 'home' || !bedUsable(state.clock)) return state;
   const { day, minuteOfDay } = state.clock;
   const wakeDay = minuteOfDay < CLOCK.wakeAt ? day : day + 1;
+  const rested = sleepOffTreatedFlu(state);
   const slept = endDaysSince(day, {
-    ...state,
+    ...rested,
     clock: { day: wakeDay, minuteOfDay: CLOCK.wakeAt },
-    character: { ...state.character, mood: clampMeter(state.character.mood + MOOD.changes.sleep) },
+    character: { ...rested.character, mood: clampMeter(rested.character.mood + MOOD.changes.sleep) },
   });
   return throwOutSpoiled(slept);
 }

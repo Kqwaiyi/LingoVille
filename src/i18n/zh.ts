@@ -276,6 +276,7 @@ export const zh: UiStrings = {
     askRecommendation: '按 <kbd>F</kbd> 请服务员推荐',
     joinGym: '按 <kbd>F</kbd> 咨询健身房',
     renewGym: '按 <kbd>F</kbd> 续办健身房会员',
+    settleHospitalBill: '按 <kbd>F</kbd> 结清医院账单',
     startShift: '按 <kbd>E</kbd> 开始上班 — {{job}}',
     staffOnly: '员工门 · 员工专用',
     workedToday: '员工门 · 你今天已经上过班了',

@@ -13,7 +13,7 @@ import {
   WRAP_UP_SCENE,
   type ToolResponse,
 } from '../ai/index.ts';
-import { CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction, type MedicineId } from '../content/index.ts';
 import { FAMILIARITY, LANGUAGE_CODES, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
@@ -1063,6 +1063,94 @@ describe('mock VoiceSession: the bathhouse (#21, #22)', () => {
 
     const shopkeeper = await atTheBookshop('en');
     expect(turns[0]).not.toBe(shopkeeper.turns[0]);
+  });
+});
+
+const atReception = (packId: LanguageCode) =>
+  open(buildNpcSession(INTERACTIONS.checkIn, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.receptionist, CLOCK_10AM));
+const withTheDoctor = (packId: LanguageCode) =>
+  open(buildNpcSession(INTERACTIONS.seeTheDoctor, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.doctor, { ...CLOCK_10AM, approach: 'doctorCallsName' }));
+const atThePharmacy = (packId: LanguageCode, prescription: MedicineId | null = 'cold-medicine') =>
+  open(buildNpcSession(INTERACTIONS.getMedicine, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.pharmacist, { ...CLOCK_10AM, prescription }));
+const settlingTheBill = (packId: LanguageCode) =>
+  open(
+    buildNpcSession(INTERACTIONS.settleHospitalBill, CULTURE_PACKS[packId], 'C1', NAMED_NPCS.receptionist, {
+      ...CLOCK_10AM,
+      hospital: { today: 2, owedInShifts: 1.5, instalmentInShifts: null, rentDueDay: 7 },
+    }),
+  );
+
+/** What the Player says at the clinic in each pack: a cold's symptoms, and how they pay the hospital bill. */
+const PATIENT_SAYS = {
+  ja: { cold: '咳が出て、喉が痛いです', hayFever: 'くしゃみが止まりません', all: '全部払います', weeks: '3週間でお願いします' },
+  zh: { cold: '我咳嗽，嗓子疼', hayFever: '我一直打喷嚏', all: '我全部付', weeks: '分3周吧' },
+  en: { cold: "I've got a cough and a sore throat", hayFever: "I can't stop sneezing", all: "I'll pay it all now", weeks: 'over 3 weeks please' },
+  de: { cold: 'Ich habe Husten und Halsschmerzen', hayFever: 'Ich muss ständig niesen', all: 'ich zahle alles sofort', weeks: 'in 3 Wochen bitte' },
+} as const;
+
+describe('mock VoiceSession: the clinic (#12, #13, #14, #15)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('reception hears why the Player has come, reads it back and checks them in on a yes (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atReception(packId);
+
+    await say(PATIENT_SAYS[packId].cold);
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'register_patient', args: { reason: 'cough, sore throat' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)('the doctor speaks first, names the Illness the symptoms fit and diagnoses it on a yes (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await withTheDoctor(packId);
+    expect(turns).toHaveLength(1);
+
+    await say(PATIENT_SAYS[packId].hayFever);
+    expect(toolCalls).toEqual([]);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'diagnose', args: { illness: 'hay-fever' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)('the pharmacist reads back the prescription with its price, and dispenses it on a yes (%s)', async (packId) => {
+    const { turns, toolCalls, say, answer } = await atThePharmacy(packId);
+    expect(turns[0]!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods['cold-medicine'].name.toLowerCase());
+
+    await say(PLAYER[packId].yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'dispense', args: { medicine: 'cold-medicine' } }]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(2);
+  });
+
+  it('the pharmacist dispenses nothing without a prescription', async () => {
+    const { turns, toolCalls, say } = await atThePharmacy('en', null);
+    await say('yes please');
+
+    expect(turns[0]).toMatch(/prescription/);
+    expect(toolCalls).toEqual([]);
+  });
+
+  it.each(LANGUAGE_CODES)('reception says what is owed, then settles it all now or in weeks on a yes (%s)', async (packId) => {
+    const { yes } = PLAYER[packId];
+    const { turns, toolCalls, say } = await settlingTheBill(packId);
+    expect(turns[0]).toContain(formatLocalMoney(1.5, packId));
+
+    await say(PATIENT_SAYS[packId].all);
+    await say(yes);
+    await say(PATIENT_SAYS[packId].weeks);
+    await say(yes);
+
+    expect(toolCalls.map((call) => call.args)).toEqual([{ weeks: 0 }, { weeks: 3 }]);
   });
 });
 

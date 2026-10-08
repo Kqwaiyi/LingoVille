@@ -276,6 +276,7 @@ export const de: UiStrings = {
     askRecommendation: '<kbd>F</kbd> drücken, um nach einer Empfehlung zu fragen',
     joinGym: '<kbd>F</kbd> drücken, um nach dem Fitnessstudio zu fragen',
     renewGym: '<kbd>F</kbd> drücken, um die Mitgliedschaft zu verlängern',
+    settleHospitalBill: '<kbd>F</kbd> drücken, um die Krankenhausrechnung zu begleichen',
     startShift: '<kbd>E</kbd> drücken, um eine Schicht anzufangen — {{job}}',
     staffOnly: 'Personaltür · Nur für Personal',
     workedToday: 'Personaltür · Du hast heute schon eine Schicht gearbeitet',

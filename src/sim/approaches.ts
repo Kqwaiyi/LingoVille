@@ -1,4 +1,5 @@
 import { isOpen, type OpeningHours } from './clock.ts';
+import { doctorCallDue, doctorCalled } from './clinic.ts';
 import { faintedBetween } from './faint.ts';
 import { announceNewcomerDiscount, newcomerDiscountStepDownDue } from './newcomerDiscount.ts';
 import type { NamedNpcId } from '../content/index.ts';
@@ -9,11 +10,11 @@ import type { GameState } from './state.ts';
 /**
  * The times an NPC starts a conversation with the Character by themselves,
  * without the Player pressing E: the nurse when the Character wakes from
- * Fainting, and the landlord in the hallway about rent or the Newcomer
- * Discount. Park regulars waving the Character over open Small Talk instead (`parkWaveDue`).
- * Later: the doctor calling the Character's name.
+ * Fainting, the landlord in the hallway about rent or the Newcomer
+ * Discount, and the doctor calling the Character's name in the waiting room. Park regulars waving the Character over
+ * open Small Talk instead (`parkWaveDue`).
  */
-export const APPROACH_IDS = ['nurseOnWaking', 'landlordRentDue', 'landlordDiscountStepDown'] as const;
+export const APPROACH_IDS = ['nurseOnWaking', 'landlordRentDue', 'landlordDiscountStepDown', 'doctorCallsName'] as const;
 export type ApproachId = (typeof APPROACH_IDS)[number];
 
 /** The landlord's approaches, made in the hallway at home rather than by a change to the game. */
@@ -22,7 +23,22 @@ export type HallwayApproachId = Extract<ApproachId, 'landlordRentDue' | 'landlor
 /** Whether this change to the game brings an NPC up to the Character, and which. */
 export function approachDue(before: GameState, after: GameState): ApproachId | null {
   if (faintedBetween(before, after)) return 'nurseOnWaking';
+  if (doctorCallDue(before, after)) return 'doctorCallsName';
   return null;
+}
+
+/**
+ * Whether an approach that had to wait while the Player was busy is still due now. The doctor calls only a Character
+ * still waiting at the clinic: one who has left, or fainted, has given up their place. Every other approach stands.
+ */
+export function approachStillDue(state: GameState, approachId: ApproachId): boolean {
+  if (approachId !== 'doctorCallsName') return true;
+  return state.placeId === 'clinic' && state.clinic.checkedInAt !== null;
+}
+
+/** An NPC has come over: once the doctor has called the Character in, they are no longer waiting. Other approaches change nothing here. */
+export function approachMade(state: GameState, approachId: ApproachId): GameState {
+  return approachId === 'doctorCallsName' ? doctorCalled(state) : state;
 }
 
 /** Rent is due today and unpaid, or owed as debt, and the landlord hasn't given more time. */

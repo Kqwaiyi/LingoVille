@@ -1,8 +1,19 @@
-import { ECONOMY, weekdayOf, WEEKDAYS, type Basket, type LanguageCode, type OpeningHours, type RentStatement } from '../sim/index.ts';
+import {
+  ECONOMY,
+  ILLNESS_IDS,
+  weekdayOf,
+  WEEKDAYS,
+  type Basket,
+  type HospitalStatement,
+  type LanguageCode,
+  type OpeningHours,
+  type RentStatement,
+} from '../sim/index.ts';
 import { CULTURE_PACKS, localPlaceFacts, localPlaceName } from './culturePacks.ts';
 import { chargeInShifts, formatLocalMoney, menuPrice } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
 import { DIETARY_NOTE_IDS, DIETARY_NOTES, dishContents, dishFits, isDish, ITEMS, type ItemId } from './items.ts';
+import { ILLNESSES, MEDICINE_IDS, type MedicineId } from './illnesses.ts';
 import { placeHours } from './openingHours.ts';
 import { formatTime } from './places.ts';
 
@@ -86,6 +97,75 @@ function dueOn(day: number, today: number) {
 /** Local money as a plain number, as `accept_rent` takes it. */
 const plainAmount = (shifts: number, packId: LanguageCode) => Math.round(shifts * CULTURE_PACKS[packId].currency.perShift * 100) / 100;
 
+/** What a visit and medicine cost at the clinic, and how a visit goes. */
+function clinicFacts(packId: LanguageCode): string[] {
+  const money = (shifts: number) => formatLocalMoney(shifts, packId);
+  return [
+    'Patients check in at reception, then wait in the waiting room until the doctor calls their name.',
+    `A visit to the doctor costs ${money(chargeInShifts(ECONOMY.consultationFeeInShifts, packId))}. It is taken from the patient's money ` +
+      'if they have enough; otherwise they owe it to the hospital, and settle it later at reception.',
+    // Every medicine costs the same.
+    `Medicine from the pharmacy here costs ${money(menuPrice(MEDICINE_IDS[0], packId))}, paid at the pharmacy. It is given only on the doctor's prescription.`,
+  ];
+}
+
+/** An id as English words: "sore-throat" → "sore throat". */
+const words = (id: string) => id.replaceAll('-', ' ');
+const capitalised = (text: string) => `${text[0]!.toUpperCase()}${text.slice(1)}`;
+
+/** The doctor's knowledge: each Illness by its symptoms, and the medicine that treats it. Never which one the patient has. */
+function symptomsFacts(packId: LanguageCode): string[] {
+  const { goods } = CULTURE_PACKS[packId];
+  return [
+    "You don't know which illness the patient has: only the symptoms they tell you can show it.",
+    ...ILLNESS_IDS.map((id) => {
+      const { symptoms, medicine } = ILLNESSES[id];
+      return `${capitalised(words(id))} (illness id "${id}"): ${symptoms.map(words).join(', ')}. Treated with ${goods[medicine].name}.`;
+    }),
+    "For flu, the medicine only brings the fever down: the patient must rest, and the flu clears after a good night's sleep.",
+  ];
+}
+
+const PRESCRIPTION = "The patient's prescription from the doctor:";
+
+/** What the doctor prescribed the patient, for the pharmacist: the medicine and its price, or that there's none. */
+function prescriptionFacts(prescription: MedicineId | null, packId: LanguageCode): string[] {
+  if (!prescription) return ["The patient has no prescription. Medicine is given only on a prescription from the doctor here."];
+  const { name } = CULTURE_PACKS[packId].goods[prescription];
+  return [
+    `${PRESCRIPTION} ${name}, ${formatLocalMoney(menuPrice(prescription, packId), packId)} (medicine id "${prescription}").`,
+    ...(prescription === 'fever-reducer' ? ['It brings a fever down. The patient should rest: flu clears after a good night’s sleep.'] : []),
+    'Medicine is given only as prescribed.',
+  ];
+}
+
+/** The medicine id `prescriptionFacts` wrote into this text, or null. */
+export function readPrescription(text: string): MedicineId | null {
+  const id = new RegExp(`${PRESCRIPTION} .+ \\(medicine id "([a-z-]+)"\\)\\.$`, 'm').exec(text)?.[1];
+  return MEDICINE_IDS.find((medicine) => medicine === id) ?? null;
+}
+
+const HOSPITAL_OWED = 'The patient owes the hospital';
+
+/** What the patient owes the hospital, and how it can be paid: all now, or in weekly instalments taken on rent day. */
+function hospitalBillFacts({ today, owedInShifts, instalmentInShifts, rentDueDay }: HospitalStatement, packId: LanguageCode): string[] {
+  const money = (shifts: number) => formatLocalMoney(shifts, packId);
+  if (owedInShifts === 0) return ['The patient owes the hospital nothing.'];
+  const weeks = Array.from({ length: ECONOMY.maxPaymentPlanWeeks - 1 }, (_, i) => i + 2);
+  return [
+    `${HOSPITAL_OWED} ${money(owedInShifts)}.`,
+    'They can pay it all now (for set_payment_plan: weeks 0), or in equal weekly instalments ' +
+      `over 1 to ${ECONOMY.maxPaymentPlanWeeks} weeks: ${weeks.map((n) => `${n} weeks is ${money(owedInShifts / n)} a week`).join(', ')}.`,
+    `Instalments are taken automatically on rent day, the first at the end of ${dueOn(rentDueDay, today)}. One they can't pay stays owed.`,
+    ...(instalmentInShifts !== null ? [`They are already paying ${money(instalmentInShifts)} a week; whatever they choose now replaces that.`] : []),
+  ];
+}
+
+/** What `hospitalBillFacts` wrote into this text that the patient owes, as local money, or null. */
+export function readHospitalOwed(text: string): string | null {
+  return new RegExp(`${HOSPITAL_OWED} (.+)\\.$`, 'm').exec(text)?.[1] ?? null;
+}
+
 /** What the tenant owes the landlord: this week's rent, rent debt, and the total in local money and as `accept_rent`'s plain number. */
 function rentFacts({ today, dueDay, owedThisWeekInShifts, debtInShifts, weeklyRentInShifts }: RentStatement, packId: LanguageCode): string[] {
   const money = (shifts: number) => formatLocalMoney(shifts, packId);
@@ -124,21 +204,29 @@ export function readNewWeeklyRent(text: string): string | null {
 
 /**
  * What the NPC is told about the moment: the shopping on the counter, for the landlord, the rent, and for the server,
- * the bill and any restaurant debt, in Shifts, from a bill walked out on.
+ * the bill and any restaurant debt, in Shifts, from a bill walked out on, for the pharmacist, the patient's prescription, and
+ * for reception, the hospital bill.
  */
-export type FactsContext = { basket?: Basket; rent?: RentStatement; bill?: Basket; restaurantDebt?: number };
+export type FactsContext = {
+  basket?: Basket;
+  rent?: RentStatement;
+  bill?: Basket;
+  restaurantDebt?: number;
+  prescription?: MedicineId | null;
+  hospital?: HospitalStatement;
+};
 
 /**
  * The facts an interaction's NPC knows, in English, pulled from the Culture
  * Pack, or for the ward, from what Fainting costs. At the till, the cashier
  * also knows what the customer has brought to the counter (`basket`), and the
  * landlord knows what the tenant owes (`rent`). The restaurant's server knows the guest's `bill`, and what they owe
- * from a bill they walked out on (`restaurantDebt`).
+ * from a bill they walked out on (`restaurantDebt`). The pharmacist knows the `prescription`, and reception the `hospital` bill.
  */
 export function interactionFacts(
   interaction: Interaction,
   packId: LanguageCode,
-  { basket = [], rent, bill = [], restaurantDebt = 0 }: FactsContext = {},
+  { basket = [], rent, bill = [], restaurantDebt = 0, prescription = null, hospital }: FactsContext = {},
 ): string[] {
   const { goods, customs } = CULTURE_PACKS[packId];
   const { placeId } = interaction;
@@ -184,6 +272,14 @@ export function interactionFacts(
         return rent ? rentFacts(rent, packId) : [];
       case 'newcomerDiscount':
         return rent ? newcomerDiscountFacts(rent, packId) : [];
+      case 'clinic':
+        return clinicFacts(packId);
+      case 'symptoms':
+        return symptomsFacts(packId);
+      case 'prescription':
+        return prescriptionFacts(prescription, packId);
+      case 'hospitalBill':
+        return hospital ? hospitalBillFacts(hospital, packId) : [];
     }
   });
 }

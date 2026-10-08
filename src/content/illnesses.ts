@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ILLNESS_IDS, type IllnessId } from '../sim/index.ts';
+import type { ItemId } from './items.ts';
 
 // The four Illnesses the Character can fall ill with, the same in every Culture Pack.
 // Each has its own symptoms, which the Player has to describe to the doctor, and the
@@ -20,8 +21,8 @@ export const SYMPTOM_IDS = [
 ] as const;
 export type SymptomId = (typeof SYMPTOM_IDS)[number];
 
-/** What the pharmacy dispenses: one medicine per Illness. */
-export const MEDICINE_IDS = ['cold-medicine', 'fever-reducer', 'stomach-medicine', 'antihistamine'] as const;
+/** What the pharmacy dispenses: one medicine per Illness. Each is an item, so each pack names and prices it. */
+export const MEDICINE_IDS = ['cold-medicine', 'fever-reducer', 'stomach-medicine', 'antihistamine'] as const satisfies readonly ItemId[];
 export type MedicineId = (typeof MEDICINE_IDS)[number];
 
 export const illnessSchema = z.object({
@@ -40,3 +41,8 @@ export const ILLNESSES: Record<IllnessId, Illness> = {
   'food-poisoning': illness({ id: 'food-poisoning', symptoms: ['stomach-ache', 'nausea'], medicine: 'stomach-medicine' }),
   'hay-fever': illness({ id: 'hay-fever', symptoms: ['sneezing', 'itchy-eyes'], medicine: 'antihistamine' }),
 };
+
+/** The one Illness this medicine cures. */
+export function illnessCuredBy(medicine: MedicineId): IllnessId {
+  return ILLNESS_IDS.find((id) => ILLNESSES[id].medicine === medicine)!;
+}

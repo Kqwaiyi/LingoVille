@@ -7,6 +7,7 @@ import {
   drinkModifiersSchema,
   INTERACTIONS,
   ITEM_IDS,
+  MEDICINE_IDS,
   menuPrice,
   NAMED_NPCS,
   SHIFT_TEMPLATES,
@@ -33,7 +34,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 15;
+export const SAVE_SCHEMA_VERSION = 16;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -97,7 +98,7 @@ const GameStateSchema = z.object({
     thirst: meter,
     mood: meter,
     moneyInShifts: z.number(),
-    illness: z.object({ illnessId: z.enum(ILLNESS_IDS), onsetDay: day }).nullable(),
+    illness: z.object({ illnessId: z.enum(ILLNESS_IDS), onsetDay: day, treated: z.boolean() }).nullable(),
     foodPoisoningChance: z.number().min(0).max(1),
   }),
   rent: z.object({
@@ -110,6 +111,10 @@ const GameStateSchema = z.object({
   paymentPlans: z.array(
     z.object({ debtKind: z.enum(DEBT_KINDS), instalmentInShifts: z.number().min(0), nextDueDay: day }),
   ),
+  clinic: z.object({
+    checkedInAt: z.object({ day, minuteOfDay: z.number().min(0) }).nullable(),
+    prescription: z.enum(MEDICINE_IDS).nullable(),
+  }),
   wokeInWardOnDay: day.nullable(),
   parkWavedOnDay: day.nullable(),
   proficiencyStep: z.enum(PROFICIENCY_STEPS),
@@ -295,6 +300,16 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       Object.entries(save.game.people as Record<string, object>).map(([npcId, memory]) => [npcId, { ...memory, lastOrder: null, lastOnTheHouseDay: null }]),
     );
     return { ...save, schemaVersion: 15, game: { ...save.game, people, parkWavedOnDay: null } };
+  },
+  // 15 → 16: the clinic. No one could check in or be prescribed anything before, and no medicine had treated an Illness.
+  (save) => {
+    const character = save.game.character as { illness: object | null };
+    const illness = character.illness && { ...character.illness, treated: false };
+    return {
+      ...save,
+      schemaVersion: 16,
+      game: { ...save.game, character: { ...character, illness }, clinic: { checkedInAt: null, prescription: null } },
+    };
   },
 ];
 

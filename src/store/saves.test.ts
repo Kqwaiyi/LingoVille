@@ -28,7 +28,7 @@ function lived(): GameState {
     rngState: 123456789,
     clock: { day: 3, minuteOfDay: 14 * 60 + 25.5 },
     placeId: 'cafe',
-    character: { ...game.character, moneyInShifts: 1.25, mood: 61, illness: { illnessId: 'cold', onsetDay: 2 } },
+    character: { ...game.character, moneyInShifts: 1.25, mood: 61, illness: { illnessId: 'cold', onsetDay: 2, treated: false } },
     rent: { dueDay: 7, owedInShifts: weeklyRent('A1'), extendedThroughDay: null, remindedOnDay: null },
     debts: [{ kind: 'hospital', amountInShifts: 1.5 }],
     paymentPlans: [{ debtKind: 'hospital', instalmentInShifts: 0.5, nextDueDay: 5 }],
@@ -95,9 +95,18 @@ function beforeShifts() {
   return { ...game, progression, possessions: { ...game.possessions, shift: null } };
 }
 
+/** The game before the clinic: version 15. No one was waiting for the doctor or held a prescription, and no Illness was treated. */
+function beforeTheClinic() {
+  const game: Partial<GameState> = { ...lived() };
+  delete game.clinic;
+  const illness = game.character!.illness && { illnessId: game.character!.illness.illnessId, onsetDay: game.character!.illness.onsetDay };
+  // Stored before `treated` existed, the Illness has none, whatever its type says.
+  return { ...game, character: { ...game.character!, illness } } as unknown as Omit<GameState, 'clinic'>;
+}
+
 /** The game before regulars: version 14. No order run or "on the house" day in NPC Memory, and no park wave. */
 function beforeRegulars() {
-  const game: Partial<GameState> = { ...lived() };
+  const game: Partial<GameState> = { ...beforeTheClinic() };
   delete game.parkWavedOnDay;
   const people = Object.fromEntries(
     Object.entries(game.people!).map(([npcId, memory]) => {
@@ -429,6 +438,26 @@ describe('saves', () => {
     await set('slot-1', { schemaVersion: 14, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeRegulars() }, raw);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('upgrades a save from before the clinic with no one waiting, no prescription and an untreated Illness', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 15, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeTheClinic() }, raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('keeps the clinic as it was: the check-in, the prescription, a treated flu and a payment plan', async () => {
+    const { saves } = freshSaves();
+    const game = lived();
+    const atTheClinic: GameState = {
+      ...game,
+      character: { ...game.character, illness: { illnessId: 'flu', onsetDay: 2, treated: true } },
+      clinic: { checkedInAt: { day: 3, minuteOfDay: 14 * 60 + 10.25 }, prescription: 'fever-reducer' },
+    };
+    await saves.write('slot-1', atTheClinic);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(atTheClinic);
   });
 
   it('keeps being a regular as it was: the order run, the last "on the house", the casual register and the park wave', async () => {

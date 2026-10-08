@@ -202,6 +202,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'scented-candle': { name: 'アロマキャンドル', glosses: { zh: '香薰蜡烛', en: 'Scented candle', de: 'Duftkerze' } },
       'bath-entry': { name: '入浴券', glosses: { zh: '洗浴票', en: 'Bath entry ticket', de: 'Eintrittskarte fürs Bad' } },
       'gym-membership': { name: 'ジムの会員', glosses: { zh: '健身房会员', en: 'Gym membership', de: 'Mitgliedschaft im Fitnessstudio' } },
+      'cold-medicine': { name: '風邪薬', glosses: { zh: '感冒药', en: 'Cold medicine', de: 'Erkältungsmittel' } },
+      'fever-reducer': { name: '解熱剤', glosses: { zh: '退烧药', en: 'Fever reducer', de: 'Fiebersenkendes Mittel' } },
+      'stomach-medicine': { name: '胃腸薬', glosses: { zh: '肠胃药', en: 'Stomach medicine', de: 'Magen-Darm-Mittel' } },
+      antihistamine: { name: '花粉症の薬', glosses: { zh: '过敏药', en: 'Hay fever tablets', de: 'Heuschnupfentabletten' } },
     },
     drinkOptions: {
       small: { name: 'Sサイズ', glosses: { zh: '小杯', en: 'Small', de: 'Klein' } },
@@ -365,6 +369,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'scented-candle': { name: '香薰蜡烛', glosses: { ja: 'アロマキャンドル', en: 'Scented candle', de: 'Duftkerze' } },
       'bath-entry': { name: '洗浴票', glosses: { ja: '入浴券', en: 'Bath entry ticket', de: 'Eintrittskarte fürs Bad' } },
       'gym-membership': { name: '健身卡', glosses: { ja: 'ジムの会員証', en: 'Gym pass', de: 'Karte fürs Fitnessstudio' } },
+      'cold-medicine': { name: '感冒药', glosses: { ja: '風邪薬', en: 'Cold medicine', de: 'Erkältungsmittel' } },
+      'fever-reducer': { name: '退烧药', glosses: { ja: '解熱剤', en: 'Fever reducer', de: 'Fiebersenkendes Mittel' } },
+      'stomach-medicine': { name: '肠胃药', glosses: { ja: '胃腸薬', en: 'Stomach medicine', de: 'Magen-Darm-Mittel' } },
+      antihistamine: { name: '抗过敏药', glosses: { ja: 'アレルギーの薬', en: 'Antihistamine', de: 'Antihistaminikum' } },
     },
     drinkOptions: {
       small: { name: '小杯', glosses: { ja: 'Sサイズ', en: 'Small', de: 'Klein' } },
@@ -530,6 +538,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'scented-candle': { name: 'Scented candle', glosses: { ja: 'アロマキャンドル', zh: '香薰蜡烛', de: 'Duftkerze' } },
       'bath-entry': { name: 'Swim and steam entry', glosses: { ja: 'プールとスチームルームの入場券', zh: '游泳和蒸汽房门票', de: 'Eintritt Schwimmbad und Dampfbad' } },
       'gym-membership': { name: 'Gym membership', glosses: { ja: 'ジムの会員', zh: '健身房会员', de: 'Mitgliedschaft im Fitnessstudio' } },
+      'cold-medicine': { name: 'Cold relief capsules', glosses: { ja: '風邪薬', zh: '感冒胶囊', de: 'Erkältungskapseln' } },
+      'fever-reducer': { name: 'Paracetamol', glosses: { ja: '解熱鎮痛剤', zh: '扑热息痛', de: 'Paracetamol' } },
+      'stomach-medicine': { name: 'Stomach settler', glosses: { ja: '胃腸薬', zh: '肠胃药', de: 'Magenberuhigungsmittel' } },
+      antihistamine: { name: 'Hay fever tablets', glosses: { ja: '花粉症の薬', zh: '花粉过敏药片', de: 'Heuschnupfentabletten' } },
     },
     drinkOptions: {
       small: { name: 'Small', glosses: { ja: 'スモール', zh: '小杯', de: 'Klein' } },
@@ -703,6 +715,10 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'scented-candle': { name: 'Duftkerze', glosses: { ja: 'アロマキャンドル', zh: '香薰蜡烛', en: 'Scented candle' } },
       'bath-entry': { name: 'Eintritt Bad und Sauna', glosses: { ja: 'プールとサウナの入場券', zh: '浴场和桑拿门票', en: 'Entry to the pool and sauna' } },
       'gym-membership': { name: 'Fitness-Mitgliedschaft', glosses: { ja: 'ジムの会員', zh: '健身房会员', en: 'Gym membership' } },
+      'cold-medicine': { name: 'Erkältungsmittel', glosses: { ja: '風邪薬', zh: '感冒药', en: 'Cold medicine' } },
+      'fever-reducer': { name: 'Fiebersaft', glosses: { ja: '解熱シロップ', zh: '退烧糖浆', en: 'Fever syrup' } },
+      'stomach-medicine': { name: 'Magentropfen', glosses: { ja: '胃薬の滴剤', zh: '胃药滴剂', en: 'Stomach drops' } },
+      antihistamine: { name: 'Heuschnupfentabletten', glosses: { ja: '花粉症の薬', zh: '花粉过敏药片', en: 'Hay fever tablets' } },
     },
     drinkOptions: {
       small: { name: 'Klein', glosses: { ja: 'スモール', zh: '小杯', en: 'Small' } },

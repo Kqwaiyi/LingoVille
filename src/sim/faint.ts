@@ -27,6 +27,8 @@ export function faint(state: GameState): GameState {
     clock: { day: wakeDay, minuteOfDay: CLOCK.faintWakeAt },
     placeId: 'clinic',
     wokeInWardOnDay: wakeDay,
+    // Taken to the ward, the Character gives up any place in the queue for the doctor.
+    clinic: { ...left.clinic, checkedInAt: null },
     character: {
       ...character,
       ...WELL_BEING.afterFainting,

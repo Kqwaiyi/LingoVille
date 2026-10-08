@@ -108,6 +108,12 @@ export const ECONOMY = {
   /** The most days of extra time the landlord will give at once. */
   maxRentExtensionDays: 7,
   faintingBillInShifts: 1.5,
+  /** What the doctor charges for a visit, settled at reception: taken from the Character's money, or owed as hospital debt. Well below Fainting with the medicine. */
+  consultationFeeInShifts: 0.4,
+  /** What each medicine costs at the clinic's pharmacy. */
+  medicineInShifts: 0.15,
+  /** The most weeks reception will spread a hospital bill over. */
+  maxPaymentPlanWeeks: 4,
   gymMembershipInShifts: 0.5,
   gymMembershipDays: 30,
   /** What a Comfort Purchase may cost: bought to feel good, not to get by. */
@@ -311,6 +317,11 @@ export const ILLNESS = {
   expiredFoodPoisoningChance: 0.25,
   /** Food poisoning chance from each piece of cheap counter food eaten (a convenience store snack or bento). */
   cheapFoodPoisoningChance: 0.03,
+} as const;
+
+export const CLINIC = {
+  /** How long the Character waits after checking in at reception before the doctor calls their name (default). */
+  waitForDoctorGameMinutes: 15,
 } as const;
 
 export const GROCERIES = {

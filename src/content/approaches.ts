@@ -8,6 +8,7 @@ const APPROACH_INTERACTIONS: Record<ApproachId, Interaction> = {
   nurseOnWaking: INTERACTIONS.wakeInWard,
   landlordRentDue: INTERACTIONS.rentReminder,
   landlordDiscountStepDown: INTERACTIONS.newcomerDiscountNews,
+  doctorCallsName: INTERACTIONS.seeTheDoctor,
 };
 
 export function approachInteraction(approachId: ApproachId): Interaction {
@@ -19,7 +20,7 @@ const OPENED_BY_NPCS = new Set(Object.values(APPROACH_INTERACTIONS));
 /**
  * What the Character brings to the conversation: shopping from the supermarket's shelves, or none, the Jobs they
  * already have, their current Proficiency Step, their table and bill at the restaurant, whether they owe it for a
- * bill they walked out on, and their gym membership.
+ * bill they walked out on, their gym membership, whether they owe the hospital and whether they hold a prescription.
  */
 export type Bringing = {
   shopping: boolean;
@@ -28,6 +29,8 @@ export type Bringing = {
   restaurant?: RestaurantTable;
   owesRestaurant?: boolean;
   gymMembership?: GymMembership;
+  owesHospital?: boolean;
+  holdsPrescription?: boolean;
 };
 
 /** No table at the restaurant, and nothing owed there. */
@@ -38,11 +41,12 @@ const NO_TABLE: RestaurantTable = { seated: false, bill: [] };
  * The cashier takes payment for shopping brought to the till, and otherwise helps find something.
  * The shopkeeper sells a book, and from the Advanced band recommends one by taste instead. The server takes the
  * bill while anything is on it or anything is owed from a bill walked out on, takes the order at the Character's
- * table, and otherwise gets them a table. The attendant sells a bath.
+ * table, and otherwise gets them a table. The attendant sells a bath. The receptionist checks the Character in to see the
+ * doctor, and the pharmacist hands over what the doctor prescribed, with nothing to hand over without a prescription.
  */
 export function interactionStartedWithE(
   npcId: NamedNpcId,
-  { shopping, step = 'A1', restaurant = NO_TABLE, owesRestaurant = false }: Bringing = { shopping: false },
+  { shopping, step = 'A1', restaurant = NO_TABLE, owesRestaurant = false, holdsPrescription = false }: Bringing = { shopping: false },
 ): Interaction | null {
   if (npcId === 'cashier') return shopping ? INTERACTIONS.payForGroceries : INTERACTIONS.findAnItem;
   if (npcId === 'server') {
@@ -51,6 +55,8 @@ export function interactionStartedWithE(
   }
   if (npcId === 'shopkeeper') return STEP_BANDS[step] === 'A' ? INTERACTIONS.recommendABook : INTERACTIONS.buyABook;
   if (npcId === 'attendant') return INTERACTIONS.buyBathEntry;
+  if (npcId === 'receptionist') return INTERACTIONS.checkIn;
+  if (npcId === 'pharmacist') return holdsPrescription ? INTERACTIONS.getMedicine : null;
   return Object.values(INTERACTIONS).find((i) => i.npcId === npcId && !OPENED_BY_NPCS.has(i) && i.effect.kind !== 'hire') ?? null;
 }
 
@@ -59,14 +65,16 @@ export function interactionStartedWithE(
  * With shopping, E at the cashier pays, so F asks where something else is. E at the
  * landlord pays the rent, and F asks for more time. F at the shopkeeper buys a gift, and F at the server, from a
  * table, asks for a recommendation within a dietary restriction. F at the attendant joins the gym, or renews a
- * membership that has run out (never while it runs). Staff who are hiring take an application on F until
- * the Character has that Job (the cashier, when not paying for shopping; the server, when not seated).
+ * membership that has run out (never while it runs). F at the receptionist settles the hospital bill while one is owed.
+ * Staff who are hiring take an application on F until the Character has that Job (the cashier, when not paying for
+ * shopping; the server, when not seated).
  */
 export function interactionStartedWithF(
   npcId: NamedNpcId,
-  { shopping, jobsHired = [], restaurant = NO_TABLE, gymMembership = 'none' }: Bringing = { shopping: false },
+  { shopping, jobsHired = [], restaurant = NO_TABLE, gymMembership = 'none', owesHospital = false }: Bringing = { shopping: false },
 ): Interaction | null {
   if (npcId === 'landlord') return INTERACTIONS.askForMoreTime;
+  if (npcId === 'receptionist') return owesHospital ? INTERACTIONS.settleHospitalBill : null;
   if (npcId === 'attendant') {
     if (gymMembership === 'active') return null;
     return gymMembership === 'expired' ? INTERACTIONS.renewGymMembership : INTERACTIONS.joinTheGym;

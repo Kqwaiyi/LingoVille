@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { ECONOMY } from '../sim/index.ts';
+import { ECONOMY, ILLNESS_IDS } from '../sim/index.ts';
 import { defineInteraction, type Interaction } from './defineInteraction.ts';
+import { MEDICINE_IDS } from './illnesses.ts';
 import {
   BATH_OPTIONS,
   BILL_METHODS,
@@ -373,6 +374,93 @@ export const INTERACTIONS = {
     completion: registerMember,
     band: 'I',
     effect: { kind: 'registerMember' },
+  }),
+  // #12. Checking in at the clinic's reception: E at the receptionist. The doctor then calls the Character's name.
+  checkIn: defineInteraction({
+    id: 'check-in',
+    placeId: 'clinic',
+    npcId: 'receptionist',
+    goal:
+      'A patient has come to reception. Find out why they have come, and check them in to see the doctor. ' +
+      'Tell them to take a seat in the waiting room: the doctor will call their name.',
+    facts: ['openingHours', 'clinic', 'placeFacts'],
+    items: [],
+    completion: {
+      name: 'register_patient',
+      description:
+        'Check the patient in to see the doctor, once they have confirmed your read-back of why they have come. Answers "done".',
+      args: z.object({ reason: z.string().min(1).describe('Why they have come, in a few words of English (for example "a cough and a sore throat").') }),
+    },
+    band: 'I',
+    effect: { kind: 'registerPatient' },
+  }),
+  // #13. Describing symptoms to the doctor. Not one the Player starts: the doctor calls the Character's name after check-in.
+  // The doctor never knows the Illness, only what the Player describes, so the diagnosis is right only if they got it across.
+  seeTheDoctor: defineInteraction({
+    id: 'see-the-doctor',
+    placeId: 'clinic',
+    npcId: 'doctor',
+    goal:
+      'You have called this patient in from the waiting room. Ask what the trouble is, and listen to their symptoms. ' +
+      'Work out from the symptoms they describe which illness in FACTS they have: go only by what they tell you, and ask about ' +
+      'their symptoms until they fit one illness. Tell them what it is, and that the pharmacist will give them the medicine.',
+    facts: ['symptoms', 'clinic'],
+    items: [],
+    completion: {
+      name: 'diagnose',
+      description:
+        'Record your diagnosis and the prescription that goes with it, once you have told the patient what they have and they have ' +
+        'understood. Answers "done".',
+      args: z.object({ illness: z.enum(ILLNESS_IDS).describe('The illness id in FACTS whose symptoms the patient described.') }),
+    },
+    band: 'I',
+    effect: { kind: 'diagnose' },
+  }),
+  // #14. Collecting medicine at the pharmacy: E at the pharmacist while the Character holds a prescription.
+  getMedicine: defineInteraction({
+    id: 'get-medicine',
+    placeId: 'clinic',
+    npcId: 'pharmacist',
+    goal:
+      "Give the patient the medicine on the doctor's prescription in FACTS, and take payment. Tell them how to take it " +
+      'if they ask.',
+    facts: ['prescription'],
+    items: MEDICINE_IDS,
+    completion: {
+      name: 'dispense',
+      description:
+        'Hand over the medicine and take payment, once the patient has confirmed your read-back of the medicine and its price. ' +
+        'Answers "served", "cannot_afford" (they cannot pay for it) or "invalid_arguments" (that is not what was prescribed).',
+      args: z.object({ medicine: z.enum(MEDICINE_IDS).describe('The medicine id given in FACTS.') }),
+    },
+    band: 'B',
+    effect: { kind: 'dispense' },
+  }),
+  // #15. Settling the hospital bill at reception, in full or in weekly instalments: F at the receptionist while it is owed.
+  settleHospitalBill: defineInteraction({
+    id: 'settle-hospital-bill',
+    placeId: 'clinic',
+    npcId: 'receptionist',
+    goal:
+      'The patient has come to settle what they owe the hospital. Tell them how much it is, and ask whether they will pay it all ' +
+      `now or in weekly instalments (up to ${ECONOMY.maxPaymentPlanWeeks} weeks), and settle it the way they choose.`,
+    facts: ['hospitalBill', 'placeFacts'],
+    items: [],
+    completion: {
+      name: 'set_payment_plan',
+      description:
+        'Settle the hospital bill the way the patient confirmed after your read-back: paid in full now, or in weekly instalments. ' +
+        'Answers "done", "cannot_afford" (they cannot pay it all now) or "invalid_arguments".',
+      args: z.object({
+        weeks: z
+          .int()
+          .min(0)
+          .max(ECONOMY.maxPaymentPlanWeeks)
+          .describe('How many weekly instalments to pay it in, or 0 to pay it all now.'),
+      }),
+    },
+    band: 'A',
+    effect: { kind: 'setPaymentPlan' },
   }),
   // Not one the Player starts: the nurse begins it when the Character wakes from Fainting.
   wakeInWard: defineInteraction({

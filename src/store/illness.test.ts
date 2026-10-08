@@ -9,7 +9,7 @@ function withIllness(illness: GameState['character']['illness']) {
 
 describe('feeling ill', () => {
   it('shows what the Character feels: the symptoms, never the Illness', () => {
-    const store = withIllness({ illnessId: 'flu', onsetDay: 1 });
+    const store = withIllness({ illnessId: 'flu', onsetDay: 1, treated: false });
     expect(selectSymptoms(store.getState())).toEqual(['fever', 'body-aches', 'chills']);
   });
 

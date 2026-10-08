@@ -276,6 +276,7 @@ export const ja: UiStrings = {
     askRecommendation: '<kbd>F</kbd> でおすすめを聞く',
     joinGym: '<kbd>F</kbd> でジムについて聞く',
     renewGym: '<kbd>F</kbd> でジムの会員を更新する',
+    settleHospitalBill: '<kbd>F</kbd> で病院の支払いをする',
     startShift: '<kbd>E</kbd> でシフトを始める — {{job}}',
     staffOnly: 'スタッフ用ドア · 関係者以外立入禁止',
     workedToday: 'スタッフ用ドア · 今日はもうシフトに入りました',

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   approachDue,
+  approachMade,
+  approachStillDue,
+  checkIn,
+  CLINIC,
   createSave,
   faint,
   hallwayApproach,
@@ -35,6 +39,27 @@ describe('approachDue: NPCs who start conversations themselves', () => {
   it('sends the nurse only once per Fainting', () => {
     const fainted = faint(inTown({ health: 0, hunger: 0, thirst: 0 }));
     expect(approachDue(fainted, tick(fainted, HOUR))).toBeNull();
+  });
+
+  it('has the doctor call the Character in once they have waited at the clinic after checking in', () => {
+    const waiting = checkIn({ ...inTown(), placeId: 'clinic' });
+    expect(approachDue(waiting, tick(waiting, CLINIC.waitForDoctorGameMinutes))).toBe('doctorCallsName');
+  });
+
+  it('the doctor no longer calls a Character who fainted while waiting, or who has left the clinic', () => {
+    const waiting = checkIn({ ...inTown(), placeId: 'clinic' });
+    const fainted = faint({ ...waiting, character: { ...waiting.character, health: 0, hunger: 0, thirst: 0 } });
+
+    expect(approachStillDue(fainted, 'doctorCallsName')).toBe(false);
+    expect(approachStillDue({ ...waiting, placeId: 'park' }, 'doctorCallsName')).toBe(false);
+    expect(approachStillDue(waiting, 'doctorCallsName')).toBe(true);
+    expect(approachStillDue(fainted, 'nurseOnWaking')).toBe(true);
+  });
+
+  it('once the doctor has called, the Character is not called again', () => {
+    const waiting = checkIn({ ...inTown(), placeId: 'clinic' });
+    const called = approachMade(tick(waiting, CLINIC.waitForDoctorGameMinutes), 'doctorCallsName');
+    expect(approachDue(called, tick(called, HOUR))).toBeNull();
   });
 });
 

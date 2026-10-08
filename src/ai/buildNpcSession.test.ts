@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CULTURE_PACKS, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction, type MedicineId } from '../content/index.ts';
 import {
   CLOCK,
   FAMILIARITY,
   LANGUAGE_CODES,
   PROFICIENCY_STEPS,
   type ApproachId,
+  type HospitalStatement,
   type LanguageCode,
   type NpcMemory,
   type ProficiencyStep,
@@ -198,6 +199,49 @@ describe('buildNpcSession: the bathhouse', () => {
     expect(bath.systemInstruction).toContain('swimwear-free');
     expect(bath.tools.map((tool) => tool.name)).toEqual(['admit', LEARN_NAME_TOOL, REVEAL_FAVOURITE_TOOL, 'not_understood']);
     expect(attendantSession(INTERACTIONS.renewGymMembership, 'de').tools[0]!.name).toBe('register_member');
+  });
+});
+
+describe('buildNpcSession: the clinic', () => {
+  const MORNING = { day: 2, minuteOfDay: 10 * 60 };
+  // 1.5 Shifts owed, rent due at the end of day 7.
+  const HOSPITAL: HospitalStatement = { today: 2, owedInShifts: 1.5, instalmentInShifts: null, rentDueDay: 7 };
+  const receptionSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.checkIn, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.receptionist, { clock: MORNING });
+  const doctorSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.seeTheDoctor, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.doctor, { clock: MORNING, approach: 'doctorCallsName' });
+  const pharmacySession = (packId: LanguageCode, prescription: MedicineId | null = 'fever-reducer') =>
+    buildNpcSession(INTERACTIONS.getMedicine, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.pharmacist, { clock: MORNING, prescription });
+  const billSession = (packId: LanguageCode, hospital = HOSPITAL) =>
+    buildNpcSession(INTERACTIONS.settleHospitalBill, CULTURE_PACKS[packId], 'C1', NAMED_NPCS.receptionist, { clock: MORNING, hospital });
+
+  it.each(LANGUAGE_CODES)('builds reception, the doctor, the pharmacy and the hospital bill in the %s pack', (packId) => {
+    expect(receptionSession(packId)).toMatchSnapshot();
+    expect(doctorSession(packId)).toMatchSnapshot();
+    expect(pharmacySession(packId)).toMatchSnapshot();
+    expect(billSession(packId)).toMatchSnapshot();
+  });
+
+  it('tells the doctor the symptoms of every Illness, but never which one the patient has', () => {
+    const { systemInstruction, openingScene, tools } = doctorSession('en');
+    expect(systemInstruction).toContain('Hay fever (illness id "hay-fever"): sneezing, itchy eyes.');
+    expect(systemInstruction).toContain('Flu (illness id "flu"): fever, body aches, chills. Treated with Paracetamol.');
+    expect(systemInstruction).toContain("only the symptoms they tell you can show it");
+    expect(openingScene).toMatch(/^\[SCENE: You call the patient's name in the waiting room.*\]$/);
+    expect(tools[0]).toEqual(INTERACTIONS.seeTheDoctor.toolDeclaration);
+  });
+
+  it('tells the pharmacist the prescription with its price, or that there is none', () => {
+    const price = formatLocalMoney(menuPrice('fever-reducer', 'ja'), 'ja');
+    expect(pharmacySession('ja').systemInstruction).toContain(`prescription from the doctor: 解熱剤, ${price} (medicine id "fever-reducer").`);
+    expect(pharmacySession('ja', null).systemInstruction).toContain('The patient has no prescription.');
+  });
+
+  it('tells reception what is owed and what each number of weeks comes to a week', () => {
+    const { systemInstruction } = billSession('de');
+    expect(systemInstruction).toContain(`The patient owes the hospital ${formatLocalMoney(1.5, 'de')}.`);
+    expect(systemInstruction).toContain(`3 weeks is ${formatLocalMoney(0.5, 'de')} a week`);
+    expect(systemInstruction).toContain('the first at the end of this Sunday');
   });
 });
 

@@ -1,4 +1,4 @@
-import type { AppearancePresetId, DietaryNoteId, DrinkModifiers, ItemId, NamedNpcId } from '../content/index.ts';
+import type { AppearancePresetId, DietaryNoteId, DrinkModifiers, ItemId, MedicineId, NamedNpcId } from '../content/index.ts';
 import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
@@ -164,7 +164,11 @@ export type GameState = {
     mood: number;
     /** Money is held in Shifts of base pay; the Culture Pack converts it to local currency. */
     moneyInShifts: number;
-    illness: { illnessId: IllnessId; onsetDay: number } | null;
+    /**
+     * The Illness the Character has, if any. `treated`: the fever reducer has stopped flu's Health drain, and the flu
+     * clears after the next sleep. Every other Illness is cured outright by its medicine.
+     */
+    illness: { illnessId: IllnessId; onsetDay: number; treated: boolean } | null;
     /**
      * The chance that what the Character has eaten gives them food poisoning, built up by cooking
      * gone-off groceries. Recorded here for Illness, which rolls it and starts it again from 0.
@@ -182,7 +186,14 @@ export type GameState = {
     remindedOnDay: number | null;
   };
   debts: Debt[];
+  /** At most one per debt kind. Each takes its weekly instalment on rent day. */
   paymentPlans: PaymentPlan[];
+  clinic: {
+    /** When the Character checked in at reception, to wait for the doctor to call their name. Leaving the clinic gives up the place. */
+    checkedInAt: { day: number; minuteOfDay: number } | null;
+    /** What the doctor prescribed, for the pharmacist to dispense. Used up when it is dispensed. */
+    prescription: MedicineId | null;
+  };
   /** The day the Character last woke in the ward after Fainting, or null if they never have fainted. Each Fainting wakes on a new day. */
   wokeInWardOnDay: number | null;
   /** The day a park regular last waved the Character over: once a day at most. */
@@ -256,6 +267,7 @@ export function createSave(setup: NewGameSetup): GameState {
     },
     debts: [],
     paymentPlans: [],
+    clinic: { checkedInAt: null, prescription: null },
     wokeInWardOnDay: null,
     parkWavedOnDay: null,
     proficiencyStep: setup.startingStep,

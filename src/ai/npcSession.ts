@@ -7,6 +7,7 @@ import {
   type CulturePack,
   type FunctionDeclaration,
   type Interaction,
+  type MedicineId,
   type NamedNpc,
   type NamedNpcId,
 } from '../content/index.ts';
@@ -18,6 +19,7 @@ import {
   type ApproachId,
   type Basket,
   type GameState,
+  type HospitalStatement,
   type LanguageCode,
   type NpcMemory,
   type PlaceId,
@@ -51,6 +53,10 @@ export type NpcSessionContext = {
   bill?: Basket;
   /** For the restaurant's server: what the Character owes, in Shifts, from a bill they walked out on. */
   restaurantDebt?: number;
+  /** For the pharmacist: what the doctor prescribed the Character, if anything. */
+  prescription?: MedicineId | null;
+  /** For reception settling the hospital bill: what the Character owes the hospital, and any plan they are on. */
+  hospital?: HospitalStatement;
   /** What the NPC remembers of the Character, and the Character's name for when they know it. With none, they are strangers. */
   relationship?: Relationship;
   /** A friend adds a little something "on the house" to this order: flavour only, the game drew it. */
@@ -100,6 +106,7 @@ export const GREETING_SCENE = greetingScene('customer');
 /** Opens a conversation the NPC starts, saying why they speak to the Character first. */
 const APPROACH_SCENES: Record<ApproachId, string> = {
   nurseOnWaking: '[SCENE: The patient in the bed beside you has just woken up. Speak to them first.]',
+  doctorCallsName: "[SCENE: You call the patient's name in the waiting room, and they come into your consulting room. Speak to them first.]",
   landlordRentDue: '[SCENE: Your tenant is walking past you in the hallway. Their rent is due and unpaid: stop them and speak to them first.]',
   landlordDiscountStepDown: '[SCENE: Your tenant is walking past you in the hallway. Stop them and speak to them first: you have news about their rent.]',
 };
@@ -516,6 +523,45 @@ function goalBlock(interaction: Interaction, who: string) {
       `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for it today, and that they can come back any time: nothing is charged unless they ask. The conversation goes on.`,
       `- If ${name} answers "invalid_arguments", ask them again whether they would like the membership.`,
       `- If ${name} answers "done", tell them they can use the gym from today until it runs out, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'registerPatient') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know why they have come, read it back in a few words and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with why they have come. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again why they have come.`,
+      `- If ${name} answers "done", ask them to take a seat in the waiting room until the doctor calls their name, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'diagnose') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Never guess: diagnose only from symptoms the ${who} has told you. If they fit no illness in FACTS yet, ask about how they feel until they do.`,
+      `- Tell them what you think they have, and check they have understood. Only then call ${name} with that illness. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again about their symptoms.`,
+      `- If ${name} answers "done", tell them to collect their medicine at the pharmacy, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'dispense') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- If FACTS show no prescription, tell the ${who} kindly that you can only give medicine the doctor has prescribed, and say goodbye. Never call ${name}.`,
+      `- Before you hand anything over, read back the medicine and its price from FACTS, and wait for them to confirm.`,
+      `- Only once they have confirmed, call ${name} with that medicine. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for it, and that they can come back for it. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", that is not what was prescribed: check the prescription in FACTS and read it back again.`,
+      `- If ${name} answers "served", hand it over, tell them how to take it, wish them well and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'setPaymentPlan') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once they have chosen, read back how they will pay: all of it now with the amount, or how many weeks and how much each week, from FACTS. Wait for the ${who} to confirm.`,
+      `- Only once they have confirmed, call ${name} with the number of weeks, or 0 to pay it all now. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly they don't have enough to pay it all now, and offer instalments. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again how they would like to pay.`,
+      `- If ${name} answers "done", thank them, tell them when the first instalment is taken if they chose instalments, and say goodbye.`,
     ]);
   }
   return block('YOUR GOAL', [

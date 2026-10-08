@@ -20,6 +20,7 @@ import {
   selectTramArrival,
   selectTramRunning,
   selectWardArrival,
+  selectDoctorCall,
   selectWorldKeysOff,
   useGame,
   type Interactable,
@@ -27,6 +28,7 @@ import {
 import type { Control } from './controls.ts';
 import {
   BATHHOUSE_GYM,
+  BEFORE_THE_DOCTOR,
   HOME_BED,
   HOME_STOVE,
   HOME_TAP,
@@ -143,6 +145,7 @@ export function Character() {
   const letGoOfWalkKeys = useGame((s) => s.letGoOfWalkKeys);
   const tramArrival = useGame(selectTramArrival);
   const wardArrival = useGame(selectWardArrival);
+  const doctorCall = useGame(selectDoctorCall);
   const tramRunning = useGame(selectTramRunning);
   // At work: from the staff door to the end of the Shift, the Character stands behind the counter.
   const atWork = useGame((s) => selectShift(s)?.jobId ?? null);
@@ -172,6 +175,11 @@ export function Character() {
   useEffect(() => {
     if (wardArrival) moveTo(IN_WARD_BED);
   }, [wardArrival]);
+
+  // Called in from the waiting room: the Character stands in front of the doctor.
+  useEffect(() => {
+    if (doctorCall) moveTo(BEFORE_THE_DOCTOR);
+  }, [doctorCall]);
 
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.
