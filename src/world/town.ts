@@ -1,4 +1,4 @@
-import { TOWN_NPCS, TRAM_LINE, type GroceryId, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
+import { PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type GroceryId, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
 import { PLACE_IDS, type JobId, type PlaceId } from '../sim/index.ts';
 import type { Arrival } from '../store/index.ts';
 
@@ -40,7 +40,10 @@ export const GROUND_HALF_SIZE = 60;
 /** The park: open grass on the south side of the street, with no walls or door. */
 export const PARK = { centre: [0, 18] as Vec2, size: [22, 13] as Vec2 } as const;
 
-/** Each tram stop: an island platform in the middle of the street, with a pole at its centre. */
+/**
+ * Each tram stop: an island platform in the middle of the street, with a pole at its centre. Passers-by name the stop
+ * nearest each building (`STOP_PLACES`), so moving a stop or a building means checking that list still holds.
+ */
 export const TRAM_STOPS: Record<TramStopId, { centre: Vec2 }> = {
   'west-stop': { centre: [-30, STREET.z] },
   'central-stop': { centre: [-4, STREET.z] },
@@ -64,10 +67,10 @@ export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
   'park-regular-1': [-6, 1, 16],
   'park-regular-2': [3, 1, 21],
   'park-regular-3': [8, 1, 14.5],
-  // At the east end of each platform, clear of the pole.
-  'passer-by-1': [TRAM_STOPS['west-stop'].centre[0] + 3.2, 1, STREET.z],
-  'passer-by-2': [TRAM_STOPS['central-stop'].centre[0] + 3.2, 1, STREET.z],
-  'passer-by-3': [TRAM_STOPS['east-stop'].centre[0] + 3.2, 1, STREET.z],
+  // At the east end of the platform each waits at, clear of the pole.
+  'passer-by-1': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-1']].centre[0] + 3.2, 1, STREET.z],
+  'passer-by-2': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-2']].centre[0] + 3.2, 1, STREET.z],
+  'passer-by-3': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-3']].centre[0] + 3.2, 1, STREET.z],
   shopkeeper: [-30, 1, -3.1],
   attendant: [24, 1, 14.6],
   'office-clerk': [-44, 1, -3.7],

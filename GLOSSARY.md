@@ -70,6 +70,14 @@ _Avoid_: Bot, agent
 An NPC who is a specific person with a name and a fixed persona: every counter's staff, the park regulars and the landlord. The same person appears in every Culture Pack, with a local name and local dressing.
 _Avoid_: Character (reserved for the player's avatar), villager
 
+**Passer-by**:
+An anonymous NPC waiting at a tram stop, with no name, persona or memory of the Character, who can be asked which tram goes to a place.
+_Avoid_: Stranger, pedestrian
+
+**Route marker**:
+The mark on the tram stop a Passer-by said to get off at, shown on its platform and in the tram choice until the Character gets there.
+_Avoid_: Waypoint, quest marker
+
 **Shift Customer**:
 An anonymous NPC generated for one Shift interaction, with no name or memory.
 _Avoid_: Customer (unqualified)

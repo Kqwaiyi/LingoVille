@@ -264,6 +264,7 @@ export const en = {
     workOut: 'Press <kbd>E</kbd> to work out',
     sleep: 'Press <kbd>E</kbd> to go to bed',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
+    askTheWay: 'Press <kbd>E</kbd> to ask the way — {{role}}',
     /** Small Talk with someone who has no other conversation. */
     chat: 'Press <kbd>E</kbd> to chat — {{role}}',
     /** Small Talk with staff, beside their E. */
@@ -280,6 +281,8 @@ export const en = {
     joinGym: 'Press <kbd>F</kbd> to ask about the gym',
     renewGym: 'Press <kbd>F</kbd> to renew your gym membership',
     settleHospitalBill: 'Press <kbd>F</kbd> to settle your hospital bill',
+    registerAddress: 'Press <kbd>F</kbd> to register your address',
+    returnItem: 'Press <kbd>R</kbd> to bring something back',
     startShift: 'Press <kbd>E</kbd> to start a shift — {{job}}',
     staffOnly: 'Staff door · Staff only',
     workedToday: 'Staff door · You’ve already worked a shift today',
@@ -343,6 +346,8 @@ export const en = {
   tram: {
     heading: 'Take the tram to…',
     trip: '{{minutes}} min · Free',
+    /** Beside the stop a passer-by said to get off at. */
+    routeMarker: 'Get off here',
     cancel: 'Stay here',
   },
   basket: {
@@ -415,6 +420,10 @@ export const en = {
     moreTime: 'Extra days to pay the rent: {{days}}',
     /** Hired for a Job; `job` is its Life Skill name. */
     hired: 'You got the job: {{job}}',
+    /** The town office registered the Character's address. */
+    registered: 'Address registered',
+    /** A passer-by said which tram stop to get off at; `stop` is its name. */
+    directedTo: 'Get off at {{stop}}: marked on the tram map',
     moodUp: 'Mood ↑',
     moodDown: 'Mood ↓',
     skipRecap: 'Skip Recap',
@@ -491,7 +500,6 @@ export const en = {
       closed: 'The gym is closed. It opens with the bathhouse.',
     },
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
-    nothingToSay: '{{who}} smiles and nods. There’s nothing to talk about here yet.',
   },
   fainting: {
     title: 'You fainted',

@@ -454,3 +454,92 @@ describe('Goal Interactions #21 and #22: the bathhouse', () => {
     expect(facts).toEqual(expect.arrayContaining(CULTURE_PACKS[packId].townPlaces.bathhouse.facts!));
   });
 });
+
+describe('Goal Interaction #6: return a faulty item', () => {
+  const { returnAnItem } = INTERACTIONS;
+
+  it('is the cashier’s refund(item, reason) over the groceries on the shelves, Advanced', () => {
+    expect([returnAnItem.npcId, returnAnItem.placeId, returnAnItem.toolDeclaration.name, returnAnItem.band]).toEqual(['cashier', 'supermarket', 'refund', 'A']);
+    expect(returnAnItem.parseArgs({ item: 'eggs', reason: 'cracked' }).success).toBe(true);
+    expect(returnAnItem.parseArgs({ item: 'latte', reason: 'cold' }).success).toBe(false);
+    expect(returnAnItem.parseArgs({ item: 'eggs' }).success).toBe(false);
+  });
+
+  it.each(LANGUAGE_CODES)('resolves a refund in %s to the item in the pack’s words and its shelf price, selling nothing', (packId) => {
+    expect(returnAnItem.resolveCompletion({ item: 'eggs', reason: 'cracked' }, packId)).toEqual({
+      success: true,
+      lines: [],
+      refund: { item: { itemId: 'eggs', name: CULTURE_PACKS[packId].goods.eggs.name, glosses: CULTURE_PACKS[packId].goods.eggs.glosses, quantity: 1 }, amountInShifts: menuPrice('eggs', packId) },
+    });
+  });
+
+  it('tells the cashier what the shop takes back', () => {
+    expect(interactionFacts(returnAnItem, 'en').join('\n')).toMatch(/brought back if something is wrong with it, as long as it is still within its use-by date/);
+  });
+});
+
+describe('Goal Interactions #23 and #24: the town office and post office', () => {
+  const { registerAddress, sendAParcel } = INTERACTIONS;
+
+  it('are the clerk’s #23 register_resident(fields) (A) and #24 ship(destination, speed) (I)', () => {
+    expect([registerAddress, sendAParcel].map((i) => [i.npcId, i.placeId, i.toolDeclaration.name, i.band])).toEqual([
+      ['office-clerk', 'town-office', 'register_resident', 'A'],
+      ['office-clerk', 'town-office', 'ship', 'I'],
+    ]);
+    expect(registerAddress.parseArgs({ fields: { name: 'Sam', address: 'Flat 2', nationality: 'Irish' } }).success).toBe(true);
+    expect(registerAddress.parseArgs({ fields: { name: 'Sam' } }).success).toBe(false);
+    expect(sendAParcel.parseArgs({ destination: 'Ireland', speed: 'air' }).success).toBe(true);
+    expect(sendAParcel.parseArgs({ destination: 'Ireland', speed: 'pigeon' }).success).toBe(false);
+  });
+
+  it('resolves a registration to the name on the form, for the sim to check', () => {
+    expect(registerAddress.resolveCompletion({ fields: { name: 'Sam', address: 'Flat 2', nationality: 'Irish' } }, 'de')).toEqual({
+      success: true,
+      lines: [],
+      registration: { name: 'Sam' },
+    });
+  });
+
+  it.each(LANGUAGE_CODES)('charges postage in %s by speed, express dearest, as the clerk’s facts say', (packId) => {
+    const postage = (speed: string) => sendAParcel.resolveCompletion({ destination: 'Ireland', speed }, packId);
+    const [sea, air, express] = (['sea', 'air', 'express'] as const).map((speed) => {
+      const resolved = postage(speed);
+      if (!resolved.success || !resolved.shipment) throw new Error('no shipment');
+      expect(resolved.shipment).toMatchObject({ destination: 'Ireland', speed });
+      expect(interactionFacts(sendAParcel, packId).join('\n')).toContain(`(speed id "${speed}")`);
+      expect(interactionFacts(sendAParcel, packId).join('\n')).toContain(formatLocalMoney(resolved.shipment.postageInShifts, packId));
+      return resolved.shipment.postageInShifts;
+    });
+    expect(sea).toBeLessThan(air!);
+    expect(air).toBeLessThan(express!);
+    expect(sea).toBeCloseTo(ECONOMY.postageInShifts.sea, 1);
+  });
+
+  it.each(LANGUAGE_CODES)('tells the %s clerk the town office’s own facts', (packId) => {
+    expect(interactionFacts(registerAddress, packId)).toEqual(expect.arrayContaining(CULTURE_PACKS[packId].townPlaces['town-office'].facts!));
+  });
+});
+
+describe('Goal Interaction #25: which tram goes to a place', () => {
+  const { askForDirections } = INTERACTIONS;
+
+  it('is a passer-by’s give_directions(stop) at a tram stop, Beginner', () => {
+    expect([askForDirections.npcId, askForDirections.placeId, askForDirections.toolDeclaration.name, askForDirections.band]).toEqual([
+      'passer-by',
+      'tram-stop',
+      'give_directions',
+      'B',
+    ]);
+    expect(askForDirections.resolveCompletion({ stop: 'east-stop' }, 'ja')).toEqual({ success: true, lines: [], directions: 'east-stop' });
+    expect(askForDirections.parseArgs({ stop: 'moon-stop' }).success).toBe(false);
+  });
+
+  it.each(LANGUAGE_CODES)('tells a %s passer-by each stop by its local name, the places to get off for, and where they wait', (packId) => {
+    const { tramStops, townPlaces, supermarket } = CULTURE_PACKS[packId];
+    const facts = interactionFacts(askForDirections, packId, { tramStop: 'central-stop' });
+    expect(facts).toContain(`You are waiting at ${tramStops['central-stop'].name} (stop id "central-stop").`);
+    expect(facts.join('\n')).toContain(`${tramStops['west-stop'].name} (stop id "west-stop")`);
+    expect(facts.find((fact) => fact.startsWith(`Get off at ${tramStops['west-stop'].name} for`))).toContain(townPlaces['town-office'].name);
+    expect(facts.find((fact) => fact.startsWith(`Get off at ${tramStops['east-stop'].name} for`))).toContain(supermarket.name);
+  });
+});

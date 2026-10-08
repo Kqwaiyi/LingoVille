@@ -39,6 +39,14 @@ describe('opening hours', () => {
     }
   });
 
+  it.each(LANGUAGE_CODES)('opens the town office and post office 9:00–17:00 on weekdays only in the %s pack', (packId) => {
+    const office = placeHours('town-office', packId);
+    expect(office).toMatchObject({ opensAt: 9 * HOUR, closesAt: 17 * HOUR });
+    expect(WEEKDAYS.filter((weekday) => openSometimeOn('town-office', packId, dayOf(weekday)))).toEqual(
+      WEEKDAYS.filter((weekday) => weekday !== 'saturday' && weekday !== 'sunday'),
+    );
+  });
+
   it('runs the trams until 1:00 the next morning', () => {
     expect(isOpen(placeHours('tram-stop', 'ja'), { day: 2, minuteOfDay: 0.5 * HOUR })).toBe(true);
     expect(isOpen(placeHours('tram-stop', 'ja'), { day: 2, minuteOfDay: 1 * HOUR })).toBe(false);

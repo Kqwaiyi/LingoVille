@@ -1,8 +1,6 @@
-import { useFrame } from '@react-three/fiber';
-import { useRef } from 'react';
-import type { Mesh } from 'three';
 import { GROCERIES_SOLD, type GroceryId } from '../content/index.ts';
 import { selectShelfMarker, useGame } from '../store/index.ts';
+import { MarkerArrow } from './Marker.tsx';
 import { SHELF_SPOTS } from './town.ts';
 
 /** Greybox stand-ins for each grocery on its shelf, until the art pass (ticket 31). */
@@ -13,22 +11,6 @@ const COLOURS: Record<GroceryId, string> = {
 };
 
 const DISPLAY = { size: [1.2, 0.35, 0.3] as const } as const;
-const MARKER = { height: 1, bob: 0.12, bobsPerSecond: 1.5, colour: '#e0483b' } as const;
-
-/** A red arrow bobbing over the grocery the cashier pointed to. */
-function ShelfMarker({ itemId }: { itemId: GroceryId }) {
-  const arrow = useRef<Mesh>(null);
-  const [x, y, z] = SHELF_SPOTS[itemId];
-  useFrame(({ clock }) => {
-    if (arrow.current) arrow.current.position.y = y + MARKER.height + Math.sin(clock.elapsedTime * MARKER.bobsPerSecond * Math.PI * 2) * MARKER.bob;
-  });
-  return (
-    <mesh ref={arrow} position={[x, y + MARKER.height, z]} rotation-x={Math.PI}>
-      <coneGeometry args={[0.18, 0.4, 12]} />
-      <meshStandardMaterial color={MARKER.colour} emissive={MARKER.colour} emissiveIntensity={0.5} />
-    </mesh>
-  );
-}
 
 /** The groceries on the supermarket's shelves, and the marker on the one the cashier pointed to. */
 export function Groceries() {
@@ -41,7 +23,8 @@ export function Groceries() {
           <meshStandardMaterial color={COLOURS[itemId]} flatShading />
         </mesh>
       ))}
-      {marked && <ShelfMarker itemId={marked} />}
+      {/* A red arrow bobbing over the grocery the cashier pointed to. */}
+      {marked && <MarkerArrow at={SHELF_SPOTS[marked]} />}
     </>
   );
 }

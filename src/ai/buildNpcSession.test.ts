@@ -14,6 +14,7 @@ import {
 } from '../sim/index.ts';
 import {
   buildNpcSession,
+  buildPasserBySession,
   buildSmallTalkSession,
   giftScene,
   GREETING_SCENE,
@@ -679,5 +680,70 @@ describe('buildSmallTalkSession', () => {
 
     expect(waved.openingScene).toBe('[SCENE: You see a person you might chat with coming into the park, and wave them over. Speak to them first.]');
     expect(waved.systemInstruction).toContain('The first one tells you why you are speaking to them: you speak first.');
+  });
+});
+
+describe('buildNpcSession: returning a faulty item to the supermarket', () => {
+  const refundSession = (packId: LanguageCode) =>
+    buildNpcSession(INTERACTIONS.returnAnItem, CULTURE_PACKS[packId], 'C1', NAMED_NPCS.cashier, { clock: { day: 2, minuteOfDay: 10 * 60 } });
+
+  it.each(LANGUAGE_CODES)('builds the cashier taking an item back in the %s pack', (packId) => {
+    expect(refundSession(packId)).toMatchSnapshot();
+  });
+
+  it('has the cashier read back the item, what is wrong with it and the refund, and pass on why it can’t be refunded', () => {
+    const { systemInstruction, tools } = refundSession('en');
+    expect(systemInstruction).toMatch(/read back the item, what is wrong with it and the refund/);
+    expect(systemInstruction).toMatch(/"invalid_arguments", its error says why it can't be refunded/);
+    expect(tools[0]!.name).toBe('refund');
+  });
+});
+
+describe('buildNpcSession: the town office and post office', () => {
+  const MIDDAY = { day: 2, minuteOfDay: 11 * 60 };
+  const clerkSession = (interaction: Interaction, packId: LanguageCode) =>
+    buildNpcSession(interaction, CULTURE_PACKS[packId], 'B1', NAMED_NPCS['office-clerk'], { clock: MIDDAY });
+
+  it.each(LANGUAGE_CODES)('builds the clerk registering an address and sending a parcel in the %s pack', (packId) => {
+    expect(clerkSession(INTERACTIONS.registerAddress, packId)).toMatchSnapshot();
+    expect(clerkSession(INTERACTIONS.sendAParcel, packId)).toMatchSnapshot();
+  });
+
+  it('lets the clerk ask the resident’s name for the form, with no learn_name, and ask again if misheard', () => {
+    const { systemInstruction, tools } = clerkSession(INTERACTIONS.registerAddress, 'de');
+    expect(tools.map((tool) => tool.name)).toEqual(['register_resident', REVEAL_FAVOURITE_TOOL, 'not_understood']);
+    expect(systemInstruction).toContain("You don't know their name yet; asking for it is part of filling in the form.");
+    expect(systemInstruction).not.toMatch(/don't ask for it/);
+    expect(systemInstruction).toMatch(/"wrong_name".*again/);
+  });
+
+  it('has the clerk read back where a parcel is going, how and the price', () => {
+    expect(clerkSession(INTERACTIONS.sendAParcel, 'en').systemInstruction).toMatch(/read back where to, how and the price/);
+  });
+});
+
+describe('buildPasserBySession: asking the way at a tram stop', () => {
+  const EVENING = { day: 3, minuteOfDay: 18 * 60 };
+  const passerBySession = (packId: LanguageCode, step: ProficiencyStep = 'A1') =>
+    buildPasserBySession(INTERACTIONS.askForDirections, CULTURE_PACKS[packId], step, { clock: EVENING, tramStop: 'west-stop', voiceSeed: 7 });
+
+  it.each(LANGUAGE_CODES)('builds the passer-by session in the %s pack', (packId) => {
+    expect(passerBySession(packId)).toMatchSnapshot();
+  });
+
+  it('plays a nameless local waiting at the stop, who speaks first, with a Shift Customer’s voice', () => {
+    const session = passerBySession('ja');
+    expect(session.systemInstruction).toContain(`waiting for the tram at ${CULTURE_PACKS.ja.tramStops['west-stop'].name}`);
+    expect(session.systemInstruction).toContain(`You are waiting at ${CULTURE_PACKS.ja.tramStops['west-stop'].name} (stop id "west-stop").`);
+    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: 7 });
+    expect(session.openingScene).toMatch(/^\[SCENE: .*Greet them first\.\]$/);
+  });
+
+  it('offers only give_directions and not_understood: a passer-by learns no name and has no favourite gift', () => {
+    expect(passerBySession('en').tools.map((tool) => tool.name)).toEqual(['give_directions', 'not_understood']);
+  });
+
+  it('speaks at the learner’s step', () => {
+    expect(passerBySession('de', 'C2').systemInstruction).toMatch(/near-native level/);
   });
 });

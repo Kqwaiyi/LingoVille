@@ -1,11 +1,12 @@
 // Public interface of the content module. Other modules import from here.
 export { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
-export { approachInteraction, interactionStartedWithE, interactionStartedWithF } from './approaches.ts';
+export { approachInteraction, interactionStartedWithE, interactionStartedWithF, interactionStartedWithR } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {
   CULTURE_PACKS,
   culturePackSchema,
   cafeAllergensIn,
+  localNpcPlaceName,
   localPlaceName,
   localShop,
   PROP_IDS,
@@ -23,18 +24,24 @@ export { chargeInShifts, formatLocalAmount, formatLocalMoney, localPrice, menuPr
 export {
   defineInteraction,
   FACT_SOURCES,
+  PASSER_BY,
+  SHIPPING_SPEEDS,
   type Band,
   type Diagnosis,
   type EffectKind,
   type FactSource,
   type Interaction,
   type InteractionDefinition,
+  type InteractionNpcId,
   type JobApplication,
   type OrderLine,
   type ParsedArgs,
   type RentChange,
   type ResolvedCompletion,
+  type Refund,
   type ServedItem,
+  type Shipment,
+  type ShippingSpeed,
   type Treatment,
 } from './defineInteraction.ts';
 export {
@@ -113,11 +120,16 @@ export { placeHours } from './openingHours.ts';
 export { formatTime, HOURS_IDS, OPEN_AIR_PLACES, PLACE_HOURS, SERVICE_HOURS, type HoursId } from './places.ts';
 export { SIGN_IDS, worldSign, type SignId, type SignLine } from './signs.ts';
 export {
+  isPasserBy,
+  PASSER_BY_IDS,
+  PASSER_BY_STOPS,
   ROLE_IDS,
+  STOP_PLACES,
   stopsBetween,
   TOWN_NPC_IDS,
   TOWN_NPCS,
   TRAM_LINE,
+  type PasserById,
   type RoleId,
   type TownNpc,
   type TownNpcId,

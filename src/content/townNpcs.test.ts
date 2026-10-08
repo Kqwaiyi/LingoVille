@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
-import { CULTURE_PACKS, localPlaceName, NAMED_NPCS, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId } from './index.ts';
+import { CULTURE_PACKS, isPasserBy, localNpcPlaceName, localPlaceName, NAMED_NPCS, PASSER_BY_STOPS, STOP_PLACES, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, type RoleId } from './index.ts';
 
 /** The NPCs column of the spec's places table. */
 const STAFF_BY_PLACE: Record<PlaceId, RoleId[]> = {
@@ -61,5 +61,22 @@ describe('the tram line', () => {
     expect(stopsBetween(first!, last!)).toBe(2);
     expect(stopsBetween(last!, first!)).toBe(2);
     expect(stopsBetween(first!, first!)).toBe(0);
+  });
+});
+
+describe('passers-by and the tram line', () => {
+  it('has one passer-by waiting at each stop, and no one else is a passer-by', () => {
+    expect(Object.values(PASSER_BY_STOPS).sort()).toEqual([...TRAM_LINE].sort());
+    expect(TOWN_NPC_IDS.filter(isPasserBy)).toEqual(TOWN_NPC_IDS.filter((npcId) => TOWN_NPCS[npcId].role === 'passer-by'));
+  });
+
+  it('names one stop to get off at for every place but the tram stop itself', () => {
+    const served = TRAM_LINE.flatMap((stopId) => STOP_PLACES[stopId]);
+    expect(served.sort()).toEqual(PLACE_IDS.filter((placeId) => placeId !== 'tram-stop').sort());
+  });
+
+  it('finds a passer-by at their stop, by its local name, and anyone else at their place', () => {
+    expect(localNpcPlaceName('passer-by-3', 'de')).toBe(CULTURE_PACKS.de.tramStops['east-stop'].name);
+    expect(localNpcPlaceName('office-clerk', 'ja')).toBe(localPlaceName('town-office', 'ja'));
   });
 });

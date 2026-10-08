@@ -1,12 +1,13 @@
-import type { Interaction, JobApplication, OrderLine, RentChange, ServedItem, Treatment } from '../content/index.ts';
+import type { Interaction, JobApplication, OrderLine, Refund, RentChange, ServedItem, Shipment, TramStopId, Treatment } from '../content/index.ts';
 import type { Basket } from './basket.ts';
 import { checkIn, diagnose, dispense, settleHospitalBill } from './clinic.ts';
+import { refundItem, registerAddress } from './errands.ts';
 import { stockInventory } from './inventory.ts';
 import { hire, namesMatch } from './jobs.ts';
 import { goalInteractionFamiliarity } from './familiarity.ts';
 import { membershipBoughtUntil } from './gym.ts';
 import { clampMeter } from './meters.ts';
-import { metNpc } from './npcMemory.ts';
+import { metNpc, namedNpcOf } from './npcMemory.ts';
 import { recordOrder } from './regulars.ts';
 import { grantExtension, payRent } from './rent.ts';
 import { billTotal, restaurantDebt } from './restaurant.ts';
@@ -23,7 +24,9 @@ export type InteractionOutcome = { kind: 'success'; args: unknown; basket?: Bask
  * What happened. `served` is what the Character was handed: eaten on the spot,
  * or for a purchase, put in the inventory. `pointedTo` is the item an NPC showed
  * the way to, `extendedDays` the more time the landlord gave, and `hired` the Job
- * the Character got. `moodChange` is the change that actually happened, after
+ * the Character got. `refundedInShifts` is money paid back for an item returned, `registered` that the Character's
+ * address now is, and `directedTo` the tram stop a passer-by said to get off at. `moodChange` is the change that
+ * actually happened, after
  * clamping. `cannot_afford`, `invalid_arguments` and `wrong_name` (the NPC
  * misheard the Character's name) change nothing: the NPC is told, and the
  * conversation goes on.
@@ -37,6 +40,9 @@ export type OutcomeResult =
       pointedTo?: ServedItem;
       extendedDays?: number;
       hired?: JobId;
+      refundedInShifts?: number;
+      registered?: true;
+      directedTo?: TramStopId;
     }
   | { kind: 'failure'; moodChange: number }
   | { kind: 'abandon' }
@@ -73,10 +79,10 @@ function comfortMood(lines: OrderLine[]): number {
   return [...kinds].reduce((lift, kind) => lift + MOOD.changes.comfortPurchase[kind], 0);
 }
 
-/** A success that serves nothing: the Character seated, or a bill paid. */
-function succeeded(state: GameState, paidInShifts = 0): { state: GameState; result: OutcomeResult } {
+/** A success that serves nothing: the Character seated, a bill paid, an address `registered`, or a tram stop named (`directedTo`). */
+function succeeded(state: GameState, paidInShifts = 0, more: { directedTo?: TramStopId; registered?: true } = {}): { state: GameState; result: OutcomeResult } {
   const lifted = changeMood(state, MOOD.changes.goalInteractionSuccess);
-  return { state: lifted.state, result: { kind: 'success', served: [], paidInShifts, moodChange: lifted.moodChange } };
+  return { state: lifted.state, result: { kind: 'success', served: [], paidInShifts, moodChange: lifted.moodChange, ...more } };
 }
 
 /** The bill with these lines added to it, a line per item. */
@@ -112,6 +118,34 @@ function applyJobApplication(state: GameState, { jobId, name }: JobApplication):
   return { state: hired.state, result: { kind: 'success', served: [], paidInShifts: 0, moodChange: hired.moodChange, hired: jobId } };
 }
 
+/** The supermarket takes an item back: paid back, if the Character has it and it hasn't gone off. */
+function applyRefund(state: GameState, refund: Refund): { state: GameState; result: OutcomeResult } {
+  const refunded = refundItem(state, refund);
+  const { name } = refund.item;
+  if (refunded.kind === 'not_held') return { state, result: { kind: 'invalid_arguments', error: `The customer has no ${name} with them to bring back.` } };
+  if (refunded.kind === 'gone_off') {
+    return { state, result: { kind: 'invalid_arguments', error: `The ${name} the customer brought back is past its date, so it can't be refunded.` } };
+  }
+  const lifted = changeMood(refunded.state, MOOD.changes.goalInteractionSuccess);
+  const result: OutcomeResult = { kind: 'success', served: [], paidInShifts: 0, moodChange: lifted.moodChange, refundedInShifts: refund.amountInShifts };
+  return { state: lifted.state, result };
+}
+
+/** The town office registers the Character's address, once, if the name on the form is theirs. */
+function applyRegistration(state: GameState, { name }: { name: string }): { state: GameState; result: OutcomeResult } {
+  if (!namesMatch(name, state.identity.characterName)) return { state, result: { kind: 'wrong_name' } };
+  if (state.possessions.addressRegistered) return { state, result: { kind: 'invalid_arguments', error: 'This resident has already registered their address.' } };
+  return succeeded(registerAddress(state), 0, { registered: true });
+}
+
+/** The post office sends a parcel home: paid for, it lifts Mood more than a plain success. */
+function applyShipment(state: GameState, { postageInShifts }: Shipment): { state: GameState; result: OutcomeResult } {
+  if (postageInShifts > state.character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
+  const paid: GameState = { ...state, character: { ...state.character, moneyInShifts: state.character.moneyInShifts - postageInShifts } };
+  const lifted = changeMood(paid, MOOD.changes.goalInteractionSuccess + MOOD.changes.parcelSent);
+  return { state: lifted.state, result: { kind: 'success', served: [], paidInShifts: postageInShifts, moodChange: lifted.moodChange } };
+}
+
 /** The pharmacist's completion: the prescribed medicine, paid for and taken on the spot. */
 function applyTreatment(state: GameState, treatment: Treatment, lines: OrderLine[]): { state: GameState; result: OutcomeResult } {
   const { costInShifts } = orderTotals(lines);
@@ -131,7 +165,7 @@ function applyTreatment(state: GameState, treatment: Treatment, lines: OrderLine
  * prompt), then pays, applies the effect and lifts Mood, more for a Comfort Purchase. Failure dips Mood a
  * little and charges nothing. Abandoning costs nothing. A finished conversation,
  * however it ended, counts as meeting the NPC once more, and a success makes them
- * a little more familiar, and for an order, counts toward the Character's usual.
+ * a little more familiar, and for an order, counts toward the Character's usual. A passer-by remembers nothing.
  */
 export function applyInteractionOutcome(
   state: GameState,
@@ -142,10 +176,11 @@ export function applyInteractionOutcome(
   // Success, failure and abandon finish the conversation; anything else lets it go on.
   const { kind } = applied.result;
   const finished = kind === 'success' || kind === 'failure' || kind === 'abandon';
-  if (!finished) return applied;
-  const met = metNpc(applied.state, interaction.npcId);
+  const npcId = namedNpcOf(interaction);
+  if (!finished || !npcId) return applied;
+  const met = metNpc(applied.state, npcId);
   if (kind !== 'success' || outcome.kind !== 'success') return { ...applied, state: met };
-  return { ...applied, state: recordOrder(goalInteractionFamiliarity(met, interaction.npcId), interaction, outcome.args) };
+  return { ...applied, state: recordOrder(goalInteractionFamiliarity(met, npcId), interaction, outcome.args) };
 }
 
 function applyOutcome(state: GameState, interaction: Interaction, outcome: InteractionOutcome): { state: GameState; result: OutcomeResult } {
@@ -177,6 +212,10 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
         if (settled.kind === 'cannot_afford') return { state, result: { kind: 'cannot_afford' } };
         return succeeded(settled.state, settled.paidInShifts);
       }
+      if (completion.refund) return applyRefund(state, completion.refund);
+      if (completion.registration) return applyRegistration(state, completion.registration);
+      if (completion.shipment) return applyShipment(state, completion.shipment);
+      if (completion.directions) return succeeded(state, 0, { directedTo: completion.directions });
       if (effect.kind === 'seatGuest') return succeeded({ ...state, restaurant: { ...restaurant, seated: true } });
       if (effect.kind === 'orderMeal' && !restaurant.seated) {
         return { state, result: { kind: 'invalid_arguments', error: 'The customer has no table yet: they must be seated before they order.' } };

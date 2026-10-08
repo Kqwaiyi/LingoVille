@@ -20,6 +20,7 @@ import {
   selectStaffDoor,
   selectTalkWithE,
   selectTalkWithF,
+  selectTalkWithR,
   selectTramHours,
   selectTramRunning,
   selectTramStop,
@@ -39,8 +40,12 @@ const F_PROMPTS: Partial<Record<EffectKind, 'prompt.askForTime' | 'prompt.askFor
 };
 
 /** What F offers by the conversation itself, where its effect doesn't say. */
-const F_PROMPTS_BY_INTERACTION = new Map<Interaction, 'prompt.buyGift' | 'prompt.askRecommendation' | 'prompt.joinGym' | 'prompt.renewGym'>([
+const F_PROMPTS_BY_INTERACTION = new Map<
+  Interaction,
+  'prompt.buyGift' | 'prompt.askRecommendation' | 'prompt.joinGym' | 'prompt.renewGym' | 'prompt.registerAddress'
+>([
   [INTERACTIONS.buyAGift, 'prompt.buyGift'],
+  [INTERACTIONS.registerAddress, 'prompt.registerAddress'],
   [INTERACTIONS.recommendAMeal, 'prompt.askRecommendation'],
   [INTERACTIONS.joinTheGym, 'prompt.joinGym'],
   [INTERACTIONS.renewGymMembership, 'prompt.renewGym'],
@@ -48,7 +53,7 @@ const F_PROMPTS_BY_INTERACTION = new Map<Interaction, 'prompt.buyGift' | 'prompt
 
 /**
  * What F offers with this conversation: at the bookshop, buying a gift, at a restaurant table, a recommendation, at the
- * bathhouse, joining or renewing at the gym, and otherwise by its effect.
+ * bathhouse, joining or renewing at the gym, at the town office, registering an address, and otherwise by its effect.
  */
 const fPrompt = (interaction: Interaction) =>
   F_PROMPTS_BY_INTERACTION.get(interaction) ?? F_PROMPTS[interaction.effect.kind] ?? 'prompt.ask';
@@ -58,7 +63,8 @@ const PAYS: readonly EffectKind[] = ['purchase', 'settleBill'];
 
 /**
  * "Press E to …" while the Character is close enough to use something, and E to use it. Some NPCs also offer a second
- * conversation on F. A Named NPC with nothing else to talk about chats on E; staff chat on T.
+ * conversation on F, and the cashier a third on R, to bring something back. A Named NPC with nothing else to talk about
+ * chats on E; staff chat on T. E asks a passer-by the way.
  */
 export function InteractionPrompt() {
   const { t } = useTranslation();
@@ -70,6 +76,7 @@ export function InteractionPrompt() {
   const staffDoor = useGame(selectStaffDoor);
   const talkWithE = useGame(selectTalkWithE);
   const talkWithF = useGame(selectTalkWithF);
+  const talkWithR = useGame(selectTalkWithR);
   const smallTalkKey = useGame(selectSmallTalkKey);
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
@@ -94,6 +101,8 @@ export function InteractionPrompt() {
       // Ctrl+F stays the browser's find.
       if (e.code === 'KeyF' && talkWithF && !e.ctrlKey && !e.metaKey) return talk('F');
       if (e.code === 'KeyT' && smallTalkKey === 'T' && !e.ctrlKey && !e.metaKey) return talk('T');
+      // Ctrl+R stays the browser's reload.
+      if (e.code === 'KeyR' && talkWithR && !e.ctrlKey && !e.metaKey) return talk('R');
       if (e.code !== 'KeyE') return;
       if (interactable === 'tap') drinkWater();
       else if (interactable === 'stove') cook();
@@ -106,7 +115,7 @@ export function InteractionPrompt() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, smallTalkKey, drinkWater, cook, sleep, workOut, openTram, takeFromShelf, startShift, talk]);
+  }, [usable, interactable, tramStop, shelf, staffDoor, talkWithF, talkWithR, smallTalkKey, drinkWater, cook, sleep, workOut, openTram, takeFromShelf, startShift, talk]);
 
   if (!active) return null;
   // Trams that ran all day (null hours) would always be running, so they have hours here.
@@ -147,7 +156,15 @@ export function InteractionPrompt() {
       ) : (
         <>
           <Trans
-            i18nKey={talkWithE && PAYS.includes(talkWithE.effect.kind) ? 'prompt.pay' : smallTalkKey === 'E' ? 'prompt.chat' : 'prompt.talk'}
+            i18nKey={
+              talkWithE && PAYS.includes(talkWithE.effect.kind)
+                ? 'prompt.pay'
+                : talkWithE === INTERACTIONS.askForDirections
+                  ? 'prompt.askTheWay'
+                  : smallTalkKey === 'E'
+                    ? 'prompt.chat'
+                    : 'prompt.talk'
+            }
             values={{ role: t(`roles.${TOWN_NPCS[interactable as TownNpcId].role}.name`) }}
             components={{ kbd: <kbd /> }}
           />
@@ -155,6 +172,12 @@ export function InteractionPrompt() {
             <>
               {' · '}
               <Trans i18nKey={fPrompt(talkWithF)} components={{ kbd: <kbd /> }} />
+            </>
+          )}
+          {talkWithR && (
+            <>
+              {' · '}
+              <Trans i18nKey="prompt.returnItem" components={{ kbd: <kbd /> }} />
             </>
           )}
           {smallTalkKey === 'T' && (

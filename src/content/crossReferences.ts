@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
+import { ECONOMY, LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
 import { culturePackSchema, type CulturePack } from './culturePacks.ts';
 import { priceProblem } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
@@ -13,7 +13,7 @@ const GIFT_WORDS: Record<(typeof GIFTS_SOLD)[number], string> = { flowers: 'flow
  * Everything wrong with the Culture Packs, one line each, or nothing: each pack
  * passes its schema (with glosses in exactly the three other Native Languages),
  * sells every item an interaction refers to (saying which allergens are in each one the barista sells avoiding an
- * allergen), converts every catalogue price, and
+ * allergen), converts every catalogue price and the postage, and
  * localises and dresses every Named NPC, keeping to the gift each one loves most.
  */
 export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, interactions: readonly Interaction[]): string[] {
@@ -34,6 +34,10 @@ export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, in
     for (const [item, { priceInShifts }] of Object.entries(ITEMS)) {
       const problem = priceProblem(priceInShifts, pack.currency);
       if (problem) problems.push(`${item}: ${problem}`);
+    }
+    for (const [speed, postageInShifts] of Object.entries(ECONOMY.postageInShifts)) {
+      const problem = priceProblem(postageInShifts, pack.currency);
+      if (problem) problems.push(`${speed} postage: ${problem}`);
     }
     for (const npcId of Object.keys(NAMED_NPCS) as NamedNpcId[]) {
       if (!pack.personas[npcId]) problems.push(`gives ${npcId} no local name.`);

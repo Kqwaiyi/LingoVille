@@ -80,6 +80,26 @@ export const TOWN_NPCS: Record<TownNpcId, TownNpc> = {
 export const TRAM_LINE = ['west-stop', 'central-stop', 'east-stop'] as const;
 export type TramStopId = (typeof TRAM_LINE)[number];
 
+/** The stop each passer-by waits at. */
+export const PASSER_BY_STOPS = {
+  'passer-by-1': 'west-stop',
+  'passer-by-2': 'central-stop',
+  'passer-by-3': 'east-stop',
+} as const satisfies Partial<Record<TownNpcId, TramStopId>>;
+export type PasserById = keyof typeof PASSER_BY_STOPS;
+/** The passers-by, in a fixed order. */
+export const PASSER_BY_IDS = Object.keys(PASSER_BY_STOPS) as PasserById[];
+
+/** Someone at a tram stop: not a Named NPC, with no name, persona or memory of the Character. */
+export const isPasserBy = (npcId: TownNpcId): npcId is PasserById => npcId in PASSER_BY_STOPS;
+
+/** The places nearest each stop, west to east: where to get off for each. The world lays the town out to match. */
+export const STOP_PLACES: Record<TramStopId, readonly PlaceId[]> = {
+  'west-stop': ['town-office', 'bookshop', 'clinic'],
+  'central-stop': ['home', 'convenience-store', 'park', 'cafe'],
+  'east-stop': ['supermarket', 'bathhouse', 'restaurant'],
+};
+
 /** How many stops along the line one stop is from another. */
 export function stopsBetween(from: TramStopId, to: TramStopId): number {
   return Math.abs(TRAM_LINE.indexOf(to) - TRAM_LINE.indexOf(from));

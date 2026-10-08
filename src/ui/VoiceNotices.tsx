@@ -28,7 +28,6 @@ export function Toast() {
       {toast.kind === 'tooEarlyForBed' && t('toast.tooEarlyForBed', { time: formatTime(CLOCK.bedUsableFrom) })}
       {toast.kind === 'npcSteppedAway' &&
         t('toast.npcSteppedAway', { who: toast.npcId ? t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) : t('shift.customerSubject') })}
-      {toast.kind === 'nothingToSay' && t('toast.nothingToSay', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
     </div>
   );
 }

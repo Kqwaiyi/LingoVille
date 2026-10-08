@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   basketChangedScene,
   buildNpcSession,
+  buildPasserBySession,
   buildShiftCustomerSession,
   buildSmallTalkSession,
   giftScene,
@@ -13,8 +14,8 @@ import {
   WRAP_UP_SCENE,
   type ToolResponse,
 } from '../ai/index.ts';
-import { CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction, type MedicineId } from '../content/index.ts';
-import { FAMILIARITY, LANGUAGE_CODES, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
+import { chargeInShifts, CULTURE_PACKS, formatLocalAmount, formatLocalMoney, INTERACTIONS, menuPrice, NAMED_NPCS, type Interaction, type MedicineId } from '../content/index.ts';
+import { ECONOMY, FAMILIARITY, LANGUAGE_CODES, namedNpcOf, type ApproachId, type LanguageCode, type NpcMemory, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { MOCK_DROP_LINE, openMockVoiceSession, type ToolCall, type VoiceSessionEvents } from './index.ts';
 
 function npcSession(packId: LanguageCode) {
@@ -542,7 +543,7 @@ describe('mock VoiceSession: asking the barista for work (#26)', () => {
 
   async function hiring(packId: LanguageCode, interaction = INTERACTIONS.askBaristaForWork) {
     const heard = listen();
-    const npcSession = buildNpcSession(interaction, CULTURE_PACKS[packId], 'A1', NAMED_NPCS[interaction.npcId], {
+    const npcSession = buildNpcSession(interaction, CULTURE_PACKS[packId], 'A1', NAMED_NPCS[namedNpcOf(interaction)!], {
       clock: { day: 2, minuteOfDay: 540 },
     });
     const session = openMockVoiceSession(npcSession, heard.events);
@@ -1420,5 +1421,174 @@ describe('mock VoiceSession: café orders with options and allergens (#2, #3)', 
     await say('yes please');
 
     expect(toolCalls.map((call) => call.args)).toEqual([usual]);
+  });
+});
+
+const returningAnItem = (packId: LanguageCode) =>
+  open(buildNpcSession(INTERACTIONS.returnAnItem, CULTURE_PACKS[packId], 'C1', NAMED_NPCS.cashier, CLOCK_10AM));
+const atTheTownOffice = (packId: LanguageCode, interaction: Interaction) =>
+  open(buildNpcSession(interaction, CULTURE_PACKS[packId], 'B1', NAMED_NPCS['office-clerk'], CLOCK_10AM));
+const atTheTramStop = (packId: LanguageCode) =>
+  open(buildPasserBySession(INTERACTIONS.askForDirections, CULTURE_PACKS[packId], 'A1', { ...CLOCK_10AM, tramStop: 'west-stop', voiceSeed: 1 }));
+
+/** What the Player says on errands in each pack, and the name the mock should hear in it. */
+const ERRANDS_SAID = {
+  ja: {
+    faulty: '卵が割れていました',
+    name: 'サムです',
+    heardName: 'サム',
+    address: 'さくら荘です',
+    nationality: 'アイルランドです',
+    destination: 'アイルランド',
+    air: '航空便で',
+    supermarket: 'スーパーに行きたいです',
+  },
+  zh: { faulty: '鸡蛋是坏的', name: '我叫Sam', heardName: 'Sam', address: '幸福公寓', nationality: '爱尔兰', destination: '爱尔兰', air: '空运', supermarket: '我想去超市' },
+  en: {
+    faulty: 'the eggs were cracked',
+    name: "my name's Sam",
+    heardName: 'Sam',
+    address: 'Rosewood House',
+    nationality: 'Irish',
+    destination: 'Ireland',
+    air: 'by air please',
+    supermarket: 'how do I get to the supermarket',
+  },
+  de: {
+    faulty: 'die Eier sind kaputt',
+    name: 'ich heiße Sam',
+    heardName: 'Sam',
+    address: 'Haus Lindenhof',
+    nationality: 'irisch',
+    destination: 'Irland',
+    air: 'mit Luftpost bitte',
+    supermarket: 'wie komme ich zum Supermarkt',
+  },
+} as const;
+
+describe('mock VoiceSession: returning a faulty item (#6)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('hears the item and what is wrong, reads back the refund, then calls refund on a yes (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await returningAnItem(packId);
+
+    await say(ERRANDS_SAID[packId].faulty);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)!.toLowerCase()).toContain(CULTURE_PACKS[packId].goods.eggs.name.toLowerCase());
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'refund', args: { item: 'eggs', reason: expect.any(String) } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('asks what is wrong with an item named on its own', async () => {
+    const { turns, toolCalls, say } = await returningAnItem('en');
+    await say('these eggs');
+    expect(turns.at(-1)).toMatch(/wrong/);
+    await say('they were cracked');
+    await say('yes');
+    expect(toolCalls).toHaveLength(1);
+  });
+
+  it('says it can’t be refunded when the game says so', async () => {
+    const { turns, say, answer } = await returningAnItem('en');
+    await say('the eggs were cracked');
+    await say('yes');
+    await answer({ result: 'invalid_arguments', error: 'The customer has no eggs with them to bring back.' });
+    expect(turns.at(-1)).toMatch(/can't/);
+  });
+});
+
+describe('mock VoiceSession: the town office and post office (#23, #24)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('fills in the form one field at a time, reads it back, then calls register_resident on a yes (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const said = ERRANDS_SAID[packId];
+    const { turns, toolCalls, say, answer } = await atTheTownOffice(packId, INTERACTIONS.registerAddress);
+
+    await say(said.name);
+    await say(said.address);
+    await say(said.nationality);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)).toContain(said.heardName);
+    await say(yes);
+    expect(toolCalls).toEqual([
+      {
+        id: expect.any(String),
+        name: 'register_resident',
+        args: { fields: { name: said.heardName, address: expect.any(String), nationality: expect.any(String) } },
+      },
+    ]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(5);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('asks the name again when the game says it was misheard', async () => {
+    const { turns, toolCalls, say, answer } = await atTheTownOffice('en', INTERACTIONS.registerAddress);
+    for (const line of ["I'm Tom", 'Rosewood House', 'Irish', 'yes']) await say(line);
+    await answer({ result: 'wrong_name' });
+    expect(turns.at(-1)).toMatch(/name/);
+    await say("my name's Sam");
+    await say('yes');
+    expect(toolCalls.at(-1)!.args).toMatchObject({ fields: { name: 'Sam', address: 'Rosewood House', nationality: 'Irish' } });
+  });
+
+  it.each(LANGUAGE_CODES)('asks where a parcel is going and how, reads back the price, then calls ship on a yes (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const said = ERRANDS_SAID[packId];
+    const { turns, toolCalls, say, answer } = await atTheTownOffice(packId, INTERACTIONS.sendAParcel);
+
+    await say(said.destination);
+    await say(said.air);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)).toContain(formatLocalMoney(chargeInShifts(ECONOMY.postageInShifts.air, packId), packId));
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'ship', args: { destination: said.destination, speed: 'air' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(4);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+});
+
+describe('mock VoiceSession: a passer-by at a tram stop (#25)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('names the stop for where the Player wants to go, then calls give_directions once they understand (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheTramStop(packId);
+
+    await say(ERRANDS_SAID[packId].supermarket);
+    expect(toolCalls).toEqual([]);
+    expect(turns.at(-1)).toContain(CULTURE_PACKS[packId].tramStops['east-stop'].name);
+    await say(yes);
+    expect(toolCalls).toEqual([{ id: expect.any(String), name: 'give_directions', args: { stop: 'east-stop' } }]);
+    await answer({ result: 'done' });
+
+    expect(turns).toHaveLength(3);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('knows each place by its local name too', async () => {
+    const { turns, toolCalls, say } = await atTheTramStop('en');
+    await say(`which tram for ${CULTURE_PACKS.en.townPlaces['town-office'].name}?`);
+    expect(turns.at(-1)).toContain(CULTURE_PACKS.en.tramStops['west-stop'].name);
+    await say('ok');
+    expect(toolCalls.at(-1)!.args).toEqual({ stop: 'west-stop' });
+  });
+
+  it('calls not_understood for gibberish', async () => {
+    const { toolCalls, say } = await atTheTramStop('de');
+    await say('asdf qwer');
+    expect(toolCalls.at(-1)!.name).toBe('not_understood');
   });
 });

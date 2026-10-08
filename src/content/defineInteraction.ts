@@ -18,6 +18,7 @@ import {
 } from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
 import { PLACE_HOURS } from './places.ts';
+import type { TramStopId } from './townNpcs.ts';
 import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.ts';
 
 /** How hard a Goal Interaction is: Beginner, Intermediate or Advanced. */
@@ -44,6 +45,10 @@ export const FACT_SOURCES = [
   'symptoms',
   'prescription',
   'hospitalBill',
+  'returns',
+  'registration',
+  'post',
+  'tramLine',
 ] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
@@ -80,6 +85,22 @@ type DiagnoseArgs = { illness: IllnessId };
 type DispenseArgs = { medicine: MedicineId };
 /** The arguments a `setPaymentPlan` effect reads: how many weekly instalments, or 0 to pay the hospital bill in full now. */
 type PaymentPlanArgs = { weeks: number };
+/** The arguments a `refund` effect reads: the item brought back (the reason is flavour only). */
+type RefundArgs = { item: ItemId; reason: string };
+/** The arguments a `registerResident` effect reads: the form as the clerk filled it in. The sim checks the name. */
+type RegisterResidentArgs = { fields: { name: string } };
+/** The arguments a `ship` effect reads: where the parcel goes (flavour only), and how fast, which sets the postage. */
+type ShipArgs = { destination: string; speed: ShippingSpeed };
+/** The arguments a `giveDirections` effect reads: the stop to get off at. */
+type GiveDirectionsArgs = { stop: TramStopId };
+
+/** How fast a parcel goes from the post office, each with its postage (`ECONOMY.postageInShifts`). */
+export const SHIPPING_SPEEDS = ['sea', 'air', 'express'] as const satisfies readonly (keyof typeof ECONOMY.postageInShifts)[];
+export type ShippingSpeed = (typeof SHIPPING_SPEEDS)[number];
+
+/** Who a Goal Interaction is with: a Named NPC, or anyone waiting at a tram stop. */
+export const PASSER_BY = 'passer-by';
+export type InteractionNpcId = NamedNpcId | typeof PASSER_BY;
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
@@ -92,7 +113,10 @@ type PaymentPlanArgs = { weeks: number };
  * charges a bath, and `registerMember` charges gym membership and gives `ECONOMY.gymMembershipDays` at the gym. At the clinic,
  * `registerPatient` checks the Character in to wait for the doctor, `diagnose` records the doctor's prescription and charges
  * the visit, `dispense` charges the prescribed medicine and cures the Illness it treats, and `setPaymentPlan` pays hospital
- * debt in full or spreads it over weekly instalments. `none` is flavour only.
+ * debt in full or spreads it over weekly instalments. At the supermarket, `refund` takes back an item from the inventory and pays
+ * its price back. At the town office, `registerResident` registers the Character's address (once the sim has checked the
+ * name), and `ship` charges postage for a parcel home and lifts Mood. At a tram stop, `giveDirections` marks the stop to get
+ * off at. `none` is flavour only.
  */
 export type EffectKind =
   | 'none'
@@ -110,7 +134,11 @@ export type EffectKind =
   | 'registerPatient'
   | 'diagnose'
   | 'dispense'
-  | 'setPaymentPlan';
+  | 'setPaymentPlan'
+  | 'refund'
+  | 'registerResident'
+  | 'ship'
+  | 'giveDirections';
 type EffectFor<Args> =
   | { kind: 'none' }
   | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
@@ -127,13 +155,17 @@ type EffectFor<Args> =
   | (Args extends RegisterPatientArgs ? { kind: 'registerPatient' } : never)
   | (Args extends DiagnoseArgs ? { kind: 'diagnose' } : never)
   | (Args extends DispenseArgs ? { kind: 'dispense' } : never)
-  | (Args extends PaymentPlanArgs ? { kind: 'setPaymentPlan' } : never);
+  | (Args extends PaymentPlanArgs ? { kind: 'setPaymentPlan' } : never)
+  | (Args extends RefundArgs ? { kind: 'refund' } : never)
+  | (Args extends RegisterResidentArgs ? { kind: 'registerResident' } : never)
+  | (Args extends ShipArgs ? { kind: 'ship' } : never)
+  | (Args extends GiveDirectionsArgs ? { kind: 'giveDirections' } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
   id: string;
   placeId: PlaceId;
-  npcId: NamedNpcId;
+  npcId: InteractionNpcId;
   /** The one goal, in plain English, as the NPC is told it. */
   goal: string;
   facts: FactSource[];
@@ -176,10 +208,17 @@ export type Diagnosis = { illnessId: IllnessId; prescription: MedicineId; feeInS
 /** A medicine handed over at the pharmacy, and the one Illness it cures. Its price is in the completion's lines. */
 export type Treatment = { medicineId: MedicineId; cures: IllnessId };
 
+/** An item brought back to the supermarket, and its shelf price in this pack, in Shifts, to pay back. */
+export type Refund = { item: ServedItem; amountInShifts: number };
+
+/** A parcel sent home: where to (flavour only), how fast, and its postage in this pack, in Shifts. */
+export type Shipment = { destination: string; speed: ShippingSpeed; postageInShifts: number };
+
 /**
  * What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown,
  * for the landlord, the change to the rent, and for hiring, the application. At the clinic, the check-in, the diagnosis,
- * the medicine and the hospital bill's plan (in weeks, 0 to pay now). Settling the bill pays nothing here: the
+ * the medicine and the hospital bill's plan (in weeks, 0 to pay now). At the supermarket, the refund; at the town office, the
+ * name on the registration form, or the parcel; at a tram stop, the stop to get off at. Settling the bill pays nothing here: the
  * sim knows the bill, at the prices it was ordered at, and any restaurant debt. The sim likewise knows the hospital debt.
  */
 export type ResolvedCompletion =
@@ -193,6 +232,10 @@ export type ResolvedCompletion =
       diagnosis?: Diagnosis;
       treatment?: Treatment;
       paymentPlanWeeks?: number;
+      refund?: Refund;
+      registration?: { name: string };
+      shipment?: Shipment;
+      directions?: TramStopId;
     }
   | { success: false; error: string };
 
@@ -213,7 +256,7 @@ export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
 const definitionSchema = z.object({
   id: z.string().regex(/^[a-z]+(-[a-z]+)*$/),
   placeId: z.custom<PlaceId>((value) => typeof value === 'string' && value in PLACE_HOURS, 'unknown place'),
-  npcId: z.custom<NamedNpcId>((value) => typeof value === 'string' && value in NAMED_NPCS, 'unknown NPC'),
+  npcId: z.custom<InteractionNpcId>((value) => typeof value === 'string' && (value in NAMED_NPCS || value === PASSER_BY), 'unknown NPC'),
   goal: z.string().min(1),
   facts: z.array(z.enum(FACT_SOURCES)).min(1),
   items: z.array(z.enum(ITEM_IDS)),
@@ -242,6 +285,10 @@ const definitionSchema = z.object({
         'diagnose',
         'dispense',
         'setPaymentPlan',
+        'refund',
+        'registerResident',
+        'ship',
+        'giveDirections',
       ]),
     }),
     z.object({ kind: z.literal('hire'), jobId: z.enum(JOB_IDS) }),
@@ -338,6 +385,18 @@ function resolveEffect(effect: Interaction['effect'], args: Record<string, unkno
     }
     case 'setPaymentPlan':
       return { success: true, lines: [], paymentPlanWeeks: (args as PaymentPlanArgs).weeks };
+    case 'refund': {
+      const { item } = args as RefundArgs;
+      return { success: true, lines: [], refund: { item: servedItem(item, 1, packId), amountInShifts: menuPrice(item, packId) } };
+    }
+    case 'registerResident':
+      return { success: true, lines: [], registration: { name: (args as RegisterResidentArgs).fields.name } };
+    case 'ship': {
+      const { destination, speed } = args as ShipArgs;
+      return { success: true, lines: [], shipment: { destination, speed, postageInShifts: chargeInShifts(ECONOMY.postageInShifts[speed], packId) } };
+    }
+    case 'giveDirections':
+      return { success: true, lines: [], directions: (args as GiveDirectionsArgs).stop };
   }
 }
 

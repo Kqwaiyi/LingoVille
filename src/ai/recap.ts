@@ -18,6 +18,7 @@ import {
   orderSaid,
   InteractionIdSchema,
   interactionById,
+  interactionPartner,
   LanguageSchema,
   StepSchema,
   transcriptLines,
@@ -179,9 +180,9 @@ function helpLines(helpLog: HelpLogEntry[]) {
 
 function conversationBlock(heading: string, conversation: RecapConversation, pack: CulturePack) {
   const interaction = interactionById(conversation.interactionId);
-  const { role } = NAMED_NPCS[interaction.npcId];
+  const { role, place } = interactionPartner(interaction, pack);
   return block(heading, [
-    `With the ${role} at ${localPlaceName(interaction.placeId, pack.id)}. The ${role}'s goal: ${interaction.goal} Outcome: ${OUTCOMES[conversation.outcome]}.`,
+    `With the ${role} at ${place}. The ${role}'s goal: ${interaction.goal} Outcome: ${OUTCOMES[conversation.outcome]}.`,
     ...transcriptLines(conversation.transcript),
     ...helpLines(conversation.helpLog),
   ]);
@@ -313,7 +314,7 @@ function writeBlock(request: RecapRequest, pack: CulturePack) {
     lines.push('Write one combined Recap for the whole Shift: the outcome line sums up how the customers went.');
   }
   if (request.kind !== 'shift' && request.registerOffered) {
-    const { role } = NAMED_NPCS[request.kind === 'goal' ? interactionById(request.conversation.interactionId).npcId : request.npcId];
+    const { role } = request.kind === 'goal' ? interactionPartner(interactionById(request.conversation.interactionId), pack) : NAMED_NPCS[request.npcId];
     const { formal, casual } = pack.casualRegister;
     lines.push(
       `In this conversation the ${role}, now a friend, offered to switch from ${formal} to ${casual}: a real cultural milestone. ` +

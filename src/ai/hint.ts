@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { CULTURE_PACKS, interactionFacts, JOB_PLACES, localPlaceName, NAMED_NPCS, toGeminiSchema } from '../content/index.ts';
+import { CULTURE_PACKS, interactionFacts, JOB_PLACES, localPlaceName, toGeminiSchema } from '../content/index.ts';
 import { JOB_IDS, type JobId } from '../sim/index.ts';
 import {
   block,
   InteractionIdSchema,
   interactionById,
+  interactionPartner,
   LanguageSchema,
   StepSchema,
   transcriptLines,
@@ -86,12 +87,12 @@ function learner(request: HintRequest) {
 function goalInstruction(request: Extract<HintRequest, { interactionId: string }>) {
   const { pack, native, target, intro, languages } = learner(request);
   const interaction = interactionById(request.interactionId);
-  const { role } = NAMED_NPCS[interaction.npcId];
+  const { role, learnerIs } = interactionPartner(interaction, pack);
 
   return [
     block('WHO YOU ARE', [
       intro,
-      `They are a customer at ${localPlaceName(interaction.placeId, pack.id)}, talking to the ${role}, and they have asked for help with what to say next.`,
+      `They are ${learnerIs}, talking to the ${role}, and they have asked for help with what to say next.`,
     ]),
     block('THE SITUATION', [
       `The ${role}'s goal: ${interaction.goal}`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { APPROACH_IDS } from '../sim/index.ts';
-import { approachInteraction, INTERACTIONS, interactionStartedWithE, interactionStartedWithF } from './index.ts';
+import { APPROACH_IDS, namedNpcOf } from '../sim/index.ts';
+import { approachInteraction, INTERACTIONS, interactionStartedWithE, interactionStartedWithF, interactionStartedWithR } from './index.ts';
 
 describe('NPCs who start conversations themselves', () => {
   it('opens the ward conversation with the nurse when the Character wakes from Fainting', () => {
@@ -10,7 +10,7 @@ describe('NPCs who start conversations themselves', () => {
   it('keeps a conversation an NPC opens out of reach of E', () => {
     for (const approachId of APPROACH_IDS) {
       const interaction = approachInteraction(approachId);
-      expect(interactionStartedWithE(interaction.npcId)).not.toBe(interaction);
+      expect(interactionStartedWithE(namedNpcOf(interaction)!)).not.toBe(interaction);
     }
     expect(interactionStartedWithE('nurse')).toBeNull();
   });
@@ -135,5 +135,30 @@ describe('the attendant at the bathhouse', () => {
     expect(interactionStartedWithF('attendant', { shopping: false, gymMembership: 'none' })).toBe(INTERACTIONS.joinTheGym);
     expect(interactionStartedWithF('attendant', { shopping: false, gymMembership: 'expired' })).toBe(INTERACTIONS.renewGymMembership);
     expect(interactionStartedWithF('attendant', { shopping: false, gymMembership: 'active' })).toBeNull();
+  });
+});
+
+describe('the clerk at the town office and post office', () => {
+  it('sends a parcel with E', () => {
+    expect(interactionStartedWithE('office-clerk')).toBe(INTERACTIONS.sendAParcel);
+    expect(interactionStartedWithE('office-clerk', { shopping: false, addressRegistered: true })).toBe(INTERACTIONS.sendAParcel);
+  });
+
+  it('registers the Character’s address with F, until it is registered', () => {
+    expect(interactionStartedWithF('office-clerk')).toBe(INTERACTIONS.registerAddress);
+    expect(interactionStartedWithF('office-clerk', { shopping: false, addressRegistered: true })).toBeNull();
+  });
+});
+
+describe('returning something to the supermarket', () => {
+  it('starts with R at the cashier while the Character has something bought there to bring back, and nothing to pay for', () => {
+    expect(interactionStartedWithR('cashier', { shopping: false, returnable: true })).toBe(INTERACTIONS.returnAnItem);
+    expect(interactionStartedWithR('cashier', { shopping: true, returnable: true })).toBeNull();
+    expect(interactionStartedWithR('cashier', { shopping: false, returnable: false })).toBeNull();
+    expect(interactionStartedWithR('cashier')).toBeNull();
+  });
+
+  it('is only the cashier’s', () => {
+    expect(interactionStartedWithR('barista', { shopping: false, returnable: true })).toBeNull();
   });
 });

@@ -10,7 +10,7 @@ import {
   type RecapRequest,
   type ToolResponse,
 } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, placeHours, type ItemId, type TownNpcId } from '../content/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, placeHours, type ItemId, type NamedNpcId, type TownNpcId } from '../content/index.ts';
 import { createSave, FAMILIARITY, memoryOf, MOOD, rollOnTheHouse, type GameState, type NpcMemory } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -123,14 +123,14 @@ describe('starting Small Talk', () => {
     expect(selectSmallTalkKey(store.getState())).toBeNull();
   });
 
-  it('has nothing to say to someone who is not a Named NPC', () => {
+  it('chats with no one who is not a Named NPC: E asks a passer-by the way instead', () => {
     const { store } = nextTo('passer-by-1', 'tram-stop');
 
     expect(selectSmallTalkKey(store.getState())).toBeNull();
     store.getState().talk('E');
 
-    expect(selectConversation(store.getState())).toBeNull();
-    expect(selectToast(store.getState())).toEqual({ kind: 'nothingToSay', npcId: 'passer-by-1' });
+    expect(selectConversation(store.getState())).toMatchObject({ smallTalk: null, interaction: INTERACTIONS.askForDirections });
+    expect(selectToast(store.getState())).toBeNull();
   });
 });
 
@@ -475,7 +475,7 @@ describe('park regulars waving the Player over', () => {
 
     const conversation = selectConversation(store.getState());
     expect(conversation?.smallTalk).not.toBeNull();
-    expect(NAMED_NPCS[conversation!.npcId!].placeId).toBe('park');
+    expect(NAMED_NPCS[conversation!.npcId as NamedNpcId].placeId).toBe('park');
     expect(npc.session?.openingScene).toMatch(/^\[SCENE: .*wave them over.*\]$/);
     expect(store.getState().heldStill).toBe(true);
   });

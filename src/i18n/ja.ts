@@ -261,6 +261,7 @@ export const ja: UiStrings = {
     workOut: '<kbd>E</kbd> でトレーニングする',
     sleep: '<kbd>E</kbd> で寝る',
     talk: '<kbd>E</kbd> で話しかける — {{role}}',
+    askTheWay: '<kbd>E</kbd> で道をたずねる — {{role}}',
     /** Small Talk with someone who has no other conversation. */
     chat: '<kbd>E</kbd> で世間話をする — {{role}}',
     /** Small Talk with staff, beside their E. */
@@ -277,6 +278,8 @@ export const ja: UiStrings = {
     joinGym: '<kbd>F</kbd> でジムについて聞く',
     renewGym: '<kbd>F</kbd> でジムの会員を更新する',
     settleHospitalBill: '<kbd>F</kbd> で病院の支払いをする',
+    registerAddress: '<kbd>F</kbd> で住所を届け出る',
+    returnItem: '<kbd>R</kbd> で返品する',
     startShift: '<kbd>E</kbd> でシフトを始める — {{job}}',
     staffOnly: 'スタッフ用ドア · 関係者以外立入禁止',
     workedToday: 'スタッフ用ドア · 今日はもうシフトに入りました',
@@ -340,6 +343,7 @@ export const ja: UiStrings = {
   tram: {
     heading: '路面電車で行き先を選ぶ',
     trip: '{{minutes}}分 · 無料',
+    routeMarker: 'ここで降りる',
     cancel: 'ここに残る',
   },
   basket: {
@@ -408,6 +412,8 @@ export const ja: UiStrings = {
     pointedTo: '{{item}}：棚に印をつけました',
     moreTime: '家賃の支払いを{{days}}日延ばしてもらいました',
     hired: '採用されました：{{job}}',
+    registered: '住所を登録しました',
+    directedTo: '{{stop}}で降りる：路面電車の地図に印をつけました',
     moodUp: '気分 ↑',
     moodDown: '気分 ↓',
     skipRecap: '振り返りを飛ばす',
@@ -483,7 +489,6 @@ export const ja: UiStrings = {
       closed: 'ジムは閉まっています。銭湯の営業時間に開いています。',
     },
     npcSteppedAway: '{{who}}は席を外しました。何も失われていません。',
-    nothingToSay: '{{who}}はにっこり会釈しました。ここではまだ話すことがありません。',
   },
   fainting: {
     title: '倒れてしまった',

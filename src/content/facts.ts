@@ -7,11 +7,12 @@ import {
   type HospitalStatement,
   type LanguageCode,
   type OpeningHours,
+  type PlaceId,
   type RentStatement,
 } from '../sim/index.ts';
 import { cafeAllergensIn, CULTURE_PACKS, localPlaceFacts, localPlaceName } from './culturePacks.ts';
 import { chargeInShifts, formatLocalMoney, menuPrice } from './currency.ts';
-import type { Interaction } from './defineInteraction.ts';
+import { SHIPPING_SPEEDS, type Interaction, type ShippingSpeed } from './defineInteraction.ts';
 import {
   ALLERGENS,
   DIETARY_NOTE_IDS,
@@ -32,6 +33,7 @@ import {
 import { ILLNESSES, MEDICINE_IDS, type MedicineId } from './illnesses.ts';
 import { placeHours } from './openingHours.ts';
 import { formatTime } from './places.ts';
+import { STOP_PLACES, TRAM_LINE, type TramStopId } from './townNpcs.ts';
 
 /** "Somewhere is open 09:00–17:00, closed on Sundays.", or open 24 hours. */
 function hoursFact(what: string, hours: OpeningHours): string[] {
@@ -132,6 +134,61 @@ function bathhouseFacts(packId: LanguageCode): string[] {
     `Bath entry: ${goods['bath-entry'].name}, ${price('bath-entry')}. A towel to borrow and the sauna or steam room come with it at no extra charge.`,
     `Gym membership: ${goods['gym-membership'].name}, ${price('gym-membership')}. It gives ${ECONOMY.gymMembershipDays} days at the gym, and members may work out once a day.`,
     'Membership is never renewed automatically. Once it runs out, the member renews it here, with you, and pays again.',
+  ];
+}
+
+/** What the supermarket takes back, and how. */
+const RETURNS_FACTS = [
+  'Anything bought here can be brought back if something is wrong with it, as long as it is still within its use-by date. ' +
+    'You pay back its shelf price in full, in cash.',
+  'Ask which item it is and what is wrong with it.',
+];
+
+/** What the town office's resident registration form asks for. */
+const REGISTRATION_FACTS = [
+  "Registering an address is free. The resident registration form asks for the resident's full name, their address in town " +
+    'and their nationality.',
+  'A resident registers once, when they move in.',
+];
+
+/** How long a parcel takes at each speed, in English. */
+const SHIPPING_TIMES: Record<ShippingSpeed, string> = { sea: 'about two months', air: 'about a week', express: 'two or three days' };
+
+/** How a parcel can be sent from the post office counter, and what each way costs. */
+function postFacts(packId: LanguageCode): string[] {
+  const postage = (speed: ShippingSpeed) => formatLocalMoney(chargeInShifts(ECONOMY.postageInShifts[speed], packId), packId);
+  return [
+    `A parcel abroad can go ${listed(SHIPPING_SPEEDS.map((speed) => `by ${speed} (speed id "${speed}"): ${SHIPPING_TIMES[speed]}, ${postage(speed)}`))}.`,
+    'The postage is paid here at the counter. A box and tape are free.',
+  ];
+}
+
+/** Each place as the passer-by would explain it in English. */
+const PLACE_WORDS: Partial<Record<PlaceId, string>> = {
+  home: 'the apartment block',
+  cafe: 'the café',
+  supermarket: 'the supermarket',
+  'convenience-store': 'the convenience store',
+  restaurant: 'the restaurant',
+  clinic: 'the hospital and its clinic and pharmacy',
+  park: 'the park',
+  bookshop: 'the bookshop',
+  bathhouse: 'the bathhouse and gym',
+  'town-office': 'the town office and post office',
+};
+
+/** The tram line as someone waiting for a tram knows it: its stops, the places to get off at each for, and when the trams run. */
+function tramLineFacts(packId: LanguageCode, waitingAt: TramStopId | undefined): string[] {
+  const { tramStops } = CULTURE_PACKS[packId];
+  const stop = (id: TramStopId) => `${tramStops[id].name} (stop id "${id}")`;
+  const hours = placeHours('tram-stop', packId);
+  return [
+    `The tram line runs west to east, stopping at ${listed(TRAM_LINE.map(stop), 'and')}. Every tram stops at every stop.`,
+    ...(waitingAt ? [`You are waiting at ${stop(waitingAt)}.`] : []),
+    ...TRAM_LINE.map(
+      (id) => `Get off at ${tramStops[id].name} for ${listed(STOP_PLACES[id].map((place) => `${PLACE_WORDS[place]} (${localPlaceName(place, packId)})`), 'and')}.`,
+    ),
+    hours ? `The trams run ${formatTime(hours.opensAt)}–${formatTime(hours.closesAt)}, and riding is free.` : 'The trams run all day, and riding is free.',
   ];
 }
 
@@ -252,8 +309,8 @@ export function readNewWeeklyRent(text: string): string | null {
 
 /**
  * What the NPC is told about the moment: the shopping on the counter, for the landlord, the rent, and for the server,
- * the bill and any restaurant debt, in Shifts, from a bill walked out on, for the pharmacist, the patient's prescription, and
- * for reception, the hospital bill.
+ * the bill and any restaurant debt, in Shifts, from a bill walked out on, for the pharmacist, the patient's prescription,
+ * for reception, the hospital bill, and for a passer-by, the tram stop they are waiting at.
  */
 export type FactsContext = {
   basket?: Basket;
@@ -262,6 +319,7 @@ export type FactsContext = {
   restaurantDebt?: number;
   prescription?: MedicineId | null;
   hospital?: HospitalStatement;
+  tramStop?: TramStopId;
 };
 
 /**
@@ -274,7 +332,7 @@ export type FactsContext = {
 export function interactionFacts(
   interaction: Interaction,
   packId: LanguageCode,
-  { basket = [], rent, bill = [], restaurantDebt = 0, prescription = null, hospital }: FactsContext = {},
+  { basket = [], rent, bill = [], restaurantDebt = 0, prescription = null, hospital, tramStop }: FactsContext = {},
 ): string[] {
   const { goods, customs } = CULTURE_PACKS[packId];
   const { placeId } = interaction;
@@ -332,6 +390,14 @@ export function interactionFacts(
         return prescriptionFacts(prescription, packId);
       case 'hospitalBill':
         return hospital ? hospitalBillFacts(hospital, packId) : [];
+      case 'returns':
+        return RETURNS_FACTS;
+      case 'registration':
+        return REGISTRATION_FACTS;
+      case 'post':
+        return postFacts(packId);
+      case 'tramLine':
+        return tramLineFacts(packId, tramStop);
     }
   });
 }

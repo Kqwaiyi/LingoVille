@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ECONOMY, ILLNESS_IDS } from '../sim/index.ts';
-import { defineInteraction, type Interaction } from './defineInteraction.ts';
+import { defineInteraction, PASSER_BY, SHIPPING_SPEEDS, type Interaction } from './defineInteraction.ts';
 import { MEDICINE_IDS } from './illnesses.ts';
 import {
   ALLERGENS,
@@ -20,6 +20,7 @@ import {
   SEATING,
   type ItemId,
 } from './items.ts';
+import { TRAM_LINE } from './townNpcs.ts';
 
 /** The lines of an order or a sale from a menu: each item by its menu id, and how many. */
 const orderItems = (menu: readonly [ItemId, ...ItemId[]]) =>
@@ -268,6 +269,30 @@ export const INTERACTIONS = {
     },
     band: 'B',
     effect: { kind: 'pointTo' },
+  }),
+  // #6. Bringing back something faulty bought at the supermarket. R at the cashier, with nothing to pay for, while the
+  // Character has groceries from there. The sim checks they have it, and that it hasn't gone off.
+  returnAnItem: defineInteraction({
+    id: 'return-an-item',
+    placeId: 'supermarket',
+    npcId: 'cashier',
+    goal:
+      'The customer has brought back something they bought here, because something is wrong with it. Find out which item it is ' +
+      'and what is wrong with it, and refund it.',
+    facts: ['openingHours', 'shelves', 'returns', 'placeFacts'],
+    items: GROCERIES_SOLD,
+    completion: {
+      name: 'refund',
+      description:
+        'Take the item back and pay the customer its shelf price, once they have confirmed your read-back of the item, what is wrong ' +
+        'with it and the refund. Answers "done", or "invalid_arguments" (they have no such item with them, or it is past its date).',
+      args: z.object({
+        item: z.enum(GROCERIES_SOLD).describe('The shelf id given in FACTS of the item brought back.'),
+        reason: z.string().min(1).describe('What is wrong with it, in a few words of English (for example "the eggs were cracked").'),
+      }),
+    },
+    band: 'A',
+    effect: { kind: 'refund' },
   }),
   // #7. A hot snack or a bento over the convenience store counter.
   buyCounterFood: defineInteraction({
@@ -541,6 +566,76 @@ export const INTERACTIONS = {
     },
     band: 'A',
     effect: { kind: 'setPaymentPlan' },
+  }),
+  // #23. Registering the Character's address at the town office. F at the clerk, until it is registered. Flavour only:
+  // it is recorded in the save, once the sim has checked the name.
+  registerAddress: defineInteraction({
+    id: 'register-address',
+    placeId: 'town-office',
+    npcId: 'office-clerk',
+    goal:
+      'A newcomer has come to register their address. Fill in the resident registration form with them: ask their full name, ' +
+      'their address in town and their nationality, and register them.',
+    facts: ['openingHours', 'registration', 'placeFacts'],
+    items: [],
+    completion: {
+      name: 'register_resident',
+      description:
+        'Register the resident, once they have confirmed your read-back of the form. Answers "done", "wrong_name" (that is not ' +
+        'their name: you misheard it) or "invalid_arguments".',
+      args: z.object({
+        fields: z.object({
+          name: z
+            .string()
+            .min(1)
+            .describe('Their full name exactly as they said it. If they spelled it out, use that spelling; write a foreign name in Latin letters.'),
+          address: z.string().min(1).describe('Their address in town, as they said it.'),
+          nationality: z.string().min(1).describe('Their nationality, in English.'),
+        }),
+      }),
+    },
+    band: 'A',
+    effect: { kind: 'registerResident' },
+  }),
+  // #24. Sending a parcel home from the post office counter. E at the town office's clerk.
+  sendAParcel: defineInteraction({
+    id: 'send-a-parcel',
+    placeId: 'town-office',
+    npcId: 'office-clerk',
+    goal:
+      'The customer wants to send a parcel. Ask where it is going, and how they would like to send it, and take the postage.',
+    facts: ['openingHours', 'post', 'placeFacts'],
+    items: [],
+    completion: {
+      name: 'ship',
+      description:
+        'Send the parcel and take the postage, once the customer has confirmed your read-back of where it is going, how and the ' +
+        'price. Answers "done", "cannot_afford" (they cannot pay for it) or "invalid_arguments".',
+      args: z.object({
+        destination: z.string().min(1).describe('Where the parcel is going (a country, or a city and country), in English.'),
+        speed: z.enum(SHIPPING_SPEEDS).describe('The speed id given in FACTS.'),
+      }),
+    },
+    band: 'I',
+    effect: { kind: 'ship' },
+  }),
+  // #25. Asking someone waiting at a tram stop which tram goes to a place. E at a passer-by. The stop to get off at is marked.
+  askForDirections: defineInteraction({
+    id: 'ask-for-directions',
+    placeId: 'tram-stop',
+    npcId: PASSER_BY,
+    goal:
+      'A stranger has asked you something while you wait for the tram: they want to know how to get somewhere by tram. ' +
+      'Find out where they want to go, and tell them which stop to get off at.',
+    facts: ['tramLine'],
+    items: [],
+    completion: {
+      name: 'give_directions',
+      description: 'Call this once you have told them which stop to get off at and they have confirmed they have it. Answers "done".',
+      args: z.object({ stop: z.enum(TRAM_LINE).describe('The stop id given in FACTS of the stop to get off at.') }),
+    },
+    band: 'B',
+    effect: { kind: 'giveDirections' },
   }),
   // Not one the Player starts: the nurse begins it when the Character wakes from Fainting.
   wakeInWard: defineInteraction({

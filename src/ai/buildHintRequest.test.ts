@@ -129,3 +129,11 @@ describe('buildHintRequest at a Shift', () => {
     expect(prompt).toMatch(/never say, repeat back, guess or translate what the customer wants/i);
   });
 });
+
+describe('buildHintRequest: asking a passer-by the way', () => {
+  it('writes hints for someone at a tram stop talking to a passer-by, with the tram line facts', () => {
+    const hint = text({ culturePackId: 'de', step: 'A1', nativeLanguage: 'en', interactionId: INTERACTIONS.askForDirections.id, transcript: [] });
+    expect(hint).toContain('They are at a tram stop, talking to the passer-by');
+    expect(hint).toContain(CULTURE_PACKS.de.tramStops['east-stop'].name);
+  });
+});

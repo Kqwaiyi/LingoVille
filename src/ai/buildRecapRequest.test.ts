@@ -295,3 +295,10 @@ describe('RecapSchema', () => {
     expect(RecapSchema.safeParse({ ...recap, corrections }).success).toBe(false);
   });
 });
+
+describe('buildRecapRequest: asking a passer-by the way', () => {
+  it('reads the conversation as one with a passer-by at a tram stop', () => {
+    const directions: RecapRequest = { ...goal, conversation: { ...ORDER, interactionId: INTERACTIONS.askForDirections.id } };
+    expect(text(directions)).toContain('With the passer-by at a tram stop.');
+  });
+});

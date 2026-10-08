@@ -1,6 +1,6 @@
-import { buildNpcSession, NOT_UNDERSTOOD_TOOL, type ToolResponse } from '../src/ai/index.ts';
+import { buildNpcSession, buildPasserBySession, NOT_UNDERSTOOD_TOOL, type ToolResponse } from '../src/ai/index.ts';
 import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, type Interaction } from '../src/content/index.ts';
-import { isOutOfPatience, losePatience, namesMatch, newPlayerTurn, startPatience } from '../src/sim/index.ts';
+import { isOutOfPatience, losePatience, namedNpcOf, namesMatch, newPlayerTurn, startPatience } from '../src/sim/index.ts';
 import { openLiveSession, type LiveAudio, type LiveDeps, type LiveToken } from '../src/voice/liveSession.ts';
 import type { NpcCase, TurnTag } from './cases/schema.ts';
 
@@ -45,11 +45,14 @@ export const interactionById = (id: string): Interaction => Object.values(INTERA
 /** Whether the NPC must read back and get a confirmation before completing. A goal with no effect has nothing to read back. */
 export const needsReadBack = (interaction: Interaction) => interaction.effect.kind !== 'none';
 
-/** The NPC's session for this case: the real builder, at noon on day 1. */
+/** The NPC's session for this case: the real builder, at noon on day 1. A passer-by waits at the central stop. */
 export function npcSessionFor(c: NpcCase) {
   const interaction = interactionById(c.interactionId);
-  return buildNpcSession(interaction, CULTURE_PACKS[c.targetLanguage], c.step, NAMED_NPCS[interaction.npcId], {
-    clock: { day: 1, minuteOfDay: 12 * 60 },
+  const clock = { day: 1, minuteOfDay: 12 * 60 };
+  const npcId = namedNpcOf(interaction);
+  if (!npcId) return buildPasserBySession(interaction, CULTURE_PACKS[c.targetLanguage], c.step, { clock, tramStop: 'central-stop', voiceSeed: 0 });
+  return buildNpcSession(interaction, CULTURE_PACKS[c.targetLanguage], c.step, NAMED_NPCS[npcId], {
+    clock,
     ...(c.basket && { basket: c.basket }),
   });
 }

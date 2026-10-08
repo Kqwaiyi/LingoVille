@@ -20,7 +20,8 @@ const OPENED_BY_NPCS = new Set(Object.values(APPROACH_INTERACTIONS));
 /**
  * What the Character brings to the conversation: shopping from the supermarket's shelves, or none, the Jobs they
  * already have, their current Proficiency Step, their table and bill at the restaurant, whether they owe it for a
- * bill they walked out on, their gym membership, whether they owe the hospital and whether they hold a prescription.
+ * bill they walked out on, their gym membership, whether they owe the hospital and whether they hold a prescription,
+ * whether their address is registered, and whether they have anything bought at the supermarket they could bring back.
  */
 export type Bringing = {
   shopping: boolean;
@@ -31,6 +32,8 @@ export type Bringing = {
   gymMembership?: GymMembership;
   owesHospital?: boolean;
   holdsPrescription?: boolean;
+  addressRegistered?: boolean;
+  returnable?: boolean;
 };
 
 /** The barista's order E starts in each band. */
@@ -51,6 +54,7 @@ const NO_TABLE: RestaurantTable = { seated: false, bill: [] };
  * bill while anything is on it or anything is owed from a bill walked out on, takes the order at the Character's
  * table, and otherwise gets them a table. The attendant sells a bath. The receptionist checks the Character in to see the
  * doctor, and the pharmacist hands over what the doctor prescribed, with nothing to hand over without a prescription.
+ * The town office's clerk sends a parcel.
  */
 export function interactionStartedWithE(
   npcId: NamedNpcId,
@@ -66,6 +70,7 @@ export function interactionStartedWithE(
   if (npcId === 'attendant') return INTERACTIONS.buyBathEntry;
   if (npcId === 'receptionist') return INTERACTIONS.checkIn;
   if (npcId === 'pharmacist') return holdsPrescription ? INTERACTIONS.getMedicine : null;
+  if (npcId === 'office-clerk') return INTERACTIONS.sendAParcel;
   return Object.values(INTERACTIONS).find((i) => i.npcId === npcId && !OPENED_BY_NPCS.has(i) && i.effect.kind !== 'hire') ?? null;
 }
 
@@ -75,14 +80,18 @@ export function interactionStartedWithE(
  * landlord pays the rent, and F asks for more time. F at the shopkeeper buys a gift, and F at the server, from a
  * table, asks for a recommendation within a dietary restriction. F at the attendant joins the gym, or renews a
  * membership that has run out (never while it runs). F at the receptionist settles the hospital bill while one is owed.
+ * F at the town office's clerk registers the Character's address, until it is registered.
  * Staff who are hiring take an application on F until the Character has that Job (the cashier, when not paying for
  * shopping; the server, when not seated).
  */
 export function interactionStartedWithF(
   npcId: NamedNpcId,
-  { shopping, jobsHired = [], restaurant = NO_TABLE, gymMembership = 'none', owesHospital = false }: Bringing = { shopping: false },
+  { shopping, jobsHired = [], restaurant = NO_TABLE, gymMembership = 'none', owesHospital = false, addressRegistered = false }: Bringing = {
+    shopping: false,
+  },
 ): Interaction | null {
   if (npcId === 'landlord') return INTERACTIONS.askForMoreTime;
+  if (npcId === 'office-clerk') return addressRegistered ? null : INTERACTIONS.registerAddress;
   if (npcId === 'receptionist') return owesHospital ? INTERACTIONS.settleHospitalBill : null;
   if (npcId === 'attendant') {
     if (gymMembership === 'active') return null;
@@ -96,4 +105,12 @@ export function interactionStartedWithF(
     if (interaction.npcId === npcId && effect.kind === 'hire') return jobsHired.includes(effect.jobId) ? null : interaction;
   }
   return null;
+}
+
+/**
+ * The conversation R starts with this Named NPC, or null: at the cashier, with nothing to pay for, bringing back
+ * something faulty bought at the supermarket while the Character has any.
+ */
+export function interactionStartedWithR(npcId: NamedNpcId, { shopping, returnable = false }: Bringing = { shopping: false }): Interaction | null {
+  return npcId === 'cashier' && !shopping && returnable ? INTERACTIONS.returnAnItem : null;
 }

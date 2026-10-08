@@ -261,6 +261,7 @@ export const de: UiStrings = {
     workOut: '<kbd>E</kbd> drücken, um zu trainieren',
     sleep: '<kbd>E</kbd> drücken, um ins Bett zu gehen',
     talk: '<kbd>E</kbd> drücken, um zu sprechen — {{role}}',
+    askTheWay: '<kbd>E</kbd> drücken, um nach dem Weg zu fragen — {{role}}',
     /** Small Talk with someone who has no other conversation. */
     chat: '<kbd>E</kbd> drücken, um zu plaudern — {{role}}',
     /** Small Talk with staff, beside their E. */
@@ -277,6 +278,8 @@ export const de: UiStrings = {
     joinGym: '<kbd>F</kbd> drücken, um nach dem Fitnessstudio zu fragen',
     renewGym: '<kbd>F</kbd> drücken, um die Mitgliedschaft zu verlängern',
     settleHospitalBill: '<kbd>F</kbd> drücken, um die Krankenhausrechnung zu begleichen',
+    registerAddress: '<kbd>F</kbd> drücken, um die Adresse anzumelden',
+    returnItem: '<kbd>R</kbd> drücken, um etwas zurückzugeben',
     startShift: '<kbd>E</kbd> drücken, um eine Schicht anzufangen — {{job}}',
     staffOnly: 'Personaltür · Nur für Personal',
     workedToday: 'Personaltür · Du hast heute schon eine Schicht gearbeitet',
@@ -340,6 +343,7 @@ export const de: UiStrings = {
   tram: {
     heading: 'Mit der Straßenbahn nach …',
     trip: '{{minutes}} Min. · Kostenlos',
+    routeMarker: 'Hier aussteigen',
     cancel: 'Hierbleiben',
   },
   basket: {
@@ -408,6 +412,8 @@ export const de: UiStrings = {
     pointedTo: '{{item}}: im Regal markiert',
     moreTime: 'Zusätzliche Tage für die Miete: {{days}}',
     hired: 'Eingestellt: {{job}}',
+    registered: 'Adresse angemeldet',
+    directedTo: 'An der Haltestelle {{stop}} aussteigen: auf dem Tramplan markiert',
     moodUp: 'Stimmung ↑',
     moodDown: 'Stimmung ↓',
     skipRecap: 'Rückblick überspringen',
@@ -483,7 +489,6 @@ export const de: UiStrings = {
       closed: 'Das Fitnessstudio ist geschlossen. Es hat die Öffnungszeiten des Badehauses.',
     },
     npcSteppedAway: '{{who}} musste kurz weg. Nichts ist verloren.',
-    nothingToSay: '{{who}} lächelt und nickt. Hier gibt es noch nichts zu besprechen.',
   },
   fainting: {
     title: 'Du bist ohnmächtig geworden',

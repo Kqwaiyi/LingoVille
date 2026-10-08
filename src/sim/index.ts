@@ -53,7 +53,7 @@ export {
   startSmallTalk,
   type FamiliarityTier,
 } from './familiarity.ts';
-export { memoryOf } from './npcMemory.ts';
+export { memoryOf, namedNpcOf } from './npcMemory.ts';
 export { casualRegisterDue, casualRegisterOffered, onTheHouseGiven, rollOnTheHouse, usualOffered } from './regulars.ts';
 export {
   isOutOfPatience,

@@ -15,6 +15,7 @@ import {
 } from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
 import { hours, HOURS_IDS, type HoursId } from './places.ts';
+import { isPasserBy, PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type TownNpcId, type TramStopId } from './townNpcs.ts';
 
 // Each Culture Pack dresses the same town as Japan, China, the UK or Germany:
 // local names, prices, money, customs, signs, sounds and props. Everything the
@@ -86,6 +87,8 @@ export type CulturePack = {
   hospital: { name: string; nameGlosses: Glosses };
   /** The apartment block the Character lives in, by its local name: where the landlord is. */
   apartments: { name: string; nameGlosses: Glosses };
+  /** The tram stops by their local names, as the stop signs and passers-by say them. */
+  tramStops: Record<TramStopId, { name: string; nameGlosses: Glosses }>;
   /** The other places Named NPCs are found, by their local names, and any facts their staff know (in English). */
   townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses; facts?: string[] }>;
   /** Persona localisations: each Named NPC's local name, and their favourite gift (the persona's `favouriteGift`) as a local would put it (in English, as the prompt reads it). */
@@ -159,6 +162,7 @@ export function culturePackSchema(packId: LanguageCode) {
     restaurant: shop,
     hospital: z.object({ name: text, nameGlosses: glosses }),
     apartments: z.object({ name: text, nameGlosses: glosses }),
+    tramStops: z.record(z.enum(TRAM_LINE), z.object({ name: text, nameGlosses: glosses })),
     townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses, facts: z.array(text).optional() })),
     personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
     casualRegister: z.object({ formal: text, casual: text, offer: text, inUse: text }),
@@ -288,6 +292,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { zh: '绿树综合医院', en: 'Midori General Hospital', de: 'Allgemeines Krankenhaus Midori' },
     },
     apartments: { name: 'さくら荘', nameGlosses: { zh: '樱花庄', en: 'Sakura House', de: 'Haus Sakura' } },
+    tramStops: {
+      'west-stop': { name: '旧市街', nameGlosses: { zh: '老城', en: 'Old Town', de: 'Altstadt' } },
+      'central-stop': { name: '中央', nameGlosses: { zh: '市中心', en: 'Town Centre', de: 'Stadtmitte' } },
+      'east-stop': { name: '市場通り', nameGlosses: { zh: '市场街', en: 'Market Street', de: 'Marktstraße' } },
+    },
     townPlaces: {
       park: { name: '桜ヶ丘公園', nameGlosses: { zh: '樱丘公园', en: 'Sakuragaoka Park', de: 'Sakuragaoka-Park' } },
       bookshop: { name: 'ひだまり書店', nameGlosses: { zh: '向阳书店', en: 'Hidamari Books', de: 'Buchhandlung Hidamari' } },
@@ -301,7 +310,15 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
           'After the bath, many people buy a bottle of cold milk from the fridge by the desk.',
         ],
       },
-      'town-office': { name: '南町役場', nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' } },
+      'town-office': {
+        name: '南町役場',
+        nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' },
+        facts: [
+          'Anyone who moves to town registers their new address here (a moving-in notification, 転入届) within 14 days.',
+          'The post office counter is in the same hall, at the far end.',
+          'Customers take a numbered ticket from the machine by the door and wait to be called.',
+        ],
+      },
     },
     casualRegister: {
       formal: '敬語',
@@ -462,6 +479,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: '緑城病院', en: 'Green City Hospital', de: 'Krankenhaus Grünstadt' },
     },
     apartments: { name: '幸福公寓', nameGlosses: { ja: '幸福アパート', en: 'Happiness Apartments', de: 'Wohnhaus Glück' } },
+    tramStops: {
+      'west-stop': { name: '老城', nameGlosses: { ja: '旧市街', en: 'Old Town', de: 'Altstadt' } },
+      'central-stop': { name: '市中心', nameGlosses: { ja: '中央', en: 'Town Centre', de: 'Stadtmitte' } },
+      'east-stop': { name: '市场街', nameGlosses: { ja: '市場通り', en: 'Market Street', de: 'Marktstraße' } },
+    },
     townPlaces: {
       park: { name: '人民公园', nameGlosses: { ja: '人民公園', en: 'People’s Park', de: 'Volkspark' } },
       bookshop: { name: '书香书店', nameGlosses: { ja: '書香書店', en: 'Book Fragrance Bookshop', de: 'Buchhandlung Bücherduft' } },
@@ -475,7 +497,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
           'Many people rest in the lounge after bathing, with a pot of tea.',
         ],
       },
-      'town-office': { name: '街道办事处', nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' } },
+      'town-office': {
+        name: '街道办事处',
+        nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' },
+        facts: [
+          'Newcomers register their address here (residence registration, 住宿登记) soon after they move in.',
+          'There is a China Post counter (中国邮政) in the same hall.',
+        ],
+      },
     },
     casualRegister: {
       formal: '您',
@@ -638,6 +667,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: 'セント・メアリー病院', zh: '圣玛丽医院', de: 'St.-Marien-Krankenhaus' },
     },
     apartments: { name: 'Rosewood House', nameGlosses: { ja: 'ローズウッド・ハウス', zh: '玫瑰木公寓', de: 'Rosewood House' } },
+    tramStops: {
+      'west-stop': { name: 'Old Town', nameGlosses: { ja: '旧市街', zh: '老城', de: 'Altstadt' } },
+      'central-stop': { name: 'Town Centre', nameGlosses: { ja: '中央', zh: '市中心', de: 'Stadtmitte' } },
+      'east-stop': { name: 'Market Street', nameGlosses: { ja: '市場通り', zh: '市场街', de: 'Marktstraße' } },
+    },
     townPlaces: {
       park: { name: 'Victoria Park', nameGlosses: { ja: 'ヴィクトリア公園', zh: '维多利亚公园', de: 'Victoria Park' } },
       bookshop: { name: 'The Book Nook', nameGlosses: { ja: 'ブック・ヌック', zh: '书角书店', de: 'Bücherecke' } },
@@ -651,7 +685,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
           'The gym is a corner just inside the entrance with a running machine. Members sign in at the desk first.',
         ],
       },
-      'town-office': { name: 'Town Hall', nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' } },
+      'town-office': {
+        name: 'Town Hall',
+        nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' },
+        facts: [
+          'New residents register their address with the council here, which also puts them on the electoral register.',
+          'The Post Office counter is just inside the main doors.',
+        ],
+      },
     },
     casualRegister: {
       formal: 'Mr / Ms',
@@ -822,6 +863,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       nameGlosses: { ja: '公園前総合病院', zh: '公园医院', en: 'Park Hospital' },
     },
     apartments: { name: 'Haus Lindenhof', nameGlosses: { ja: 'リンデンホーフ荘', zh: '椴树庭公寓', en: 'Lindenhof House' } },
+    tramStops: {
+      'west-stop': { name: 'Altstadt', nameGlosses: { ja: '旧市街', zh: '老城', en: 'Old Town' } },
+      'central-stop': { name: 'Stadtmitte', nameGlosses: { ja: '中央', zh: '市中心', en: 'Town Centre' } },
+      'east-stop': { name: 'Marktstraße', nameGlosses: { ja: '市場通り', zh: '市场街', en: 'Market Street' } },
+    },
     townPlaces: {
       park: { name: 'Stadtpark', nameGlosses: { ja: '市立公園', zh: '城市公园', en: 'City Park' } },
       bookshop: { name: 'Buchhandlung Seitenweise', nameGlosses: { ja: 'ザイテンヴァイゼ書店', zh: '页页书店', en: 'Seitenweise Bookshop' } },
@@ -835,7 +881,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
           'The gym is a corner just inside the entrance with a running machine. Members sign in at the desk first.',
         ],
       },
-      'town-office': { name: 'Bürgeramt', nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' } },
+      'town-office': {
+        name: 'Bürgeramt',
+        nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' },
+        facts: [
+          'Anyone who moves here must register their address within two weeks (the Anmeldung) and is given a registration certificate (Meldebescheinigung).',
+          'There is a post office counter (Postfiliale) in the same building.',
+        ],
+      },
     },
     casualRegister: {
       formal: 'Sie',
@@ -913,6 +966,11 @@ export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
   const shop = localShop(placeId, packId);
   if (shop) return shop.name;
   throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
+}
+
+/** Where a town NPC is found, by its local name in this pack: their place's, or for a passer-by, the tram stop they wait at. */
+export function localNpcPlaceName(npcId: TownNpcId, packId: LanguageCode): string {
+  return isPasserBy(npcId) ? CULTURE_PACKS[packId].tramStops[PASSER_BY_STOPS[npcId]].name : localPlaceName(TOWN_NPCS[npcId].placeId, packId);
 }
 
 /** The allergens in one of this pack's café items, made with these extras (milk added to a coffee has milk in it). */

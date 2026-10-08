@@ -18,6 +18,7 @@ export {
 export {
   basketChangedScene,
   buildNpcSession,
+  buildPasserBySession,
   buildSmallTalkSession,
   giftScene,
   GREETING_SCENE,

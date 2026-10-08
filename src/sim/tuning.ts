@@ -116,6 +116,8 @@ export const ECONOMY = {
   maxPaymentPlanWeeks: 4,
   gymMembershipInShifts: 0.5,
   gymMembershipDays: 30,
+  /** What the post office charges to send a parcel home, by how fast it goes. */
+  postageInShifts: { sea: 0.2, air: 0.35, express: 0.6 },
   /** What a Comfort Purchase may cost: bought to feel good, not to get by. */
   comfortPurchaseInShifts: { min: 0.1, max: 0.3 },
   /** Money is held in Shifts, so one Shift's base pay is 1 by definition. Every price is a ratio of it. */
@@ -227,6 +229,8 @@ export const MOOD = {
      */
     comfortPurchase: { cafe: 3, reading: 5, gift: 3, meal: 5, bathhouse: 8 },
     gymSession: 4,
+    /** Sending a parcel home, on top of the conversation's success. */
+    parcelSent: 3,
     goodHomeMeal: 2,
     unmetNeedPerGameHour: -1,
     lateNightPerGameHour: -6,

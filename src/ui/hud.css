@@ -247,6 +247,13 @@ body,
   color: var(--hud-muted);
 }
 
+/* The stop a passer-by said to get off at, beside its name. */
+.tram-marker {
+  margin-right: auto;
+  color: var(--ok);
+  font-size: 12px;
+}
+
 .tram-panel .tram-cancel {
   justify-content: center;
   border-color: transparent;

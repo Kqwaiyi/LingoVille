@@ -16,6 +16,7 @@ import {
 } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { Groceries } from './Groceries.tsx';
+import { RouteMarker } from './Marker.tsx';
 import { Props } from './Props.tsx';
 import { Signs } from './Signs.tsx';
 import {
@@ -308,6 +309,7 @@ export function Town() {
       <Signs />
       <Props />
       <Groceries />
+      <RouteMarker />
     </RigidBody>
   );
 }

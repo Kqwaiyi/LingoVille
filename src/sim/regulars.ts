@@ -1,6 +1,6 @@
 import type { Interaction, NamedNpcId } from '../content/index.ts';
 import { isFamiliarAtLeast } from './familiarity.ts';
-import { memoryOf } from './npcMemory.ts';
+import { memoryOf, namedNpcOf } from './npcMemory.ts';
 import { nextRandom } from './rng.ts';
 import type { GameState, NpcMemory } from './state.ts';
 import { FAMILIARITY } from './tuning.ts';
@@ -34,11 +34,12 @@ function canonical(value: unknown): unknown {
  * different order, until another one is made enough times in a row. Anything but an order changes nothing.
  */
 export function recordOrder(state: GameState, interaction: Interaction, rawArgs: unknown): GameState {
-  if (!isOrder(interaction)) return state;
+  const npcId = namedNpcOf(interaction);
+  if (!isOrder(interaction) || !npcId) return state;
   const parsed = interaction.parseArgs(rawArgs);
   if (!parsed.success) return state;
   const args = canonical(parsed.data);
-  const memory = memoryOf(state, interaction.npcId);
+  const memory = memoryOf(state, npcId);
   const { lastOrder } = memory;
   const same = lastOrder?.interactionId === interaction.id && JSON.stringify(lastOrder.args) === JSON.stringify(args);
   const inARow = same ? lastOrder.inARow + 1 : 1;
@@ -47,7 +48,7 @@ export function recordOrder(state: GameState, interaction: Interaction, rawArgs:
     lastOrder: { interactionId: interaction.id, args, inARow },
     ...(inARow >= FAMILIARITY.usualOrderAfterIdenticalOrders && { usualOrder: { interactionId: interaction.id, args } }),
   };
-  return { ...state, people: { ...state.people, [interaction.npcId]: remembered } };
+  return { ...state, people: { ...state.people, [npcId]: remembered } };
 }
 
 /**
@@ -66,10 +67,12 @@ export function usualOffered(memory: NpcMemory, interaction: Interaction): Usual
  * It's flavour only: the order costs the same.
  */
 export function rollOnTheHouse(state: GameState, interaction: Interaction): { state: GameState; onTheHouse: boolean } {
-  const memory = memoryOf(state, interaction.npcId);
+  const npcId = namedNpcOf(interaction);
+  if (!isOrder(interaction) || !npcId) return { state, onTheHouse: false };
+  const memory = memoryOf(state, npcId);
   const { day } = state.clock;
   const tooSoon = memory.lastOnTheHouseDay !== null && day - memory.lastOnTheHouseDay < FAMILIARITY.onTheHouseCooldownDays;
-  if (!isOrder(interaction) || !isFamiliarAtLeast(memory, 'friend') || tooSoon) return { state, onTheHouse: false };
+  if (!isFamiliarAtLeast(memory, 'friend') || tooSoon) return { state, onTheHouse: false };
   const draw = nextRandom(state.rngState);
   return { state: { ...state, rngState: draw.rngState }, onTheHouse: draw.value < FAMILIARITY.onTheHouseChance };
 }

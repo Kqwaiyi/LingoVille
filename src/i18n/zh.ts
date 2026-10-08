@@ -261,6 +261,7 @@ export const zh: UiStrings = {
     workOut: '按 <kbd>E</kbd> 健身',
     sleep: '按 <kbd>E</kbd> 上床睡觉',
     talk: '按 <kbd>E</kbd> 交谈 — {{role}}',
+    askTheWay: '按 <kbd>E</kbd> 问路 — {{role}}',
     /** Small Talk with someone who has no other conversation. */
     chat: '按 <kbd>E</kbd> 闲聊 — {{role}}',
     /** Small Talk with staff, beside their E. */
@@ -277,6 +278,8 @@ export const zh: UiStrings = {
     joinGym: '按 <kbd>F</kbd> 咨询健身房',
     renewGym: '按 <kbd>F</kbd> 续办健身房会员',
     settleHospitalBill: '按 <kbd>F</kbd> 结清医院账单',
+    registerAddress: '按 <kbd>F</kbd> 登记住址',
+    returnItem: '按 <kbd>R</kbd> 退货',
     startShift: '按 <kbd>E</kbd> 开始上班 — {{job}}',
     staffOnly: '员工门 · 员工专用',
     workedToday: '员工门 · 你今天已经上过班了',
@@ -340,6 +343,7 @@ export const zh: UiStrings = {
   tram: {
     heading: '乘电车去…',
     trip: '{{minutes}} 分钟 · 免费',
+    routeMarker: '在这里下车',
     cancel: '留在这里',
   },
   basket: {
@@ -408,6 +412,8 @@ export const zh: UiStrings = {
     pointedTo: '{{item}}：已在货架上标出',
     moreTime: '房租可以晚交{{days}}天',
     hired: '被录用了：{{job}}',
+    registered: '住址已登记',
+    directedTo: '在{{stop}}下车：已在电车线路图上标出',
     moodUp: '心情 ↑',
     moodDown: '心情 ↓',
     skipRecap: '跳过回顾',
@@ -483,7 +489,6 @@ export const zh: UiStrings = {
       closed: '健身房已经关门了。它和澡堂同时营业。',
     },
     npcSteppedAway: '{{who}}临时走开了。什么都没有丢失。',
-    nothingToSay: '{{who}}微笑着点点头。这里暂时还没什么可聊的。',
   },
   fainting: {
     title: '你晕倒了',

@@ -20,6 +20,7 @@ import {
   ALLERGENS,
   BILL_METHODS,
   cafeAllergensIn,
+  chargeInShifts,
   CULTURE_PACKS,
   dishFits,
   DRINK_EXTRAS,
@@ -31,6 +32,7 @@ import {
   isDish,
   isMadeToOrder,
   ITEMS,
+  localPlaceName,
   localPrice,
   MADE_TO_ORDER_EXTRAS,
   menuPrice,
@@ -42,8 +44,11 @@ import {
   readPrescription,
   readRentOwed,
   SEATING,
+  SHIPPING_SPEEDS,
   START_WHEN,
+  STOP_PLACES,
   SYMPTOM_IDS,
+  TRAM_LINE,
   type Allergen,
   type DietaryNoteId,
   type DrinkExtra,
@@ -51,9 +56,11 @@ import {
   type DrinkSize,
   type DrinkTemperature,
   type ItemId,
+  type ShippingSpeed,
   type SymptomId,
+  type TramStopId,
 } from '../content/index.ts';
-import { ECONOMY, ILLNESS_IDS, type IllnessId, type LanguageCode } from '../sim/index.ts';
+import { ECONOMY, ILLNESS_IDS, type IllnessId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
 
 /** Roughly how long the real NPC takes to start answering. */
@@ -79,6 +86,10 @@ const REGISTER_PATIENT = INTERACTIONS.checkIn.completion.name;
 const DIAGNOSE = INTERACTIONS.seeTheDoctor.completion.name;
 const DISPENSE = INTERACTIONS.getMedicine.completion.name;
 const SET_PAYMENT_PLAN = INTERACTIONS.settleHospitalBill.completion.name;
+const REFUND = INTERACTIONS.returnAnItem.completion.name;
+const REGISTER_RESIDENT = INTERACTIONS.registerAddress.completion.name;
+const SHIP = INTERACTIONS.sendAParcel.completion.name;
+const GIVE_DIRECTIONS = INTERACTIONS.askForDirections.completion.name;
 /** How many more days the fake landlord gives. */
 const EXTENSION_DAYS = 3;
 
@@ -2499,10 +2510,435 @@ function cafeNpc(script: CafeScript, common: OrderScript, menu: ItemId[], packId
   };
 }
 
+/** The cashier taking something back (#6): finds out which item and what is wrong with it, and reads back the refund. */
+type ReturnScript = {
+  greeting: string;
+  resume: string;
+  askWhich: string;
+  askWhy: string;
+  readBack: (item: string, price: string) => string;
+  refunded: string;
+  cantRefund: string;
+  /** Words that say something is wrong with an item. */
+  faults: string[];
+};
+
+const RETURN_SCRIPT: Record<LanguageCode, ReturnScript> = {
+  ja: {
+    greeting: 'いらっしゃいませ。返品でしょうか？',
+    resume: 'お待たせしました。返品の件ですね。',
+    askWhich: 'どちらの商品でしょうか？',
+    askWhy: 'どこか問題がございましたか？',
+    readBack: (item, price) => `${item}ですね。${price}を返金いたします。よろしいですか？`,
+    refunded: '大変失礼いたしました。こちら、返金でございます。',
+    cantRefund: '申し訳ございません、こちらは返金できかねます。',
+    faults: ['割れ', '壊れ', '傷', '腐', '悪', '破', '不良', 'へん', '変'],
+  },
+  zh: {
+    greeting: '您好！是要退货吗？',
+    resume: '让您久等了。您是要退货吧？',
+    askWhich: '是哪个商品？',
+    askWhy: '这个有什么问题吗？',
+    readBack: (item, price) => `${item}，退您${price}，可以吗？`,
+    refunded: '真抱歉。这是退给您的钱。',
+    cantRefund: '不好意思，这个不能退。',
+    faults: ['坏', '破', '裂', '臭', '问题', '过期'],
+  },
+  en: {
+    greeting: 'Hiya! Are you returning something?',
+    resume: 'Sorry about that! You were returning something?',
+    askWhich: 'Which item is it?',
+    askWhy: "Oh dear, what's wrong with it?",
+    readBack: (item, price) => `${item}, so that's ${price} back to you. Is that right?`,
+    refunded: 'So sorry about that. Here’s your money back.',
+    cantRefund: "Sorry, I'm afraid I can't refund that.",
+    faults: ['broken', 'cracked', 'bad', 'off', 'damaged', 'faulty', 'mouldy', 'stale', 'rotten', 'smashed'],
+  },
+  de: {
+    greeting: 'Hallo! Möchten Sie etwas zurückgeben?',
+    resume: 'Entschuldigung! Sie wollten etwas zurückgeben?',
+    askWhich: 'Um welchen Artikel geht es?',
+    askWhy: 'Was stimmt denn damit nicht?',
+    readBack: (item, price) => `${item}, dann bekommen Sie ${price} zurück. Richtig?`,
+    refunded: 'Das tut mir leid. Hier ist Ihr Geld zurück.',
+    cantRefund: 'Tut mir leid, das kann ich leider nicht erstatten.',
+    faults: ['kaputt', 'gebrochen', 'schlecht', 'beschädigt', 'defekt', 'verdorben', 'zerbrochen', 'abgelaufen'],
+  },
+};
+
+/** #6: hears the item and what is wrong with it (in one line or two), reads back the refund, and refunds on a yes. */
+function returnNpc(script: ReturnScript, common: OrderScript, items: ItemId[], packId: LanguageCode, act: Act): Npc {
+  let item: ItemId | null = null;
+  let faulty = false;
+  let readBack = false;
+  const { yes, no, known } = common.words;
+  const startAgain = () => {
+    [item, faulty, readBack] = [null, false, false];
+  };
+  return {
+    ...common,
+    ...script,
+    hear: (line) => {
+      const named = items.find((id) => mentions(line, ITEM_WORDS[packId][id]));
+      const fault = mentions(line, script.faults);
+      if (named || fault) {
+        item = named ?? item;
+        faulty ||= fault;
+        readBack = item !== null && faulty;
+        if (!item) return act.say(script.askWhich);
+        if (!faulty) return act.say(script.askWhy);
+        return act.say(script.readBack(CULTURE_PACKS[packId].goods[item].name, common.price(localPrice(ITEMS[item].priceInShifts, packId))));
+      }
+      if (readBack && mentions(line, no)) {
+        startAgain();
+        return act.say(script.askWhich);
+      }
+      if (readBack && item && mentions(line, yes)) {
+        readBack = false;
+        return act.call(REFUND, { item, reason: 'faulty' }, (response) => {
+          if (response.result === 'done') return act.say(script.refunded);
+          startAgain();
+          act.say(script.cantRefund);
+        });
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(item ? script.askWhy : script.askWhich);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** The town office's clerk registering an address (#23): the name, the address and the nationality, one at a time. */
+type RegisterScript = {
+  greeting: string;
+  resume: string;
+  askName: string;
+  askAddress: string;
+  askNationality: string;
+  readBack: (name: string, address: string, nationality: string) => string;
+  registered: string;
+  nameAgain: string;
+};
+
+const REGISTER_SCRIPT: Record<LanguageCode, RegisterScript> = {
+  ja: {
+    greeting: 'こんにちは。住所の届け出ですね。お名前をお願いします。',
+    resume: 'お待たせしました。届け出の続きをしましょう。',
+    askName: 'お名前をお願いします。',
+    askAddress: 'ご住所はどちらですか？',
+    askNationality: 'ご国籍はどちらですか？',
+    readBack: (name, address, nationality) => `お名前は${name}様、ご住所は${address}、ご国籍は${nationality}ですね。よろしいですか？`,
+    registered: '登録が完了しました。ありがとうございました。',
+    nameAgain: '失礼しました。もう一度お名前をお願いできますか？',
+  },
+  zh: {
+    greeting: '您好，是来登记住址的吧？请问您叫什么名字？',
+    resume: '让您久等了，我们继续登记吧。',
+    askName: '请问您叫什么名字？',
+    askAddress: '您的住址是哪里？',
+    askNationality: '您的国籍是？',
+    readBack: (name, address, nationality) => `名字${name}，住址${address}，国籍${nationality}，对吗？`,
+    registered: '登记好了，谢谢！',
+    nameAgain: '不好意思，我没听清您的名字。请再说一遍？',
+  },
+  en: {
+    greeting: 'Hello! Registering your address? Can I take your full name?',
+    resume: "Sorry about that! Let's carry on with the form.",
+    askName: 'Can I take your full name?',
+    askAddress: "And what's your address?",
+    askNationality: 'And your nationality?',
+    readBack: (name, address, nationality) => `So that's ${name}, living at ${address}, nationality ${nationality}. Is that right?`,
+    registered: "Lovely, you're registered. Welcome to town!",
+    nameAgain: 'Sorry, I think I misheard your name. Could you say it again?',
+  },
+  de: {
+    greeting: 'Guten Tag! Sie möchten sich anmelden? Ihr vollständiger Name, bitte.',
+    resume: 'Entschuldigung! Machen wir mit dem Formular weiter.',
+    askName: 'Ihr vollständiger Name, bitte.',
+    askAddress: 'Und Ihre Adresse?',
+    askNationality: 'Und Ihre Staatsangehörigkeit?',
+    readBack: (name, address, nationality) => `Also: ${name}, wohnhaft ${address}, Staatsangehörigkeit ${nationality}. Richtig?`,
+    registered: 'Sie sind jetzt angemeldet. Willkommen!',
+    nameAgain: 'Entschuldigung, ich habe Ihren Namen falsch verstanden. Noch einmal, bitte?',
+  },
+};
+
+/** #23: takes each field of the form in turn, reads it back and registers on a yes, asking the name again if it was misheard. */
+function registerNpc(script: RegisterScript, common: OrderScript, introductions: readonly string[], act: Act): Npc {
+  let name: string | null = null;
+  let address: string | null = null;
+  let nationality: string | null = null;
+  const { yes, no } = common.words;
+  const nextQuestion = () => {
+    if (name === null) return script.askName;
+    if (address === null) return script.askAddress;
+    return nationality === null ? script.askNationality : script.readBack(name, address, nationality);
+  };
+  return {
+    ...common,
+    ...script,
+    hear: (line) => {
+      // Each field is whatever was said, without the words said around it.
+      const said = nameIn(line, introductions) || null;
+      if (name === null || address === null || nationality === null) {
+        if (said === null) return act.notUnderstood();
+        if (name === null) name = said;
+        else if (address === null) address = said;
+        else nationality = said;
+        return act.say(nextQuestion());
+      }
+      if (mentions(line, no)) {
+        [name, address, nationality] = [null, null, null];
+        return act.say(script.askName);
+      }
+      if (!mentions(line, yes)) return act.say(nextQuestion());
+      act.call(REGISTER_RESIDENT, { fields: { name, address, nationality } }, (response) => {
+        if (response.result === 'done') return act.say(script.registered);
+        // Misheard: the rest of the form stands, and the name is asked again.
+        name = null;
+        act.say(script.nameAgain);
+      });
+    },
+  };
+}
+
+/** The post office counter sending a parcel (#24): where to, how, and the price. */
+type ParcelScript = {
+  greeting: string;
+  resume: string;
+  askSpeed: string;
+  readBack: (destination: string, speed: string, price: string) => string;
+  sent: string;
+  cannotAfford: string;
+  /** Words said around a destination. */
+  to: string[];
+  speeds: Record<ShippingSpeed, { said: string; words: string[] }>;
+};
+
+const PARCEL_SCRIPT: Record<LanguageCode, ParcelScript> = {
+  ja: {
+    greeting: 'いらっしゃいませ。小包ですか？どちらまで送りますか？',
+    resume: 'お待たせしました。小包の続きですね。',
+    askSpeed: '船便、航空便、EMSがございます。どれになさいますか？',
+    readBack: (destination, speed, price) => `${destination}まで${speed}で、${price}です。よろしいですか？`,
+    sent: 'かしこまりました。お預かりします。',
+    cannotAfford: '申し訳ございません、お支払いが足りないようです。ほかの送り方になさいますか？',
+    to: ['に送りたいです', 'まで', 'です'],
+    speeds: {
+      sea: { said: '船便', words: ['船', 'ふなびん'] },
+      air: { said: '航空便', words: ['航空', 'こうくう', '飛行機'] },
+      express: { said: 'EMS', words: ['速達', 'そくたつ', 'EMS', '急ぎ'] },
+    },
+  },
+  zh: {
+    greeting: '您好！要寄包裹吗？寄到哪里？',
+    resume: '让您久等了。您要寄包裹吧？',
+    askSpeed: '海运、空运还是特快专递？',
+    readBack: (destination, speed, price) => `寄到${destination}，${speed}，${price}。可以吗？`,
+    sent: '好的，包裹收下了。',
+    cannotAfford: '不好意思，您的钱好像不够。要换便宜一点的方式吗？',
+    to: ['我要寄到', '寄到', '寄往'],
+    speeds: {
+      sea: { said: '海运', words: ['海运', '船'] },
+      air: { said: '空运', words: ['空运', '航空', '飞机'] },
+      express: { said: '特快专递', words: ['快递', '特快', 'EMS', '加急'] },
+    },
+  },
+  en: {
+    greeting: "Hiya! Sending a parcel? Where's it going?",
+    resume: 'Sorry about that! You were sending a parcel?',
+    askSpeed: 'By sea, by air or express?',
+    readBack: (destination, speed, price) => `To ${destination}, ${speed}: that's ${price}. Is that right?`,
+    sent: "Lovely, that's on its way. Bye now!",
+    cannotAfford: "Sorry, it looks like that's not enough. Would you like a cheaper way?",
+    to: ['send it to ', 'please'],
+    speeds: {
+      sea: { said: 'by sea', words: ['sea', 'surface', 'boat'] },
+      air: { said: 'by air', words: ['air', 'airmail', 'plane'] },
+      express: { said: 'express', words: ['express', 'fast', 'fastest', 'quick'] },
+    },
+  },
+  de: {
+    greeting: 'Hallo! Ein Paket? Wohin soll es gehen?',
+    resume: 'Entschuldigung! Sie wollten ein Paket schicken?',
+    askSpeed: 'Per Schiff, per Luftpost oder per Express?',
+    readBack: (destination, speed, price) => `Nach ${destination}, ${speed}, das macht ${price}. Richtig?`,
+    sent: 'Alles klar, das Paket geht raus. Tschüss!',
+    cannotAfford: 'Oh, das reicht leider nicht. Möchten Sie es günstiger verschicken?',
+    to: ['nach ', 'bitte'],
+    speeds: {
+      sea: { said: 'per Schiff', words: ['schiff', 'seeweg', 'see'] },
+      air: { said: 'per Luftpost', words: ['luftpost', 'flugzeug', 'luft'] },
+      express: { said: 'per Express', words: ['express', 'schnell', 'eilig'] },
+    },
+  },
+};
+
+/** #24: hears where the parcel is going, then how, reads back the postage and sends it on a yes. */
+function parcelNpc(script: ParcelScript, common: OrderScript, packId: LanguageCode, act: Act): Npc {
+  let destination: string | null = null;
+  let speed: ShippingSpeed | null = null;
+  const { yes, no, known } = common.words;
+  const postage = (s: ShippingSpeed) => formatLocalMoney(chargeInShifts(ECONOMY.postageInShifts[s], packId), packId);
+  const nextQuestion = () => {
+    if (destination === null) return script.greeting;
+    return speed === null ? script.askSpeed : script.readBack(destination, script.speeds[speed].said, postage(speed));
+  };
+  return {
+    ...common,
+    ...script,
+    hear: (line) => {
+      const heardSpeed = SHIPPING_SPEEDS.find((s) => mentions(line, script.speeds[s].words)) ?? null;
+      if (destination === null) {
+        destination = nameIn(line, script.to) || null;
+        if (destination === null) return act.notUnderstood();
+        speed = heardSpeed;
+        return act.say(nextQuestion());
+      }
+      if (heardSpeed) {
+        speed = heardSpeed;
+        return act.say(nextQuestion());
+      }
+      if (speed === null) return mentions(line, [...yes, ...no, ...known]) ? act.say(script.askSpeed) : act.notUnderstood();
+      if (mentions(line, no)) {
+        speed = null;
+        return act.say(script.askSpeed);
+      }
+      if (!mentions(line, yes)) return act.say(nextQuestion());
+      act.call(SHIP, { destination, speed }, (response) => {
+        if (response.result === 'done') return act.say(script.sent);
+        speed = null;
+        act.say(response.result === 'cannot_afford' ? script.cannotAfford : script.askSpeed);
+      });
+    },
+  };
+}
+
+/** A passer-by at a tram stop (#25): hears where the Player wants to go, and names the stop to get off at. */
+type PasserByScript = {
+  greeting: string;
+  resume: string;
+  askWhere: string;
+  getOff: (stop: string) => string;
+  goodbye: string;
+  /** How a Player might name each place, besides its local name. */
+  places: Partial<Record<PlaceId, string[]>>;
+};
+
+const PASSER_BY_SCRIPT: Record<LanguageCode, PasserByScript> = {
+  ja: {
+    greeting: 'はい？どうしましたか？',
+    resume: 'すみません、何でしたっけ？',
+    askWhere: 'どこに行きたいですか？',
+    getOff: (stop) => `${stop}で降りてください。わかりましたか？`,
+    goodbye: 'いってらっしゃい！',
+    places: {
+      cafe: ['カフェ', '喫茶'],
+      supermarket: ['スーパー'],
+      'convenience-store': ['コンビニ'],
+      restaurant: ['レストラン'],
+      clinic: ['病院', 'クリニック', '薬局'],
+      park: ['公園'],
+      bookshop: ['本屋', '書店'],
+      bathhouse: ['銭湯', 'お風呂', 'ジム'],
+      'town-office': ['役場', '郵便局', '市役所'],
+      home: ['アパート'],
+    },
+  },
+  zh: {
+    greeting: '你好！有什么事吗？',
+    resume: '不好意思，你刚才说什么？',
+    askWhere: '你想去哪儿？',
+    getOff: (stop) => `在${stop}下车。明白了吗？`,
+    goodbye: '一路顺风！',
+    places: {
+      cafe: ['咖啡馆', '咖啡店'],
+      supermarket: ['超市'],
+      'convenience-store': ['便利店'],
+      restaurant: ['餐厅', '饭店'],
+      clinic: ['医院', '诊所', '药房'],
+      park: ['公园'],
+      bookshop: ['书店'],
+      bathhouse: ['澡堂', '浴室', '健身房'],
+      'town-office': ['办事处', '邮局'],
+      home: ['公寓'],
+    },
+  },
+  en: {
+    greeting: 'Hiya! You alright? Need a hand?',
+    resume: 'Sorry, where were we?',
+    askWhere: 'Where are you trying to get to?',
+    getOff: (stop) => `Get off at ${stop}. Got that?`,
+    goodbye: 'No worries. Have a good trip!',
+    places: {
+      cafe: ['cafe', 'café', 'coffee shop'],
+      supermarket: ['supermarket'],
+      'convenience-store': ['corner shop', 'convenience store'],
+      restaurant: ['restaurant'],
+      clinic: ['hospital', 'clinic', 'doctor', 'pharmacy'],
+      park: ['park'],
+      bookshop: ['bookshop', 'book shop'],
+      bathhouse: ['baths', 'bathhouse', 'gym', 'pool'],
+      'town-office': ['town hall', 'post office', 'council'],
+      home: ['flat', 'apartment'],
+    },
+  },
+  de: {
+    greeting: 'Hallo! Kann ich Ihnen helfen?',
+    resume: 'Entschuldigung, wo waren wir?',
+    askWhere: 'Wohin möchten Sie denn?',
+    getOff: (stop) => `Steigen Sie an der Haltestelle ${stop} aus. Alles klar?`,
+    goodbye: 'Gern geschehen. Gute Fahrt!',
+    places: {
+      cafe: ['café', 'cafe'],
+      supermarket: ['supermarkt'],
+      'convenience-store': ['kiosk', 'späti'],
+      restaurant: ['restaurant', 'gasthaus'],
+      clinic: ['krankenhaus', 'klinik', 'arzt', 'apotheke'],
+      park: ['park'],
+      bookshop: ['buchhandlung', 'bücher'],
+      bathhouse: ['bad', 'schwimmbad', 'fitnessstudio'],
+      'town-office': ['bürgeramt', 'rathaus', 'post'],
+      home: ['wohnung'],
+    },
+  },
+};
+
+/** #25: names the stop to get off at for the place it hears, and calls give_directions once the Player says they've got it. */
+function passerByNpc(script: PasserByScript, common: OrderScript, packId: LanguageCode, act: Act): Npc {
+  let stop: TramStopId | null = null;
+  const { yes, no, known } = common.words;
+  const { tramStops } = CULTURE_PACKS[packId];
+  const places = Object.keys(script.places) as PlaceId[];
+  return {
+    ...common,
+    ...script,
+    hear: (line) => {
+      const place = places.find((id) => mentions(line, [...script.places[id]!, localPlaceName(id, packId)]));
+      if (place) {
+        stop = TRAM_LINE.find((id) => STOP_PLACES[id].includes(place))!;
+        return act.say(script.getOff(tramStops[stop].name));
+      }
+      if (stop && mentions(line, yes)) {
+        const directed = stop;
+        stop = null;
+        return act.call(GIVE_DIRECTIONS, { stop: directed }, () => act.say(script.goodbye));
+      }
+      if (stop && mentions(line, no)) {
+        stop = null;
+        return act.say(script.askWhere);
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(script.askWhere);
+      act.notUnderstood();
+    },
+  };
+}
+
 /** Which fake NPC plays this session, read from the completion it offers. */
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
   const offers = (name: string) => session.tools.some((tool) => tool.name === name);
+  // A passer-by borrows a Shift Customer's voice, but asks no order.
+  if (offers(GIVE_DIRECTIONS)) return passerByNpc(PASSER_BY_SCRIPT[packId], SCRIPT[packId], packId, act);
   if ('shiftCustomerVoice' in session.voice) {
     const atTheTill = readCheckout(session.systemInstruction);
     if (atTheTill) return tillCustomerNpc(TILL_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTill, act);
@@ -2529,6 +2965,9 @@ function castNpc(session: NpcSession, act: Act): Npc {
   if (offers(DIAGNOSE)) return doctorNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], packId, act);
   if (offers(DISPENSE)) return pharmacyNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, packId, act);
   if (offers(SET_PAYMENT_PLAN)) return hospitalBillNpc(CLINIC_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
+  if (offers(REFUND)) return returnNpc(RETURN_SCRIPT[packId], SCRIPT[packId], itemsIn(session, REFUND), packId, act);
+  if (offers(REGISTER_RESIDENT)) return registerNpc(REGISTER_SCRIPT[packId], SCRIPT[packId], HIRING_SCRIPT[packId].introductions, act);
+  if (offers(SHIP)) return parcelNpc(PARCEL_SCRIPT[packId], SCRIPT[packId], packId, act);
   if (offers(REGISTER_MEMBER)) {
     const renewing = session.systemInstruction.includes(INTERACTIONS.renewGymMembership.goal);
     return memberNpc(ATTENDANT_SCRIPT[packId], SCRIPT[packId], packId, renewing, act);
@@ -2578,7 +3017,12 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * asks how many and where to sit and seats the guest, takes a meal order the barista's way, recommends a dish that
  * keeps to what the guest doesn't eat, and says the bill total and asks how they pay. The bathhouse attendant asks
  * whether a bather wants a towel and reads back the bath with its price before calling admit, and reads back gym
- * membership and its price before calling register_member (renewing, it reads it back as it greets). Taking a regular's order, it
+ * membership and its price before calling register_member (renewing, it reads it back as it greets). The cashier taking
+ * something back hears the item and what is wrong with it and reads back the refund before calling refund. The town
+ * office's clerk takes the name, address and nationality one at a time and reads the form back before calling
+ * register_resident (asking the name again if it was misheard), or asks where a parcel is going and how, and reads back
+ * the postage before calling ship. A passer-by at a tram stop names the stop to get off at for the place the Player
+ * names, and calls give_directions once they say they've got it. Taking a regular's order, it
  * greets them with "the usual?" and serves it on a yes. In Small Talk it
  * chats back, calls learn_name when told a name, and says goodbye when a scene tells it to wrap up. Any Named NPC,
  * in any conversation, thanks the Character for a gift (more warmly for their favourite), and asked what gift they

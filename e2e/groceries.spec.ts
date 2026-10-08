@@ -118,3 +118,28 @@ test('buys a bento over the convenience store counter, late at night, and Hunger
   await expect(money(page)).toHaveText('¥9,280');
   expect(Number(await hunger.getAttribute('aria-valuenow'))).toBeGreaterThan(before);
 });
+
+test('brings a faulty cabbage back to the till on R, and gets its price back', async ({ page }) => {
+  await atTheCabbages(page);
+  await page.keyboard.press('KeyE');
+  await walkUntil(page, 'KeyA', 'to pay — Cashier');
+  await page.keyboard.press('KeyE');
+  await typeLine(page, 'いいえ');
+  await typeLine(page, 'いいえ');
+  await typeLine(page, 'はい');
+  await expect(money(page)).toHaveText('¥9,640');
+  await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
+  await expect(column(page)).toBeHidden();
+
+  await expect(page.getByText('Press R to bring something back')).toBeVisible();
+  await page.keyboard.press('KeyR');
+  await expect(npcLine(page, 'いらっしゃいませ。返品でしょうか？')).toBeVisible();
+  await typeLine(page, 'キャベツが傷んでいました');
+  await expect(npcLine(page, 'キャベツですね。360円を返金いたします。よろしいですか？')).toBeVisible();
+  await typeLine(page, 'はい');
+
+  await expect(closingCard(page).getByText('+¥360 · Mood ↑')).toBeVisible();
+  await expect(money(page)).toHaveText('¥10,000');
+  await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
+  await expect(page.getByText('Press R to bring something back')).toBeHidden();
+});

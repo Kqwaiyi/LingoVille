@@ -1,7 +1,7 @@
 import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import { SegmentSchema } from '../ai/index.ts';
-import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import { INTERACTIONS, NAMED_NPCS, PASSER_BY_IDS, type NamedNpcId, type PasserById } from '../content/index.ts';
 import { JOB_IDS } from '../sim/index.ts';
 
 // The Journal: every Recap the Player has had, kept per slot in its own IndexedDB
@@ -14,6 +14,8 @@ export const JOURNAL_SCHEMA_VERSION = 5;
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
+/** A Goal Interaction can be with a passer-by too. */
+const GOAL_NPC_IDS = [...NPC_IDS, ...PASSER_BY_IDS] as [NamedNpcId | PasserById, ...(NamedNpcId | PasserById)[]];
 const INTERACTION_IDS = Object.values(INTERACTIONS).map((interaction) => interaction.id) as [string, ...string[]];
 
 // What every entry has, whatever it is a Recap of.
@@ -56,7 +58,7 @@ const JournalEntrySchema = z.discriminatedUnion('kind', [
   z.object({
     ...shared,
     kind: z.literal('goal'),
-    npcId: z.enum(NPC_IDS),
+    npcId: z.enum(GOAL_NPC_IDS),
     /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
     npcName: z.string().nullable(),
     interactionId: z.enum(INTERACTION_IDS),
