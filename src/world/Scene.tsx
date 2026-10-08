@@ -7,11 +7,7 @@ import { CONTROLS } from './controls.ts';
 import { Character } from './Character.tsx';
 import { TitleShowcase } from './TitleShowcase.tsx';
 import { Town } from './Town.tsx';
-import { PALETTE } from './palette.ts';
-
-const SKY = PALETTE.sky;
-/** Gentle distance fog, into the sky's colour: the street clear, the far end of town softened. No weather. */
-const FOG = { near: 35, far: 95 } as const;
+import { Lighting } from './Lighting.tsx';
 
 /** Advances game time once per rendered frame. */
 function ClockDriver() {
@@ -26,12 +22,7 @@ export function Scene() {
   return (
     <KeyboardControls map={CONTROLS}>
       <Canvas shadows="percentage" camera={{ fov: 55, position: [-10, 5, 7] }}>
-        <color attach="background" args={[SKY]} />
-        <fog attach="fog" args={[SKY, FOG.near, FOG.far]} />
-        <hemisphereLight args={[PALETTE.white, PALETTE.leaf, 1.2]} />
-        <directionalLight position={[12, 20, 8]} intensity={1.6} castShadow shadow-mapSize={[2048, 2048]}>
-          <orthographicCamera attach="shadow-camera" args={[-30, 30, 30, -30, 1, 60]} />
-        </directionalLight>
+        <Lighting />
         <ClockDriver />
         <Suspense fallback={null}>
           <Physics>

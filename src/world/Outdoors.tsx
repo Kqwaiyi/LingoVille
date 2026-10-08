@@ -1,4 +1,6 @@
+import { DataTexture } from 'three';
 import { TRAM_LINE, type TramStopId } from '../content/index.ts';
+import { selectLampsOn, useGame } from '../store/index.ts';
 import { laidAlong, Piece, Solid, usePieceSize } from './Kit.tsx';
 import { PALETTE } from './palette.ts';
 import { GROUND_HALF_SIZE, PARK, PARK_PLANTING, PLATFORM, STREET, STREET_LIGHTS, TRAM_STOPS, TREES } from './town.ts';
@@ -11,6 +13,8 @@ const RAIL_GAUGE = 0.8;
 const SHELTER = { centreX: -2, size: [2.6, 0.2, 1.6] as const, height: 2.4, posts: [-3.1, -0.9], postZ: -0.6 } as const;
 /** How far a street light's pole stands from the middle of its piece, which reaches out over the street. */
 const LIGHT_POLE_OFFSET = 0.73;
+/** How far out over the street a street light's bulb hangs from its pole, and the pool of light it casts below. */
+const LIGHT_POOL = { reach: 1.14, radius: 2.6, opacity: 0.5 } as const;
 /** The park's trees, in turn. */
 const TREE_KINDS: readonly TownPiece[] = ['tree-round', 'tree-oak', 'tree-tall'];
 
@@ -38,15 +42,39 @@ function Ground() {
   );
 }
 
-/** Street lights along both sides of the street, each reaching out over it. 31b lights them at dusk. */
+/** A soft round falloff, bright in the middle and gone at the edge, for the pools of light under street lights. */
+const POOL_FALLOFF = (() => {
+  const size = 64;
+  // RGBA, all four alike: an alpha map is read from its green channel.
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const fromMiddle = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2);
+      data.fill(Math.round(255 * Math.max(0, 1 - fromMiddle) ** 2), (y * size + x) * 4, (y * size + x + 1) * 4);
+    }
+  }
+  const texture = new DataTexture(data, size, size);
+  texture.needsUpdate = true;
+  return texture;
+})();
+
+/** Street lights along both sides of the street, each reaching out over it, lit from dusk with a pool of light below. */
 function StreetLights() {
+  const lit = useGame(selectLampsOn);
   return STREET_LIGHTS.map(([x, z]) => {
     // On the north side the light reaches south, over the street; on the south side, north.
     const north = z < STREET.z;
+    const towardsStreet = north ? 1 : -1;
     return (
       <group key={`${x},${z}`}>
-        <Piece piece="street-light" position={[x, 0, z + (north ? LIGHT_POLE_OFFSET : -LIGHT_POLE_OFFSET)]} rotation={north ? Math.PI : 0} />
+        <Piece piece="street-light" position={[x, 0, z + towardsStreet * LIGHT_POLE_OFFSET]} rotation={north ? Math.PI : 0} lit={lit} />
         <Solid position={[x, 2, z]} size={[0.2, 4, 0.2]} />
+        {lit && (
+          <mesh position={[x, 0.05, z + towardsStreet * LIGHT_POOL.reach]} rotation-x={-Math.PI / 2}>
+            <circleGeometry args={[LIGHT_POOL.radius, 24]} />
+            <meshBasicMaterial color={PALETTE.lamplight} alphaMap={POOL_FALLOFF} transparent opacity={LIGHT_POOL.opacity} depthWrite={false} />
+          </mesh>
+        )}
       </group>
     );
   });

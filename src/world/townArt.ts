@@ -54,6 +54,8 @@ export type TownPiece = (typeof TOWN_PIECES)[number];
 /** The glass in a window, lit while its place is open. Every other material is named for its palette colour. */
 export const WINDOW_GLASS = 'window';
 export type TownMaterial = PaletteColour | typeof WINDOW_GLASS;
+/** The material of each piece's bulb, which glows while it's lit: a street light's, from dusk. */
+export const LAMP_BULBS: Partial<Record<TownPiece, TownMaterial>> = { 'street-light': 'white' };
 
 /** The colour the kit's walls come in, which each building repaints with its own façade colour. */
 export const KIT_FACADE: PaletteColour = 'lavender';

@@ -4,15 +4,16 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_ART_URLS } from '../src/world/characterArt.ts';
 import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
-import { TOWN_ART_URL, TOWN_PIECES, WINDOW_GLASS } from '../src/world/townArt.ts';
+import { LAMP_BULBS, TOWN_ART_URL, TOWN_PIECES, WINDOW_GLASS } from '../src/world/townArt.ts';
 
-// Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from, and
-// nothing but flat colours from the one shared palette. World code draws from the same palette, by name, and the
+// Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from, a bulb in
+// each piece that lights up, and nothing but flat colours from the one shared palette. World code draws from the same palette, by name, and the
 // character art's outfit (`npm run build:characters`) is painted in it too.
 
 type Gltf = {
   scenes: { nodes: number[] }[];
-  nodes: { name?: string }[];
+  nodes: { name?: string; mesh?: number; children?: number[] }[];
+  meshes?: { primitives: { material?: number }[] }[];
   materials?: { name?: string; pbrMetallicRoughness?: { baseColorFactor?: number[]; baseColorTexture?: object } }[];
   textures?: object[];
   images?: object[];
@@ -30,6 +31,13 @@ function linear(hex: string) {
     const c = parseInt(hex.slice(at, at + 2), 16) / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
+}
+
+/** The names of the materials a node and everything under it are drawn in. */
+function materialsUnder(gltf: Gltf, index: number): string[] {
+  const node = gltf.nodes[index]!;
+  const own = node.mesh === undefined ? [] : gltf.meshes![node.mesh]!.primitives.map(({ material }) => gltf.materials?.[material ?? -1]?.name ?? '');
+  return [...own, ...(node.children ?? []).flatMap((child) => materialsUnder(gltf, child))];
 }
 
 const isPaletteColour = (name: string): name is PaletteColour => name in PALETTE;
@@ -51,6 +59,10 @@ function townArtProblems(town: Gltf): string[] {
     if (off) problems.push(`town.glb's ${name} material is not ${PALETTE[name]}.`);
   }
   if (town.images?.length) problems.push('town.glb has images.');
+  for (const [piece, bulb] of Object.entries(LAMP_BULBS)) {
+    const index = town.scenes[0]!.nodes.find((at) => town.nodes[at]!.name === piece);
+    if (index !== undefined && !materialsUnder(town, index).includes(bulb)) problems.push(`town.glb's ${piece} has no ${bulb} bulb.`);
+  }
   return problems;
 }
 
@@ -99,7 +111,7 @@ describe('the town art', () => {
     expect(townArtProblems(town)).toEqual([]);
   });
 
-  it('fails art built before a piece was added, or with colours off the palette', () => {
+  it('fails art built before a piece was added, or with colours off the palette, or without a bulb to light', () => {
     const stale = structuredClone(town);
     for (const index of stale.scenes[0]!.nodes) if (stale.nodes[index]!.name === 'bench') stale.nodes[index]!.name = 'seat';
     stale.materials = [
@@ -114,6 +126,7 @@ describe('the town art', () => {
       "town.glb's colormap material has a texture.",
       "town.glb's colormap material is not a palette colour.",
       'town.glb has images.',
+      "town.glb's street-light has no white bulb.",
     ]);
   });
 });

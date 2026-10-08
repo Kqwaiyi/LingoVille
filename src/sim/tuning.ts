@@ -33,6 +33,35 @@ export const CLOCK = {
   faintWakeAt: 8 * MINUTES_PER_HOUR,
 } as const;
 
+// --- Day and night ----------------------------------------------------------
+
+export const DAYLIGHT = {
+  /**
+   * Each lighting preset shows in full at its time; between two, one blends into the next. Night is in full twice,
+   * at dusk and before dawn, so it holds through the hours between.
+   */
+  keyframes: [
+    { preset: 'night', at: 5 * MINUTES_PER_HOUR },
+    { preset: 'morning', at: 7 * MINUTES_PER_HOUR },
+    { preset: 'midday', at: 12.5 * MINUTES_PER_HOUR },
+    { preset: 'goldenHour', at: 18 * MINUTES_PER_HOUR },
+    { preset: 'night', at: 20.5 * MINUTES_PER_HOUR },
+  ],
+  sunriseAt: 6 * MINUTES_PER_HOUR,
+  sunsetAt: 19.5 * MINUTES_PER_HOUR,
+  /** In radians above the horizon, at the middle of the day and of the night. */
+  sunHighestElevation: 1.1,
+  moonHighestElevation: 0.8,
+  /** The key light never sinks below this, so its shadows never stretch the length of the town. */
+  lowestElevation: 0.25,
+  /**
+   * The street lights, and the windows of places that are open, come on at dusk, between golden hour and sunset, and
+   * go off once it's light.
+   */
+  lampsOnAt: 19 * MINUTES_PER_HOUR,
+  lampsOffAt: 6.5 * MINUTES_PER_HOUR,
+} as const;
+
 // --- Saving -----------------------------------------------------------------
 
 export const SAVE = {

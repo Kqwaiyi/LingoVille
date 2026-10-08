@@ -122,6 +122,7 @@ import {
   gymRefusal,
   gymSession,
   isGoneOff,
+  daylight,
   isOpen,
   isOutOfPatience,
   LANGUAGE_CODES,
@@ -2613,6 +2614,13 @@ export const selectDay = (s: GameStore) => s.game.clock.day;
 export const selectWeekday = (s: GameStore) => weekdayOf(s.game.clock.day);
 /** Whole game minutes since midnight, so the clock re-renders once a game minute. */
 export const selectClockMinute = (s: GameStore) => Math.floor(s.game.clock.minuteOfDay);
+/**
+ * How the town is lit now, for reading once a frame (`gameStore.getState()`) so it changes smoothly with the clock. Not
+ * for `useGame`: it's a new object on every call, so it would re-render on every store update.
+ */
+export const selectDaylight = (s: GameStore) => daylight(s.game.clock.minuteOfDay);
+/** Whether the street lights and the windows of open places are lit. */
+export const selectLampsOn = (s: GameStore) => selectDaylight(s).lampsOn;
 export const selectPlaceId = (s: GameStore) => s.game.placeId;
 /** What E would use here. Staff at a closed place don't count: there's no one to talk to. */
 export const selectInteractable = (s: GameStore) => {

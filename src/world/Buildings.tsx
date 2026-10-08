@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef, useState } from 'react';
 import type { Group } from 'three';
-import { selectIsOpen, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
+import { selectIsOpen, selectLampsOn, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { laidAlong, Piece, Solid, usePieceSize, type Repaint } from './Kit.tsx';
 import { BUILDINGS, DECOR, FURNITURE, placeAt, WALL, type Building, type Vec2 } from './town.ts';
@@ -18,22 +18,27 @@ const FLOOR_THICKNESS = 0.015;
 
 /**
  * A straight run of wall pieces, centred on `centre` and `length` long, turned by `rotation`. With `windows`, the piece
- * in the middle of the run is a window, lit while the place is open.
+ * in the middle of the run is a window: clear while the place is open, and lit too once the lamps are on.
  */
-function WallRun({ centre: [x, z], length, rotation = 0, windows = false, lit = false, repaint }: { centre: Vec2; length: number; rotation?: number; windows?: boolean; lit?: boolean; repaint: Repaint }) {
+function WallRun({ centre: [x, z], length, rotation = 0, windows = false, open = false, repaint }: { centre: Vec2; length: number; rotation?: number; windows?: boolean; open?: boolean; repaint: Repaint }) {
+  const lampsOn = useGame(selectLampsOn);
   const { each, centres } = laidAlong(length, WALL_PIECE_LENGTH);
   return (
     <group position={[x, 0, z]} rotation-y={rotation}>
-      {centres.map((along, i) => (
-        <Piece
-          key={i}
-          piece={windows && i === Math.floor(centres.length / 2) ? 'wall-window' : 'wall'}
-          position={[along, 0, 0]}
-          size={[each, null, null]}
-          repaint={repaint}
-          lit={lit}
-        />
-      ))}
+      {centres.map((along, i) => {
+        const isWindow = windows && i === Math.floor(centres.length / 2);
+        return (
+          <Piece
+            key={i}
+            piece={isWindow ? 'wall-window' : 'wall'}
+            position={[along, 0, 0]}
+            size={[each, null, null]}
+            repaint={repaint}
+            open={isWindow && open}
+            lit={isWindow && lampsOn}
+          />
+        );
+      })}
     </group>
   );
 }
@@ -58,8 +63,8 @@ function Walls({ building }: { building: Building }) {
       <WallRun centre={[cx, back]} length={w} rotation={turn + Math.PI} repaint={repaint} />
       <WallRun centre={[cx - w / 2 + t / 2, cz]} length={d - 2 * t} rotation={-Math.PI / 2} repaint={repaint} />
       <WallRun centre={[cx + w / 2 - t / 2, cz]} length={d - 2 * t} rotation={Math.PI / 2} repaint={repaint} />
-      <WallRun centre={[cx - w / 2 + run / 2, front]} length={run} rotation={turn} windows lit={open} repaint={repaint} />
-      <WallRun centre={[cx + w / 2 - run / 2, front]} length={run} rotation={turn} windows lit={open} repaint={repaint} />
+      <WallRun centre={[cx - w / 2 + run / 2, front]} length={run} rotation={turn} windows open={open} repaint={repaint} />
+      <WallRun centre={[cx + w / 2 - run / 2, front]} length={run} rotation={turn} windows open={open} repaint={repaint} />
       <Piece piece="wall-doorway" position={[cx, 0, front]} rotation={turn} repaint={repaint} />
 
       <Solid position={[cx, WALL.height / 2, back]} size={[w, WALL.height, t]} />

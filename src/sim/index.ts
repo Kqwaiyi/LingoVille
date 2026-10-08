@@ -27,6 +27,7 @@ export {
   type HospitalStatement,
 } from './clinic.ts';
 export { cook } from './cook.ts';
+export { daylight, type Daylight, type LightingPreset } from './daylight.ts';
 export { faint, faintedBetween } from './faint.ts';
 export { gymMembership, gymRefusal, gymSession, type GymMembership, type GymRefusal } from './gym.ts';
 export { fitnessIllnessFactor, jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
