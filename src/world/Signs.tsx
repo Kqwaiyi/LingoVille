@@ -6,13 +6,14 @@ import { MOVEMENT } from '../sim/index.ts';
 import { selectCulturePackId, selectScreen, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { SIGNS } from './town.ts';
+import { PALETTE } from './palette.ts';
 
 /** Pixels per metre of sign. */
 const RESOLUTION = 256;
 /** How long the tooltip waits after the pointer leaves a sign, so the pointer can reach the tooltip's Translate. */
 const LEAVE_GRACE_MS = 400;
-const INK = '#2f2a24';
-const BOARD = '#f6efe2';
+const INK = PALETTE.ink;
+const BOARD = PALETTE.cream;
 const FONT = 'system-ui, "Hiragino Sans", "Noto Sans CJK JP", "Microsoft YaHei", "PingFang SC", sans-serif';
 
 /**

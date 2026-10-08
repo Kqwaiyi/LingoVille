@@ -10,4 +10,8 @@ Offline asset builds, run by hand. Their output is committed, and the game never
 
 `npm run build:characters -- <folder with the unzipped Quaternius packs>`
 
+`npm run build:town -- <folder with the unzipped Kenney kits, each in a folder named for its page>`
+
+Both paint their art in the town's palette (`src/world/palette.ts`): the town by snapping each colour to its nearest (`scripts/palette.ts`), the outfit by a lightness ramp of palette browns.
+
 `npx tsx scripts/fetch-itch.ts <page url> <part of the upload's file name> <out file>` downloads a free itch.io pack (Kenney, Quaternius) without a browser.

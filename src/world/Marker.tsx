@@ -3,8 +3,9 @@ import { useRef } from 'react';
 import type { Mesh } from 'three';
 import { selectRouteMarker, useGame } from '../store/index.ts';
 import { TRAM_STOPS, type Vec3 } from './town.ts';
+import { PALETTE } from './palette.ts';
 
-const ARROW = { height: 1, bob: 0.12, bobsPerSecond: 1.5, colour: '#e0483b' } as const;
+const ARROW = { height: 1, bob: 0.12, bobsPerSecond: 1.5, colour: PALETTE.red } as const;
 
 /** A red arrow bobbing `ARROW.height` over `at`: what an NPC pointed the Character to. */
 export function MarkerArrow({ at: [x, y, z], size = 1 }: { at: Vec3; size?: number }) {

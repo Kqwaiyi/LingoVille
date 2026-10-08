@@ -2,12 +2,13 @@ import { GROCERIES_SOLD, type GroceryId } from '../content/index.ts';
 import { selectShelfMarker, useGame } from '../store/index.ts';
 import { MarkerArrow } from './Marker.tsx';
 import { SHELF_SPOTS } from './town.ts';
+import { PALETTE } from './palette.ts';
 
-/** Greybox stand-ins for each grocery on its shelf, until the art pass (ticket 31). */
+/** Stand-ins, in palette colours, for each grocery on its shelf, until the pack art (ticket 31c). */
 const COLOURS: Record<GroceryId, string> = {
-  vegetables: '#7bb661',
-  eggs: '#f3e9d2',
-  noodles: '#e8c66a',
+  vegetables: PALETTE.leaf,
+  eggs: PALETTE.cream,
+  noodles: PALETTE.butter,
 };
 
 const DISPLAY = { size: [1.2, 0.35, 0.3] as const } as const;

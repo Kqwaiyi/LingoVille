@@ -1,11 +1,12 @@
 import { PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type GroceryId, type PropId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
 import { PLACE_IDS, type JobId, type PlaceId } from '../sim/index.ts';
 import type { Arrival } from '../store/index.ts';
+import type { PaletteColour } from './palette.ts';
+import type { TownPiece } from './townArt.ts';
 
-// Greybox layout: one long street along the x axis, with a tram line down its
-// middle and three island platforms for the stops. Seven buildings face it
-// from the north (doors on +z) and the clinic and bathhouse from the south
-// (doors on -z), with the park, open to the street, between them.
+// The town's layout: one long street along the x axis, with a tram line down its middle and three island platforms for
+// the stops. Seven buildings face it from the north (doors on +z) and the clinic and bathhouse from the south (doors on
+// -z), with the park, open to the street, between them. The layout, façades and roofs are the same in every Culture Pack.
 
 export type Vec2 = readonly [x: number, z: number];
 export type Vec3 = readonly [x: number, y: number, z: number];
@@ -15,23 +16,25 @@ export type Building = {
   centre: Vec2;
   /** Outer width (x) and depth (z). */
   size: Vec2;
-  colour: string;
   /** Which way the front wall, with its door, faces: +1 towards +z, -1 towards -z. Both face the street. */
   facing: 1 | -1;
+  /** The walls' colour outside, and the roof's shape and colour. */
+  facade: PaletteColour;
+  roof: { shape: 'gable' | 'flat'; colour: PaletteColour };
 };
 
 export const WALL = { height: 2.4, thickness: 0.3, doorWidth: 1.8 } as const;
 
 export const BUILDINGS: readonly Building[] = [
-  { placeId: 'town-office', centre: [-44, -1], size: [12, 8], colour: '#c8c2b4', facing: 1 },
-  { placeId: 'bookshop', centre: [-30, -0.5], size: [8, 7], colour: '#b7a3c9', facing: 1 },
-  { placeId: 'home', centre: [-10, 0], size: [8, 7], colour: '#a9bfdc', facing: 1 },
-  { placeId: 'convenience-store', centre: [0.5, -0.5], size: [7, 7], colour: '#9fd0c4', facing: 1 },
-  { placeId: 'cafe', centre: [12, -1], size: [10, 8], colour: '#e9bf96', facing: 1 },
-  { placeId: 'supermarket', centre: [27, -1.5], size: [14, 9], colour: '#d9d48f', facing: 1 },
-  { placeId: 'restaurant', centre: [42, -1], size: [10, 8], colour: '#d99a8f', facing: 1 },
-  { placeId: 'clinic', centre: [-26, 16], size: [16, 10], colour: '#e6eef0', facing: -1 },
-  { placeId: 'bathhouse', centre: [24, 15.5], size: [12, 9], colour: '#8fb3cf', facing: -1 },
+  { placeId: 'town-office', centre: [-44, -1], size: [12, 8], facing: 1, facade: 'linen', roof: { shape: 'flat', colour: 'slate' } },
+  { placeId: 'bookshop', centre: [-30, -0.5], size: [8, 7], facing: 1, facade: 'lavender', roof: { shape: 'gable', colour: 'plum' } },
+  { placeId: 'home', centre: [-10, 0], size: [8, 7], facing: 1, facade: 'sky', roof: { shape: 'gable', colour: 'terracotta' } },
+  { placeId: 'convenience-store', centre: [0.5, -0.5], size: [7, 7], facing: 1, facade: 'mint', roof: { shape: 'flat', colour: 'denim' } },
+  { placeId: 'cafe', centre: [12, -1], size: [10, 8], facing: 1, facade: 'peach', roof: { shape: 'gable', colour: 'brick' } },
+  { placeId: 'supermarket', centre: [27, -1.5], size: [14, 9], facing: 1, facade: 'butter', roof: { shape: 'flat', colour: 'terracotta' } },
+  { placeId: 'restaurant', centre: [42, -1], size: [10, 8], facing: 1, facade: 'blush', roof: { shape: 'gable', colour: 'brick' } },
+  { placeId: 'clinic', centre: [-26, 16], size: [16, 10], facing: -1, facade: 'white', roof: { shape: 'flat', colour: 'sky' } },
+  { placeId: 'bathhouse', centre: [24, 15.5], size: [12, 9], facing: -1, facade: 'sky', roof: { shape: 'gable', colour: 'denim' } },
 ];
 
 export const STREET = { z: 7, width: 5 } as const;
@@ -39,6 +42,29 @@ export const GROUND_HALF_SIZE = 60;
 
 /** The park: open grass on the south side of the street, with no walls or door. */
 export const PARK = { centre: [0, 18] as Vec2, size: [22, 13] as Vec2 } as const;
+
+/** Bushes and flowers around the park's edges and by its benches, clear of the way in from the street. */
+export const PARK_PLANTING: readonly { at: Vec2; piece: TownPiece }[] = [
+  { at: [-10.2, 15], piece: 'bush' },
+  { at: [-10.2, 19.5], piece: 'bush' },
+  { at: [10.2, 16.5], piece: 'bush' },
+  { at: [10.2, 20.5], piece: 'bush' },
+  { at: [-4.5, 24], piece: 'bush' },
+  { at: [0.5, 24], piece: 'bush' },
+  { at: [6, 24], piece: 'bush' },
+  { at: [-4.6, 18.3], piece: 'flowers-red' },
+  { at: [-7.4, 18.3], piece: 'flowers-yellow' },
+  { at: [1.6, 23.3], piece: 'flowers-purple' },
+  { at: [4.4, 23.3], piece: 'flowers-red' },
+  { at: [-9.6, 17.2], piece: 'flowers-purple' },
+  { at: [9.6, 18.5], piece: 'flowers-yellow' },
+];
+
+/** Street lights, as where each pole stands: along the pavement either side of the street, clear of doors and stops. */
+export const STREET_LIGHTS: readonly Vec2[] = [
+  ...[-50.5, -37, -20, 6, 19.5, 34.5, 50.5].map((x): Vec2 => [x, STREET.z - STREET.width / 2 - 0.5]),
+  ...[-40, -15, 14, 34, 48].map((x): Vec2 => [x, STREET.z + STREET.width / 2 + 0.5]),
+];
 
 /**
  * Each tram stop: an island platform in the middle of the street, with a pole at its centre. Passers-by name the stop
@@ -79,39 +105,6 @@ export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
 /** Passers-by wait on the platforms only while the trams run. */
 export const isWaitingForTram = (npcId: TownNpcId) => TOWN_NPCS[npcId].role === 'passer-by';
 
-/** Counters, shelves and tables: solid greybox furniture, as centre and size. */
-export const FURNITURE: readonly { position: Vec3; size: Vec3; colour: string }[] = [
-  // Café counter.
-  { position: [12, 0.55, -3], size: [4, 1.1, 0.8], colour: '#8b6a4f' },
-  // Convenience store counter and shelves.
-  { position: [0.5, 0.55, -2.2], size: [3, 1.1, 0.7], colour: '#6f8f86' },
-  { position: [-1.8, 0.8, 1], size: [0.6, 1.6, 2.4], colour: '#c9d6d2' },
-  // Supermarket checkout and aisles.
-  { position: [24, 0.55, 0.4], size: [2.4, 1.1, 0.8], colour: '#8f8a52' },
-  { position: [29, 0.8, -3], size: [6, 1.6, 0.7], colour: '#ece9c6' },
-  { position: [29, 0.8, -0.5], size: [6, 1.6, 0.7], colour: '#ece9c6' },
-  // Restaurant tables.
-  { position: [39.5, 0.4, -3], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
-  { position: [44.5, 0.4, -3], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
-  // The server's table on a Shift, west of the door and clear of the way from the door to the staff door.
-  { position: [39.5, 0.4, -0.3], size: [1.4, 0.8, 1.4], colour: '#7a5442' },
-  // Clinic reception and pharmacy counters, and the waiting room bench.
-  { position: [-30, 0.55, 13.5], size: [3, 1.1, 0.8], colour: '#9fb4ba' },
-  { position: [-21, 0.55, 13.5], size: [3, 1.1, 0.8], colour: '#9fb4ba' },
-  { position: [-26, 0.25, 17], size: [3, 0.5, 0.7], colour: '#b8c7cc' },
-  // Bookshop counter and shelves.
-  { position: [-30, 0.55, -2], size: [2.6, 1.1, 0.7], colour: '#6e5a7f' },
-  { position: [-33, 1, 0], size: [0.6, 2, 3], colour: '#8e7aa0' },
-  { position: [-27, 1, 0], size: [0.6, 2, 3], colour: '#8e7aa0' },
-  // Bathhouse front desk.
-  { position: [24, 0.55, 13.5], size: [3, 1.1, 0.8], colour: '#5f88a8' },
-  // Town office counter.
-  { position: [-44, 0.55, -2.5], size: [5, 1.1, 0.8], colour: '#8d8778' },
-  // Park benches.
-  { position: [-6, 0.25, 17.4], size: [2, 0.5, 0.6], colour: '#8b6a4f' },
-  { position: [3, 0.25, 22.4], size: [2, 0.5, 0.6], colour: '#8b6a4f' },
-];
-
 /**
  * Where each grocery sits on the supermarket's aisle shelves, facing the aisle south of it.
  * The vegetables and eggs face the door; the noodles are down the aisle between the shelves.
@@ -140,6 +133,67 @@ export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
 /** The gym at the bathhouse: a running machine against the west wall beside the door, out of talking range of the attendant. */
 export const BATHHOUSE_GYM: Vec3 = [20.5, 0.5, 13];
 
+/** The Fainting ward's bed, at the back of the clinic, within talking range of the nurse. */
+export const WARD_BED: Vec3 = [-21.2, 0.25, 19.4];
+
+/**
+ * The furniture: solid to the Character, as centre and size, each drawn by a kit piece turned by `rotation` (radians about
+ * y; 0 faces +z). A piece fills its box, repeated along the box's length if it's long, unless `height` keeps the piece taller
+ * than what's solid (a bed's headboard, a bench's back).
+ */
+export const FURNITURE: readonly { position: Vec3; size: Vec3; piece: TownPiece; rotation?: number; height?: number }[] = [
+  // Café counter.
+  { position: [12, 0.55, -3], size: [4, 1.1, 0.8], piece: 'counter' },
+  // Convenience store counter and shelves.
+  { position: [0.5, 0.55, -2.2], size: [3, 1.1, 0.7], piece: 'counter' },
+  { position: [-1.8, 0.8, 1], size: [0.6, 1.6, 2.4], piece: 'shelf', rotation: Math.PI / 2 },
+  // Supermarket checkout and aisles.
+  { position: [24, 0.55, 0.4], size: [2.4, 1.1, 0.8], piece: 'counter' },
+  { position: [29, 0.8, -3], size: [6, 1.6, 0.7], piece: 'shelf' },
+  { position: [29, 0.8, -0.5], size: [6, 1.6, 0.7], piece: 'shelf' },
+  // Restaurant tables.
+  { position: [39.5, 0.4, -3], size: [1.4, 0.8, 1.4], piece: 'table' },
+  { position: [44.5, 0.4, -3], size: [1.4, 0.8, 1.4], piece: 'table' },
+  // The server's table on a Shift, west of the door and clear of the way from the door to the staff door.
+  { position: [39.5, 0.4, -0.3], size: [1.4, 0.8, 1.4], piece: 'table' },
+  // Clinic reception and pharmacy counters, and the waiting room bench.
+  { position: [-30, 0.55, 13.5], size: [3, 1.1, 0.8], piece: 'counter', rotation: Math.PI },
+  { position: [-21, 0.55, 13.5], size: [3, 1.1, 0.8], piece: 'counter', rotation: Math.PI },
+  { position: [-26, 0.25, 17], size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: Math.PI, height: 1 },
+  // Bookshop counter and shelves.
+  { position: [-30, 0.55, -2], size: [2.6, 1.1, 0.7], piece: 'counter' },
+  { position: [-33, 1, 0], size: [0.6, 2, 3], piece: 'bookcase', rotation: Math.PI / 2 },
+  { position: [-27, 1, 0], size: [0.6, 2, 3], piece: 'bookcase', rotation: -Math.PI / 2 },
+  // Bathhouse front desk.
+  { position: [24, 0.55, 13.5], size: [3, 1.1, 0.8], piece: 'counter', rotation: Math.PI },
+  // Town office counter.
+  { position: [-44, 0.55, -2.5], size: [5, 1.1, 0.8], piece: 'counter' },
+  // Park benches, facing the park regulars who sit by them.
+  { position: [-6, 0.25, 17.4], size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
+  { position: [3, 0.25, 22.4], size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
+  // Home: the tap and the stove against the back wall, and the bed.
+  { position: HOME_TAP, size: [1.2, 1, 0.6], piece: 'sink' },
+  { position: HOME_STOVE, size: [1.2, 1, 0.6], piece: 'stove' },
+  { position: HOME_BED, size: [1.4, 0.5, 2.2], piece: 'bed', height: 0.9 },
+  // The clinic's ward bed and the bathhouse's running machine.
+  { position: WARD_BED, size: [1.4, 0.5, 2.2], piece: 'bed', height: 0.9 },
+  { position: BATHHOUSE_GYM, size: [1, 1, 2], piece: 'treadmill', height: 1.4 },
+];
+
+/** Set dressing nobody bumps into: rugs, plants and fridges, as where each stands, its piece, and how it's turned. */
+export const DECOR: readonly { position: Vec3; piece: TownPiece; rotation?: number }[] = [
+  { position: [-10, 0.02, -0.4], piece: 'rug' },
+  { position: [-6.6, 0, -2.8], piece: 'plant' },
+  { position: [9.4, 0, -4.4], piece: 'fridge' },
+  { position: [7.8, 0, 2.2], piece: 'plant' },
+  { position: [16.2, 0, 2.2], piece: 'plant' },
+  { position: [46.2, 0, 2.2], piece: 'plant' },
+  { position: [-36.6, 0, 2.2], piece: 'plant' },
+  { position: [-49.2, 0, 2.2], piece: 'plant' },
+  { position: [-33.4, 0, 19.8], piece: 'plant', rotation: Math.PI },
+  { position: [-18.8, 0, 11.6], piece: 'plant', rotation: Math.PI },
+];
+
 /**
  * Where each Job is worked: its staff door, set in its place's west wall (and where the Character stands to use it);
  * where the Character stands through a Shift, behind the counter beside its staff; and where a Shift Customer stands,
@@ -164,8 +218,8 @@ export const WORKPLACES: Record<JobId, { door: Vec3; usedFrom: Vec3; behindTheCo
 
 /** Where each sign hangs, facing +z (towards the street, or the café door), and its size in metres. */
 export const SIGNS: Record<SignId, { position: Vec3; size: readonly [width: number, height: number] }> = {
-  // Over the café door, on the outside of the front wall.
-  'cafe-name': { position: [12, 2.75, 3.02], size: [3.4, 0.7] },
+  // Over the café door, hung from the eaves, in front of the roof.
+  'cafe-name': { position: [12, 2.75, 3.32], size: [3.4, 0.7] },
   // Beside the door, at eye height.
   'cafe-hours': { position: [14.1, 1.5, 3.02], size: [1, 0.7] },
   // On the back wall behind the counter, to the barista's left.
@@ -221,8 +275,6 @@ export function spawnAt(placeId: PlaceId): Vec3 {
 /** Back from a save at home, the Character wakes up in bed. It drops onto the mattress. */
 export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
 
-/** The Fainting ward's bed, at the back of the clinic, within talking range of the nurse. */
-export const WARD_BED: Vec3 = [-21.2, 0.25, 19.4];
 /** After Fainting, the Character wakes up in the ward bed. */
 export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
 

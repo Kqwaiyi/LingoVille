@@ -9,9 +9,10 @@ test('asks a passer-by which tram goes to the supermarket, and the stop is marke
   // `?spawn=tram-stop` puts the Character on the Old Town platform, west of the passer-by waiting there.
   await startNewGame(page, { path: '/?spawn=tram-stop&at=9' });
   await page.locator('canvas').click();
-  // A step to the side first, so the stop's pole doesn't stand in the way.
+  // A small step to the side first, so the Character slides round the stop's pole and walks into the passer-by rather
+  // than past them. A longer step can take it off the platform, where no one at the stop is in reach.
   await page.keyboard.down('KeyS');
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(50);
   await page.keyboard.up('KeyS');
   await page.keyboard.down('KeyD');
   await expect(page.getByText('to ask the way — passer-by')).toBeVisible({ timeout: 5_000 });

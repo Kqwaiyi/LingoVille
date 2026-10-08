@@ -20,7 +20,9 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import sharp, { type Sharp } from 'sharp';
+import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
 import type { CharacterClip } from '../src/world/characterArt.ts';
+import { hexRgb } from './palette.ts';
 
 const source = process.argv[2];
 if (!source) throw new Error('Pass the folder the Quaternius packs were unzipped into.');
@@ -82,6 +84,39 @@ async function tintable(texture: Texture, size: number) {
   const lit = [...(await image.clone().raw().toBuffer())].filter((value) => value > TINT.darkest).sort((a, b) => a - b);
   const typical = lit[Math.floor(lit.length * TINT.percentile)]!;
   await save(texture, image.linear(TINT.white / typical, 0), size);
+}
+
+/**
+ * The outfit's painted texture, in the town's palette: smoothed (a median, in pixels), then each texel ranked by how light
+ * it is and given the ramp's colour for its rank. `shares` is how much of the texture, darkest first, each colour takes,
+ * so the clothes keep their light and dark parts as flat browns.
+ */
+const OUTFIT = {
+  smoothing: 9,
+  ramp: [
+    { colour: 'ink', share: 0.2 },
+    { colour: 'walnut', share: 0.35 },
+    { colour: 'wood', share: 0.25 },
+    { colour: 'sand', share: 0.13 },
+    { colour: 'linen', share: 0.07 },
+  ],
+} as const satisfies { smoothing: number; ramp: readonly { colour: PaletteColour; share: number }[] };
+
+/** The outfit's texture in the town's palette (`OUTFIT`), kept lossless so the colours stay exact. */
+async function paletted(texture: Texture, size: number) {
+  const { data, info } = await sharp(Buffer.from(texture.getImage()!)).removeAlpha().resize(size, size).median(OUTFIT.smoothing).raw().toBuffer({ resolveWithObject: true });
+  const texels = data.length / 3;
+  const lightness = new Float32Array(texels);
+  for (let i = 0; i < texels; i++) lightness[i] = 0.2126 * data[i * 3]! + 0.7152 * data[i * 3 + 1]! + 0.0722 * data[i * 3 + 2]!;
+  const sorted = Float32Array.from(lightness).sort();
+  let taken = 0;
+  const steps = OUTFIT.ramp.map(({ colour, share }) => {
+    taken += share;
+    return { below: sorted[Math.min(texels - 1, Math.floor(taken * texels))]!, rgb: hexRgb(PALETTE[colour]).map((c) => Math.round(c * 255)) };
+  });
+  for (let i = 0; i < texels; i++) data.set((steps.find(({ below }) => lightness[i]! <= below) ?? steps.at(-1)!).rgb, i * 3);
+  const image = await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).webp({ lossless: true }).toBuffer();
+  texture.setImage(new Uint8Array(image)).setMimeType('image/webp');
 }
 
 /** A texture kept as it is, only smaller. */
@@ -186,7 +221,8 @@ async function buildCharacters() {
     if (!node.getParentNode() && !scene.listChildren().includes(node)) node.dispose();
   }
 
-  // Flat, tintable materials: no normal or roughness maps, skin and hair grey so a colour sets them.
+  // Flat, tintable materials: no normal or roughness maps, skin and hair grey so a colour sets them, the outfit in the
+  // town's palette.
   for (const material of out.getRoot().listMaterials()) {
     material.setNormalTexture(null).setMetallicRoughnessTexture(null).setOcclusionTexture(null).setMetallicFactor(0).setRoughnessFactor(0.85);
     const name = material.getName();
@@ -199,6 +235,7 @@ async function buildCharacters() {
     if (!texture) continue;
     const name = material.getName();
     if (name.startsWith('skin') || name.startsWith('hair')) await tintable(texture, name.startsWith('skin') ? SIZES.skin : SIZES.hair);
+    else if (name === 'outfit') await paletted(texture, SIZES.other);
     else await shrink(texture, name === 'eyes' ? SIZES.eyes : SIZES.other);
   }
   out.createExtension(EXTTextureWebP).setRequired(true);
