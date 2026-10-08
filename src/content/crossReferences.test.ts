@@ -17,7 +17,11 @@ describe('culturePackProblems', () => {
 
   it('fails a pack that is missing an item an interaction refers to', () => {
     const packs = withGerman((de) => delete (de.goods as Partial<CulturePack['goods']>).latte);
-    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*"latte".*order-drink/)]);
+    expect(culturePackProblems(packs, interactions)).toEqual([
+      expect.stringMatching(/^de: .*"latte".*order-drink/),
+      expect.stringMatching(/^de: .*"latte".*order-with-options/),
+      expect.stringMatching(/^de: .*"latte".*order-avoiding-allergen/),
+    ]);
   });
 
   it('fails a pack whose restaurant menu is missing a dish the server orders or recommends', () => {
@@ -26,6 +30,19 @@ describe('culturePackProblems', () => {
       expect.stringMatching(/^de: .*"veggie-dish".*order-a-meal/),
       expect.stringMatching(/^de: .*"veggie-dish".*recommend-a-meal/),
     ]);
+  });
+
+  it('fails a pack that doesn’t say which allergens are in a café item the barista sells avoiding an allergen', () => {
+    const packs = withGerman((de) => delete de.cafeAllergens.pastry);
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*allergens.*"pastry".*order-avoiding-allergen/)]);
+  });
+
+  it('fails a pack with no local name for an allergen, or for a drink option', () => {
+    const packs = withGerman((de) => {
+      delete (de.allergens as Partial<CulturePack['allergens']>).egg;
+      delete (de.drinkOptions as Partial<CulturePack['drinkOptions']>).iced;
+    });
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*drinkOptions\.iced.*allergens\.egg/s)]);
   });
 
   it('fails a gloss missing in one of the three other Native Languages', () => {

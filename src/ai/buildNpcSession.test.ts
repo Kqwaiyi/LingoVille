@@ -491,6 +491,45 @@ describe('"the usual?"', () => {
   });
 });
 
+describe('buildNpcSession: café orders with options and allergens (#2, #3)', () => {
+  const cafeSession = (interaction: Interaction, packId: LanguageCode, step: ProficiencyStep, memory?: NpcMemory) =>
+    buildNpcSession(interaction, CULTURE_PACKS[packId], step, NAMED_NPCS.barista, {
+      clock: FIRST_MORNING_CLOCK,
+      ...(memory && { relationship: { memory, characterName: 'Sam' } }),
+    });
+
+  it.each(LANGUAGE_CODES)('builds the barista taking an order with options, and one avoiding an allergen, in the %s pack', (packId) => {
+    expect({
+      options: cafeSession(INTERACTIONS.orderWithOptions, packId, 'B1'),
+      allergen: cafeSession(INTERACTIONS.orderAvoidingAllergen, packId, 'C1'),
+    }).toMatchSnapshot();
+  });
+
+  it('reads back how each drink is made, and passes on what the game says is wrong with an order', () => {
+    const goal = (interaction: Interaction) => {
+      const { systemInstruction } = cafeSession(interaction, 'en', 'C1');
+      return systemInstruction.slice(systemInstruction.indexOf('YOUR GOAL'), systemInstruction.indexOf('THE SITUATION'));
+    };
+
+    expect(goal(INTERACTIONS.orderWithOptions)).toContain('how each drink is made');
+    expect(goal(INTERACTIONS.orderWithOptions)).toContain('its error says what is wrong');
+    expect(goal(INTERACTIONS.orderAvoidingAllergen)).toContain('the allergen they told you');
+  });
+
+  it('names a usual made to order with how it is made, and the allergy it avoids, for the completion call', () => {
+    const coffee = { item: 'coffee', quantity: 1, size: 'large', temperature: 'iced', extras: ['sugar'] };
+    const usual = (interactionId: string, args: unknown): NpcMemory => ({ ...ACQUAINTANCE_WITH_A_USUAL, usualOrder: { interactionId, args } });
+
+    const withOptions = youAndThisPerson(cafeSession(INTERACTIONS.orderWithOptions, 'en', 'B1', usual('order-with-options', { items: [coffee] })).systemInstruction);
+    const avoiding = youAndThisPerson(
+      cafeSession(INTERACTIONS.orderAvoidingAllergen, 'en', 'C1', usual('order-avoiding-allergen', { items: [coffee], allergen: 'milk' })).systemInstruction,
+    );
+
+    expect(withOptions).toContain('1 × Filter coffee (menu id "coffee", size "large", temperature "iced", extras "sugar")');
+    expect(avoiding).toContain('allergic to milk (allergen "milk")');
+  });
+});
+
 describe('"on the house"', () => {
   function friendlyBarista(onTheHouse: boolean) {
     return buildNpcSession(INTERACTIONS.orderDrink, CULTURE_PACKS.en, 'B1', NAMED_NPCS.barista, {

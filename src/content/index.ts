@@ -5,6 +5,7 @@ export { culturePackProblems } from './crossReferences.ts';
 export {
   CULTURE_PACKS,
   culturePackSchema,
+  cafeAllergensIn,
   localPlaceName,
   localShop,
   PROP_IDS,
@@ -64,6 +65,7 @@ export {
   type TableTemplate,
 } from './shifts.ts';
 export {
+  ALLERGENS,
   BEHIND_THE_COUNTER,
   CAFE_COUNTER,
   CAFE_MENU,
@@ -83,13 +85,16 @@ export {
   GIFTS_SOLD,
   GROCERIES_SOLD,
   isDish,
+  isMadeToOrder,
   ITEM_IDS,
   ITEMS,
+  MADE_TO_ORDER_EXTRAS,
   READING_SOLD,
   RESTAURANT_DISHES,
   RESTAURANT_DRINKS,
   RESTAURANT_MENU,
   SEATING,
+  type Allergen,
   type DietaryNoteId,
   type DrinkExtra,
   type DrinkModifiers,

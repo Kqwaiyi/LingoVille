@@ -1308,3 +1308,117 @@ describe('mock VoiceSession: "the usual?"', () => {
     expect(toolCalls).toEqual([]);
   });
 });
+
+const atTheCafe = (packId: LanguageCode, interaction: Interaction, step: 'B1' | 'C1', memory?: NpcMemory) =>
+  open(
+    buildNpcSession(interaction, CULTURE_PACKS[packId], step, NAMED_NPCS.barista, {
+      clock: { day: 2, minuteOfDay: 600 },
+      ...(memory && { relationship: { memory, characterName: 'Sam' } }),
+    }),
+  );
+
+/** What a customer says to the barista, in each pack: a coffee and a pastry, then how the coffee is made, or all at once. */
+const CUSTOMER_SAYS = {
+  ja: { coffeeAndPastry: 'コーヒーとメロンパンをください', large: 'Lサイズで', iced: 'アイスで', all: 'Lサイズのアイスコーヒーにミルクを入れてください', egg: '卵アレルギーです', none: 'アレルギーはありません' },
+  zh: { coffeeAndPastry: '我要咖啡和蛋挞', large: '大杯', iced: '要冰的', all: '我要大杯冰的咖啡，加奶', egg: '我对鸡蛋过敏', none: '我没有过敏' },
+  en: { coffeeAndPastry: 'a coffee and a scone please', large: 'large please', iced: 'iced please', all: 'a large iced coffee with milk please', egg: "I'm allergic to eggs", none: 'no allergies' },
+  de: { coffeeAndPastry: 'einen Kaffee und eine Brezel bitte', large: 'groß bitte', iced: 'mit Eis bitte', all: 'einen großen Kaffee mit Eis und Milch bitte', egg: 'ich bin allergisch gegen Eier', none: 'keine Allergien' },
+} as const;
+
+const LARGE_ICED = { item: 'coffee', quantity: 1, size: 'large', temperature: 'iced' } as const;
+
+describe('mock VoiceSession: café orders with options and allergens (#2, #3)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(LANGUAGE_CODES)('asks the size and hot or iced of a drink made to order, reads the order back, then serves it (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const says = CUSTOMER_SAYS[packId];
+    const { goods } = CULTURE_PACKS[packId];
+    const { turns, toolCalls, say, answer } = await atTheCafe(packId, INTERACTIONS.orderWithOptions, 'B1');
+
+    await say(says.coffeeAndPastry);
+    await say(says.large);
+    await say(says.iced);
+    expect(toolCalls).toEqual([]);
+    const total = formatLocalMoney(menuPrice('coffee', packId) + menuPrice('pastry', packId), packId);
+    expect(turns.at(-1)).toContain(goods.coffee.name);
+    expect(turns.at(-1)).toContain(goods.pastry.name);
+    expect(turns.at(-1)).toContain(total);
+    await say(yes);
+    expect(toolCalls).toEqual([
+      { id: expect.any(String), name: 'serve_order', args: { items: [{ ...LARGE_ICED, extras: [] }, { item: 'pastry', quantity: 1 }] } },
+    ]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(5);
+    expect(new Set(turns).size).toBe(5);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it.each(LANGUAGE_CODES)('takes a drink with its size, hot or iced and an extra all said at once (%s)', async (packId) => {
+    const { turns, toolCalls, say } = await atTheCafe(packId, INTERACTIONS.orderWithOptions, 'B1');
+
+    await say(CUSTOMER_SAYS[packId].all);
+    expect(turns.at(-1)).toContain(CULTURE_PACKS[packId].drinkOptions.milk.name);
+    await say(PLAYER[packId].yes);
+
+    expect(toolCalls.map((call) => call.args)).toEqual([{ items: [{ ...LARGE_ICED, extras: ['milk'] }] }]);
+  });
+
+  it.each(LANGUAGE_CODES)('asks about allergies first, then serves an order avoiding the one the customer has (%s)', async (packId) => {
+    const { yes, script } = PLAYER[packId];
+    const { turns, toolCalls, say, answer } = await atTheCafe(packId, INTERACTIONS.orderAvoidingAllergen, 'C1');
+
+    await say(CUSTOMER_SAYS[packId].egg);
+    expect(turns.at(-1)).toContain(CULTURE_PACKS[packId].allergens.egg.name);
+    await say(CUSTOMER_SAYS[packId].all);
+    await say(yes);
+    expect(toolCalls.map((call) => call.args)).toEqual([{ items: [{ ...LARGE_ICED, extras: ['milk'] }], allergen: 'egg' }]);
+    await answer({ result: 'served' });
+
+    expect(turns).toHaveLength(4);
+    for (const turn of turns) expect(turn).toMatch(script);
+  });
+
+  it('orders with no allergy as "none"', async () => {
+    const { toolCalls, say } = await atTheCafe('en', INTERACTIONS.orderAvoidingAllergen, 'C1');
+
+    await say('no allergies');
+    await say('a latte please');
+    await say('yes');
+
+    expect(toolCalls.map((call) => call.args)).toEqual([{ items: [{ item: 'latte', quantity: 1 }], allergen: 'none' }]);
+  });
+
+  it('says what has the allergen in it when the game rejects the order, and takes another', async () => {
+    const { turns, toolCalls, say, answer } = await atTheCafe('en', INTERACTIONS.orderAvoidingAllergen, 'C1');
+    await say("I'm allergic to milk");
+    await say('a latte please');
+    await say('yes');
+
+    await answer({ result: 'invalid_arguments', error: 'Latte (menu id "latte") has milk in it.' });
+    expect(turns.at(-1)).toMatch(/latte has milk in it/i);
+    await say('a tea please');
+    await say('medium please');
+    await say('hot please');
+    await say('yes');
+
+    expect(toolCalls.at(-1)!.args).toEqual({ items: [{ item: 'tea', quantity: 1, size: 'medium', temperature: 'hot', extras: [] }], allergen: 'milk' });
+  });
+
+  it('offers a usual made to order, and serves it as it is made', async () => {
+    const usual = { items: [{ ...LARGE_ICED, extras: ['sugar'] }] };
+    const memory: NpcMemory = {
+      ...STRANGER,
+      familiarity: FAMILIARITY.tierThresholds.acquaintance,
+      usualOrder: { interactionId: INTERACTIONS.orderWithOptions.id, args: usual },
+    };
+    const { turns, toolCalls, say } = await atTheCafe('en', INTERACTIONS.orderWithOptions, 'B1', memory);
+
+    expect(turns[0]).toBe('Hiya! The usual?');
+    await say('yes please');
+
+    expect(toolCalls.map((call) => call.args)).toEqual([usual]);
+  });
+});

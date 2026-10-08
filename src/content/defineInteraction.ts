@@ -1,9 +1,21 @@
 import { z } from 'zod';
 import { ECONOMY, JOB_IDS, type Basket, type ComfortKind, type IllnessId, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
-import { CULTURE_PACKS, type Glosses } from './culturePacks.ts';
+import { cafeAllergensIn, CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { chargeInShifts, menuPrice } from './currency.ts';
 import { illnessCuredBy, ILLNESSES, type MedicineId } from './illnesses.ts';
-import { BATH_OPTIONS, DIETARY_NOTES, dishContents, dishFits, ITEM_IDS, ITEMS, type DietaryNoteId, type ItemId, type Restores } from './items.ts';
+import {
+  BATH_OPTIONS,
+  DIETARY_NOTES,
+  dishContents,
+  dishFits,
+  ITEM_IDS,
+  ITEMS,
+  type Allergen,
+  type DietaryNoteId,
+  type DrinkExtra,
+  type ItemId,
+  type Restores,
+} from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
 import { PLACE_HOURS } from './places.ts';
 import { toToolDeclaration, type FunctionDeclaration } from './toolDeclaration.ts';
@@ -15,6 +27,8 @@ export type Band = 'B' | 'I' | 'A';
 export const FACT_SOURCES = [
   'openingHours',
   'menu',
+  'drinkOptions',
+  'allergens',
   'dietary',
   'stock',
   'shelves',
@@ -33,8 +47,11 @@ export const FACT_SOURCES = [
 ] as const;
 export type FactSource = (typeof FACT_SOURCES)[number];
 
-/** The arguments a `serveOrder` effect reads from its completion function. */
-type ServeOrderArgs = { items: { item: ItemId; quantity: number }[] };
+/**
+ * The arguments a `serveOrder` effect reads from its completion function: the order, with the extras in each café drink
+ * made to order, and at the café, an allergen nothing in it may have in it.
+ */
+type ServeOrderArgs = { items: { item: ItemId; quantity: number; extras?: readonly DrinkExtra[] }[]; allergen?: Allergen | 'none' };
 /** The arguments a `purchase` effect's completion carries: the Character's choices at the till. */
 type PurchaseArgs = { bag: boolean; card: boolean };
 /** The arguments a `pointTo` effect reads: the item the NPC shows the way to. */
@@ -259,13 +276,26 @@ function dietaryProblem(items: ServeOrderArgs['items'], restriction: DietaryNote
   );
 }
 
+/** Why this café order has the allergen in it, for the NPC, or null if nothing in it does. */
+function allergenProblem(items: ServeOrderArgs['items'], allergen: Allergen, packId: LanguageCode): string | null {
+  const has = items.find(({ item, extras = [] }) => cafeAllergensIn(item, extras, packId).includes(allergen));
+  if (!has) return null;
+  const added = !cafeAllergensIn(has.item, [], packId).includes(allergen);
+  return (
+    `${CULTURE_PACKS[packId].goods[has.item].name} (menu id "${has.item}")${added ? ' with what is added to it' : ''} has ${allergen} in it, ` +
+    `and the customer is allergic to ${allergen}. Suggest something without it.`
+  );
+}
+
 /** The definition's type only allows each effect on arguments shaped for it. */
 function resolveEffect(effect: Interaction['effect'], args: Record<string, unknown>, packId: LanguageCode, basket: Basket): ResolvedCompletion {
   switch (effect.kind) {
     case 'none':
       return { success: true, lines: [] };
     case 'serveOrder': {
-      const { items } = args as ServeOrderArgs;
+      const { items, allergen } = args as ServeOrderArgs;
+      const problem = allergen && allergen !== 'none' ? allergenProblem(items, allergen, packId) : null;
+      if (problem) return { success: false, error: problem };
       return { success: true, lines: orderLines(items.map(({ item, quantity }) => ({ itemId: item, quantity })), packId) };
     }
     case 'purchase':

@@ -17,14 +17,23 @@ import {
   type ToolResponse,
 } from '../ai/index.ts';
 import {
+  ALLERGENS,
   BILL_METHODS,
+  cafeAllergensIn,
   CULTURE_PACKS,
   dishFits,
+  DRINK_EXTRAS,
+  DRINK_SIZES,
+  DRINK_TEMPERATURES,
+  formatLocalMoney,
   ILLNESSES,
   INTERACTIONS,
   isDish,
+  isMadeToOrder,
   ITEMS,
   localPrice,
+  MADE_TO_ORDER_EXTRAS,
+  menuPrice,
   NAMED_NPCS,
   readBasketTotal,
   readBillTotal,
@@ -35,7 +44,12 @@ import {
   SEATING,
   START_WHEN,
   SYMPTOM_IDS,
+  type Allergen,
   type DietaryNoteId,
+  type DrinkExtra,
+  type DrinkOptionId,
+  type DrinkSize,
+  type DrinkTemperature,
   type ItemId,
   type SymptomId,
 } from '../content/index.ts';
@@ -1919,10 +1933,18 @@ const USUAL_GREETING: Record<LanguageCode, string> = {
 };
 
 /** The Character's usual, as the session's "You and this person" block names it, or null if the NPC doesn't offer one. */
-function readUsual(systemInstruction: string): { items: { item: string; quantity: number }[] } | null {
+function readUsual(systemInstruction: string): { items: Record<string, unknown>[]; allergen?: string } | null {
   const usual = /their usual: (.+)\.$/m.exec(systemInstruction)?.[1];
   if (!usual) return null;
-  return { items: [...usual.matchAll(/(\d+) × [^(]+ \(menu id "([a-z-]+)"\)/g)].map(([, quantity, item]) => ({ item: item!, quantity: Number(quantity) })) };
+  const items = [...usual.matchAll(/(\d+) × [^(]+ \(menu id "([a-z-]+)"([^)]*)\)/g)].map(([, quantity, item, made = '']) => {
+    const size = /size "([a-z]+)"/.exec(made)?.[1];
+    const temperature = /temperature "([a-z]+)"/.exec(made)?.[1];
+    const extras = [...(/extras ((?:"[a-z-]+"(?:, )?)+)/.exec(made)?.[1]?.matchAll(/"([a-z-]+)"/g) ?? [])].map(([, extra]) => extra);
+    // A drink made to order says how it's made; anything else is just the item.
+    return { item: item!, quantity: Number(quantity), ...(temperature && { size, temperature, extras }) };
+  });
+  const allergen = /\(allergen "([a-z]+)"\)/.exec(systemInstruction)?.[1];
+  return { items, ...(allergen && { allergen }) };
 }
 
 /**
@@ -2250,6 +2272,233 @@ function customerNpc(script: CustomerScript, common: OrderScript, systemInstruct
   };
 }
 
+/**
+ * The barista taking an order with options (#2), and one avoiding an allergen (#3): first asking about allergies, then
+ * asking the size and hot or iced of each drink made to order, reading the whole order back with its total.
+ */
+type CafeScript = {
+  greeting: string;
+  /** Avoiding an allergen, the greeting asks about allergies first. */
+  allergyGreeting: string;
+  askAllergy: string;
+  askWhichAllergy: string;
+  /** The allergy heard, by its local name, or null for none, then what they would like. */
+  noted: (allergen: string | null) => string;
+  askSize: (drink: string) => string;
+  askTemperature: (drink: string) => string;
+  /** A drink with how it's made, by the options' local names. */
+  made: (drink: string, options: string[]) => string;
+  readBack: (order: string[], total: string) => string;
+  hasAllergen: (item: string, allergen: string) => string;
+  /** How each option and allergen might be said, and saying there's no allergy. */
+  options: Record<DrinkOptionId, string[]>;
+  allergens: Record<Allergen, string[]>;
+  noAllergy: string[];
+};
+
+const CAFE_SCRIPT: Record<LanguageCode, CafeScript> = {
+  ja: {
+    greeting: 'いらっしゃいませ！お飲み物はサイズとホット・アイスをお選びいただけます。ご注文をどうぞ。',
+    allergyGreeting: 'いらっしゃいませ！ご注文の前に、食物アレルギーはございますか？',
+    askAllergy: '食物アレルギーはございますか？',
+    askWhichAllergy: '何のアレルギーでしょうか？',
+    noted: (allergen) => (allergen ? `${allergen}のアレルギーですね。かしこまりました。ご注文をどうぞ。` : 'かしこまりました。ご注文をどうぞ。'),
+    askSize: (drink) => `${drink}のサイズはS、M、Lのどれになさいますか？`,
+    askTemperature: (drink) => `${drink}はホットとアイス、どちらになさいますか？`,
+    made: (drink, options) => `${drink}（${options.join('、')}）`,
+    readBack: (order, total) => `${order.join('と')}ですね。合計${total}です。よろしいですか？`,
+    hasAllergen: (item, allergen) => `申し訳ございません、${item}には${allergen}が入っております。ほかのものになさいますか？`,
+    // Lower case "s", "m" and "l": `mentions` lowercases the line.
+    options: {
+      small: ['sサイズ', 'スモール', '小さい'],
+      medium: ['mサイズ', 'ミディアム', '普通'],
+      large: ['lサイズ', 'ラージ', '大きい'],
+      hot: ['ホット', '温かい'],
+      iced: ['アイス', '冷たい'],
+      milk: ['ミルク', '牛乳'],
+      sugar: ['砂糖', 'さとう'],
+      'extra-shot': ['ショット'],
+      lemon: ['レモン'],
+    },
+    allergens: { milk: ['乳', 'ミルク'], egg: ['卵', 'たまご'], wheat: ['小麦', 'こむぎ', 'グルテン'] },
+    noAllergy: ['ありません', 'ないです', '大丈夫', 'いいえ'],
+  },
+  zh: {
+    greeting: '欢迎光临！饮料有小杯、中杯、大杯，可以做热的或冰的。您想点什么？',
+    allergyGreeting: '欢迎光临！点单之前想问一下，您有什么食物过敏吗？',
+    askAllergy: '您有什么食物过敏吗？',
+    askWhichAllergy: '请问您对什么过敏？',
+    noted: (allergen) => (allergen ? `好的，您对${allergen}过敏。您想点什么？` : '好的。您想点什么？'),
+    askSize: (drink) => `${drink}要小杯、中杯还是大杯？`,
+    askTemperature: (drink) => `${drink}要热的还是冰的？`,
+    made: (drink, options) => `${drink}（${options.join('，')}）`,
+    readBack: (order, total) => `${order.join('和')}，一共${total}。对吗？`,
+    hasAllergen: (item, allergen) => `不好意思，${item}里有${allergen}。要换别的吗？`,
+    options: {
+      small: ['小杯'],
+      medium: ['中杯'],
+      large: ['大杯'],
+      hot: ['热的'],
+      iced: ['冰的', '加冰'],
+      milk: ['加奶', '牛奶'],
+      sugar: ['加糖', '糖'],
+      'extra-shot': ['浓缩'],
+      lemon: ['柠檬'],
+    },
+    allergens: { milk: ['牛奶', '奶'], egg: ['鸡蛋'], wheat: ['小麦', '面粉', '麸质'] },
+    noAllergy: ['没有', '不过敏'],
+  },
+  en: {
+    greeting: 'Hiya! What can I get you? Drinks come small, medium or large, hot or iced.',
+    allergyGreeting: 'Hiya! Before you order, do you have any food allergies?',
+    askAllergy: 'Do you have any food allergies?',
+    askWhichAllergy: 'What are you allergic to?',
+    noted: (allergen) => (allergen ? `${allergen} allergy, got it. What can I get you?` : 'Lovely. What can I get you?'),
+    askSize: (drink) => `What size would you like the ${drink.toLowerCase()}: small, medium or large?`,
+    askTemperature: (drink) => `Would you like the ${drink.toLowerCase()} hot or iced?`,
+    made: (drink, options) => `${drink} (${options.join(', ')})`,
+    readBack: (order, total) => `So that's ${order.join(' and ')}, ${total} altogether. Is that right?`,
+    hasAllergen: (item, allergen) => `Sorry, the ${item.toLowerCase()} has ${allergen.toLowerCase()} in it. Would you like something else?`,
+    options: {
+      small: ['small'],
+      medium: ['medium', 'regular'],
+      large: ['large', 'big'],
+      hot: ['hot'],
+      iced: ['iced', 'cold'],
+      milk: ['milk'],
+      sugar: ['sugar'],
+      'extra-shot': ['extra shot', 'double'],
+      lemon: ['lemon'],
+    },
+    allergens: { milk: ['milk', 'dairy', 'lactose'], egg: ['egg', 'eggs'], wheat: ['wheat', 'gluten', 'flour'] },
+    noAllergy: ['no allergies', 'none', 'no'],
+  },
+  de: {
+    greeting: 'Hallo! Was darf’s sein? Getränke gibt es klein, mittel oder groß, heiß oder mit Eis.',
+    allergyGreeting: 'Hallo! Bevor Sie bestellen: Haben Sie eine Lebensmittelallergie?',
+    askAllergy: 'Haben Sie eine Lebensmittelallergie?',
+    askWhichAllergy: 'Wogegen sind Sie allergisch?',
+    noted: (allergen) => (allergen ? `Also nichts mit ${allergen}, alles klar. Was darf’s sein?` : 'Alles klar. Was darf’s sein?'),
+    askSize: (drink) => `Welche Größe für ${drink}: klein, mittel oder groß?`,
+    askTemperature: (drink) => `${drink} heiß oder mit Eis?`,
+    made: (drink, options) => `${drink} (${options.join(', ')})`,
+    readBack: (order, total) => `Also ${order.join(' und ')}, zusammen ${total}, richtig?`,
+    hasAllergen: (item, allergen) => `Tut mir leid, in ${item} ist ${allergen}. Möchten Sie etwas anderes?`,
+    options: {
+      small: ['klein', 'kleinen', 'kleine', 'kleiner'],
+      medium: ['mittel', 'mittleren', 'mittlere', 'normal'],
+      large: ['groß', 'großen', 'große', 'großer'],
+      hot: ['heiß', 'heißen', 'warm'],
+      iced: ['mit eis', 'eiskalt', 'kalt'],
+      milk: ['milch'],
+      sugar: ['zucker'],
+      'extra-shot': ['extra shot', 'doppelt'],
+      lemon: ['zitrone'],
+    },
+    allergens: { milk: ['milch', 'laktose'], egg: ['ei', 'eier'], wheat: ['weizen', 'gluten', 'mehl'] },
+    noAllergy: ['keine', 'nein', 'nichts'],
+  },
+};
+
+/** One line of a café order as the fake barista takes it: one of an item, and for a drink made to order, how it's made. */
+type CafeLine = { item: ItemId; size?: DrinkSize; temperature?: DrinkTemperature; extras: DrinkExtra[] };
+
+/** The line's completion arguments: how it's made only for a drink made to order. */
+function cafeLineArgs({ item, size, temperature, extras }: CafeLine) {
+  return isMadeToOrder(item) ? { item, quantity: 1, size, temperature, extras } : { item, quantity: 1 };
+}
+
+/**
+ * The barista taking a café order with options, and with `avoidingAllergen`, first asking what the customer is allergic
+ * to. Items and options can come in any order and all at once; a drink made to order is asked its size, then hot or
+ * iced. The whole order is read back with its total and served on a yes. Like the server, it reads back anything the
+ * customer names: if the game rejects it, it says what has the allergen in it and takes the rest of the order on.
+ */
+function cafeNpc(script: CafeScript, common: OrderScript, menu: ItemId[], packId: LanguageCode, avoidingAllergen: boolean, act: Act): Npc {
+  const { goods, drinkOptions, allergens } = CULTURE_PACKS[packId];
+  const { yes, no, known } = common.words;
+  let allergen: Allergen | 'none' | null = avoidingAllergen ? null : 'none';
+  let order: CafeLine[] = [];
+  let readBack = false;
+
+  const said = (line: CafeLine) => {
+    const options = [line.size, line.temperature, ...line.extras].filter((option) => option !== undefined);
+    return options.length > 0 ? script.made(goods[line.item].name, options.map((option) => drinkOptions[option].name)) : goods[line.item].name;
+  };
+  /** The next thing to ask: how a drink is made, or the read-back of the whole order. */
+  const nextQuestion = () => {
+    const unmade = order.find((line) => isMadeToOrder(line.item) && (!line.size || !line.temperature));
+    if (unmade) return unmade.size ? script.askTemperature(goods[unmade.item].name) : script.askSize(goods[unmade.item].name);
+    readBack = order.length > 0;
+    const total = order.reduce((sum, { item }) => sum + menuPrice(item, packId), 0);
+    return readBack ? script.readBack(order.map(said), formatLocalMoney(total, packId)) : common.askAgain;
+  };
+  const heardOption = <Option extends DrinkOptionId>(line: string, options: readonly Option[]) =>
+    options.find((option) => mentions(line, script.options[option]));
+  const serve = () => {
+    const kept = allergen;
+    const args = { items: order.map(cafeLineArgs), ...(avoidingAllergen && { allergen: kept }) };
+    return act.call(SERVE_ORDER, args, (response) => {
+      if (response.result === 'served') return act.say(common.served);
+      if (response.result === 'cannot_afford') return act.say(common.cannotAfford);
+      const allergic = kept === 'none' || kept === null ? null : kept;
+      const has = allergic && order.find((line) => cafeAllergensIn(line.item, line.extras, packId).includes(allergic));
+      if (!allergic || !has) {
+        order = [];
+        return act.say(common.askAgain);
+      }
+      order = order.filter((line) => line !== has);
+      act.say(script.hasAllergen(goods[has.item].name, allergens[allergic].name));
+    });
+  };
+
+  return {
+    ...common,
+    greeting: avoidingAllergen ? script.allergyGreeting : script.greeting,
+    resume: avoidingAllergen ? script.askAllergy : script.greeting,
+    hear: (line) => {
+      if (allergen === null) {
+        const heard = ALLERGENS.find((id) => mentions(line, script.allergens[id]));
+        if (heard) {
+          allergen = heard;
+          return act.say(script.noted(allergens[heard].name));
+        }
+        if (mentions(line, script.noAllergy)) {
+          allergen = 'none';
+          return act.say(script.noted(null));
+        }
+        if (mentions(line, yes)) return act.say(script.askWhichAllergy);
+        return mentions(line, [...no, ...known]) || menu.some((id) => mentions(line, ITEM_WORDS[packId][id])) ? act.say(script.askAllergy) : act.notUnderstood();
+      }
+      const items = menu.filter((id) => mentions(line, ITEM_WORDS[packId][id]));
+      const size = heardOption(line, DRINK_SIZES);
+      const temperature = heardOption(line, DRINK_TEMPERATURES);
+      const extras = DRINK_EXTRAS.filter((extra) => mentions(line, script.options[extra]));
+      if (items.length > 0 || size || temperature || extras.length > 0) {
+        order.push(...items.map((item) => ({ item, extras: [] })));
+        // How a drink is made goes to the drink made to order still being made, or else the last one ordered.
+        const drink = order.find((l) => isMadeToOrder(l.item) && (!l.size || !l.temperature)) ?? order.findLast((l) => isMadeToOrder(l.item));
+        if (drink) {
+          drink.size = size ?? drink.size;
+          drink.temperature = temperature ?? drink.temperature;
+          drink.extras = [...new Set([...drink.extras, ...extras.filter((extra) => MADE_TO_ORDER_EXTRAS[drink.item]!.includes(extra))])];
+        }
+        return act.say(nextQuestion());
+      }
+      if (readBack && mentions(line, no)) {
+        [order, readBack] = [[], false];
+        return act.say(common.askAgain);
+      }
+      if (readBack && mentions(line, yes)) {
+        readBack = false;
+        return serve();
+      }
+      if (mentions(line, [...yes, ...no, ...known])) return act.say(nextQuestion());
+      act.notUnderstood();
+    },
+  };
+}
+
 /** Which fake NPC plays this session, read from the completion it offers. */
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
@@ -2299,6 +2548,12 @@ function castNpc(session: NpcSession, act: Act): Npc {
   }
   if (offers(COMPLETE_PURCHASE)) return tillNpc(TILL_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
   if (offers(POINT_TO)) return shelvesNpc(SHELVES_SCRIPT[packId], SCRIPT[packId], itemsIn(session, POINT_TO), packId, act);
+  // The barista's order with options, and avoiding an allergen, say how each line is made.
+  const orderLine = session.tools.find((tool) => tool.name === SERVE_ORDER)?.parameters;
+  if (orderLine?.properties?.items?.items?.properties?.size) {
+    const cafe = cafeNpc(CAFE_SCRIPT[packId], SCRIPT[packId], itemsIn(session, SERVE_ORDER), packId, orderLine.properties.allergen !== undefined, act);
+    return offeringTheUsual(cafe, usual, SCRIPT[packId], packId, act);
+  }
   const script = 'npcId' in session.voice && session.voice.npcId === 'convenience-clerk' ? CLERK_SCRIPT[packId] : SCRIPT[packId];
   return offeringTheUsual(orderNpc(script, itemsIn(session, SERVE_ORDER), packId, act), usual, script, packId, act);
 }

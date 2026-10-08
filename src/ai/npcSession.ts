@@ -5,6 +5,9 @@ import {
   localPlaceName,
   toToolDeclaration,
   type CulturePack,
+  type DrinkExtra,
+  type DrinkSize,
+  type DrinkTemperature,
   type FunctionDeclaration,
   type Interaction,
   type MedicineId,
@@ -335,18 +338,39 @@ function rememberedLines(
   return lines;
 }
 
+/** How a usual's café drink is made, as its completion arguments say it: ', size "large", temperature "iced", extras "milk"'. */
+function madeAs({ size, temperature, extras = [] }: UsualLine): string {
+  const quoted = (ids: readonly string[]) => ids.map((id) => `"${id}"`).join(', ');
+  const made = [size && `size "${size}"`, temperature && `temperature "${temperature}"`, extras.length > 0 && `extras ${quoted(extras)}`];
+  return made.filter(Boolean).map((option) => `, ${option}`).join('');
+}
+
+/** One line of a usual's completion arguments: at the café, how a drink made to order is made. */
+type UsualLine = { size?: DrinkSize; temperature?: DrinkTemperature; extras?: readonly DrinkExtra[] };
+
+/** What the usual's completion arguments say of the Character's allergy, at the café: nothing, if they don't carry one. */
+function allergyLine(allergen: unknown): string[] {
+  if (typeof allergen !== 'string') return [];
+  return [allergen === 'none' ? 'They have no allergies (allergen "none").' : `They are allergic to ${allergen} (allergen "${allergen}").`];
+}
+
 /**
  * "The usual?": what the Character always orders in this interaction, which the NPC offers, and takes a yes to as
  * the confirmation. None unless the NPC knows them well enough and this is where they order it.
  */
 function usualLines(interaction: Interaction, memory: NpcMemory, pack: CulturePack): string[] {
   const usual = usualOffered(memory, interaction);
+  const parsed = usual === null ? null : interaction.parseArgs(usual);
   const completion = usual === null ? null : interaction.resolveCompletion(usual, pack.id);
-  if (!completion?.success) return [];
-  const order = completion.lines.map(({ itemId, name, quantity }) => `${quantity} × ${name} (menu id "${itemId}")`).join(', ');
+  if (!parsed?.success || !completion?.success) return [];
+  const made = (parsed.data.items ?? []) as UsualLine[];
+  const order = completion.lines
+    .map(({ itemId, name, quantity }, i) => `${quantity} × ${name} (menu id "${itemId}"${madeAs(made[i] ?? {})})`)
+    .join(', ');
   const { name } = interaction.completion;
   return [
     `They always order the same here, their usual: ${order}.`,
+    ...allergyLine(parsed.data.allergen),
     `When you greet them, ask whether they'll have "the usual", in your own words. If they say yes, that is their confirmation: ` +
       `tell them the price, and call ${name} with exactly their usual. If they want something else, take their order as you would any other.`,
   ];
@@ -562,6 +586,17 @@ function goalBlock(interaction: Interaction, who: string) {
       `- If ${name} answers "cannot_afford", tell them kindly they don't have enough to pay it all now, and offer instalments. The conversation goes on.`,
       `- If ${name} answers "invalid_arguments", ask them again how they would like to pay.`,
       `- If ${name} answers "done", thank them, tell them when the first instalment is taken if they chose instalments, and say goodbye.`,
+    ]);
+  }
+  if (interaction.facts.includes('drinkOptions')) {
+    const allergen = interaction.facts.includes('allergens') ? ', and the allergen they told you, or "none"' : '';
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you act on it, read back the whole order, with how each drink is made and the prices, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed: each drink made to order with its size, hot or iced, and extras${allergen}. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money and ask whether they would like something else. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", its error says what is wrong: apologise, put it right with them, and read the order back again.`,
+      `- If ${name} answers "served", hand it over, thank them and say goodbye.`,
     ]);
   }
   return block('YOUR GOAL', [

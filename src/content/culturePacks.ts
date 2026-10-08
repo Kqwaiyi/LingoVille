@@ -1,7 +1,18 @@
 import { z } from 'zod';
 import { CLOCK, LANGUAGE_CODES, WEEKDAYS, type LanguageCode, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
-import { DIETARY_NOTE_IDS, DRINK_OPTIONS, ITEM_IDS, type DietaryNoteId, type DrinkOptionId, type ItemId } from './items.ts';
+import {
+  ALLERGENS,
+  DIETARY_NOTE_IDS,
+  DRINK_OPTIONS,
+  EXTRA_ALLERGENS,
+  ITEM_IDS,
+  type Allergen,
+  type DietaryNoteId,
+  type DrinkExtra,
+  type DrinkOptionId,
+  type ItemId,
+} from './items.ts';
 import type { NamedNpcId } from './npcs.ts';
 import { hours, HOURS_IDS, type HoursId } from './places.ts';
 
@@ -62,6 +73,10 @@ export type CulturePack = {
   drinkOptions: Record<DrinkOptionId, Good>;
   /** The dietary needs a server notes on the order pad, as the pad and diners say them. */
   dietaryNotes: Record<DietaryNoteId, Good>;
+  /** What a café customer can be allergic to, as customers and the barista say it. */
+  allergens: Record<Allergen, Good>;
+  /** Which allergens each of this pack's café items has in it (none: an empty list), by what the local item is made with. */
+  cafeAllergens: Partial<Record<ItemId, readonly Allergen[]>>;
   signs: Record<SignWord, { text: string; glosses: Glosses }>;
   cafe: Shop;
   supermarket: Shop;
@@ -135,6 +150,8 @@ export function culturePackSchema(packId: LanguageCode) {
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     drinkOptions: z.record(z.enum(DRINK_OPTIONS), z.object({ name: text, glosses })),
     dietaryNotes: z.record(z.enum(DIETARY_NOTE_IDS), z.object({ name: text, glosses })),
+    allergens: z.record(z.enum(ALLERGENS), z.object({ name: text, glosses })),
+    cafeAllergens: z.partialRecord(z.enum(ITEM_IDS), z.array(z.enum(ALLERGENS)).readonly()),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
     cafe: shop,
     supermarket: shop,
@@ -223,6 +240,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'no-pork': { name: '豚肉抜き', glosses: { zh: '不吃猪肉', en: 'No pork', de: 'Ohne Schweinefleisch' } },
       'no-seafood': { name: '魚介類抜き', glosses: { zh: '不吃海鲜', en: 'No fish or seafood', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
+    allergens: {
+      milk: { name: '乳', glosses: { zh: '牛奶', en: 'Milk', de: 'Milch' } },
+      egg: { name: '卵', glosses: { zh: '鸡蛋', en: 'Egg', de: 'Ei' } },
+      wheat: { name: '小麦', glosses: { zh: '小麦', en: 'Wheat', de: 'Weizen' } },
+    },
+    // Melon bread and shortcake are made with flour, egg and butter or cream; a cream soda float has ice cream on top.
+    cafeAllergens: { latte: ['milk'], coffee: [], tea: [], pastry: ['wheat', 'egg', 'milk'], cake: ['wheat', 'egg', 'milk'], 'special-drink': ['milk'] },
     signs: {
       openingHours: { text: '営業時間', glosses: { zh: '营业时间', en: 'Opening hours', de: 'Öffnungszeiten' } },
       menu: { text: 'メニュー', glosses: { zh: '菜单', en: 'Menu', de: 'Speisekarte' } },
@@ -390,6 +414,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'no-pork': { name: '不吃猪肉', glosses: { ja: '豚肉抜き', en: 'No pork', de: 'Ohne Schweinefleisch' } },
       'no-seafood': { name: '不吃海鲜', glosses: { ja: '魚介類抜き', en: 'No fish or seafood', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
+    allergens: {
+      milk: { name: '牛奶', glosses: { ja: '乳', en: 'Milk', de: 'Milch' } },
+      egg: { name: '鸡蛋', glosses: { ja: '卵', en: 'Egg', de: 'Ei' } },
+      wheat: { name: '小麦', glosses: { ja: '小麦', en: 'Wheat', de: 'Weizen' } },
+    },
+    // An egg tart has a buttery pastry case; tiramisu has sponge fingers, egg and mascarpone. The mango smoothie is fruit and ice.
+    cafeAllergens: { latte: ['milk'], coffee: [], tea: [], pastry: ['wheat', 'egg', 'milk'], cake: ['wheat', 'egg', 'milk'], 'special-drink': [] },
     signs: {
       openingHours: { text: '营业时间', glosses: { ja: '営業時間', en: 'Opening hours', de: 'Öffnungszeiten' } },
       menu: { text: '菜单', glosses: { ja: 'メニュー', en: 'Menu', de: 'Speisekarte' } },
@@ -559,6 +590,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'no-pork': { name: 'No pork', glosses: { ja: '豚肉抜き', zh: '不吃猪肉', de: 'Ohne Schweinefleisch' } },
       'no-seafood': { name: 'No fish or seafood', glosses: { ja: '魚介類抜き', zh: '不吃海鲜', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
+    allergens: {
+      milk: { name: 'Milk', glosses: { ja: '乳', zh: '牛奶', de: 'Milch' } },
+      egg: { name: 'Egg', glosses: { ja: '卵', zh: '鸡蛋', de: 'Ei' } },
+      wheat: { name: 'Wheat', glosses: { ja: '小麦', zh: '小麦', de: 'Weizen' } },
+    },
+    // Scones and a Victoria sponge are made with flour, egg and butter; hot chocolate is made with milk.
+    cafeAllergens: { latte: ['milk'], coffee: [], tea: [], pastry: ['wheat', 'egg', 'milk'], cake: ['wheat', 'egg', 'milk'], 'special-drink': ['milk'] },
     signs: {
       openingHours: { text: 'Opening hours', glosses: { ja: '営業時間', zh: '营业时间', de: 'Öffnungszeiten' } },
       menu: { text: 'Menu', glosses: { ja: 'メニュー', zh: '菜单', de: 'Speisekarte' } },
@@ -736,6 +774,13 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'no-pork': { name: 'Ohne Schweinefleisch', glosses: { ja: '豚肉抜き', zh: '不吃猪肉', en: 'No pork' } },
       'no-seafood': { name: 'Ohne Fisch und Meeresfrüchte', glosses: { ja: '魚介類抜き', zh: '不吃海鲜', en: 'No fish or seafood' } },
     },
+    allergens: {
+      milk: { name: 'Milch', glosses: { ja: '乳', zh: '牛奶', en: 'Milk' } },
+      egg: { name: 'Ei', glosses: { ja: '卵', zh: '鸡蛋', en: 'Egg' } },
+      wheat: { name: 'Weizen', glosses: { ja: '小麦', zh: '小麦', en: 'Wheat' } },
+    },
+    // A butter pretzel is wheat dough with butter, and no egg; cheesecake has a shortcrust base, quark and egg.
+    cafeAllergens: { latte: ['milk'], coffee: [], tea: [], pastry: ['wheat', 'milk'], cake: ['wheat', 'egg', 'milk'], 'special-drink': ['milk'] },
     signs: {
       openingHours: { text: 'Öffnungszeiten', glosses: { ja: '営業時間', zh: '营业时间', en: 'Opening hours' } },
       menu: { text: 'Karte', glosses: { ja: 'メニュー', zh: '菜单', en: 'Menu' } },
@@ -868,4 +913,10 @@ export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
   const shop = localShop(placeId, packId);
   if (shop) return shop.name;
   throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
+}
+
+/** The allergens in one of this pack's café items, made with these extras (milk added to a coffee has milk in it). */
+export function cafeAllergensIn(itemId: ItemId, extras: readonly DrinkExtra[], packId: LanguageCode): Allergen[] {
+  const added = extras.flatMap((extra) => EXTRA_ALLERGENS[extra] ?? []);
+  return ALLERGENS.filter((allergen) => (CULTURE_PACKS[packId].cafeAllergens[itemId] ?? []).includes(allergen) || added.includes(allergen));
 }

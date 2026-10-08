@@ -132,6 +132,69 @@ describe('Goal Interaction #1: order a drink', () => {
   });
 });
 
+describe('Goal Interactions #2 and #3: a café order with options, and one avoiding an allergen', () => {
+  const { orderWithOptions, orderAvoidingAllergen } = INTERACTIONS;
+  const COFFEE = { item: 'coffee', quantity: 1, size: 'large', temperature: 'iced', extras: ['milk'] };
+
+  it('are the barista’s serve_order, Intermediate and Advanced, over the café counter', () => {
+    expect([orderWithOptions, orderAvoidingAllergen].map((i) => [i.npcId, i.placeId, i.completion.name, i.band, i.effect.kind])).toEqual([
+      ['barista', 'cafe', 'serve_order', 'I', 'serveOrder'],
+      ['barista', 'cafe', 'serve_order', 'A', 'serveOrder'],
+    ]);
+    expect(orderWithOptions.items).toEqual([...CAFE_COUNTER]);
+  });
+
+  it('declares how a drink is made as optional size, hot or iced and extras on each line', () => {
+    const line = orderWithOptions.toolDeclaration.parameters.properties!.items!.items!;
+    expect(line.required).toEqual(['item', 'quantity']);
+    expect(line.properties!.size!.enum).toEqual(['small', 'medium', 'large']);
+    expect(line.properties!.temperature!.enum).toEqual(['hot', 'iced']);
+    expect(line.properties!.extras!.items!.enum).toEqual(['milk', 'sugar', 'extra-shot', 'lemon']);
+  });
+
+  it('takes a drink made to order with its options, and food as it comes', () => {
+    expect(orderWithOptions.parseArgs({ items: [COFFEE, { item: 'cake', quantity: 1 }] }).success).toBe(true);
+    expect(orderWithOptions.parseArgs({ items: [{ ...COFFEE, size: 'huge' }] }).success).toBe(false);
+  });
+
+  it('must say what the customer is allergic to, or that they are not, avoiding an allergen', () => {
+    expect(orderAvoidingAllergen.toolDeclaration.parameters.properties!.allergen!.enum).toEqual(['milk', 'egg', 'wheat', 'none']);
+    expect(orderAvoidingAllergen.parseArgs({ items: [COFFEE] }).success).toBe(false);
+    expect(orderAvoidingAllergen.parseArgs({ items: [COFFEE], allergen: 'egg' }).success).toBe(true);
+  });
+
+  it.each(LANGUAGE_CODES)('rejects an order in %s with the allergen in it, naming the item by its local name', (packId) => {
+    const resolved = orderAvoidingAllergen.resolveCompletion({ items: [{ item: 'latte', quantity: 1 }], allergen: 'milk' }, packId);
+
+    expect(resolved).toEqual({ success: false, error: expect.stringContaining(CULTURE_PACKS[packId].goods.latte.name) });
+  });
+
+  it.each(LANGUAGE_CODES)('tells the %s barista how each drink made to order can be made, by local name and id', (packId) => {
+    const { goods, drinkOptions } = CULTURE_PACKS[packId];
+    const facts = interactionFacts(orderWithOptions, packId);
+
+    expect(facts).toContain(
+      `${goods.tea.name} (menu id "tea") is made to order. It can have added: ` +
+        `${drinkOptions.milk.name} (id "milk"), ${drinkOptions.sugar.name} (id "sugar"), ${drinkOptions.lemon.name} (id "lemon").`,
+    );
+    expect(facts.some((fact) => fact.includes(`${drinkOptions.iced.name} (id "iced")`))).toBe(true);
+    expect(facts.some((fact) => fact.includes('(menu id "latte") is made to order'))).toBe(false);
+  });
+
+  it('tells the barista avoiding an allergen what is in each item in this pack, and what an extra adds', () => {
+    const facts = interactionFacts(orderAvoidingAllergen, 'de');
+
+    expect(facts).toContain('Butterbrezel (menu id "pastry") has milk and wheat in it.');
+    expect(facts).toContain('Filterkaffee (menu id "coffee") has no milk, egg or wheat in it.');
+    expect(facts).toContain('Adding milk to a drink adds milk to it.');
+    expect(facts).toContain(
+      'The allergies you know about: Milch (allergen id "milk"), Ei (allergen id "egg") and Weizen (allergen id "wheat"). ' +
+        "You can't say what else anything has in it.",
+    );
+    expect(interactionFacts(orderWithOptions, 'de').some((fact) => fact.includes('Butterbrezel (menu id "pastry") has'))).toBe(false);
+  });
+});
+
 describe('Goal Interaction #4: pay for groceries at the supermarket', () => {
   const { payForGroceries } = INTERACTIONS;
 

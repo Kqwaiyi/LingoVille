@@ -60,6 +60,23 @@ describe('NPCs who start conversations themselves', () => {
   });
 });
 
+describe('the barista at the café', () => {
+  it.each([
+    ['A1', INTERACTIONS.orderDrink],
+    ['A2', INTERACTIONS.orderDrink],
+    ['B1', INTERACTIONS.orderWithOptions],
+    ['B2', INTERACTIONS.orderWithOptions],
+    ['C1', INTERACTIONS.orderAvoidingAllergen],
+    ['C2', INTERACTIONS.orderAvoidingAllergen],
+  ] as const)('takes the order with E at %s by the band: a drink, then one made to order with food, then avoiding an allergen', (step, order) => {
+    expect(interactionStartedWithE('barista', { shopping: false, step })).toBe(order);
+  });
+
+  it('still takes an application with F at any step, until the Character is a barista', () => {
+    expect(interactionStartedWithF('barista', { shopping: false, step: 'C2' })).toBe(INTERACTIONS.askBaristaForWork);
+  });
+});
+
 describe('the shopkeeper at the bookshop', () => {
   it('sells a book with E in the Beginner and Intermediate bands', () => {
     for (const step of ['A1', 'A2', 'B1', 'B2'] as const) {

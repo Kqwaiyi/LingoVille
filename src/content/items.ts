@@ -63,6 +63,22 @@ export type DrinkTemperature = (typeof DRINK_TEMPERATURES)[number];
 export const DRINK_EXTRAS = ['milk', 'sugar', 'extra-shot', 'lemon'] as const;
 export type DrinkExtra = (typeof DRINK_EXTRAS)[number];
 
+/** What can be added to each café drink made to order: the drinks a customer orders in a size, hot or iced. */
+export const MADE_TO_ORDER_EXTRAS: Partial<Record<ItemId, readonly DrinkExtra[]>> = {
+  coffee: ['milk', 'sugar', 'extra-shot'],
+  tea: ['milk', 'sugar', 'lemon'],
+};
+
+/** The café drink is made to order: in a size, hot or iced, with the extras it takes. */
+export const isMadeToOrder = (itemId: ItemId) => MADE_TO_ORDER_EXTRAS[itemId] !== undefined;
+
+/** What a café customer can be allergic to. Each Culture Pack says which of its café items have each in them. */
+export const ALLERGENS = ['milk', 'egg', 'wheat'] as const;
+export type Allergen = (typeof ALLERGENS)[number];
+
+/** What an extra adds to a drink that a customer can be allergic to. */
+export const EXTRA_ALLERGENS: Partial<Record<DrinkExtra, readonly Allergen[]>> = { milk: ['milk'] };
+
 /** Every way a café drink can be made, which each Culture Pack names. */
 export const DRINK_OPTIONS = [...DRINK_SIZES, ...DRINK_TEMPERATURES, ...DRINK_EXTRAS] as const;
 export type DrinkOptionId = (typeof DRINK_OPTIONS)[number];

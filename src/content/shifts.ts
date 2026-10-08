@@ -8,6 +8,7 @@ import {
   DRINK_TEMPERATURES,
   GROCERIES_SOLD,
   ITEMS,
+  MADE_TO_ORDER_EXTRAS,
   RESTAURANT_DISHES,
   RESTAURANT_DRINKS,
   RESTAURANT_MENU,
@@ -91,7 +92,7 @@ const CAFE_DRINKS = CAFE_MENU.filter(isDrink);
 const MADE_TO_ORDER = {
   sizes: DRINK_SIZES,
   temperatures: DRINK_TEMPERATURES,
-  extras: { coffee: ['milk', 'sugar', 'extra-shot'], tea: ['milk', 'sugar', 'lemon'] },
+  extras: MADE_TO_ORDER_EXTRAS,
 } as const satisfies NonNullable<DrinkTemplate['modifiers']>;
 const MADE_TO_ORDER_DRINKS = Object.keys(MADE_TO_ORDER.extras) as ItemId[];
 

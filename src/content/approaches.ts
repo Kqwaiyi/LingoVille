@@ -1,5 +1,5 @@
 import { STEP_BANDS, type ApproachId, type GymMembership, type JobId, type ProficiencyStep, type RestaurantTable } from '../sim/index.ts';
-import type { Interaction } from './defineInteraction.ts';
+import type { Band, Interaction } from './defineInteraction.ts';
 import { INTERACTIONS } from './interactions.ts';
 import type { NamedNpcId } from './npcs.ts';
 
@@ -33,12 +33,20 @@ export type Bringing = {
   holdsPrescription?: boolean;
 };
 
+/** The barista's order E starts in each band. */
+const CAFE_ORDERS: Record<Band, Interaction> = {
+  B: INTERACTIONS.orderDrink,
+  I: INTERACTIONS.orderWithOptions,
+  A: INTERACTIONS.orderAvoidingAllergen,
+};
+
 /** No table at the restaurant, and nothing owed there. */
 const NO_TABLE: RestaurantTable = { seated: false, bill: [] };
 
 /**
  * The conversation E starts with this Named NPC, or null if they only ever start one themselves.
- * The cashier takes payment for shopping brought to the till, and otherwise helps find something.
+ * The barista takes an order by the band: a drink (Beginner), a drink made to order and something to eat (Intermediate),
+ * or an order avoiding an allergen (Advanced). The cashier takes payment for shopping brought to the till, and otherwise helps find something.
  * The shopkeeper sells a book, and from the Advanced band recommends one by taste instead. The server takes the
  * bill while anything is on it or anything is owed from a bill walked out on, takes the order at the Character's
  * table, and otherwise gets them a table. The attendant sells a bath. The receptionist checks the Character in to see the
@@ -48,6 +56,7 @@ export function interactionStartedWithE(
   npcId: NamedNpcId,
   { shopping, step = 'A1', restaurant = NO_TABLE, owesRestaurant = false, holdsPrescription = false }: Bringing = { shopping: false },
 ): Interaction | null {
+  if (npcId === 'barista') return CAFE_ORDERS[STEP_BANDS[step]];
   if (npcId === 'cashier') return shopping ? INTERACTIONS.payForGroceries : INTERACTIONS.findAnItem;
   if (npcId === 'server') {
     if (restaurant.bill.length > 0 || owesRestaurant) return INTERACTIONS.payTheBill;
