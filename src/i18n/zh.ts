@@ -222,6 +222,7 @@ export const zh: UiStrings = {
     debt: {
       hospital: '医院欠款 {{amount}}',
       rent: '房租欠款 {{amount}}',
+      restaurant: '餐厅欠款 {{amount}}',
     },
   },
   placeLine: {

@@ -222,6 +222,7 @@ export const ja: UiStrings = {
     debt: {
       hospital: '病院の未払い {{amount}}',
       rent: '家賃の未払い {{amount}}',
+      restaurant: 'レストランの未払い {{amount}}',
     },
   },
   placeLine: {

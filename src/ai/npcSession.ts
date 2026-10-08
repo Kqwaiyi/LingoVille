@@ -48,6 +48,8 @@ export type NpcSessionContext = {
   rent?: RentStatement;
   /** For the restaurant's server: what the Character has eaten and not paid for. */
   bill?: Basket;
+  /** For the restaurant's server: what the Character owes, in Shifts, from a bill they walked out on. */
+  restaurantDebt?: number;
   /** What the NPC remembers of the Character, and the Character's name for when they know it. With none, they are strangers. */
   relationship?: Relationship;
 };

@@ -76,6 +76,29 @@ describe('the restaurant', () => {
     expect(selectTalkWithE(store.getState())).toBe(INTERACTIONS.getATable);
   });
 
+  it('makes a bill walked out on restaurant debt, which E at the server takes before seating the Character again', () => {
+    const restaurant = atTheRestaurant({ placeId: 'restaurant', restaurant: { seated: true, bill: [] } });
+    const { store, npc } = restaurant;
+    store.getState().talk('E');
+    complete(restaurant, 'serve_order', { items: [{ item: 'pork-dish', quantity: 1 }] });
+    const money = store.getState().game.character.moneyInShifts;
+    const owed = menuPrice('pork-dish', 'ja');
+
+    store.getState().enterPlace('park');
+    store.getState().enterPlace('restaurant');
+    store.getState().setInteractable('server');
+    expect(store.getState().game.debts).toEqual([{ kind: 'restaurant', amountInShifts: owed }]);
+    expect(selectTalkWithE(store.getState())).toBe(INTERACTIONS.payTheBill);
+
+    store.getState().talk('E');
+    expect(npc.session!.systemInstruction).toContain(`Owed from last time, when they left without paying: ${formatLocalMoney(owed, 'ja')}.`);
+    complete(restaurant, 'settle_bill', { method: 'card' });
+
+    expect(store.getState().game.debts).toEqual([]);
+    expect(store.getState().game.character.moneyInShifts).toBeCloseTo(money - owed);
+    expect(selectTalkWithE(store.getState())).toBe(INTERACTIONS.getATable);
+  });
+
   it('tells the server a recommended dish breaks the dietary need, and serves nothing', () => {
     const { store, npc } = atTheRestaurant({ placeId: 'restaurant', restaurant: { seated: true, bill: [] } });
 

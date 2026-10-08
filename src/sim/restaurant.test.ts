@@ -52,8 +52,8 @@ describe('the restaurant: ordering a meal (#9)', () => {
     expect(after.character.mood).toBe(state.character.mood + MOOD.changes.goalInteractionSuccess + MOOD.changes.comfortPurchase.meal);
     expect(after.character.moneyInShifts).toBe(state.character.moneyInShifts);
     expect(after.restaurant.bill).toEqual([
-      { itemId: 'chicken-dish', quantity: 1 },
-      { itemId: 'juice', quantity: 1 },
+      { itemId: 'chicken-dish', quantity: 1, priceInShifts: price('chicken-dish') },
+      { itemId: 'juice', quantity: 1, priceInShifts: price('juice') },
     ]);
     expect(result).toMatchObject({ kind: 'success', paidInShifts: 0, served: [{ itemId: 'chicken-dish' }, { itemId: 'juice' }] });
   });
@@ -72,8 +72,8 @@ describe('the restaurant: ordering a meal (#9)', () => {
     const { state: after } = succeed(once, orderAMeal, { items: [{ item: 'juice', quantity: 2 }] });
 
     expect(after.restaurant.bill).toEqual([
-      { itemId: 'fish-dish', quantity: 1 },
-      { itemId: 'juice', quantity: 3 },
+      { itemId: 'fish-dish', quantity: 1, priceInShifts: price('fish-dish') },
+      { itemId: 'juice', quantity: 3, priceInShifts: price('juice') },
     ]);
   });
 
@@ -153,6 +153,49 @@ describe('the restaurant: paying the bill (#11)', () => {
     expect(after).toBe(state);
   });
 
+  it('pays restaurant debt from a bill walked out on, with nothing on the bill now', () => {
+    const owing = enterPlace(succeed(seated(), orderAMeal, meal('pork-dish')).state, 'park', null);
+    const back = enterPlace(owing, 'restaurant', null);
+
+    const { state: after, result } = succeed(back, payTheBill, { method: 'cash' });
+
+    const owed = price('pork-dish') + price('juice');
+    expect(after.debts).toEqual([]);
+    expect(after.character.moneyInShifts).toBeCloseTo(back.character.moneyInShifts - owed);
+    expect(result).toMatchObject({ kind: 'success', paidInShifts: expect.closeTo(owed), moodChange: MOOD.changes.goalInteractionSuccess });
+  });
+
+  it('pays restaurant debt and the bill together', () => {
+    const owing = enterPlace(enterPlace(succeed(seated(), orderAMeal, meal('pork-dish')).state, 'park', null), 'restaurant', null);
+    const eaten = succeed(succeed(owing, getATable, { party: 1, seating: 'table' }).state, orderAMeal, meal('fish-dish', 'cola')).state;
+
+    const { state: after, result } = succeed(eaten, payTheBill, { method: 'card' });
+
+    const owed = price('pork-dish') + price('juice') + price('fish-dish') + price('cola');
+    expect(after.debts).toEqual([]);
+    expect(after.restaurant).toEqual({ seated: false, bill: [] });
+    expect(result).toMatchObject({ kind: 'success', paidInShifts: expect.closeTo(owed) });
+  });
+
+  it('leaves the other debts for the landlord and the hospital to take', () => {
+    const owing = enterPlace(succeed(seated(), orderAMeal, meal('pork-dish')).state, 'park', null);
+    const back: GameState = { ...owing, debts: [{ kind: 'hospital', amountInShifts: 1 }, ...owing.debts] };
+
+    const { state: after } = succeed(back, payTheBill, { method: 'cash' });
+
+    expect(after.debts).toEqual([{ kind: 'hospital', amountInShifts: 1 }]);
+  });
+
+  it('leaves restaurant debt owed if the Character cannot pay it now', () => {
+    const owing = enterPlace(succeed(seated(), orderAMeal, meal('pork-dish')).state, 'park', null);
+    const broke: GameState = { ...owing, character: { ...owing.character, moneyInShifts: 0.01 } };
+
+    const { state: after, result } = succeed(broke, payTheBill, { method: 'cash' });
+
+    expect(result).toEqual({ kind: 'cannot_afford' });
+    expect(after).toBe(broke);
+  });
+
   it('leaves the bill open if the Character cannot pay it now', () => {
     const eaten = succeed(seated(), orderAMeal, meal('pork-dish')).state;
     const broke: GameState = { ...eaten, character: { ...eaten.character, moneyInShifts: 0.01 } };
@@ -165,12 +208,38 @@ describe('the restaurant: paying the bill (#11)', () => {
 });
 
 describe('the restaurant: leaving', () => {
-  it('walking out gives up the table, but the bill stays open to pay next time', () => {
+  it('walking out with the bill unpaid gives up the table and turns the whole bill, at menu prices, into restaurant debt', () => {
     const eaten = succeed(seated(), orderAMeal, meal('pork-dish')).state;
 
     const outside = enterPlace(eaten, 'park', null);
 
-    expect(outside.restaurant).toEqual({ seated: false, bill: eaten.restaurant.bill });
+    expect(outside.restaurant).toEqual({ seated: false, bill: [] });
+    expect(outside.debts).toEqual([{ kind: 'restaurant', amountInShifts: expect.closeTo(price('pork-dish') + price('juice')) }]);
+    expect(outside.character.moneyInShifts).toBe(eaten.character.moneyInShifts);
+  });
+
+  it('a second unpaid bill joins the same restaurant debt', () => {
+    const once = enterPlace(succeed(seated(), orderAMeal, meal('pork-dish')).state, 'park', null);
+    const back = enterPlace(once, 'restaurant', null);
+    const again = succeed(succeed(back, getATable, { party: 1, seating: 'table' }).state, orderAMeal, meal('fish-dish', 'cola')).state;
+
+    const outside = enterPlace(again, 'park', null);
+
+    const owed = price('pork-dish') + price('juice') + price('fish-dish') + price('cola');
+    expect(outside.debts).toEqual([{ kind: 'restaurant', amountInShifts: expect.closeTo(owed) }]);
+  });
+
+  it('walking out with nothing on the bill owes nothing', () => {
+    expect(enterPlace(seated(), 'park', null).debts).toEqual([]);
+  });
+
+  it('fainting at the table with the bill unpaid turns it into restaurant debt too', () => {
+    const eaten = succeed(seated(), orderAMeal, meal('veggie-dish')).state;
+
+    const fainted = faint(eaten);
+
+    expect(fainted.restaurant).toEqual({ seated: false, bill: [] });
+    expect(fainted.debts).toContainEqual({ kind: 'restaurant', amountInShifts: expect.closeTo(price('veggie-dish') + price('juice')) });
   });
 
   it('fainting at the table gives it up too', () => {

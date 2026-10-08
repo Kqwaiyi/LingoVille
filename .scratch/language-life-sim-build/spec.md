@@ -320,7 +320,8 @@ The `sim` module exposes pure functions over one state object. The exact names a
 - **Ratio ladder:** groceries ~0.06 per meal; convenience bento ~0.12; café drink ~0.07; café food ~0.1; restaurant meal ~0.25 (a Comfort Purchase); Comfort Purchases 0.1–0.3; weekly rent 2.0 at full price; Fainting bill ~1.5; doctor + medicine well below 1.5; gym membership ~0.5 per month; tap water and trams free. Survival target ~0.5 per day; ~4 Shifts in 7 days covers survival plus rent.
 - **Rent** is weekly and first due at the end of day 7. Unpaid rent becomes debt, with a Mood penalty and a landlord reminder. Extensions are negotiated (#17). There is no eviction.
 - **Hospital bills** can become debt or a payment plan (#15). Debt carries forward.
-- **Debt is repaid at the counter, never from Shift pay.** Rent debt is cleared by paying the landlord (#16). Hospital debt is paid at reception (#15 accepts payment in full as well as a plan); a payment plan's weekly instalments are taken automatically on rent day, and a missed instalment stays as debt.
+- **A restaurant bill** left unpaid on leaving the restaurant (or fainting there) becomes restaurant debt, at menu prices. Like hospital debt, it costs no daily Mood.
+- **Debt is repaid at the counter, never from Shift pay.** Rent debt is cleared by paying the landlord (#16). Hospital debt is paid at reception (#15 accepts payment in full as well as a plan). Restaurant debt is paid to the server with any bill (#11), who seats no one owing it. A payment plan's weekly instalments are taken automatically on rent day, and a missed instalment stays as debt.
 - **Gym membership** lasts 30 in-game days and is never charged automatically. When it expires, gym sessions are refused until the Player renews by talking to the attendant (a short renewal path on #22). It never becomes debt.
 - **Newcomer Discount and Shift stakes, by Proficiency Step** (both ratchet to the highest step reached):
 
@@ -546,7 +547,7 @@ The `sim` module exposes pure functions over one state object. The exact names a
   - *Identity*: Character name, Target Language, Culture Pack id, Appearance Preset.
   - *Clock & place*: day, minute of day, place id.
   - *Character*: Health, Hunger, Thirst, Mood, money, current Illness (id + onset day).
-  - *Obligations*: rent day, amount owed, debts (rent, hospital), payment plans.
+  - *Obligations*: rent day, amount owed, debts (rent, hospital, restaurant), payment plans.
   - *Progression*: Proficiency score, highest step reached, Newcomer Discount step, XP for 5 Life Skills, daily Cooking and gym counters.
   - *Possessions & status*: inventory (item id, quantity, expiry day), gym membership expiry, address registered, Jobs hired, Shift in progress (customers served, pay so far).
   - *Phrasebook*: the personal phrasebook (text, reading, gloss in the Native Language it was saved in, day added).
@@ -685,4 +686,4 @@ No ticket answered these. The dev decided them on 2026-10-03, before the build t
 10. **Japanese reading aids:** furigana by default, plus a separate "Show romaji" setting, off by default.
 11. **Shift Recaps:** one combined Recap per Shift.
 12. **"Helping NPCs pays off in Mood and relationships"** ([Core loop](../language-life-sim/issues/01-core-loop-and-economy.md)) is dropped. Small Talk, gifts and regular visits cover relationships.
-13. **Debt** is repaid at the counter (the landlord for rent, reception for hospital bills), never taken from Shift pay. Payment-plan instalments come out automatically on rent day.
+13. **Debt** is repaid at the counter (the landlord for rent, reception for hospital bills, the server for restaurant bills), never taken from Shift pay. Payment-plan instalments come out automatically on rent day.

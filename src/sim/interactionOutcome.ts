@@ -6,6 +6,7 @@ import { goalInteractionFamiliarity } from './familiarity.ts';
 import { clampMeter } from './meters.ts';
 import { metNpc } from './npcMemory.ts';
 import { grantExtension, payRent } from './rent.ts';
+import { billTotal, restaurantDebt } from './restaurant.ts';
 import type { GameState, JobId, RestaurantTable } from './state.ts';
 import { MOOD } from './tuning.ts';
 
@@ -72,10 +73,10 @@ function succeeded(state: GameState, paidInShifts = 0): { state: GameState; resu
 /** The bill with these lines added to it, a line per item. */
 function addToBill(bill: RestaurantTable['bill'], lines: OrderLine[]): RestaurantTable['bill'] {
   const added = bill.map((line) => ({ ...line }));
-  for (const { itemId, quantity } of lines) {
+  for (const { itemId, quantity, priceInShifts } of lines) {
     const line = added.find((l) => l.itemId === itemId);
     if (line) line.quantity += quantity;
-    else added.push({ itemId, quantity });
+    else added.push({ itemId, quantity, priceInShifts });
   }
   return added;
 }
@@ -137,9 +138,7 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
     case 'success': {
       const { effect } = interaction;
       const { restaurant } = state;
-      // The bill is the sim's to know: the server charges whatever is on it, and a meal is only served if it could be paid.
-      const basket = effect.kind === 'settleBill' || effect.kind === 'orderMeal' ? restaurant.bill : outcome.basket;
-      const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, basket);
+      const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId, outcome.basket);
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
       if (completion.rent) return applyRentChange(state, completion.rent);
       if (completion.application) return applyJobApplication(state, completion.application);
@@ -149,19 +148,24 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
       }
       const { costInShifts, hunger, thirst } = orderTotals(completion.lines);
       const { character, possessions } = state;
+      // The bill is the sim's to know: the server charges whatever is on it, and a meal is only served if it could be paid.
       if (effect.kind === 'settleBill') {
-        if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
+        // The bill, at the prices it was ordered at, and anything owed from a bill walked out on are paid together.
+        const dueInShifts = billTotal(restaurant.bill) + restaurantDebt(state);
+        if (dueInShifts === 0) return { state, result: { kind: 'invalid_arguments', error: 'The customer has nothing on their bill to pay.' } };
+        if (dueInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
         // Paid up, the Character gets up from the table.
         const settled: GameState = {
           ...state,
           restaurant: { seated: false, bill: [] },
-          character: { ...character, moneyInShifts: character.moneyInShifts - costInShifts },
+          debts: state.debts.filter((debt) => debt.kind !== 'restaurant'),
+          character: { ...character, moneyInShifts: character.moneyInShifts - dueInShifts },
         };
-        return succeeded(settled, costInShifts);
+        return succeeded(settled, dueInShifts);
       }
       // A meal at the restaurant goes on the bill rather than being paid now, but is only served if the bill could be paid with it on.
       const billed = effect.kind === 'orderMeal';
-      const owedInShifts = orderTotals(completion.bill ?? []).costInShifts;
+      const owedInShifts = billTotal(restaurant.bill);
       if (owedInShifts + costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };
       const paidInShifts = billed ? 0 : costInShifts;
 

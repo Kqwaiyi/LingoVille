@@ -18,9 +18,16 @@ const OPENED_BY_NPCS = new Set(Object.values(APPROACH_INTERACTIONS));
 
 /**
  * What the Character brings to the conversation: shopping from the supermarket's shelves, or none, the Jobs they
- * already have, their current Proficiency Step, and their table and bill at the restaurant.
+ * already have, their current Proficiency Step, their table and bill at the restaurant, and whether they owe it for a
+ * bill they walked out on.
  */
-export type Bringing = { shopping: boolean; jobsHired?: readonly JobId[]; step?: ProficiencyStep; restaurant?: RestaurantTable };
+export type Bringing = {
+  shopping: boolean;
+  jobsHired?: readonly JobId[];
+  step?: ProficiencyStep;
+  restaurant?: RestaurantTable;
+  owesRestaurant?: boolean;
+};
 
 /** No table at the restaurant, and nothing owed there. */
 const NO_TABLE: RestaurantTable = { seated: false, bill: [] };
@@ -29,15 +36,16 @@ const NO_TABLE: RestaurantTable = { seated: false, bill: [] };
  * The conversation E starts with this Named NPC, or null if they only ever start one themselves.
  * The cashier takes payment for shopping brought to the till, and otherwise helps find something.
  * The shopkeeper sells a book, and from the Advanced band recommends one by taste instead. The server takes the
- * bill while anything is on it, takes the order at the Character's table, and otherwise gets them a table.
+ * bill while anything is on it or anything is owed from a bill walked out on, takes the order at the Character's
+ * table, and otherwise gets them a table.
  */
 export function interactionStartedWithE(
   npcId: NamedNpcId,
-  { shopping, step = 'A1', restaurant = NO_TABLE }: Bringing = { shopping: false },
+  { shopping, step = 'A1', restaurant = NO_TABLE, owesRestaurant = false }: Bringing = { shopping: false },
 ): Interaction | null {
   if (npcId === 'cashier') return shopping ? INTERACTIONS.payForGroceries : INTERACTIONS.findAnItem;
   if (npcId === 'server') {
-    if (restaurant.bill.length > 0) return INTERACTIONS.payTheBill;
+    if (restaurant.bill.length > 0 || owesRestaurant) return INTERACTIONS.payTheBill;
     return restaurant.seated ? INTERACTIONS.orderAMeal : INTERACTIONS.getATable;
   }
   if (npcId === 'shopkeeper') return STEP_BANDS[step] === 'A' ? INTERACTIONS.recommendABook : INTERACTIONS.buyABook;

@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { createStore, get, keys, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it } from 'vitest';
+import { menuPrice } from '../content/index.ts';
 import { createSave, weeklyRent, type GameState, type ShiftCustomer } from '../sim/index.ts';
 import { createSaves, DEV_SETUP, SAVE_SCHEMA_VERSION, SLOT_IDS } from './index.ts';
 
@@ -382,7 +383,25 @@ describe('saves', () => {
 
   it("keeps the Character's restaurant table and an unpaid bill as they were", async () => {
     const { saves } = freshSaves();
-    const game: GameState = { ...lived(), restaurant: { seated: true, bill: [{ itemId: 'fish-dish', quantity: 1 }] } };
+    const game: GameState = { ...lived(), restaurant: { seated: true, bill: [{ itemId: 'fish-dish', quantity: 1, priceInShifts: 0.2 }] } };
+    await saves.write('slot-1', game);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(game);
+  });
+
+  it('upgrades an unpaid bill from before bills kept their prices, pricing each line at the menu price', async () => {
+    const { saves, raw } = freshSaves();
+    const game = lived();
+    const stored = { ...game, restaurant: { seated: false, bill: [{ itemId: 'fish-dish', quantity: 2 }] } };
+    await set('slot-1', { schemaVersion: 13, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: stored }, raw);
+
+    const priceInShifts = menuPrice('fish-dish', game.identity.culturePackId);
+    expect((await saves.load('slot-1'))?.save.game.restaurant).toEqual({ seated: false, bill: [{ itemId: 'fish-dish', quantity: 2, priceInShifts }] });
+  });
+
+  it('keeps restaurant debt as it was', async () => {
+    const { saves } = freshSaves();
+    const game: GameState = { ...lived(), debts: [{ kind: 'restaurant', amountInShifts: 0.35 }] };
     await saves.write('slot-1', game);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(game);

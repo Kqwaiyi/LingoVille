@@ -33,15 +33,20 @@ export function readBasketTotal(text: string): string | null {
   return totals.at(-1)?.[1] ?? null;
 }
 
-/** What the guest has eaten and not paid for yet, each at its price, and the total to pay. */
-function billFacts(bill: Basket, packId: LanguageCode): string[] {
-  if (bill.length === 0) return ['The customer has nothing on their bill.'];
+/**
+ * What the guest has eaten and not paid for yet, each at its price, anything they owe from a bill they walked out on
+ * (in Shifts), and the total to pay for both.
+ */
+function billFacts(bill: Basket, owedInShifts: number, packId: LanguageCode): string[] {
+  if (bill.length === 0 && owedInShifts === 0) return ['The customer has nothing on their bill.'];
   const { goods } = CULTURE_PACKS[packId];
   const money = (shifts: number) => formatLocalMoney(shifts, packId);
-  const total = bill.reduce((sum, { itemId, quantity }) => sum + menuPrice(itemId, packId) * quantity, 0);
+  const total = bill.reduce((sum, { itemId, quantity }) => sum + menuPrice(itemId, packId) * quantity, owedInShifts);
   return [
-    "The customer's bill:",
-    ...bill.map(({ itemId, quantity }) => `${quantity} × ${goods[itemId].name}, ${money(menuPrice(itemId, packId))} each`),
+    ...(bill.length === 0
+      ? ['The customer has nothing on their bill today.']
+      : ["The customer's bill:", ...bill.map(({ itemId, quantity }) => `${quantity} × ${goods[itemId].name}, ${money(menuPrice(itemId, packId))} each`)]),
+    ...(owedInShifts > 0 ? [`Owed from last time, when they left without paying: ${money(owedInShifts)}.`] : []),
     `Bill total: ${money(total)}.`,
   ];
 }
@@ -106,16 +111,24 @@ export function readNewWeeklyRent(text: string): string | null {
   return /From now on the tenant's weekly rent is (.+)\.$/m.exec(text)?.[1] ?? null;
 }
 
-/** What the NPC is told about the moment: the shopping on the counter, for the landlord, the rent, and for the server, the bill. */
-export type FactsContext = { basket?: Basket; rent?: RentStatement; bill?: Basket };
+/**
+ * What the NPC is told about the moment: the shopping on the counter, for the landlord, the rent, and for the server,
+ * the bill and any restaurant debt, in Shifts, from a bill walked out on.
+ */
+export type FactsContext = { basket?: Basket; rent?: RentStatement; bill?: Basket; restaurantDebt?: number };
 
 /**
  * The facts an interaction's NPC knows, in English, pulled from the Culture
  * Pack, or for the ward, from what Fainting costs. At the till, the cashier
  * also knows what the customer has brought to the counter (`basket`), and the
- * landlord knows what the tenant owes (`rent`). The restaurant's server knows the guest's `bill`.
+ * landlord knows what the tenant owes (`rent`). The restaurant's server knows the guest's `bill`, and what they owe
+ * from a bill they walked out on (`restaurantDebt`).
  */
-export function interactionFacts(interaction: Interaction, packId: LanguageCode, { basket = [], rent, bill = [] }: FactsContext = {}): string[] {
+export function interactionFacts(
+  interaction: Interaction,
+  packId: LanguageCode,
+  { basket = [], rent, bill = [], restaurantDebt = 0 }: FactsContext = {},
+): string[] {
   const { goods, customs } = CULTURE_PACKS[packId];
   const { placeId } = interaction;
   return interaction.facts.flatMap((source) => {
@@ -140,7 +153,7 @@ export function interactionFacts(interaction: Interaction, packId: LanguageCode,
       case 'basket':
         return basketFacts(basket, packId);
       case 'bill':
-        return billFacts(bill, packId);
+        return billFacts(bill, restaurantDebt, packId);
       case 'placeFacts':
         return localShop(placeId, packId)?.facts ?? [];
       case 'customs':

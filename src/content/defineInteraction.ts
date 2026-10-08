@@ -103,10 +103,11 @@ export type JobApplication = { jobId: JobId; name: string };
 
 /**
  * What a completion comes to in this pack: the lines to pay for, for `pointTo` the item shown,
- * for the landlord, the change to the rent, for hiring, the application, and for a restaurant meal, what's already on the bill.
+ * for the landlord, the change to the rent, and for hiring, the application. Settling the bill pays nothing here: the
+ * sim knows the bill, at the prices it was ordered at, and any restaurant debt.
  */
 export type ResolvedCompletion =
-  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange; application?: JobApplication; bill?: OrderLine[] }
+  | { success: true; lines: OrderLine[]; pointedTo?: ServedItem; rent?: RentChange; application?: JobApplication }
   | { success: false; error: string };
 
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
@@ -118,7 +119,7 @@ export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
   parseArgs: (raw: unknown) => ParsedArgs;
   /**
    * Validates the arguments and looks up what they come to in this Culture Pack:
-   * the order, for a `purchase`, the `basket` the Character brought to the till, and at the restaurant, the bill (`basket`).
+   * the order, and for a `purchase`, the `basket` the Character brought to the till.
    */
   resolveCompletion: (raw: unknown, packId: LanguageCode, basket?: Basket) => ResolvedCompletion;
 };
@@ -198,11 +199,10 @@ function resolveEffect(effect: Interaction['effect'], args: Record<string, unkno
       const { items, restriction } = args as OrderMealArgs;
       const problem = restriction ? dietaryProblem(items, restriction, packId) : null;
       if (problem) return { success: false, error: problem };
-      return { success: true, lines: orderLines(items.map(({ item, quantity }) => ({ itemId: item, quantity })), packId), bill: orderLines(basket, packId) };
+      return { success: true, lines: orderLines(items.map(({ item, quantity }) => ({ itemId: item, quantity })), packId) };
     }
     case 'settleBill':
-      if (basket.length === 0) return { success: false, error: 'The customer has nothing on their bill to pay.' };
-      return { success: true, lines: orderLines(basket, packId) };
+      return { success: true, lines: [] };
   }
 }
 

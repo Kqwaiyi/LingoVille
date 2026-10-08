@@ -1018,4 +1018,12 @@ describe('mock VoiceSession: the restaurant (#8, #9, #10, #11)', () => {
     expect(turns).toHaveLength(3);
     for (const turn of turns) expect(turn).toMatch(script);
   });
+
+  it.each(LANGUAGE_CODES)('says what is owed from a bill walked out on as the total, with nothing on the bill today (%s)', async (packId) => {
+    const owed = menuPrice('pork-dish', packId) + menuPrice('juice', packId);
+    const session = buildNpcSession(INTERACTIONS.payTheBill, CULTURE_PACKS[packId], 'B1', NAMED_NPCS.server, { ...LUNCH, restaurantDebt: owed });
+    const { turns } = await open(session);
+
+    expect(turns[0]).toContain(formatLocalMoney(owed, packId));
+  });
 });

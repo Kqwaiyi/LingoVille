@@ -330,4 +330,27 @@ describe('the restaurant interactions', () => {
     expect(facts).toContain(`Bill total: ${formatLocalMoney(total, packId)}.`);
     expect(readBillTotal(facts.join('\n'))).toBe(formatLocalMoney(total, packId));
   });
+
+  it.each(LANGUAGE_CODES)('tells the %s server what is owed from a bill walked out on, and adds it to the total', (packId) => {
+    const bill = [{ itemId: 'fish-dish', quantity: 1 }] as const;
+    const owed = menuPrice('pork-dish', packId);
+
+    const facts = interactionFacts(payTheBill, packId, { bill, restaurantDebt: owed });
+
+    expect(facts).toContain(`Owed from last time, when they left without paying: ${formatLocalMoney(owed, packId)}.`);
+    expect(facts).toContain(`Bill total: ${formatLocalMoney(owed + menuPrice('fish-dish', packId), packId)}.`);
+  });
+
+  it('tells the server what is owed from last time when nothing is on the bill now', () => {
+    const owed = menuPrice('pork-dish', 'en');
+
+    const facts = interactionFacts(payTheBill, 'en', { restaurantDebt: owed });
+
+    expect(facts).toEqual([
+      'The customer has nothing on their bill today.',
+      `Owed from last time, when they left without paying: ${formatLocalMoney(owed, 'en')}.`,
+      `Bill total: ${formatLocalMoney(owed, 'en')}.`,
+      ...interactionFacts(payTheBill, 'en').slice(1),
+    ]);
+  });
 });

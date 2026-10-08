@@ -82,15 +82,17 @@ describe('the shopkeeper at the bookshop', () => {
 describe('the server at the restaurant', () => {
   const NO_TABLE = { seated: false, bill: [] };
   const SEATED = { seated: true, bill: [] };
-  const EATEN = { seated: true, bill: [{ itemId: 'fish-dish' as const, quantity: 1 }] };
-  const WALKED_OUT = { seated: false, bill: [{ itemId: 'fish-dish' as const, quantity: 1 }] };
+  const EATEN = { seated: true, bill: [{ itemId: 'fish-dish' as const, quantity: 1, priceInShifts: 0.2 }] };
 
-  it('gets a table with E, then takes the order, then the bill once anything is on it, even after walking out', () => {
+  it('gets a table with E, then takes the order, then the bill once anything is on it', () => {
     expect(interactionStartedWithE('server')).toBe(INTERACTIONS.getATable);
     expect(interactionStartedWithE('server', { shopping: false, restaurant: NO_TABLE })).toBe(INTERACTIONS.getATable);
     expect(interactionStartedWithE('server', { shopping: false, restaurant: SEATED })).toBe(INTERACTIONS.orderAMeal);
     expect(interactionStartedWithE('server', { shopping: false, restaurant: EATEN })).toBe(INTERACTIONS.payTheBill);
-    expect(interactionStartedWithE('server', { shopping: false, restaurant: WALKED_OUT })).toBe(INTERACTIONS.payTheBill);
+  });
+
+  it('takes payment with E, and seats no one, while the Character owes for a bill they walked out on', () => {
+    expect(interactionStartedWithE('server', { shopping: false, restaurant: NO_TABLE, owesRestaurant: true })).toBe(INTERACTIONS.payTheBill);
   });
 
   it('asks for a recommendation within a dietary restriction with F at the table, at any step', () => {

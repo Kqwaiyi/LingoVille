@@ -3,6 +3,7 @@ import { throwOutSpoiled } from './inventory.ts';
 import type { GameState } from './state.ts';
 import { clampMeter } from './meters.ts';
 import { endDaysSince } from './rent.ts';
+import { leaveTable } from './restaurant.ts';
 import { CLOCK, ECONOMY, MOOD, WELL_BEING } from './tuning.ts';
 
 /**
@@ -19,12 +20,12 @@ export function faint(state: GameState): GameState {
   const { day, minuteOfDay } = state.clock;
   // Before the night is over (when the bed would wake the Character), the next day is the same day number.
   const wakeDay = minuteOfDay < CLOCK.wakeAt ? day : day + 1;
+  // Taken from the restaurant, the Character gives up the table, and any unpaid bill becomes debt.
+  const left = leaveTable(state);
   const fainted: GameState = {
-    ...state,
+    ...left,
     clock: { day: wakeDay, minuteOfDay: CLOCK.faintWakeAt },
     placeId: 'clinic',
-    // Taken from the restaurant, the Character gives up the table. Any unpaid bill stays open.
-    restaurant: { ...state.restaurant, seated: false },
     wokeInWardOnDay: wakeDay,
     character: {
       ...character,
@@ -32,7 +33,7 @@ export function faint(state: GameState): GameState {
       mood: clampMeter(character.mood + MOOD.changes.fainting),
       moneyInShifts: canPay ? character.moneyInShifts - bill : character.moneyInShifts,
     },
-    debts: canPay ? state.debts : addDebt(state.debts, { kind: 'hospital', amountInShifts: bill }),
+    debts: canPay ? left.debts : addDebt(left.debts, { kind: 'hospital', amountInShifts: bill }),
   };
   return throwOutSpoiled(endDaysSince(day, fainted));
 }

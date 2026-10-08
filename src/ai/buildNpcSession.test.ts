@@ -275,6 +275,11 @@ describe('buildNpcSession: the restaurant', () => {
     expect(guestSessions(packId)).toMatchSnapshot();
   });
 
+  it.each(LANGUAGE_CODES)('builds the server taking payment for a bill walked out on, with a new bill, in the %s pack', (packId) => {
+    const context = { clock: LUNCHTIME, bill: BILL, restaurantDebt: 0.25 };
+    expect(buildNpcSession(INTERACTIONS.payTheBill, CULTURE_PACKS[packId], 'A1', NAMED_NPCS.server, context)).toMatchSnapshot();
+  });
+
   it('offers seat_guest, serve_order (with the dietary need for a recommendation) and settle_bill', () => {
     const { table, order, recommend, bill } = guestSessions('en');
     expect([table, order, recommend, bill].map(({ tools }) => tools[0]!.name)).toEqual(['seat_guest', 'serve_order', 'serve_order', 'settle_bill']);

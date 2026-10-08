@@ -292,7 +292,7 @@ export const INTERACTIONS = {
     band: 'A',
     effect: { kind: 'orderMeal' },
   }),
-  // #11. Paying the bill. E at the server while anything is on it, even after leaving and coming back.
+  // #11. Paying the bill. E at the server while anything is on it, or while a bill walked out on is owed as debt.
   payTheBill: defineInteraction({
     id: 'pay-the-bill',
     placeId: 'restaurant',

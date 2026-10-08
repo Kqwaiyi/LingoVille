@@ -222,6 +222,7 @@ export const de: UiStrings = {
     debt: {
       hospital: 'Krankenhausschulden {{amount}}',
       rent: 'Mietschulden {{amount}}',
+      restaurant: 'Restaurantschulden {{amount}}',
     },
   },
   placeLine: {

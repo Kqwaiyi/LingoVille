@@ -112,6 +112,7 @@ import {
   putBackFromBasket,
   rememberTopic,
   rentStatement,
+  restaurantDebt,
   rideTram,
   SAVE,
   shiftRefusal,
@@ -1786,7 +1787,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           ...(approach && { approach }),
           ...(onCounter.length > 0 && { basket: onCounter }),
           ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
-          ...(interaction.effect.kind === 'settleBill' && { bill: game.restaurant.bill }),
+          ...(interaction.effect.kind === 'settleBill' && { bill: game.restaurant.bill, restaurantDebt: restaurantDebt(game) }),
           relationship: relationshipWith(game, npc.id),
         });
       // An NPC who comes up to the Character stops them where they are.
@@ -2433,13 +2434,14 @@ export const selectShelf = (s: GameStore) => {
 };
 /**
  * The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring, the Jobs
- * they have, their Proficiency Step and their restaurant table and bill, or null.
+ * they have, their Proficiency Step, their restaurant table and bill and any restaurant debt, or null.
  */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
   if (!isNamedNpc(npcId)) return null;
   const { possessions, proficiencyStep, restaurant } = s.game;
-  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: possessions.jobsHired, step: proficiencyStep, restaurant });
+  const owesRestaurant = restaurantDebt(s.game) > 0;
+  return startedWith(npcId, { shopping: s.basket.length > 0, jobsHired: possessions.jobsHired, step: proficiencyStep, restaurant, owesRestaurant });
 };
 /**
  * The key that starts Small Talk with the Named NPC the Character is next to: E with someone who has no other

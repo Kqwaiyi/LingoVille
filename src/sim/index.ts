@@ -72,6 +72,7 @@ export {
 } from './state.ts';
 export { grantExtension, payRent, rentDebt, rentOwed, rentStatement, type RentPayment, type RentStatement } from './rent.ts';
 export { weeklyRent } from './rentPrice.ts';
+export { restaurantDebt } from './restaurant.ts';
 export { bedUsable, sleep } from './sleep.ts';
 export { rideTram, tramTripMinutes } from './tram.ts';
 export * from './tuning.ts';

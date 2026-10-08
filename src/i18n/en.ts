@@ -225,6 +225,7 @@ export const en = {
     debt: {
       hospital: 'Hospital debt {{amount}}',
       rent: 'Rent debt {{amount}}',
+      restaurant: 'Restaurant debt {{amount}}',
     },
   },
   placeLine: {
