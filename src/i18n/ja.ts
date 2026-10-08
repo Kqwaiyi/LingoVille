@@ -187,8 +187,14 @@ export const ja: UiStrings = {
     appearance: {
       heading: '{{name}}の見た目は？',
       body: 'キャラクターの見た目を選んでください。',
-      choices: '見た目',
-      preset: '見た目 {{number}}',
+      build: '体型と顔',
+      look: '見た目 {{number}}',
+      hairStyle: '髪型',
+      hairStyles: { short: 'ショート', long: 'ロング', buns: 'お団子', buzzed: '坊主', bearded: 'ショート・ひげあり', bald: 'スキンヘッド' },
+      hairColour: '髪の色',
+      hairColours: { black: '黒', 'dark-brown': 'こげ茶', brown: '茶色', auburn: '赤茶', blonde: '金髪', grey: 'グレー' },
+      skinTone: '肌の色',
+      tone: '肌の色 {{number}}',
     },
     micCheck: {
       heading: 'マイクのチェック',

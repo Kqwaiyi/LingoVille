@@ -187,8 +187,14 @@ export const zh: UiStrings = {
     appearance: {
       heading: '{{name}}长什么样？',
       body: '为你的角色选一个外观。',
-      choices: '外观',
-      preset: '外观 {{number}}',
+      build: '体型和脸',
+      look: '外观 {{number}}',
+      hairStyle: '发型',
+      hairStyles: { short: '短发', long: '长发', buns: '丸子头', buzzed: '寸头', bearded: '短发，留胡子', bald: '光头' },
+      hairColour: '发色',
+      hairColours: { black: '黑色', 'dark-brown': '深棕色', brown: '棕色', auburn: '红棕色', blonde: '金色', grey: '灰色' },
+      skinTone: '肤色',
+      tone: '肤色 {{number}}',
     },
     micCheck: {
       heading: '检查一下麦克风',

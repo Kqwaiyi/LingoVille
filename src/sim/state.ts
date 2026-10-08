@@ -1,4 +1,4 @@
-import type { AppearancePresetId, DietaryNoteId, DrinkModifiers, ItemId, MedicineId, NamedNpcId } from '../content/index.ts';
+import type { AppearancePreset, DietaryNoteId, DrinkModifiers, ItemId, MedicineId, NamedNpcId } from '../content/index.ts';
 import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
@@ -140,7 +140,7 @@ export type NewGameSetup = {
   culturePackId: LanguageCode;
   /** From the self-assessment. */
   startingStep: StartingStep;
-  appearancePresetId: AppearancePresetId;
+  appearance: AppearancePreset;
   /** The Player chose "Skip tutorial" on the last setup screen. */
   skipFirstMorning: boolean;
   rngSeed: number;
@@ -152,7 +152,7 @@ export type GameState = {
     characterName: string;
     targetLanguage: LanguageCode;
     culturePackId: LanguageCode;
-    appearancePresetId: AppearancePresetId;
+    appearance: AppearancePreset;
   };
   clock: { day: number; minuteOfDay: number };
   /** The Character's current place. Positions live in the world, not here. */
@@ -246,7 +246,7 @@ export function createSave(setup: NewGameSetup): GameState {
       characterName: setup.characterName,
       targetLanguage: setup.targetLanguage,
       culturePackId: setup.culturePackId,
-      appearancePresetId: setup.appearancePresetId,
+      appearance: setup.appearance,
     },
     clock: { day: FIRST_MORNING.day, minuteOfDay: FIRST_MORNING.minuteOfDay },
     placeId: 'home',

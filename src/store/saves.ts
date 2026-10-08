@@ -1,7 +1,7 @@
 import { createStore, delMany, entries, get, promisifyRequest, set, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import {
-  APPEARANCE_PRESET_IDS,
+  AppearancePresetSchema,
   CULTURE_PACKS,
   DIETARY_NOTE_IDS,
   drinkModifiersSchema,
@@ -34,7 +34,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 16;
+export const SAVE_SCHEMA_VERSION = 17;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -87,8 +87,8 @@ const GameStateSchema = z.object({
     characterName: z.string(),
     targetLanguage: z.enum(LANGUAGE_CODES),
     culturePackId: z.enum(PACK_IDS),
-    // Any id outside the Appearance Preset pool fails loudly. Every save so far holds preset-1, so no migration is needed.
-    appearancePresetId: z.enum(APPEARANCE_PRESET_IDS),
+    // A part outside the Appearance Preset pool fails loudly.
+    appearance: AppearancePresetSchema,
   }),
   clock: z.object({ day, minuteOfDay: z.number().min(0) }),
   placeId: z.enum(PLACE_IDS),
@@ -310,6 +310,14 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       schemaVersion: 16,
       game: { ...save.game, character: { ...character, illness }, clinic: { checkedInAt: null, prescription: null } },
     };
+  },
+  // 16 → 17: Appearance Presets with parts. Each of the four placeholder looks becomes that body and face preset, with
+  // everyday hair to suit it (short on the first two, long on the others), dark brown hair and a middle skin tone.
+  (save) => {
+    const { appearancePresetId, ...identity } = save.game.identity as { appearancePresetId: string };
+    const number = Number(appearancePresetId.replace('preset-', ''));
+    const appearance = { body: `body-${number}`, hairStyle: number <= 2 ? 'short' : 'long', hairColour: 'dark-brown', skinTone: 'tone-3' };
+    return { ...save, schemaVersion: 17, game: { ...save.game, identity: { ...identity, appearance } } };
   },
 ];
 

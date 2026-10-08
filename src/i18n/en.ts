@@ -190,8 +190,14 @@ export const en = {
     appearance: {
       heading: 'How does {{name}} look?',
       body: 'Pick a look for your character.',
-      choices: 'Appearance',
-      preset: 'Look {{number}}',
+      build: 'Build and face',
+      look: 'Look {{number}}',
+      hairStyle: 'Hair',
+      hairStyles: { short: 'Short', long: 'Long', buns: 'Buns', buzzed: 'Buzzed', bearded: 'Short, with a beard', bald: 'Bald' },
+      hairColour: 'Hair colour',
+      hairColours: { black: 'Black', 'dark-brown': 'Dark brown', brown: 'Brown', auburn: 'Auburn', blonde: 'Blonde', grey: 'Grey' },
+      skinTone: 'Skin tone',
+      tone: 'Skin tone {{number}}',
     },
     micCheck: {
       heading: 'Let’s check your mic',

@@ -187,8 +187,14 @@ export const de: UiStrings = {
     appearance: {
       heading: 'Wie sieht {{name}} aus?',
       body: 'Wähle ein Aussehen für deine Figur.',
-      choices: 'Aussehen',
-      preset: 'Aussehen {{number}}',
+      build: 'Statur und Gesicht',
+      look: 'Aussehen {{number}}',
+      hairStyle: 'Frisur',
+      hairStyles: { short: 'Kurz', long: 'Lang', buns: 'Dutts', buzzed: 'Raspelkurz', bearded: 'Kurz, mit Bart', bald: 'Glatze' },
+      hairColour: 'Haarfarbe',
+      hairColours: { black: 'Schwarz', 'dark-brown': 'Dunkelbraun', brown: 'Braun', auburn: 'Kastanienrot', blonde: 'Blond', grey: 'Grau' },
+      skinTone: 'Hautton',
+      tone: 'Hautton {{number}}',
     },
     micCheck: {
       heading: 'Kurzer Mikrofontest',

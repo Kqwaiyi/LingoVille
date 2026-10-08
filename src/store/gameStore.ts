@@ -34,9 +34,9 @@ import {
   type ToolResponse,
 } from '../ai/index.ts';
 import {
-  APPEARANCE_PRESET_IDS,
   approachInteraction,
   CULTURE_PACKS,
+  DEFAULT_APPEARANCE,
   DEFAULT_DRINK,
   GROCERIES_SOLD,
   interactionStartedWithE,
@@ -61,7 +61,7 @@ import {
   shiftTemplates,
   tillFor,
   worldSign,
-  type AppearancePresetId,
+  type AppearancePreset,
   type DietaryNoteId,
   type DrinkExtra,
   type DrinkModifiers,
@@ -236,7 +236,7 @@ export const DEV_SETUP: NewGameSetup = {
   targetLanguage: 'ja',
   culturePackId: 'ja',
   startingStep: 'A1',
-  appearancePresetId: 'preset-1',
+  appearance: DEFAULT_APPEARANCE,
   skipFirstMorning: false,
   rngSeed: 20261003,
 };
@@ -274,7 +274,7 @@ export type Setup = {
   /** From the self-assessment. */
   startingStep: StartingStep | null;
   characterName: string;
-  appearancePresetId: AppearancePresetId;
+  appearance: AppearancePreset;
   /** The mic check, while its screen shows. */
   mic: MicCheckStatus | null;
   /** "Skip tutorial": the game starts without the First Morning. */
@@ -297,6 +297,8 @@ export type SlotCard =
       lastPlayedAt: string;
       /** It will load from this morning's backup. */
       fromBackup: boolean;
+      /** How the save's Character looks, for the title screen. */
+      appearance: AppearancePreset;
     }
   | { slotId: SlotId; status: 'damaged'; characterName: string | null; lastPlayedAt: string };
 
@@ -605,6 +607,7 @@ function slotCard(slot: Slot): SlotCard {
         moneyInShifts: character.moneyInShifts,
         lastPlayedAt: slot.lastPlayedAt,
         fromBackup: slot.fromBackup,
+        appearance: identity.appearance,
       };
     }
   }
@@ -744,7 +747,8 @@ export type GameStore = {
   chooseStartingStep: (startingStep: StartingStep) => void;
   /** Names the Character, cut to the longest a name may be. */
   nameCharacter: (characterName: string) => void;
-  chooseAppearance: (appearancePresetId: AppearancePresetId) => void;
+  /** Changes one or more parts of the look, keeping the rest. */
+  chooseAppearance: (change: Partial<AppearancePreset>) => void;
   /** "Skip tutorial", on the last setup screen: whether the game starts without the First Morning. */
   chooseSkipFirstMorning: (skip: boolean) => void;
   /** On to the next setup screen once this one is answered; after the last, the First Morning in its slot. */
@@ -1094,7 +1098,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     /** Setup is over: the First Morning starts in its slot, saved at once. */
     const startNewGame = (setup: Setup) => {
       stopMicCheck();
-      const { targetLanguage, startingStep, characterName, appearancePresetId, skipFirstMorning } = setup;
+      const { targetLanguage, startingStep, characterName, appearance, skipFirstMorning } = setup;
       set({ setup: null });
       // The pre-selected language counts as chosen too, so it no longer follows the browser's.
       const nativeLanguage = get().nativeLanguage;
@@ -1104,7 +1108,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         targetLanguage: targetLanguage!,
         culturePackId: targetLanguage!,
         startingStep: startingStep!,
-        appearancePresetId,
+        appearance,
         skipFirstMorning,
         rngSeed: deps.newRngSeed(),
       });
@@ -2093,7 +2097,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             targetLanguage: null,
             startingStep: null,
             characterName: '',
-            appearancePresetId: APPEARANCE_PRESET_IDS[0],
+            appearance: DEFAULT_APPEARANCE,
             mic: null,
             skipFirstMorning: false,
           },
@@ -2110,7 +2114,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       chooseStartingStep: (startingStep) => answerSetup({ startingStep }),
       nameCharacter: (characterName) => answerSetup({ characterName: [...characterName.trimStart()].slice(0, CHARACTER_NAME.maxLength).join('') }),
-      chooseAppearance: (appearancePresetId) => answerSetup({ appearancePresetId }),
+      chooseAppearance: (change) => {
+        const setup = get().setup;
+        if (setup) answerSetup({ appearance: { ...setup.appearance, ...change } });
+      },
       chooseSkipFirstMorning: (skipFirstMorning) => answerSetup({ skipFirstMorning }),
       setupNext: () => {
         const { setup, nativeLanguage, micCheckPassed } = get();
@@ -2566,12 +2573,18 @@ export const selectTitle = (s: GameStore) => s.title;
 export const selectArrival = (s: GameStore) => s.arrival;
 export const selectSavedCount = (s: GameStore) => s.savedCount;
 export const selectPersistCallout = (s: GameStore) => s.persistCallout;
-/** The place the title screen shows: where the Continue save was left, or home. */
-export const selectTitlePlaceId = (s: GameStore): PlaceId => {
+/** The save Continue would load, as the title screen shows it, if there is one. */
+const continueCard = (s: GameStore) => {
   const title = s.title?.status === 'ready' ? s.title : null;
   const card = title?.slots.find((slot) => slot.slotId === title.continueSlotId);
-  return card?.status === 'ready' ? card.placeId : 'home';
+  return card?.status === 'ready' ? card : null;
 };
+/** The place the title screen shows: where the Continue save was left, or home. */
+export const selectTitlePlaceId = (s: GameStore): PlaceId => continueCard(s)?.placeId ?? 'home';
+/** The Character standing in the live scene behind the title screen: the look being chosen in setup, else the Continue save's. */
+export const selectShowcaseAppearance = (s: GameStore): AppearancePreset =>
+  s.setup?.appearance ?? continueCard(s)?.appearance ?? DEFAULT_APPEARANCE;
+export const selectAppearance = (s: GameStore) => s.game.identity.appearance;
 
 export const selectTimeScale = (s: GameStore) => {
   if (s.tabHidden || s.journal || s.fainting || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;

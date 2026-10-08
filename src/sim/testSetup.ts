@@ -6,7 +6,7 @@ export const TEST_SETUP: NewGameSetup = {
   targetLanguage: 'ja',
   culturePackId: 'ja',
   startingStep: 'A1',
-  appearancePresetId: 'preset-1',
+  appearance: { body: 'body-1', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-3' },
   skipFirstMorning: false,
   rngSeed: 1,
 };

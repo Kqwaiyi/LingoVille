@@ -43,11 +43,22 @@ test('through the setup screens into the town, as the Character the Player descr
   await page.getByRole('textbox', { name: 'Your character’s name' }).fill('Mika');
   await button(page, 'Next').click();
 
-  // Screen 4: an Appearance Preset.
+  // Screen 4: an Appearance Preset, part by part, starting from the default look. The Character beside the panel wears it.
   await expect(heading(page, 'How does Mika look?')).toBeVisible();
-  await expect(page.getByRole('radio', { name: /^Look \d$/ })).toHaveCount(4);
-  await expect(page.getByRole('radio', { name: 'Look 1' })).toBeChecked();
+  const part = (name: string) => page.getByRole('group', { name, exact: true });
+  await expect(part('Build and face').getByRole('radio')).toHaveCount(4);
+  await expect(part('Build and face').getByRole('radio', { name: 'Look 1' })).toBeChecked();
+  await expect(part('Hair').getByRole('radio')).toHaveCount(6);
+  await expect(part('Hair').getByRole('radio', { name: 'Short', exact: true })).toBeChecked();
+  await expect(part('Hair colour').getByRole('radio', { name: 'Dark brown' })).toBeChecked();
+  await expect(part('Skin tone').getByRole('radio')).toHaveCount(6);
+  await expect(part('Skin tone').getByRole('radio', { name: 'Skin tone 3' })).toBeChecked();
   await page.getByRole('radio', { name: 'Look 3' }).check();
+  await page.getByRole('radio', { name: 'Buns' }).check();
+  await page.getByRole('radio', { name: 'Auburn' }).check();
+  await page.getByRole('radio', { name: 'Skin tone 5' }).check();
+  await expect(page.getByRole('radio', { name: 'Look 1' })).not.toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Skin tone 3' })).not.toBeChecked();
   await button(page, 'Next').click();
 
   // Screen 5: the mic check, with a live level, until it hears the smoke's fake mic beep.

@@ -5,5 +5,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["server", "evals", "e2e", "tooling", "*.config.ts"]
+  "include": ["server", "evals", "e2e", "tooling", "scripts", "*.config.ts"]
 }

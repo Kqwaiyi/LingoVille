@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CULTURE_PACKS, culturePackProblems, INTERACTIONS, type CulturePack } from './index.ts';
+import { BODY_IDS, BODY_PRESETS, CULTURE_PACKS, culturePackProblems, INTERACTIONS, type CulturePack } from './index.ts';
 
 const interactions = Object.values(INTERACTIONS);
 
@@ -70,6 +70,13 @@ describe('culturePackProblems', () => {
       expect.stringMatching(/^de: .*barista.*name/),
       expect.stringMatching(/^de: .*barista.*appearance/i),
     ]);
+  });
+
+  it('fails a Named NPC whose build changes from pack to pack', () => {
+    const jaBarista = BODY_PRESETS[CULTURE_PACKS.ja.appearances.npcs.barista];
+    const otherBuild = BODY_IDS.find((body) => BODY_PRESETS[body].build !== jaBarista.build)!;
+    const packs = withGerman((de) => (de.appearances.npcs.barista = otherBuild));
+    expect(culturePackProblems(packs, interactions)).toEqual([expect.stringMatching(/^de: .*barista.*build/)]);
   });
 
   it('fails a persona localisation with no favourite gift', () => {

@@ -1917,72 +1917,76 @@ ruby {
   line-height: 1.4;
 }
 
-.setup-choices-presets {
+.setup-appearance-part {
+  margin-top: 2px;
+}
+
+.setup-appearance-part legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+/* The parts of a look are short words, so each row holds several. */
+.setup-choices-looks {
   grid-template-columns: repeat(4, 1fr);
 }
 
-.setup-choices-presets .setup-choice {
-  flex-direction: column;
-  align-items: center;
+.setup-choices-hair {
+  grid-template-columns: repeat(3, 1fr);
 }
 
-/* The preset input sits under its picture, which is what's clicked. */
-.setup-choices-presets .setup-choice input {
-  order: 1;
-}
-
-/* Placeholder Appearance Presets until the characters arrive (ticket 30a): a head and shoulders in each preset's colours. */
-.appearance-placeholder {
-  --skin: #f1c9a5;
-  --hair: #3b2a20;
-  --top: #7aa7d9;
+.setup-appearance-part .setup-choice {
   position: relative;
-  width: 56px;
-  height: 64px;
+  justify-content: center;
+  padding: 8px 10px;
 }
 
-.appearance-placeholder::before,
-.appearance-placeholder::after {
-  content: '';
+.setup-appearance-part .setup-choice input {
   position: absolute;
-  left: 50%;
-  translate: -50% 0;
+  opacity: 0;
 }
 
-/* The head, with its hair as a thick top border. */
-.appearance-placeholder::before {
-  top: 2px;
-  width: 30px;
-  height: 30px;
+.setup-appearance-part .setup-choice small {
+  font-size: 14px;
+  color: var(--hud-ink);
+}
+
+.setup-choices-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* A round sample of the colour, ringed when chosen. */
+.setup-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
   border-radius: 50%;
-  border-top: 9px solid var(--hair);
-  background: var(--skin);
+  background: var(--swatch);
+  cursor: pointer;
 }
 
-.appearance-placeholder::after {
-  bottom: 0;
-  width: 52px;
-  height: 26px;
-  border-radius: 26px 26px 6px 6px;
-  background: var(--top);
+.setup-swatch:has(input:checked) {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px rgba(111, 207, 142, 0.35);
 }
 
-.appearance-placeholder[data-preset='preset-2'] {
-  --skin: #c98e62;
-  --hair: #1d1a1a;
-  --top: #e39a6f;
+.setup-swatch:has(input:focus-visible) {
+  outline: 2px solid var(--ok);
+  outline-offset: 3px;
 }
 
-.appearance-placeholder[data-preset='preset-3'] {
-  --skin: #f5d7bd;
-  --hair: #c9863f;
-  --top: #8fc79a;
-}
-
-.appearance-placeholder[data-preset='preset-4'] {
-  --skin: #8a5a3c;
-  --hair: #5b3a6e;
-  --top: #d9c46f;
+.setup-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .setup-name {

@@ -31,7 +31,7 @@ describe('createSave', () => {
       characterName: setup.characterName,
       targetLanguage: setup.targetLanguage,
       culturePackId: setup.culturePackId,
-      appearancePresetId: setup.appearancePresetId,
+      appearance: setup.appearance,
     });
     expect(state.proficiencyStep).toBe(setup.startingStep);
   });

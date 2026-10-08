@@ -144,7 +144,10 @@ describe('export and import', () => {
   it('imports an old file through the same migrations as a load, the save and each Journal entry on their own', async () => {
     const { stores, save } = await samInSlotOne();
     const good = JSON.parse((await exportSave(stores, 'slot-1')).contents);
-    const v1Game: Partial<GameState> = { ...save.game };
+    // Back then, the look was a placeholder id: the first, which upgrades to the dev setup's look.
+    const { appearance, ...identity } = save.game.identity;
+    expect(appearance).toEqual(DEV_SETUP.appearance);
+    const v1Game: Partial<GameState> = { ...save.game, identity: { ...identity, appearancePresetId: 'preset-1' } as unknown as GameState['identity'] };
     delete v1Game.phrasebook;
     const v1Entry: Record<string, unknown> = { ...good.journal[0], schemaVersion: 1 };
     delete v1Entry.npcName;

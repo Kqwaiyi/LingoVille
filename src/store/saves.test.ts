@@ -88,7 +88,8 @@ const nextDay = (game: GameState): GameState => ({ ...game, clock: { day: game.c
 
 /** The game before Shifts could be worked: version 7. No Shift could start, so none was ever under way. */
 function beforeShifts() {
-  const game = lived();
+  // Stored before Appearance Presets had parts, the identity holds a placeholder id, whatever its type says.
+  const game = beforeAppearanceParts('preset-1') as unknown as GameState;
   const progression: Partial<GameState['progression']> = { ...game.progression };
   delete progression.lastShiftDay;
   delete progression.shiftDays;
@@ -97,11 +98,19 @@ function beforeShifts() {
 
 /** The game before the clinic: version 15. No one was waiting for the doctor or held a prescription, and no Illness was treated. */
 function beforeTheClinic() {
-  const game: Partial<GameState> = { ...lived() };
+  const game = { ...beforeAppearanceParts('preset-1') } as unknown as Partial<GameState>;
   delete game.clinic;
   const illness = game.character!.illness && { illnessId: game.character!.illness.illnessId, onsetDay: game.character!.illness.onsetDay };
   // Stored before `treated` existed, the Illness has none, whatever its type says.
   return { ...game, character: { ...game.character!, illness } } as unknown as Omit<GameState, 'clinic'>;
+}
+
+/** The game before Appearance Presets had parts: version 16. The look was one of four placeholder ids. */
+function beforeAppearanceParts(preset: string) {
+  const game: Partial<GameState> = { ...lived() };
+  const identity: Partial<GameState['identity']> = { ...game.identity! };
+  delete identity.appearance;
+  return { ...game, identity: { ...identity, appearancePresetId: preset } };
 }
 
 /** The game before regulars: version 14. No order run or "on the house" day in NPC Memory, and no park wave. */
@@ -343,7 +352,7 @@ describe('saves', () => {
 
   it('upgrades a save with a Shift Customer at the counter from before harder customers as a single-drink customer', async () => {
     const { saves, raw } = freshSaves();
-    const game = lived();
+    const game = beforeAppearanceParts('preset-1') as unknown as GameState;
     const shift = { ...game.possessions.shift!, customer: { order: [{ itemId: 'latte', quantity: 1 }], voiceSeed: 4242 } };
     await set('slot-1', { schemaVersion: 8, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: { ...game, possessions: { ...game.possessions, shift } } }, raw);
 
@@ -417,7 +426,7 @@ describe('saves', () => {
 
   it('upgrades an unpaid bill from before bills kept their prices, pricing each line at the menu price', async () => {
     const { saves, raw } = freshSaves();
-    const game = lived();
+    const game = beforeAppearanceParts('preset-1') as unknown as GameState;
     const stored = { ...game, restaurant: { seated: false, bill: [{ itemId: 'fish-dish', quantity: 2 }] } };
     await set('slot-1', { schemaVersion: 13, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: stored }, raw);
 
@@ -445,6 +454,24 @@ describe('saves', () => {
     await set('slot-1', { schemaVersion: 15, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeTheClinic() }, raw);
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+  });
+
+  it('upgrades a save from before Appearance Presets had parts by keeping its body and face, with everyday hair and skin', async () => {
+    const { saves, raw } = freshSaves();
+    await set('slot-1', { schemaVersion: 16, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeAppearanceParts('preset-1') }, raw);
+    await set('slot-2', { schemaVersion: 16, slotId: 'slot-2', createdAt: '', lastPlayedAt: '', game: beforeAppearanceParts('preset-3') }, raw);
+
+    const game = lived();
+    expect((await saves.load('slot-1'))?.save.game).toEqual({
+      ...game,
+      identity: { ...game.identity, appearance: { body: 'body-1', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-3' } },
+    });
+    expect((await saves.load('slot-2'))?.save.game.identity.appearance).toEqual({
+      body: 'body-3',
+      hairStyle: 'long',
+      hairColour: 'dark-brown',
+      skinTone: 'tone-3',
+    });
   });
 
   it('keeps the clinic as it was: the check-in, the prescription, a treated flu and a payment plan', async () => {

@@ -8,11 +8,12 @@ import {
   type RapierContext,
   type RapierRigidBody,
 } from '@react-three/rapier';
-import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Vector3, type Group } from 'three';
 import { GROCERIES_SOLD, jobAt, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT } from '../sim/index.ts';
 import {
+  selectAppearance,
   selectArrival,
   selectHeldStill,
   selectPlaceId,
@@ -25,6 +26,7 @@ import {
   useGame,
   type Interactable,
 } from '../store/index.ts';
+import { CharacterFigure, JOG_METRES_PER_SECOND } from './CharacterFigure.tsx';
 import type { Control } from './controls.ts';
 import {
   BATHHOUSE_GYM,
@@ -46,6 +48,7 @@ import {
 
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
+const NO_ROTATION: [boolean, boolean, boolean] = [false, false, false];
 
 type CharacterController = ReturnType<RapierContext['world']['createCharacterController']>;
 const CAMERA = { distance: 7, lookHeight: 1.2, minPitch: 0.15, maxPitch: 1.2, dragSensitivity: 0.005, follow: 10 } as const;
@@ -129,10 +132,11 @@ export function Character() {
   const arrival = useGame(selectArrival);
   const startPlaceId = useGame(selectPlaceId);
   // Where the Character appeared. Fixed at mount: after that, the Character walks.
-  const [spawn] = useState(() => {
+  // A copy of its own, the same array every render: a new one would put the body back here each time the Character re-renders.
+  const [spawn] = useState((): [number, number, number] => {
     const point = spawnPoint(arrival, startPlaceId, window.location.search);
     characterPosition.set(...point);
-    return point;
+    return [...point];
   });
   const [, getKeys] = useKeyboardControls<Control>();
   const { world } = useRapier();
@@ -149,6 +153,9 @@ export function Character() {
   const tramRunning = useGame(selectTramRunning);
   // At work: from the staff door to the end of the Shift, the Character stands behind the counter.
   const atWork = useGame((s) => selectShift(s)?.jobId ?? null);
+  const appearance = useGame(selectAppearance);
+  // Moving or standing, for the figure's clip. Changes only when the Character starts or stops.
+  const [moving, setMoving] = useState(false);
   // The camera jumps with the Character after a tram ride, instead of sweeping across town.
   const snapCamera = useRef(false);
 
@@ -227,6 +234,7 @@ export function Character() {
     body.current.setNextKinematicTranslation(next);
     characterPosition.set(next.x, next.y, next.z);
     if (walking && model.current) model.current.rotation.y = Math.atan2(move.x, move.z);
+    if (walking !== moving) setMoving(walking);
 
     const target = scratch.target.set(next.x, next.y + CAMERA.lookHeight - CAPSULE.halfHeight, next.z);
     const wanted = scratch.camera.set(
@@ -244,28 +252,23 @@ export function Character() {
   });
 
   return (
-    <RigidBody ref={body} type="kinematicPosition" colliders={false} position={[...spawn]} enabledRotations={[false, false, false]}>
+    <RigidBody ref={body} type="kinematicPosition" colliders={false} position={spawn} enabledRotations={NO_ROTATION}>
       <CapsuleCollider ref={collider} args={[CAPSULE.halfHeight, CAPSULE.radius]} />
-      <CharacterModel ref={model} rotationY={Math.PI} />
+      <group ref={model} rotation-y={Math.PI}>
+        {/* The figure stands on the floor, below the middle of the capsule. */}
+        <group position-y={-STANDING_HEIGHT}>
+          <Suspense fallback={null}>
+            <CharacterFigure
+              appearance={appearance}
+              clip={moving ? 'jog' : 'idle'}
+              speed={moving ? MOVEMENT.walkSpeedMetresPerSecond / JOG_METRES_PER_SECOND : 1}
+            />
+          </Suspense>
+        </group>
+      </group>
     </RigidBody>
   );
 }
 
 /** How high the middle of the Character's body stands above the floor. */
-export const STANDING_HEIGHT = CAPSULE.halfHeight + CAPSULE.radius;
-
-/** The Character's placeholder body until the Appearance Presets arrive (ticket 30). At rotation 0 it faces +z. */
-export function CharacterModel({ ref, rotationY = 0 }: { ref?: Ref<Group>; rotationY?: number }) {
-  return (
-    <group ref={ref} rotation-y={rotationY}>
-      <mesh castShadow>
-        <capsuleGeometry args={[CAPSULE.radius, CAPSULE.halfHeight * 2, 4, 12]} />
-        <meshStandardMaterial color="#f2d16b" flatShading />
-      </mesh>
-      <mesh position={[0, 0.45, CAPSULE.radius]} castShadow>
-        <boxGeometry args={[0.18, 0.12, 0.2]} />
-        <meshStandardMaterial color="#5b4a3a" />
-      </mesh>
-    </group>
-  );
-}
+const STANDING_HEIGHT = CAPSULE.halfHeight + CAPSULE.radius;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { APPEARANCE_PRESET_IDS } from '../content/index.ts';
+import { BODY_IDS, HAIR_COLOUR_IDS, HAIR_COLOURS, HAIR_STYLE_IDS, SKIN_TONE_IDS, SKIN_TONES } from '../content/index.ts';
 import { languageEndonym, Trans, useTranslation } from '../i18n/index.ts';
 import { LANGUAGE_CODES, STARTING_STEPS } from '../sim/index.ts';
 import {
@@ -203,30 +203,76 @@ function AboutYou({ setup }: { setup: Setup }) {
   );
 }
 
-/** Screen 4: an Appearance Preset from the pool, drawn as placeholders until the characters arrive (ticket 30a). */
+/**
+ * Screen 4: the Appearance Preset, part by part: body and face, hair style, hair colour and skin tone. The Character
+ * stands in the live scene beside the panel, wearing the look as it's chosen.
+ */
 function Appearance({ setup }: { setup: Setup }) {
   const { t } = useTranslation();
   const chooseAppearance = useGame((s) => s.chooseAppearance);
+  const { appearance } = setup;
 
   return (
     <>
       <Heading title={t('setup.appearance.heading', { name: setup.characterName.trim() })} body={t('setup.appearance.body')} />
-      <fieldset className="setup-choices setup-choices-presets">
-        <legend className="visually-hidden">{t('setup.appearance.choices')}</legend>
-        {APPEARANCE_PRESET_IDS.map((presetId, i) => (
-          <Choice
-            key={presetId}
-            name="appearance"
-            checked={presetId === setup.appearancePresetId}
-            autoFocus={presetId === setup.appearancePresetId}
-            onChoose={() => chooseAppearance(presetId)}
-          >
-            <span className="appearance-placeholder" data-preset={presetId} aria-hidden />
-            <small>{t('setup.appearance.preset', { number: i + 1 })}</small>
+      <AppearancePart legend={t('setup.appearance.build')} className="setup-choices-looks">
+        {BODY_IDS.map((body, i) => (
+          <Choice key={body} name="body" checked={body === appearance.body} autoFocus={body === appearance.body} onChoose={() => chooseAppearance({ body })}>
+            <small>{t('setup.appearance.look', { number: i + 1 })}</small>
           </Choice>
         ))}
-      </fieldset>
+      </AppearancePart>
+      <AppearancePart legend={t('setup.appearance.hairStyle')} className="setup-choices-hair">
+        {HAIR_STYLE_IDS.map((hairStyle) => (
+          <Choice key={hairStyle} name="hair-style" checked={hairStyle === appearance.hairStyle} autoFocus={false} onChoose={() => chooseAppearance({ hairStyle })}>
+            <small>{t(`setup.appearance.hairStyles.${hairStyle}`)}</small>
+          </Choice>
+        ))}
+      </AppearancePart>
+      <AppearancePart legend={t('setup.appearance.hairColour')} className="setup-choices-swatches">
+        {HAIR_COLOUR_IDS.map((hairColour) => (
+          <Swatch
+            key={hairColour}
+            name="hair-colour"
+            colour={HAIR_COLOURS[hairColour]}
+            label={t(`setup.appearance.hairColours.${hairColour}`)}
+            checked={hairColour === appearance.hairColour}
+            onChoose={() => chooseAppearance({ hairColour })}
+          />
+        ))}
+      </AppearancePart>
+      <AppearancePart legend={t('setup.appearance.skinTone')} className="setup-choices-swatches">
+        {SKIN_TONE_IDS.map((skinTone, i) => (
+          <Swatch
+            key={skinTone}
+            name="skin-tone"
+            colour={SKIN_TONES[skinTone]}
+            label={t('setup.appearance.tone', { number: i + 1 })}
+            checked={skinTone === appearance.skinTone}
+            onChoose={() => chooseAppearance({ skinTone })}
+          />
+        ))}
+      </AppearancePart>
     </>
+  );
+}
+
+/** One part of the look, as a row of choices under its name. */
+function AppearancePart({ legend, className, children }: { legend: string; className: string; children: ReactNode }) {
+  return (
+    <fieldset className={`setup-choices setup-appearance-part ${className}`}>
+      <legend>{legend}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
+/** A colour to choose, named for screen readers and on hover. */
+function Swatch(props: { name: string; colour: string; label: string; checked: boolean; onChoose: () => void }) {
+  return (
+    <label className="setup-swatch" title={props.label} style={{ '--swatch': props.colour } as CSSProperties}>
+      <input type="radio" name={props.name} aria-label={props.label} checked={props.checked} onChange={props.onChoose} />
+    </label>
   );
 }
 

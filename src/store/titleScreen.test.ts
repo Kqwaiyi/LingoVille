@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { createStore, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it, vi } from 'vitest';
-import { APPEARANCE_PRESET_IDS } from '../content/index.ts';
+import { DEFAULT_APPEARANCE, type AppearancePreset } from '../content/index.ts';
 import { CHARACTER_NAME, CLOCK, createSave, MIC_CHECK, STARTING_STEPS, type GameState } from '../sim/index.ts';
 import type { OpenMic, OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from '../voice/index.ts';
 import {
@@ -25,6 +25,7 @@ import {
   selectSetup,
   selectSetupCanGoOn,
   selectSetupIsLast,
+  selectShowcaseAppearance,
   selectTargetLanguages,
   selectTitle,
   selectToast,
@@ -198,6 +199,7 @@ describe('the title screen', () => {
       moneyInShifts: 1.2,
       lastPlayedAt: '2026-10-03T09:00:00.000Z',
       fromBackup: false,
+      appearance: DEV_SETUP.appearance,
     });
     expect(title).toMatchObject({ continueSlotId: 'slot-2', freeSlotId: 'slot-1' });
   });
@@ -249,6 +251,23 @@ describe('the title screen', () => {
     expect(selectMoneyInShifts(after.getState())).toBe(1.2);
     expect(after.getState().game).toEqual(game);
     expect(selectToast(after.getState())).toBeNull();
+  });
+
+  it('shows the Continue save’s Character, or the default look with no save to continue', async () => {
+    let clock = new Date('2026-10-03T09:00:00Z');
+    const browser = freshBrowser({ clock: () => clock });
+    const empty = createGameStore(null, browser);
+    await openTitle(empty);
+    expect(selectShowcaseAppearance(empty.getState())).toEqual(DEFAULT_APPEARANCE);
+
+    const mika: AppearancePreset = { body: 'body-3', hairStyle: 'long', hairColour: 'blonde', skinTone: 'tone-2' };
+    await browser.saves.write('slot-3', dayFour());
+    clock = new Date('2026-10-03T10:00:00Z');
+    await browser.saves.write('slot-1', { ...dayFour(), identity: { ...dayFour().identity, appearance: mika } });
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+
+    expect(selectShowcaseAppearance(store.getState())).toEqual(mika);
   });
 
   it('Continue loads the most recently played slot, and Load a save plays any other', async () => {
@@ -412,7 +431,8 @@ describe('New game setup', () => {
     const store = createGameStore(null, { ...browser, newRngSeed: () => 42 });
     await openTitle(store);
 
-    setUpNewGame(store, { targetLanguage: 'zh', startingStep: 'B2', characterName: '  Mika ', appearancePresetId: 'preset-3' });
+    const appearance: AppearancePreset = { body: 'body-3', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-5' };
+    setUpNewGame(store, { targetLanguage: 'zh', startingStep: 'B2', characterName: '  Mika ', appearance });
     await saved(store, 1);
 
     const game = createSave({
@@ -420,7 +440,7 @@ describe('New game setup', () => {
       targetLanguage: 'zh',
       culturePackId: 'zh',
       startingStep: 'B2',
-      appearancePresetId: 'preset-3',
+      appearance,
       skipFirstMorning: false,
       rngSeed: 42,
     });
@@ -485,13 +505,24 @@ describe('New game setup', () => {
     expect(selectSetup(store.getState())?.characterName).toHaveLength(CHARACTER_NAME.maxLength);
   });
 
-  it('picks an Appearance Preset from the pool, the first one until the Player chooses', async () => {
+  it('starts from the default look, and each choice changes one part of it, keeping the rest', async () => {
     const store = await inSetup();
-    expect(selectSetup(store.getState())?.appearancePresetId).toBe(APPEARANCE_PRESET_IDS[0]);
+    expect(selectSetup(store.getState())?.appearance).toEqual(DEFAULT_APPEARANCE);
 
-    store.getState().chooseAppearance('preset-4');
+    store.getState().chooseAppearance({ body: 'body-4' });
+    store.getState().chooseAppearance({ hairStyle: 'buns' });
+    store.getState().chooseAppearance({ hairColour: 'grey' });
+    store.getState().chooseAppearance({ skinTone: 'tone-6' });
 
-    expect(selectSetup(store.getState())?.appearancePresetId).toBe('preset-4');
+    expect(selectSetup(store.getState())?.appearance).toEqual({ body: 'body-4', hairStyle: 'buns', hairColour: 'grey', skinTone: 'tone-6' });
+  });
+
+  it('shows the look being chosen behind setup, so the Player sees the real Character', async () => {
+    const store = await inSetup();
+
+    store.getState().chooseAppearance({ body: 'body-2', skinTone: 'tone-1' });
+
+    expect(selectShowcaseAppearance(store.getState())).toEqual({ ...DEFAULT_APPEARANCE, body: 'body-2', skinTone: 'tone-1' });
   });
 
   it('Back goes to the screen before, keeping the answers, and from the first screen to the title', async () => {

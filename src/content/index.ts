@@ -1,5 +1,20 @@
 // Public interface of the content module. Other modules import from here.
-export { APPEARANCE_PRESET_IDS, type AppearancePresetId } from './appearance.ts';
+export {
+  AppearancePresetSchema,
+  BODY_IDS,
+  BODY_PRESETS,
+  DEFAULT_APPEARANCE,
+  HAIR_COLOUR_IDS,
+  HAIR_COLOURS,
+  HAIR_STYLE_IDS,
+  SKIN_TONE_IDS,
+  SKIN_TONES,
+  type AppearancePreset,
+  type BodyId,
+  type HairColourId,
+  type HairStyleId,
+  type SkinToneId,
+} from './appearance.ts';
 export { approachInteraction, interactionStartedWithE, interactionStartedWithF, interactionStartedWithR } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {

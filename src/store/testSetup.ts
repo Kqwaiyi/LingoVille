@@ -8,7 +8,7 @@ import { DEV_SETUP, type createGameStore } from './gameStore.ts';
  * store's `newRngSeed` gives.
  */
 export function setUpNewGame(store: ReturnType<typeof createGameStore>, answers: Partial<Omit<NewGameSetup, 'rngSeed'>> = {}) {
-  const { targetLanguage, startingStep, characterName, appearancePresetId, skipFirstMorning } = { ...DEV_SETUP, ...answers };
+  const { targetLanguage, startingStep, characterName, appearance, skipFirstMorning } = { ...DEV_SETUP, ...answers };
   const s = () => store.getState();
   s().newGame();
   s().setupNext();
@@ -17,7 +17,7 @@ export function setUpNewGame(store: ReturnType<typeof createGameStore>, answers:
   s().chooseStartingStep(startingStep);
   s().nameCharacter(characterName);
   s().setupNext();
-  s().chooseAppearance(appearancePresetId);
+  s().chooseAppearance(appearance);
   s().setupNext();
   if (s().setup?.step !== 'micCheck') return;
   s().chooseSkipFirstMorning(skipFirstMorning);

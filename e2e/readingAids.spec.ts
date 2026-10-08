@@ -18,12 +18,18 @@ const openSettings = async (page: Page) => {
   await titleMenu(page).getByRole('button', { name: 'Settings' }).click();
 };
 
-/** Sets reading aids settings on the title screen, and checks they are kept for this browser after a reload. */
+/**
+ * Sets reading aids settings on the title screen, and checks they are kept for this browser after a reload. The
+ * setting is written in the background, and a reload straight away (while the title scene is still loading) can beat
+ * it, so the whole round is tried again until the setting is kept.
+ */
 async function keepSettings(page: Page, settings: Settings) {
-  await openSettings(page);
-  for (const [name, on] of Object.entries(settings)) await page.getByRole('checkbox', { name }).setChecked(on);
-  await openSettings(page);
-  for (const [name, on] of Object.entries(settings)) await expect(page.getByRole('checkbox', { name })).toBeChecked({ checked: on });
+  await expect(async () => {
+    await openSettings(page);
+    for (const [name, on] of Object.entries(settings)) await page.getByRole('checkbox', { name }).setChecked(on);
+    await openSettings(page);
+    for (const [name, on] of Object.entries(settings)) await expect(page.getByRole('checkbox', { name })).toBeChecked({ checked: on, timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 test('furigana sit over the kanji of an NPC line, and only over the kanji', async ({ page }) => {

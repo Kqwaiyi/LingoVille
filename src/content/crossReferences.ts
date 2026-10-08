@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ECONOMY, LANGUAGE_CODES, type LanguageCode } from '../sim/index.ts';
+import { BODY_PRESETS } from './appearance.ts';
 import { culturePackSchema, type CulturePack } from './culturePacks.ts';
 import { priceProblem } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
@@ -14,7 +15,8 @@ const GIFT_WORDS: Record<(typeof GIFTS_SOLD)[number], string> = { flowers: 'flow
  * passes its schema (with glosses in exactly the three other Native Languages),
  * sells every item an interaction refers to (saying which allergens are in each one the barista sells avoiding an
  * allergen), converts every catalogue price and the postage, and
- * localises and dresses every Named NPC, keeping to the gift each one loves most.
+ * localises and dresses every Named NPC, keeping to the gift each one loves most and to the same build in every pack
+ * (as the Japanese pack has it).
  */
 export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, interactions: readonly Interaction[]): string[] {
   return LANGUAGE_CODES.flatMap((packId) => {
@@ -46,7 +48,10 @@ export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, in
       if (favourite && !favourite.includes(GIFT_WORDS[favouriteGift])) {
         problems.push(`gives ${npcId} a favourite gift that isn't ${GIFT_WORDS[favouriteGift]}, the one they love most.`);
       }
-      if (!pack.appearances.npcs[npcId]) problems.push(`gives ${npcId} no Appearance Preset.`);
+      const body = pack.appearances.npcs[npcId];
+      const build = packs.ja.appearances.npcs[npcId] && BODY_PRESETS[packs.ja.appearances.npcs[npcId]].build;
+      if (!body) problems.push(`gives ${npcId} no Appearance Preset.`);
+      else if (build && BODY_PRESETS[body].build !== build) problems.push(`gives ${npcId} a ${BODY_PRESETS[body].build} build, not the ${build} one they have in every pack.`);
     }
     return problems.map((problem) => `${packId}: ${problem}`);
   });
