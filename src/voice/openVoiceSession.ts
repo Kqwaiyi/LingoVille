@@ -3,7 +3,8 @@ import { openLiveSession, type LiveToken } from './liveSession.ts';
 import { openMockVoiceSession } from './mockVoiceSession.ts';
 import { VoiceServiceUnavailableError, type OpenVoiceSession, type VoiceSession } from './voiceSession.ts';
 
-type TokenResponse = LiveToken & { mock: boolean };
+/** In mock mode, the token also says how long the scripted fake NPC waits before each answer. */
+type TokenResponse = LiveToken & { mock: boolean; replyDelayMs?: number };
 
 /** Asks the gateway for a one-use token. Every failure here means voice can't work at all. */
 async function mintToken(voice: VoiceRequest): Promise<TokenResponse> {
@@ -33,7 +34,9 @@ export const openVoiceSession: OpenVoiceSession = (session, events, options) => 
     connect: async () => {
       const token = await mintToken(session.voice);
       if (closed) return;
-      inner = token.mock ? openMockVoiceSession(session, events, options) : openLiveSession(token, session, events, options);
+      inner = token.mock
+        ? openMockVoiceSession(session, events, options, token.replyDelayMs)
+        : openLiveSession(token, session, events, options);
       await inner.connect();
     },
     startTalking: () => inner?.startTalking(),

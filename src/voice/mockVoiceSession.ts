@@ -61,10 +61,10 @@ import {
   type TramStopId,
 } from '../content/index.ts';
 import { ECONOMY, ILLNESS_IDS, type IllnessId, type LanguageCode, type PlaceId } from '../sim/index.ts';
-import type { OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
+import type { VoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './voiceSession.ts';
 
-/** Roughly how long the real NPC takes to start answering. */
-const REPLY_DELAY_MS = 600;
+/** Roughly how long the real NPC takes to start answering: the delay when the gateway names none. */
+const DEFAULT_REPLY_DELAY_MS = 600;
 
 // The completions the fake knows how to script: an order over a counter, paying at the till or the bookshop,
 // pointing to an item on the shelves, the nurse letting the patient go home, and the landlord
@@ -3029,13 +3029,15 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * would like, calls reveal_favourite and says their favourite by its local name. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
- * but has forgotten any read-back.
+ * but has forgotten any read-back. Every event waits `replyDelayMs`, from the gateway's
+ * token, and comes from a timer even at 0, never from within the call that caused it.
  */
-export const openMockVoiceSession: OpenVoiceSession = (
+export const openMockVoiceSession = (
   session: NpcSession,
   events: VoiceSessionEvents,
   options: VoiceSessionOptions = {},
-) => {
+  replyDelayMs = DEFAULT_REPLY_DELAY_MS,
+): VoiceSession => {
   const pending = new Set<ReturnType<typeof setTimeout>>();
   const awaitingAnswer = new Map<string, (response: ToolResponse) => void>();
   let calls = 0;
@@ -3045,7 +3047,7 @@ export const openMockVoiceSession: OpenVoiceSession = (
     const timer = setTimeout(() => {
       pending.delete(timer);
       act();
-    }, REPLY_DELAY_MS);
+    }, replyDelayMs);
     pending.add(timer);
   };
 

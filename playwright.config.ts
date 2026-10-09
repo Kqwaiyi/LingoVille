@@ -39,6 +39,7 @@ export default defineConfig({
     url: `http://localhost:${WEB_PORT}`,
     reuseExistingServer: false,
     timeout: 60_000,
-    env: { GEMINI_MOCK: '1', WEB_PORT, GATEWAY_PORT },
+    // The fake NPC answers in 50ms instead of a real NPC's 600: still later, never within the same call, but fast.
+    env: { GEMINI_MOCK: '1', GEMINI_MOCK_REPLY_MS: '50', WEB_PORT, GATEWAY_PORT },
   },
 });

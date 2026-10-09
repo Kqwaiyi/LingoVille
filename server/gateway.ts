@@ -33,6 +33,8 @@ export type GatewayEnv = {
   mock: boolean;
   apiKey: string | undefined;
   port: number;
+  /** How long the scripted fake NPC waits before each answer, in mock mode. */
+  mockReplyDelayMs: number;
 };
 
 /** What the gateway reaches outside itself, so tests can stand in for Gemini. */
@@ -46,6 +48,7 @@ export function readGatewayEnv(env: Record<string, string | undefined>): Gateway
     mock: env.GEMINI_MOCK === '1',
     apiKey: env.GEMINI_API_KEY || undefined,
     port: parsePort(env.GATEWAY_PORT),
+    mockReplyDelayMs: parseMockReplyDelayMs(env.GEMINI_MOCK_REPLY_MS),
   };
 }
 
@@ -56,6 +59,18 @@ function parsePort(value: string | undefined): number {
     throw new Error(`GATEWAY_PORT must be a port number (1–65535), got "${value}"`);
   }
   return port;
+}
+
+/** Roughly how long the real NPC takes to start answering, so mock-mode play feels the same. */
+const DEFAULT_MOCK_REPLY_DELAY_MS = 600;
+
+// Checked in real mode too, so a typo in .env is caught whichever mode it's in.
+function parseMockReplyDelayMs(value: string | undefined): number {
+  if (value === undefined || value === '') return DEFAULT_MOCK_REPLY_DELAY_MS;
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`GEMINI_MOCK_REPLY_MS must be a whole number of milliseconds (0 or more), got "${value}"`);
+  }
+  return Number(value);
 }
 
 function sendJson(res: http.ServerResponse, status: number, body: unknown) {
@@ -130,7 +145,7 @@ async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingM
   if (!voiceName) return sendJson(res, 400, { error: 'bad_request' });
 
   const session = liveSessionTarget(voiceName);
-  if (env.mock) return sendJson(res, 200, { mock: true, token: MOCK_TOKEN, ...session });
+  if (env.mock) return sendJson(res, 200, { mock: true, token: MOCK_TOKEN, ...session, replyDelayMs: env.mockReplyDelayMs });
   if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
 
   try {

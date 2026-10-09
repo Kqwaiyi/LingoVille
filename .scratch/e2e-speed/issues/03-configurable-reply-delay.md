@@ -15,14 +15,15 @@ See the spec's Solution step 3 and Implementation Decisions ("Reply delay contra
 
 **Blocked by:** 01 (Steady smoke tests)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Gateway (Vitest, via `createGateway`): the mock-mode token response carries the configured delay, and 600 when the env var is unset
-- [ ] Gateway (Vitest): a malformed delay value is rejected at startup with a message naming the variable
-- [ ] Gateway (Vitest): the real-mode token response carries no reply delay
-- [ ] Mock VoiceSession (Vitest, fake timers): a reply arrives after the delay it was given and not before, and after 600ms when none is given
-- [ ] Mock VoiceSession (Vitest): with a delay of 0, events still arrive asynchronously, not within the call that caused them
-- [ ] The smoke config's web server env sets the short delay alongside `GEMINI_MOCK=1`
-- [ ] `.env.example` lists the new variable, and the server and voice `AGENTS.md` files say the delay comes from the token response
+- [x] Gateway (Vitest, via `createGateway`): the mock-mode token response carries the configured delay, and 600 when the env var is unset
+- [x] Gateway (Vitest): a malformed delay value is rejected at startup with a message naming the variable
+- [x] Gateway (Vitest): the real-mode token response carries no reply delay
+- [x] Mock VoiceSession (Vitest, fake timers): a reply arrives after the delay it was given and not before, and after 600ms when none is given
+- [x] Mock VoiceSession (Vitest): with a delay of 0, events still arrive asynchronously, not within the call that caused them
+- [x] The smoke config's web server env sets the short delay alongside `GEMINI_MOCK=1`
+- [x] `.env.example` lists the new variable, and the server and voice `AGENTS.md` files say the delay comes from the token response
 - [ ] `npm test`, `npm run lint`, `npm run typecheck` and `npm run test:e2e` pass
-- [ ] The full-suite wall-clock time, before and after, is recorded under `## Comments` on the spec
+  - `npm test`, lint and typecheck pass. In the full `npm run test:e2e` run, 93 passed and 2 failed: `readingAids` hiding reading aids, and `slots`' persist callout. Both are reload-beats-settings-write flakes, unrelated to the reply delay, and both passed 10/10 on their own. The fix is a separate task.
+- [x] The full-suite wall-clock time, before and after, is recorded under `## Comments` on the spec

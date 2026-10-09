@@ -71,6 +71,55 @@ async function atTheCounter(packId: LanguageCode = 'ja', { nurse = false } = {})
 
 const { goods } = CULTURE_PACKS.ja;
 
+describe("mock VoiceSession's reply delay", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('answers after the delay it was given, and not before', async () => {
+    const { turns, events } = listen();
+    const session = openMockVoiceSession(npcSession('ja'), events, {}, 50);
+
+    await session.connect();
+    await vi.advanceTimersByTimeAsync(49);
+    expect(turns).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(turns).toHaveLength(1);
+
+    session.sendText('コーヒー ください');
+    await vi.advanceTimersByTimeAsync(49);
+    expect(turns).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(turns).toHaveLength(2);
+  });
+
+  it('answers after 600ms when given no delay', async () => {
+    const { turns, events } = listen();
+    const session = openMockVoiceSession(npcSession('ja'), events);
+
+    await session.connect();
+    await vi.advanceTimersByTimeAsync(599);
+    expect(turns).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(turns).toHaveLength(1);
+  });
+
+  it('still answers later, never within the call, with a delay of 0', async () => {
+    const { turns, events } = listen();
+    const session = openMockVoiceSession(npcSession('ja'), events, {}, 0);
+
+    await session.connect();
+    expect(turns).toEqual([]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(turns).toHaveLength(1);
+
+    session.sendText('コーヒー ください');
+    await Promise.resolve();
+    expect(turns).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(turns).toHaveLength(2);
+  });
+});
+
 describe('mock VoiceSession', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());

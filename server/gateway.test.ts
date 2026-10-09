@@ -51,6 +51,17 @@ describe('readGatewayEnv', () => {
     expect(readGatewayEnv({ GATEWAY_PORT: '' }).port).toBe(DEFAULT_GATEWAY_PORT);
   });
 
+  it('rejects a GEMINI_MOCK_REPLY_MS that is not a non-negative whole number, in either mode', () => {
+    for (const value of ['abc', '-1', '1.5', '50ms', ' ']) {
+      expect(() => readGatewayEnv({ GEMINI_MOCK: '1', GEMINI_MOCK_REPLY_MS: value })).toThrow(/GEMINI_MOCK_REPLY_MS/);
+    }
+    expect(() => readGatewayEnv({ GEMINI_MOCK_REPLY_MS: 'abc' })).toThrow(/GEMINI_MOCK_REPLY_MS/);
+  });
+
+  it('treats an empty GEMINI_MOCK_REPLY_MS as unset', () => {
+    expect(readGatewayEnv({ GEMINI_MOCK_REPLY_MS: '' }).mockReplyDelayMs).toBe(600);
+  });
+
   it('treats an empty key as no key', () => {
     expect(readGatewayEnv({ GEMINI_API_KEY: '' }).apiKey).toBeUndefined();
     expect(readGatewayEnv({ GEMINI_API_KEY: 'k' }).apiKey).toBe('k');
@@ -166,6 +177,22 @@ describe('POST /api/token', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ mock: true, model: MODELS.live, voiceName: VOICES.ja, token: expect.any(String) });
     expect(gemini.calls).toEqual([]);
+  });
+
+  it.each([
+    [{}, 600],
+    [{ GEMINI_MOCK_REPLY_MS: '50' }, 50],
+    [{ GEMINI_MOCK_REPLY_MS: '0' }, 0],
+  ])('tells the browser how long the fake NPC waits before answering (%o → %ims)', async (env, replyDelayMs) => {
+    const base = await start({ GEMINI_MOCK: '1', ...env });
+
+    expect(await (await askForToken(base)).json()).toMatchObject({ mock: true, replyDelayMs });
+  });
+
+  it('gives a real token no reply delay', async () => {
+    const base = await start({ GEMINI_API_KEY: 'k', GEMINI_MOCK_REPLY_MS: '50' });
+
+    expect(await (await askForToken(base)).json()).not.toHaveProperty('replyDelayMs');
   });
 
   it('reports the voice service unavailable when there is no key', async () => {

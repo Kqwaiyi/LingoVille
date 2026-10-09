@@ -139,3 +139,8 @@ The full smoke suite runs in about a third of the time and passes reliably. No t
   - After, with `trace: 'off'`: 95 passed in 9.2 min (551s wall-clock), about 4 min saved.
   - The failed test took 9.4s, about as long as it takes to pass with tracing, so it barely skews the comparison.
   - The failure was `culturePacks`' café in the `de` pack, a flake that isn't about tracing. Its trace shows the walk let go on "Press E to talk — Barista", which was gone a frame later, so E opened nothing. The Character's prompt is set from the position it asks the physics engine for, which a render frame with no physics step drops. The fix is left to a separate task, outside this spec.
+- Step 3 (configurable reply delay), on 2026-10-09, `npm run test:e2e` (1 worker):
+  - Before, the step 2 run above with the fake NPC at 600ms: 95 passed in 551s wall-clock.
+  - After, with `GEMINI_MOCK_REPLY_MS=50`: 93 passed and 2 failed in 8.8 min (531s wall-clock), about 20s saved. The two failures each spent about 5s waiting on an assertion, so the true saving is a little more.
+  - That is well short of the 2–3 min estimate. Most tests have only a few NPC turns. The delay itself works: `shift.spec.ts` alone took 35.7s at 50ms against 46.7s at 600ms.
+  - Both failures are flakes unrelated to the delay: `readingAids`' "hiding reading aids…" and `slots`' persist-callout test. Each reloads straight after a click whose device-settings write lands in the background, so the reload can beat the write. Both passed 10/10 under `--repeat-each=5`. The fix is left to a separate task.
