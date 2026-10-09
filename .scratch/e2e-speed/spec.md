@@ -1,6 +1,6 @@
 # Spec: Faster, steadier smoke suite
 
-Status: ready-for-agent
+Status: done
 
 The Playwright smoke suite (`npm run test:e2e`) takes about 15 minutes. This spec cuts that time without dropping any test or what it checks. Terms follow `GLOSSARY.md`.
 
