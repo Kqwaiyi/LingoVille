@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 
@@ -8,9 +9,7 @@ const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Co
 async function atTheClerk(page: Page) {
   await startNewGame(page, { path: '/?spawn=town-office&at=10' });
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — clerk')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to talk — clerk');
 }
 
 test('registers the address on F, after which F has nothing more to offer', async ({ page }) => {

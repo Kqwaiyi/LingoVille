@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { expect, test, type Page } from './test.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const dock = (page: Page) => page.getByRole('region', { name: 'Dock' });
 
@@ -32,6 +33,7 @@ test('the clock runs at one game minute per real second and stops while the tab 
 
   await hideTab(page);
   const frozen = await time.textContent();
+  // Real time passing: 2.5 real seconds would move a running clock on.
   await page.waitForTimeout(2_500);
   await expect(time).toHaveText(frozen!);
 });
@@ -45,9 +47,7 @@ test('walking to the tap at home and pressing E refills Thirst for free', async 
 
   // The Character starts facing the tap; walk forward until it is in reach.
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to drink tap water')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to drink tap water');
 
   await page.keyboard.press('KeyE');
   await expect(thirst).toHaveAttribute('aria-valuenow', '100');

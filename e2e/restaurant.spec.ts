@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 
@@ -8,9 +9,7 @@ const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Co
 async function atTheServer(page: Page) {
   await startNewGame(page, { path: '/?spawn=restaurant&at=12&day=3' });
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyD');
-  await expect(page.getByText('to talk — server')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyD');
+  await walkUntil(page, 'KeyD', 'to talk — server');
 }
 
 /** Closes the closing card, back to the server. */

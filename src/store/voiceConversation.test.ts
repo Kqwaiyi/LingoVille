@@ -10,6 +10,7 @@ import {
 import {
   createGameStore,
   DEV_SETUP,
+  selectCanTakeTurn,
   selectChatLines,
   selectClosingCard,
   selectConversation,
@@ -267,6 +268,17 @@ describe('a dropped connection', () => {
 
     expect(npc.sessions).toHaveLength(2);
     expect(selectChatLines(store.getState())).toHaveLength(1);
+  });
+
+  it('takes no turn from the Player until the fresh session has connected', async () => {
+    const { store, npc } = await talkingToTheBarista();
+    expect(selectCanTakeTurn(store.getState())).toBe(true);
+
+    npc.latest.events.onDisconnect();
+    expect(selectCanTakeTurn(store.getState())).toBe(false);
+    await npc.latest.connects();
+
+    expect(selectCanTakeTurn(store.getState())).toBe(true);
   });
 
   it('stops listening, and ignores typed lines, while reconnecting', async () => {

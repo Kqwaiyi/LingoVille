@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, typeLine, walkToTheBarista } from './barista.ts';
 import { startNewGame, type Language } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const money = (page: Page) => dock(page).getByLabel('Money');
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
@@ -61,9 +62,7 @@ test('the café works in the en pack: local menu, local prices, local money', as
     await page.keyboard.press('Enter');
   };
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('um zu sprechen — Barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'um zu sprechen — Barista');
 
   await expect(geld).toHaveText('£100');
   await page.keyboard.press('KeyE');
@@ -77,11 +76,17 @@ test('the café works in the en pack: local menu, local prices, local money', as
   await expect(geld).toHaveText('£95.50');
 });
 
-/** Sweeps the pointer across the scene, right of centre first where the menu board hangs, until a sign's tooltip shows. */
-async function pointAtASign(page: Page) {
+/**
+ * Sweeps the pointer across the scene until a sign's tooltip shows: by default right of centre first, where the café's
+ * menu board hangs. `rows` and `columns` are where to look, as fractions of the scene's height and width.
+ */
+async function pointAtASign(
+  page: Page,
+  { rows = [0.35, 0.3, 0.4, 0.25, 0.45, 0.2, 0.5], columns = [0.6, 0.65, 0.7, 0.55, 0.75, 0.5, 0.8, 0.45, 0.4] } = {},
+) {
   const box = (await page.locator('canvas').boundingBox())!;
-  for (const fy of [0.35, 0.3, 0.4, 0.25, 0.45, 0.2, 0.5]) {
-    for (const fx of [0.6, 0.65, 0.7, 0.55, 0.75, 0.5, 0.8, 0.45, 0.4]) {
+  for (const fy of rows) {
+    for (const fx of columns) {
       await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
       try {
         await expect(signTooltip(page)).toBeVisible({ timeout: 150 });
@@ -108,12 +113,12 @@ test('pointing at a sign shows its pinyin, and Translate shows what it means', a
 
 test('the town’s signs outdoors, not just the café’s, show pinyin and Translate', async ({ page }) => {
   await startNewGame(page, { path: '/?spawn=bookshop', target: 'zh' });
-  // Out of the bookshop's door and onto the pavement, with its name board and hours, and a tram stop's name, in view.
+  // Out of the bookshop's door, across the pavement and onto the tram platform, with the bookshop's name board and
+  // hours, and the stop's name, in view.
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyS');
-  await page.waitForTimeout(900);
-  await page.keyboard.up('KeyS');
-  await pointAtASign(page);
+  await walkUntil(page, 'KeyS', 'Tram stop');
+  // The bookshop's name board, high above the door and clear of the lanterns beside it.
+  await pointAtASign(page, { rows: [0.2, 0.25, 0.15], columns: [0.5, 0.45, 0.55] });
 
   await expect(signTooltip(page).locator('ruby rt').first()).toBeVisible();
   await signTooltip(page).getByRole('button', { name: 'Translate' }).click();

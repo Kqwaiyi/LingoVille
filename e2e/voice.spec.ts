@@ -29,6 +29,7 @@ test('holding Space turns the mic red and listening, until it is released', asyn
 test('Space types a space instead of listening while the typed field has focus', async ({ page }) => {
   await talkToTheBarista(page);
   await page.keyboard.press('KeyT');
+  await expect(field(page)).toBeFocused();
 
   await page.keyboard.down('Space');
   await expect(field(page)).toHaveValue(' ');

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { chat, column, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 // What the scripted fake table says in the ja pack (mock mode): each diner's dish and drink, and any dietary need.
 const DINER = /(?:私|友達|もう一人の友達)は(.+?)と(.+?)を(?:、(.+?)で)?お願いします。/g;
@@ -8,13 +9,6 @@ const DINER = /(?:私|友達|もう一人の友達)は(.+?)と(.+?)を(?:、(.+?
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 const orderPad = (page: Page) => column(page).getByRole('region', { name: 'Order pad' });
 const lastNpcLine = (page: Page) => chat(page).getByRole('button', { name: /^Replay “/ }).last();
-
-/** Walks with `key` held until `prompt` shows. */
-async function walkUntil(page: Page, key: string, prompt: string) {
-  await page.keyboard.down(key);
-  await expect(page.getByText(prompt)).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up(key);
-}
 
 /**
  * A new game (Japanese, from B1) inside the restaurant's door at 12:00 on day 3, a Wednesday, hired as a server

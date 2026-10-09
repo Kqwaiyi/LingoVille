@@ -51,6 +51,7 @@ export {
   selectPlaceOpen,
   selectReadingAids,
   selectReconnecting,
+  selectCanTakeTurn,
   selectRecap,
   selectSmallTalkKey,
   selectSavedCount,

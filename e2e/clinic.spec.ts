@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 
@@ -15,11 +16,7 @@ async function atReception(page: Page) {
   await startNewGame(page, { path: '/?spawn=clinic&at=10&ill=cold' });
   await page.locator('canvas').click();
   // Reception is to the west of the door, past the waiting room's bench.
-  await page.keyboard.down('KeyS');
-  await page.keyboard.down('KeyA');
-  await expect(page.getByText('to talk — receptionist')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyA');
-  await page.keyboard.up('KeyS');
+  await walkUntil(page, ['KeyS', 'KeyA'], 'to talk — receptionist');
 }
 
 test('checks in at reception, and the doctor calls the Character in and diagnoses what they describe', async ({ page }) => {

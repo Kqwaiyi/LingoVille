@@ -906,6 +906,10 @@ const staffDoorJob = (interactable: Interactable | null, game: GameState): JobId
 const staffDoorRefusal = (jobId: JobId, game: GameState) =>
   shiftRefusal(game, jobId, placeHours(JOB_PLACES[jobId], game.identity.culturePackId));
 
+/** A conversation that takes the Player's turns: not yet decided, and not reconnecting. */
+const takesTurns = (conversation: Conversation | null): conversation is Conversation =>
+  conversation !== null && !conversation.outcome && !conversation.reconnecting;
+
 /** A Goal Interaction's outcome, which its closing card shows, rather than a Shift Customer's. */
 const isClosingCard = (outcome: Conversation['outcome']): outcome is ClosingCard =>
   outcome?.kind === 'success' || outcome?.kind === 'failure' || outcome?.kind === 'smallTalk';
@@ -1753,8 +1757,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     /** The Player can take a turn: the conversation is under way, connected, and not yet decided. */
-    const canTakeTurn = (conversation: Conversation | null): conversation is Conversation =>
-      conversation !== null && voice !== null && !conversation.outcome && !conversation.reconnecting;
+    const canTakeTurn = (conversation: Conversation | null): conversation is Conversation => voice !== null && takesTurns(conversation);
 
     /** Adds a piece of a turn to the line it belongs to, or starts that line. Returns the line's index. */
     const addPiece = (lines: ChatLine[], index: number | null, speaker: ChatLine['speaker'], text: string) => {
@@ -2752,6 +2755,8 @@ export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== nu
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;
+/** The Player can take a turn: not while the NPC says goodbye once the outcome is decided, nor while reconnecting. */
+export const selectCanTakeTurn = (s: GameStore) => takesTurns(s.conversation);
 export const selectConversationUsage = (s: GameStore) => s.conversation?.usage ?? NO_USAGE;
 export const selectToast = (s: GameStore) => s.toast;
 export const selectVoiceUnavailable = (s: GameStore) => s.voiceUnavailable;

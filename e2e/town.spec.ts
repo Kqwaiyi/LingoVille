@@ -2,6 +2,7 @@ import { expect, test, type Page } from './test.ts';
 import { tramTripMinutes } from '../src/sim/index.ts';
 import { dock } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { stepAsideOnThePlatform, walkUntil } from './walk.ts';
 
 const placeLine = (page: Page) => page.getByRole('status', { name: 'Place' });
 const tramChoice = (page: Page) => page.getByRole('dialog', { name: 'Take the tram to…' });
@@ -43,10 +44,12 @@ test('outside the trams’ hours, the stop says no tram is running', async ({ pa
   await page.keyboard.press('KeyE');
   await expect(tramChoice(page)).toBeHidden();
 
-  // No one waits for a tram at night, so nothing stands between the Character and that line, all along the platform.
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(1_000);
-  await page.keyboard.up('KeyD');
+  // No one waits for a tram at night, so nothing stands between the Character and that line, all along the platform:
+  // past the pole to its east end, where a passer-by waits by day, the line shows until the Character steps off.
+  await stepAsideOnThePlatform(page, 'No tram is running');
+  await walkUntil(page, 'KeyD', 'No tram is running', { gone: true });
+  await expect(page.getByText('to ask the way')).toBeHidden();
+  await walkUntil(page, 'KeyA', 'No tram is running');
   await expect(page.getByText('No tram is running')).toBeVisible();
 });
 
@@ -54,9 +57,7 @@ test('each place has its staff: Press E near the bookshop’s shopkeeper', async
   await startNewGame(page, { path: '/?spawn=bookshop&at=10' });
   await expect(placeLine(page)).toContainText('Bookshop');
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — shopkeeper')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to talk — shopkeeper');
 
   // E sells a book; the shopkeeper chats on T.
   await page.keyboard.press('KeyE');
@@ -68,7 +69,6 @@ test('the place line follows the Character walking out of a shop onto the tram p
   await expect(placeLine(page)).toContainText('Bookshop');
   await page.locator('canvas').click();
   // Back out through the door, across the pavement and onto the Old Town platform.
-  await page.keyboard.down('KeyS');
-  await expect(placeLine(page)).toContainText('Tram stop', { timeout: 5_000 });
-  await page.keyboard.up('KeyS');
+  await walkUntil(page, 'KeyS', 'Tram stop');
+  await expect(placeLine(page)).toContainText('Tram stop');
 });

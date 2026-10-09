@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 import { reloadAndContinue, startNewGame, titleMenu } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const money = (page: Page) => dock(page).getByLabel('Money');
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
@@ -33,9 +34,7 @@ test('order a drink, reload, Continue: the money and the place are as they were'
   await expect(money(page)).toHaveText('¥9,550');
   // Back at the café's entrance: a few steps forward reach the barista.
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to talk — barista');
 });
 
 test('a reload mid-conversation comes back as if the conversation never happened', async ({ page }) => {

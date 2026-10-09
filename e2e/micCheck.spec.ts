@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, field, GREETING, npcLine, typeLine } from './barista.ts';
 import { languageChoice, titleMenu } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const heading = (page: Page) => page.getByRole('heading', { name: 'Let’s check your mic' });
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -37,9 +38,7 @@ test('a refused mic lands in the Typed Fallback, with nothing locked', async ({ 
 
   // At the counter, the mic is off and the order goes through typed.
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to talk — barista');
   await page.keyboard.press('KeyE');
   await expect(npcLine(page, GREETING)).toBeVisible();
   await expect(column(page).getByText('🎤 off')).toBeVisible();

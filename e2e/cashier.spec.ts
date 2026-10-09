@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { chat, column, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 // What the scripted fake Shift Customer at the till says in the ja pack (mock mode).
 const WANTS_A_BAG = '袋をお願いします。';
@@ -14,13 +15,6 @@ const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Co
 const till = (page: Page) => column(page).getByRole('region', { name: 'Till' });
 const lastNpcLine = (page: Page) => chat(page).getByRole('button', { name: /^Replay “/ }).last();
 const yen = (text: string) => Number(text.replace(/[¥,]/g, ''));
-
-/** Walks with `key` held until `prompt` shows. */
-async function walkUntil(page: Page, key: string, prompt: string) {
-  await page.keyboard.down(key);
-  await expect(page.getByText(prompt)).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up(key);
-}
 
 /** A new game (Japanese, from B1) inside the supermarket's door at 10:00, hired as a cashier (F at the cashier, as Sam), then at the staff door. */
 async function hiredAtTheStaffDoor(page: Page) {

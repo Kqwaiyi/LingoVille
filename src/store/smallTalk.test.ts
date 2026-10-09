@@ -17,6 +17,7 @@ import {
   createGameStore,
   createJournal,
   DEV_SETUP,
+  selectCanTakeTurn,
   selectClosingCard,
   selectConversation,
   selectGiftsToGive,
@@ -209,6 +210,18 @@ describe('Small Talk under way', () => {
     // The cap allows only some of the exchanges to lift Mood.
     expect(card?.moodChange).toBe(MOOD.changes.smallTalkExchange.stranger * (FAMILIARITY.dailyCapPerNpc / FAMILIARITY.smallTalkExchange));
     expect(memoryOf(setup.store.getState().game, 'park-regular-1').timesMet).toBe(met + 1);
+  });
+
+  it('takes no more turns from the Player once the NPC wraps up, while they say goodbye', () => {
+    const setup = chattingInThePark();
+    const { exchanges } = smallTalkOf(setup.store)!;
+    for (let i = 0; i < exchanges - 1; i++) exchange(setup);
+    expect(selectCanTakeTurn(setup.store.getState())).toBe(true);
+
+    exchange(setup);
+
+    expect(selectCanTakeTurn(setup.store.getState())).toBe(false);
+    expect(selectClosingCard(setup.store.getState())).toBeNull();
   });
 
   it('has the NPC wrap up when they become busy: their place has closed', () => {

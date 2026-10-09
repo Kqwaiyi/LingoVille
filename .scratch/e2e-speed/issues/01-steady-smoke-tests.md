@@ -10,12 +10,19 @@ The Playwright config defaults don't change here: tracing, workers and the reply
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `npx playwright test --workers=2 --repeat-each=3 --trace=off` passes with no failures
-- [ ] `smallTalk`, `directions` and `shift`'s network-drop test wait on visible state, not on timing
-- [ ] No held-key walk depends on how long the key is held; each ends when its prompt appears, through the shared helper
-- [ ] Every remaining `waitForTimeout` in `e2e/` has a comment naming the real-time behaviour it measures
-- [ ] No test is removed and no assertion is weakened
-- [ ] The e2e `AGENTS.md` states the rule: wait on something the Player sees, never on a fixed sleep or a timed key hold
-- [ ] `npm run lint` and `npm run typecheck` pass
+- [x] `npx playwright test --workers=2 --repeat-each=3 --trace=off` passes with no failures
+- [x] `smallTalk`, `directions` and `shift`'s network-drop test wait on visible state, not on timing
+- [x] No held-key walk depends on how long the key is held; each ends when its prompt appears, through the shared helper
+- [x] Every remaining `waitForTimeout` in `e2e/` has a comment naming the real-time behaviour it measures
+- [x] No test is removed and no assertion is weakened
+- [x] The e2e `AGENTS.md` states the rule: wait on something the Player sees, never on a fixed sleep or a timed key hold
+- [x] `npm run lint` and `npm run typecheck` pass
+
+## Comments
+
+- smallTalk had nothing visible to wait on: during the barista's goodbye the Typed reply field stayed on screen while lines typed into it were silently dropped. With the dev's go-ahead, the field is now read-only whenever the NPC can't take a turn (the goodbye, Reconnecting…), via `selectCanTakeTurn`, and the test waits for an editable field.
+- `walkUntil` (`e2e/walk.ts`) looks for prompt text every frame and lets go of the keys in that same frame, so a walk stops within a frame's step of its prompt. It sends the key-up itself, which leans on the scene reading walk keys from window events.
+- places keeps one timed walk, as this ticket allows: nothing visible shows that the Character got no further in a closed café. If frames are slower than the clock's cap, it walks less far, so the test can only get weaker, never flaky.
+- `npx playwright test --workers=2 --repeat-each=3 --trace=off`: 285 passed in 21.7 min. The full suite once at 2 workers with tracing off took 7.6 min.

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 // What the scripted fake landlord says in the ja pack (mock mode), with a week's rent at the A1 Newcomer Discount owed.
 const REMINDER = 'あ、ちょっといいですか。家賃がまだなんです。全部で¥6,000です。今払えますか？';
@@ -16,9 +17,8 @@ async function onRentDay(page: Page) {
 /** Walks back from the tap towards the front door, past the landlord in the hallway, until they speak. */
 async function walkOut(page: Page) {
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyS');
-  await expect(npcLine(page, REMINDER)).toBeVisible({ timeout: 10_000 });
-  await page.keyboard.up('KeyS');
+  // The landlord holds the Character still once they come over, so a few steps more don't matter.
+  await walkUntil(page, 'KeyS', npcLine(page, REMINDER), { timeout: 10_000 });
 }
 
 test('the landlord catches the Character on the way out when rent is due, and takes it', async ({ page }) => {

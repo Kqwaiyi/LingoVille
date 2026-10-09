@@ -1,5 +1,6 @@
 import { expect, test } from './test.ts';
 import { chat, column, dock, field, npcLine, talkToTheBarista } from './barista.ts';
+import { walkUntil } from './walk.ts';
 
 // The fake barista reads back an order it recognises, even typed in romaji with a loanword.
 const READ_BACK = 'ホットラテですね。450円です。よろしいですか？';
@@ -48,6 +49,7 @@ test('Esc leaves the conversation at no cost', async ({ page }) => {
   const money = await dock(page).getByLabel('Money').textContent();
 
   await page.keyboard.press('KeyT');
+  await expect(field(page)).toBeFocused();
   await page.keyboard.type('hello');
   await page.keyboard.press('Escape');
 
@@ -59,7 +61,5 @@ test('Esc leaves the conversation at no cost', async ({ page }) => {
 test('walking away from the counter ends the conversation', async ({ page }) => {
   await talkToTheBarista(page);
 
-  await page.keyboard.down('KeyS');
-  await expect(column(page)).toBeHidden({ timeout: 5_000 });
-  await page.keyboard.up('KeyS');
+  await walkUntil(page, 'KeyS', column(page), { gone: true });
 });

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 
@@ -8,9 +9,7 @@ const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Co
 async function atTheShopkeeper(page: Page) {
   await startNewGame(page, { path: '/?spawn=bookshop&at=10' });
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — shopkeeper')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to talk — shopkeeper');
   await expect(page.getByText('to buy a gift')).toBeVisible();
   await expect(page.getByText('Press T to chat')).toBeVisible();
 }

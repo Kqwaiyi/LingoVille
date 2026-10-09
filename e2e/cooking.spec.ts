@@ -1,6 +1,7 @@
 import { expect, test } from './test.ts';
 import { dock } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 test('the skills page shows all five Life Skills as stars, starting at none', async ({ page }) => {
   await startNewGame(page);
@@ -19,11 +20,7 @@ test('the stove at home says there is nothing to cook without groceries', async 
 
   // The Character starts facing the tap; the stove is along the same wall, ahead and to the right.
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await page.keyboard.down('KeyD');
-  await expect(page.getByText('to cook a meal')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyD');
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, ['KeyW', 'KeyD'], 'to cook a meal');
 
   await page.keyboard.press('KeyE');
   await expect(page.getByText('Nothing to cook.', { exact: false })).toBeVisible();

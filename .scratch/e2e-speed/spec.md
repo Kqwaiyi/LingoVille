@@ -129,4 +129,5 @@ The full smoke suite runs in about a third of the time and passes reliably. No t
   - Skip-setup: about 2s per test that uses it.
   - 2 workers: roughly halves what's left.
   - Target: the full suite in about 5 min at 2 workers.
+- After step 1 (steady tests), on 2026-10-09: the full suite at `--workers=2 --trace=off` took 7.6 min, and `--repeat-each=3` at 2 workers passed 285/285 in 21.7 min.
 - In mock-mode `npm run dev` for manual play, the delay stays 600ms unless the dev sets the env var.

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { startNewGame, type Language } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 export const column = (page: Page) => page.getByRole('complementary', { name: 'Conversation' });
 export const chat = (page: Page) => column(page).getByRole('log', { name: 'Chat' });
@@ -22,9 +23,7 @@ export const GREETING = 'いらっしゃいませ！ご注文はお決まりで�
 export async function walkToTheBarista(page: Page, target?: Language) {
   await startNewGame(page, { path: '/?spawn=cafe&at=9', target });
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('to talk — barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'to talk — barista');
 }
 
 export async function talkToTheBarista(page: Page) {
@@ -35,9 +34,14 @@ export async function talkToTheBarista(page: Page) {
   await expect(npcLine(page, GREETING)).toBeVisible();
 }
 
-/** The Typed Fallback: T focuses the field, then the line is typed and sent with Enter. */
+/**
+ * The Typed Fallback: T focuses the field, then the line is typed and sent with Enter. Only once the NPC can take a
+ * turn: the field takes no line while they say goodbye or the connection is coming back.
+ */
 export async function typeLine(page: Page, line: string) {
+  await expect(field(page)).toBeEditable();
   await page.keyboard.press('KeyT');
+  await expect(field(page)).toBeFocused();
   await field(page).fill(line);
   await page.keyboard.press('Enter');
 }

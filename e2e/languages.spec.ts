@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { expect, test, type Locator, type Page } from './test.ts';
 import { goThroughSetup, startNewGame, titleMenu } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const choice = (page: Page, endonym: string) => page.getByRole('radio', { name: new RegExp(`^${endonym}`) });
 const next = (page: Page, name = 'Next') => page.getByRole('button', { name, exact: true });
@@ -103,9 +104,7 @@ test('German strings fit in the dock and the conversation column', async ({ page
   expect(await overflowing(page.getByRole('status', { name: 'Ort' }), { vertical: true })).toEqual([]);
 
   await page.locator('canvas').click();
-  await page.keyboard.down('KeyW');
-  await expect(page.getByText('um zu sprechen — Barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyW');
+  await walkUntil(page, 'KeyW', 'um zu sprechen — Barista');
   await page.keyboard.press('KeyE');
 
   const column = page.getByRole('complementary', { name: 'Gespräch' });

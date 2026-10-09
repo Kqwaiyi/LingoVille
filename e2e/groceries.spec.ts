@@ -2,17 +2,11 @@ import { expect, test, type Page } from './test.ts';
 import { GROCERIES } from '../src/sim/index.ts';
 import { column, dock, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 const money = (page: Page) => dock(page).getByLabel('Money');
 const basket = (page: Page) => page.getByRole('region', { name: 'Basket' });
-
-/** Walks with `key` held until `prompt` shows. */
-async function walkUntil(page: Page, key: string, prompt: string) {
-  await page.keyboard.down(key);
-  await expect(page.getByText(prompt)).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up(key);
-}
 
 /** A new game (learning Japanese) inside the supermarket's door on day 1 at 10:00, walked up to the cabbages. */
 async function atTheCabbages(page: Page) {

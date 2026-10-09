@@ -1,5 +1,6 @@
 import { expect, test, type Page } from './test.ts';
 import { chat, column, typeLine, walkToTheBarista } from './barista.ts';
+import { walkUntil } from './walk.ts';
 
 // Typed to the scripted fake NPC (mock mode), this drops its connection.
 const MOCK_DROP = '#drop';
@@ -25,9 +26,7 @@ async function getHired(page: Page) {
 
 /** Goes to the staff door, in the west wall level with the counter, and starts a Shift with E. Returns how many customers it has. */
 async function startAShift(page: Page) {
-  await page.keyboard.down('KeyA');
-  await expect(page.getByText('to start a shift — Barista')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyA');
+  await walkUntil(page, 'KeyA', 'to start a shift — Barista');
   await page.keyboard.press('KeyE');
   await expect(column(page)).toContainText(/Customer 1 of \d+/);
   return Number((await column(page).textContent())!.match(/Customer 1 of (\d+)/)![1]);

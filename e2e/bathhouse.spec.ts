@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, typeLine } from './barista.ts';
 import { startNewGame } from './title.ts';
+import { walkUntil } from './walk.ts';
 
 const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 
@@ -9,18 +10,14 @@ async function atTheAttendant(page: Page) {
   await startNewGame(page, { path: '/?spawn=bathhouse&at=10' });
   await page.locator('canvas').click();
   // The door faces the street, so the desk is behind the Character as they come in.
-  await page.keyboard.down('KeyS');
-  await expect(page.getByText('to talk — attendant')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyS');
+  await walkUntil(page, 'KeyS', 'to talk — attendant');
   await expect(page.getByText('to ask about the gym')).toBeVisible();
   await expect(page.getByText('Press T to chat')).toBeVisible();
 }
 
 /** Walks west from the desk to the running machine beside the door. */
 async function toTheGym(page: Page) {
-  await page.keyboard.down('KeyA');
-  await expect(page.getByText('to work out')).toBeVisible({ timeout: 5_000 });
-  await page.keyboard.up('KeyA');
+  await walkUntil(page, 'KeyA', 'to work out');
 }
 
 test('buys a bath on E: a Comfort Purchase that lifts Mood', async ({ page }) => {

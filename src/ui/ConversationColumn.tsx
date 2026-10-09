@@ -3,6 +3,7 @@ import { CULTURE_PACKS, formatLocalMoney, isPasserBy, localNpcPlaceName, localPl
 import { useTranslation } from '../i18n/index.ts';
 import type { JobId, LanguageCode } from '../sim/index.ts';
 import {
+  selectCanTakeTurn,
   selectChatLines,
   selectClockMinute,
   selectClosingCard,
@@ -197,6 +198,8 @@ function TypedField() {
   const [text, setText] = useState('');
   const field = useRef<HTMLInputElement>(null);
   const typing = useGame(selectTyping);
+  // While the NPC says goodbye, or the connection is coming back, a line typed now would go nowhere.
+  const canTakeTurn = useGame(selectCanTakeTurn);
   const sendTypedLine = useGame((s) => s.sendTypedLine);
   const setTyping = useGame((s) => s.setTyping);
 
@@ -214,7 +217,7 @@ function TypedField() {
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     // Enter while an IME is composing (Japanese, Chinese) confirms the characters; it doesn't send.
-    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing || !canTakeTurn) return;
     e.preventDefault();
     sendTypedLine(text);
     setText('');
@@ -227,6 +230,7 @@ function TypedField() {
       aria-label={t('chat.typedLabel')}
       placeholder={t('chat.typedPlaceholder')}
       autoComplete="off"
+      readOnly={!canTakeTurn}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onKeyDown={onKeyDown}
