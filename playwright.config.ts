@@ -18,7 +18,10 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
-    trace: 'retain-on-failure',
+    // Off: recording a trace cost every test a second or two, even the ones that passed. Re-run a failing
+    // test with `--trace=on` for one; e2e/test.ts still names any crash in the page. No retries, so a
+    // flake stays visible.
+    trace: 'off',
   },
   projects: [
     {

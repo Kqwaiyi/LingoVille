@@ -131,3 +131,11 @@ The full smoke suite runs in about a third of the time and passes reliably. No t
   - Target: the full suite in about 5 min at 2 workers.
 - After step 1 (steady tests), on 2026-10-09: the full suite at `--workers=2 --trace=off` took 7.6 min, and `--repeat-each=3` at 2 workers passed 285/285 in 21.7 min.
 - In mock-mode `npm run dev` for manual play, the delay stays 600ms unless the dev sets the env var.
+
+## Comments
+
+- Step 2 (tracing off), on 2026-10-09, `npm run test:e2e` (1 worker):
+  - Before, with `trace: 'retain-on-failure'`: 94 passed and 1 failed in 13.1 min (791s wall-clock).
+  - After, with `trace: 'off'`: 95 passed in 9.2 min (551s wall-clock), about 4 min saved.
+  - The failed test took 9.4s, about as long as it takes to pass with tracing, so it barely skews the comparison.
+  - The failure was `culturePacks`' café in the `de` pack, a flake that isn't about tracing. Its trace shows the walk let go on "Press E to talk — Barista", which was gone a frame later, so E opened nothing. The Character's prompt is set from the position it asks the physics engine for, which a render frame with no physics step drops. The fix is left to a separate task, outside this spec.

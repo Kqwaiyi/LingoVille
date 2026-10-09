@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 (Steady smoke tests)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The smoke config's `trace` is `'off'`, with no retries added
-- [ ] The e2e `AGENTS.md` says how to get a trace for a failing test (`--trace=on`)
-- [ ] The uncaught-error fixture is unchanged and `uncaughtErrors.spec.ts` still passes
-- [ ] `npm run test:e2e` passes
-- [ ] The full-suite wall-clock time, before and after, is recorded under `## Comments` on the spec
+- [x] The smoke config's `trace` is `'off'`, with no retries added
+- [x] The e2e `AGENTS.md` says how to get a trace for a failing test (`--trace=on`)
+- [x] The uncaught-error fixture is unchanged and `uncaughtErrors.spec.ts` still passes
+- [x] `npm run test:e2e` passes
+- [x] The full-suite wall-clock time, before and after, is recorded under `## Comments` on the spec
