@@ -11,13 +11,13 @@ See the spec's Solution step 4 and Implementation Decisions ("Skip-setup", "e2e 
 
 **Blocked by:** 01 (Steady smoke tests)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A new smoke test starts a game with `?newGame` plus `?spawn=` and `?at=` and reaches an NPC's prompt, with no title or setup screen shown
-- [ ] `?newGame=<lang>` starts the game in that Target Language, which a smoke test checks for a non-default language
-- [ ] The parameter has no effect in a production build, as with the existing dev parameters
-- [ ] `startNewGame` uses the shortcut by default and the real screens on request; the title, setup, mic-check, Continue and save-slot specs use the real screens
-- [ ] Every other spec's assertions are unchanged
-- [ ] The e2e `AGENTS.md` describes the shortcut and when to opt into the real screens
-- [ ] `npm test`, `npm run lint`, `npm run typecheck` and `npm run test:e2e` pass
-- [ ] The full-suite wall-clock time, before and after, is recorded under `## Comments` on the spec
+- [x] A new smoke test starts a game with `?newGame` plus `?spawn=` and `?at=` and reaches an NPC's prompt, with no title or setup screen shown
+- [x] `?newGame=<lang>` starts the game in that Target Language, which a smoke test checks for a non-default language
+- [x] The parameter has no effect in a production build, as with the existing dev parameters
+- [x] `startNewGame` uses the shortcut by default and the real screens on request; the title, setup, mic-check, Continue and save-slot specs use the real screens
+- [x] Every other spec's assertions are unchanged
+- [x] The e2e `AGENTS.md` describes the shortcut and when to opt into the real screens
+- [x] `npm test`, `npm run lint`, `npm run typecheck` and `npm run test:e2e` pass
+- [x] The full-suite wall-clock time, before and after, is recorded under `## Comments` on the spec

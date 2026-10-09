@@ -14,7 +14,7 @@ test('a browser with no saves is offered only New game', async ({ page }) => {
 });
 
 test('the game saves itself, with a brief "Saved ✓" under the clock', async ({ page }) => {
-  await startNewGame(page);
+  await startNewGame(page, { throughScreens: true });
 
   await expect(dock(page).getByText('Saved ✓')).toBeVisible();
   await expect(dock(page).getByText('Saved ✓')).toBeHidden({ timeout: 5_000 });

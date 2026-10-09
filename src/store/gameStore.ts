@@ -567,6 +567,8 @@ export type GameStoreDeps = {
   devFaintSoon: () => 'paying' | 'broke' | null;
   /** Dev only: a new game starts already ill with this Illness, or well (null). */
   devIllness: () => IllnessId | null;
+  /** Dev only: the Target Language of a new game to start at once, skipping the title screen and setup, or null. Asked once per title screen. */
+  devNewGameTarget: () => LanguageCode | null;
   /** Opens the mic for the mic check. */
   openMic: OpenMic;
 };
@@ -649,6 +651,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   devStartDay: devStartDayFromUrl,
   devFaintSoon: devFaintSoonFromUrl,
   devIllness: devIllnessFromUrl,
+  devNewGameTarget: takeDevNewGameFromUrl,
   openMic: openBrowserMic,
 };
 
@@ -679,6 +682,32 @@ function devIllnessFromUrl(): IllnessId | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const ill = new URLSearchParams(window.location.search).get('ill');
   return (ILLNESS_IDS as readonly (string | null)[]).includes(ill) ? (ill as IllnessId) : null;
+}
+
+/** The answers `?newGame` gives setup, the defaults of `startNewGame` in `e2e/title.ts`: keep the two the same. */
+const DEV_NEW_GAME = {
+  nativeLanguage: 'en',
+  targetLanguage: 'ja',
+  startingStep: 'A1',
+  characterName: 'Sam',
+} as const satisfies { nativeLanguage: LanguageCode } & Pick<Setup, 'targetLanguage' | 'startingStep' | 'characterName'>;
+
+/**
+ * Dev only: `?newGame` starts a new game straight into the First Morning, learning Japanese or (`?newGame=de`) the
+ * language named, so a smoke test about the town skips the title screen and setup. It comes off the URL once read, so
+ * a reload shows the title screen.
+ */
+function takeDevNewGameFromUrl(): LanguageCode | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const url = new URL(window.location.href);
+  const target = url.searchParams.get('newGame');
+  if (target === null) return null;
+  url.searchParams.delete('newGame');
+  window.history.replaceState(window.history.state, '', url);
+  const language = target === '' ? DEV_NEW_GAME.targetLanguage : target;
+  if (language !== DEV_NEW_GAME.nativeLanguage && (LANGUAGE_CODES as readonly string[]).includes(language)) return language as LanguageCode;
+  console.warn(`[dev] ?newGame=${target} names no Target Language for an English speaker, so the title screen shows`);
+  return null;
 }
 
 export type GameStore = {
@@ -953,6 +982,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   // Found by the title screen: what Continue and Load a save play.
   let slots: Slot[] = [];
   let askedToPersist = false;
+  // A `?newGame` game is on its way, so the title screen isn't offered meanwhile (StrictMode opens it twice).
+  let startingDevGame = false;
   const stores: SlotStores = { saves: deps.saves, journal: deps.journal };
   // Each conversation's NPC line readings and the annotations still on their way, kept past
   // the conversation's end until its Journal entry is written, so the Journal keeps the corrected readings.
@@ -1146,6 +1177,29 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       save();
     };
 
+    /** Dev only: a new game in the first empty slot, as if the Player had gone through setup with `DEV_NEW_GAME`'s answers and skipped the mic check. */
+    const startDevNewGame = (targetLanguage: LanguageCode) =>
+      // Saves that can't be read leave no slot to start in: the title screen then says why.
+      deps.saves.slots().catch((): Slot[] => []).then(
+        (found) => {
+          startingDevGame = false;
+          const free = found.find((slot) => slot.status === 'empty');
+          if (get().screen !== 'title' || !free) return checkSlots();
+          slots = found;
+          set({ nativeLanguage: DEV_NEW_GAME.nativeLanguage });
+          startNewGame({
+            slotId: free.slotId,
+            step: 'micCheck',
+            targetLanguage,
+            startingStep: DEV_NEW_GAME.startingStep,
+            characterName: DEV_NEW_GAME.characterName,
+            appearance: DEFAULT_APPEARANCE,
+            mic: null,
+            skipFirstMorning: false,
+          });
+        },
+      );
+
     const readyTitle = () => {
       const title = get().title;
       return get().screen === 'title' && title?.status === 'ready' ? title : null;
@@ -1156,7 +1210,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       deps.saves.slots().then(
         (found) => {
           slots = found;
-          if (get().screen !== 'title') return;
+          if (get().screen !== 'title' || startingDevGame) return;
           const played = found
             .filter((slot) => slot.status !== 'empty')
             .sort((a, b) => b.lastPlayedAt.localeCompare(a.lastPlayedAt));
@@ -2072,6 +2126,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       sign: null,
       openTitle: () => {
         set({ title: { status: 'checking' } });
+        const devTarget = deps.devNewGameTarget();
+        if (devTarget) startingDevGame = true;
         // The settings come first, so the title shows in the Player's language.
         settingsWrites
           .then(() => deps.deviceSettings.load())
@@ -2080,7 +2136,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
               set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed }),
             (error: unknown) => console.warn('[settings] could not be read:', error),
           )
-          .then(() => checkSlots());
+          .then(() => (devTarget ? startDevNewGame(devTarget) : checkSlots()));
       },
       continueGame: () => {
         const continueSlotId = readyTitle()?.continueSlotId;

@@ -97,7 +97,7 @@ test('Back and Esc step back through setup, keeping the answers', async ({ page 
 });
 
 test('a second New game on the same browser pre-fills the Native Language chosen for the first', async ({ page }) => {
-  await startNewGame(page, { native: 'ja', target: 'zh' });
+  await startNewGame(page, { native: 'ja', target: 'zh', throughScreens: true });
 
   await page.reload();
   await page.getByRole('navigation', { name: 'タイトルメニュー' }).getByRole('button', { name: 'ニューゲーム' }).click();

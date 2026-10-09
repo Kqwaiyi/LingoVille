@@ -7,7 +7,7 @@ const slotRow = (page: Page, slot: number) => panel(page, 'Load a save').getByRo
 
 /** Starts a new game and waits for it to be saved, then reloads to the title screen. */
 async function newGameSavedThenReload(page: Page) {
-  await startNewGame(page);
+  await startNewGame(page, { throughScreens: true });
   await expect(dock(page).getByText('Saved ✓')).toBeVisible();
   await page.reload();
 }
@@ -119,7 +119,7 @@ test('when the browser won’t keep saves, a callout says so until it is dismiss
   });
   const callout = page.getByRole('complementary', { name: 'Keeping your saves' });
 
-  await startNewGame(page);
+  await startNewGame(page, { throughScreens: true });
   await expect(callout).toBeVisible();
 
   // Back on the title screen after a reload, it still shows until it is dismissed.

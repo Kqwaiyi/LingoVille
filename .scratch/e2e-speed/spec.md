@@ -144,3 +144,9 @@ The full smoke suite runs in about a third of the time and passes reliably. No t
   - After, with `GEMINI_MOCK_REPLY_MS=50`: 93 passed and 2 failed in 8.8 min (531s wall-clock), about 20s saved. The two failures each spent about 5s waiting on an assertion, so the true saving is a little more.
   - That is well short of the 2–3 min estimate. Most tests have only a few NPC turns. The delay itself works: `shift.spec.ts` alone took 35.7s at 50ms against 46.7s at 600ms.
   - Both failures are flakes unrelated to the delay: `readingAids`' "hiding reading aids…" and `slots`' persist-callout test. Each reloads straight after a click whose device-settings write lands in the background, so the reload can beat the write. Both passed 10/10 under `--repeat-each=5`. The fix is left to a separate task.
+- Step 4 (skip-setup shortcut), on 2026-10-09, `npm run test:e2e` (1 worker):
+  - Before, the step 3 run above: 93 passed and 2 failed in 531s wall-clock.
+  - After, with `startNewGame` going through `?newGame` by default: 96 passed and 1 failed in 7.6 min (459s wall-clock), about 70s saved. The suite now has 97 tests, 2 of them new for the shortcut.
+  - Specs whose answers the shortcut can't carry (`level: 2` in cashier and server, `native: 'de'` in culturePacks and languages) still go through setup, as do continue, setup and slots by `throughScreens`.
+  - The first run after the change failed `directions` 3 times in 6. Starting straight in the town, the walk began before the scene had put the Character on the platform, so `stepAsideOnThePlatform`'s "until the prompt goes" ended at once. It now waits for the prompt to show first, and passed 5/5 under `--repeat-each`.
+  - The one failure was the `readingAids` reload flake from step 3, which doesn't start a game and passed 5/5 on its own. `townOffice` failed once in the first run, a prompt-flicker flake like step 2's `culturePacks` one, and passed 5/5 on its own.

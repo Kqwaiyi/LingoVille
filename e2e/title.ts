@@ -26,14 +26,26 @@ export type NewGame = {
   name?: string;
   /** Which Appearance Preset, from 0. */
   look?: number;
+  /** Go through the title screen and setup instead of the `?newGame` shortcut, for a test about those screens. */
+  throughScreens?: boolean;
 };
 
 /**
- * Loads the page, picks New game on the title screen and goes through the
- * setup screens, by keyboard and in whatever language the UI is in: by
- * default Sam, learning Japanese from A1, in the first look.
+ * Starts a new game: by default Sam, learning Japanese from A1, in the first
+ * Appearance Preset. Straight into the First Morning through the dev-only `?newGame`
+ * shortcut, which takes only the Target Language. Answers it can't carry, or
+ * `throughScreens`, go through the title screen and setup instead, by keyboard
+ * and in whatever language the UI is in.
  */
-export async function startNewGame(page: Page, { path = '/', ...answers }: NewGame = {}) {
+export async function startNewGame(page: Page, { path = '/', throughScreens = false, ...answers }: NewGame = {}) {
+  const { native, target = 'ja', level = 0, name = 'Sam', look = 0 } = answers;
+  if (!throughScreens && (native ?? 'en') === 'en' && level === 0 && name === 'Sam' && look === 0) {
+    const url = new URL(path, 'http://localhost');
+    url.searchParams.set('newGame', target);
+    await page.goto(url.pathname + url.search);
+    await expect(page.getByRole('region', { name: 'Dock' })).toBeVisible();
+    return;
+  }
   await page.goto(path);
   await titleMenu(page).getByRole('button', { name: 'New game' }).click();
   await goThroughSetup(page, answers);

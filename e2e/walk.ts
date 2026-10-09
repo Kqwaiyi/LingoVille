@@ -56,6 +56,8 @@ async function letGoWhen(page: Page, held: string[], text: string, gone: boolean
  * rather than walking into it.
  */
 export async function stepAsideOnThePlatform(page: Page, prompt: string) {
+  // From where it shows: a new game can start before the scene has put the Character on the platform.
+  await expect(page.getByText(prompt)).toBeVisible();
   await walkUntil(page, 'KeyS', prompt, { gone: true });
   await walkUntil(page, 'KeyW', prompt);
 }
