@@ -11,9 +11,10 @@ const GPU_ARGS = ['--enable-gpu', ...(process.platform === 'win32' ? ['--use-ang
 
 export default defineConfig({
   testDir: './e2e',
-  // Every test boots the 3D scene, which can swamp a laptop without a GPU, so they run one at a
-  // time. Pass `--workers=N` to try more.
-  workers: 1,
+  // Every test boots the 3D scene, so 2 run at a time. Not 4: on the dev's laptop (RTX 3060, 16 threads), 4 workers
+  // roughly doubled each test's duration and surfaced flakes. Before raising it, check the suite passes
+  // `--workers=N --repeat-each=3`.
+  workers: 2,
   timeout: 60_000,
   reporter: 'list',
   use: {
