@@ -530,6 +530,30 @@ export const en = {
     body: 'This browser may clear your saves if it runs low on space. Export a backup now and then, from Load a save.',
     gotIt: 'Got it',
   },
+  // One-time tooltips: a card above the dock the first time each system comes up.
+  tooltip: {
+    gotIt: 'Got it',
+    shift: {
+      title: 'Shifts',
+      body: 'Customers come up one at a time. Listen to what each one wants, then give them exactly that. You’re paid when the Shift ends, for every customer served right.',
+    },
+    fainting: {
+      title: 'Fainting',
+      body: 'When Health runs out, you faint and wake up here in the ward. Eat, drink and sleep to keep it up. A hospital bill you can’t pay is owed until you settle it at reception.',
+    },
+    journal: {
+      title: 'Your Journal',
+      body: 'Every Recap is kept in your Journal, with the whole conversation. Press J outside a conversation to read it back.',
+    },
+    openMic: {
+      title: 'Open mic',
+      body: 'Just speak when it’s your turn: there’s no need to hold Space. Use headphones, so the mic doesn’t hear the NPC.',
+    },
+    typedFallback: {
+      title: 'Typing your replies',
+      body: 'Type what you’d say in the field under the chat and press Enter. To speak instead, turn the mic on in Settings: press Esc outside a conversation.',
+    },
+  },
   sign: {
     label: 'Sign',
     translate: 'Translate',

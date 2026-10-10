@@ -519,6 +519,29 @@ export const de: UiStrings = {
     body: 'Dieser Browser löscht deine Spielstände vielleicht, wenn der Speicher knapp wird. Exportiere ab und zu eine Sicherung über „Spielstand laden“.',
     gotIt: 'Verstanden',
   },
+  tooltip: {
+    gotIt: 'Verstanden',
+    shift: {
+      title: 'Schichten',
+      body: 'Die Kundschaft kommt einzeln zu dir. Hör genau hin, was jemand möchte, und gib genau das. Wenn die Schicht vorbei ist, wirst du für alle richtig bedienten Kunden bezahlt.',
+    },
+    fainting: {
+      title: 'Ohnmacht',
+      body: 'Geht deine Gesundheit zur Neige, wirst du ohnmächtig und wachst hier im Krankenhaus auf. Iss, trink und schlaf genug, um gesund zu bleiben. Eine Krankenhausrechnung, die du nicht zahlen kannst, schuldest du, bis du sie am Empfang begleichst.',
+    },
+    journal: {
+      title: 'Dein Tagebuch',
+      body: 'Jeder Rückblick wird mit dem ganzen Gespräch in deinem Tagebuch aufbewahrt. Drück außerhalb eines Gesprächs J, um ihn nachzulesen.',
+    },
+    openMic: {
+      title: 'Offenes Mikrofon',
+      body: 'Sprich einfach, wenn du dran bist: Du musst die Leertaste nicht gedrückt halten. Nimm Kopfhörer, damit das Mikrofon die NPCs nicht hört.',
+    },
+    typedFallback: {
+      title: 'Antworten tippen',
+      body: 'Tipp, was du sagen willst, ins Feld unter dem Chat und drück Enter. Wenn du lieber sprichst, schalte das Mikrofon in den Einstellungen ein: Drück außerhalb eines Gesprächs Esc.',
+    },
+  },
   sign: {
     label: 'Schild',
     translate: 'Übersetzen',

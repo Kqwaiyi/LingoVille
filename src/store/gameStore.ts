@@ -585,6 +585,9 @@ export type GameStoreDeps = {
 /** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
 export type StoragePersistence = { persisted: () => Promise<boolean>; persist: () => Promise<boolean> };
 
+/** The systems a one-time tooltip explains the first time each comes up. */
+export type TooltipId = 'shift' | 'fainting' | 'journal' | 'openMic' | 'typedFallback';
+
 /** The device settings tooltip id that remembers the persist-refused callout was dismissed. */
 const PERSIST_REFUSED = 'persist-refused';
 
@@ -743,6 +746,8 @@ export type GameStore = {
   volumes: Volumes;
   /** One-time tooltips show. A device setting. */
   tooltips: boolean;
+  /** The one-time tooltips that have come up and not been dismissed, in turn: the first one shows. */
+  tooltipsDue: TooltipId[];
   micRetry: MicRetry | null;
   /** The day the mic-off chip last said to enable the mic in Settings, and the conversation it said it in. */
   micOffReminder: { day: number; conversationId: number } | null;
@@ -920,8 +925,10 @@ export type GameStore = {
   setVolume: (bus: VolumeBus, level: number) => void;
   /** Push-to-talk or open mic, kept on this device. */
   setTalkMode: (talkMode: TalkMode) => void;
-  /** Turns one-time tooltips on or off, on this device. */
+  /** Turns one-time tooltips on or off, on this device. Turned off, the one showing goes. */
   setTooltips: (on: boolean) => void;
+  /** Got it: closes the tooltip showing, and the next one due shows. */
+  dismissTooltip: () => void;
   /** Types replies instead of speaking them: the Typed Fallback, kept on this device. */
   chooseTypedFallback: () => void;
   /** Retry microphone: asks for the mic again, and switches back to Speaking once it opens. */
@@ -1116,6 +1123,37 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const updateDeviceSettings = (change: (settings: DeviceSettings) => DeviceSettings | null) => {
       const written = deps.deviceSettings.update(change).catch((error: unknown) => console.warn('[settings] could not be saved:', error));
       settingsWrites = settingsWrites.then(() => written);
+    };
+
+    /** This browser has shown a tooltip (or the persist-refused callout), so no save shows it again. */
+    const markSeen = (id: string) =>
+      updateDeviceSettings((settings) => (settings.tooltipsSeen.includes(id) ? null : { ...settings, tooltipsSeen: [...settings.tooltipsSeen, id] }));
+
+    // Each one-time tooltip is offered once per store, then shows only if this browser hasn't shown it before, in
+    // any save. It counts as seen once the Player can see it: one still waiting behind a screen can come up again.
+    const tooltipsOffered = new Set<TooltipId>();
+    api.subscribe((state, before) => {
+      const shown = selectTooltip(state);
+      if (shown && shown !== selectTooltip(before)) markSeen(shown);
+    });
+    /** A system has come up: its tooltip shows, or waits for the one showing, unless it has shown before or tooltips are off. */
+    const offerTooltip = (id: TooltipId) => {
+      if (!get().tooltips || tooltipsOffered.has(id)) return;
+      tooltipsOffered.add(id);
+      settingsWrites
+        .then(() => deps.deviceSettings.load())
+        .then(
+          ({ tooltipsSeen }) => {
+            if (tooltipsSeen.includes(id)) return;
+            // Turned off meanwhile: it can come up again once they are back on.
+            if (!get().tooltips) return void tooltipsOffered.delete(id);
+            set({ tooltipsDue: [...get().tooltipsDue, id] });
+          },
+          (error: unknown) => {
+            tooltipsOffered.delete(id);
+            console.warn('[settings] could not be read:', error);
+          },
+        );
     };
 
     const answerSetup = (answers: Partial<Setup>) => {
@@ -1845,6 +1883,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       approachIfFree();
     };
 
+    /** Ends the conversation. If it had a Recap, that's in the Journal now, which the Player may not know of yet. */
+    const endAndOfferJournal = () => {
+      const recap = get().conversation?.recap;
+      endConversation();
+      if (recap) offerTooltip('journal');
+    };
+
     const endConversation = () => {
       const conversation = get().conversation;
       if (conversation?.shiftCustomer) {
@@ -2081,6 +2126,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
       remindMicOff(id);
+      if (get().inputMode === 'typed') offerTooltip('typedFallback');
+      else if (openMicOn()) offerTooltip('openMic');
       set({
         voiceUnavailable: false,
         conversation: {
@@ -2191,6 +2238,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       talkMode: DEFAULT_DEVICE_SETTINGS.talkMode,
       volumes: DEFAULT_DEVICE_SETTINGS.volumes,
       tooltips: DEFAULT_DEVICE_SETTINGS.tooltips,
+      tooltipsDue: [],
       micRetry: null,
       micOffReminder: null,
       journal: null,
@@ -2308,9 +2356,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       dismissPersistCallout: () => {
         set({ persistCallout: false });
-        updateDeviceSettings((settings) =>
-          settings.tooltipsSeen.includes(PERSIST_REFUSED) ? null : { ...settings, tooltipsSeen: [...settings.tooltipsSeen, PERSIST_REFUSED] },
-        );
+        markSeen(PERSIST_REFUSED);
       },
       saveNow: () => save(),
       advance: (realDeltaMs) => {
@@ -2413,6 +2459,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       wakeInWard: () => {
         if (!get().fainting) return;
         set({ fainting: null });
+        offerTooltip('fainting');
         approachIfFree();
       },
       sleep: () => {
@@ -2452,6 +2499,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (after === game) return;
         set({ game: after, shiftEnd: null });
         sizeLastSet = null;
+        offerTooltip('shift');
         nextShiftCustomerOrEnd();
       },
       tapMenuItem: (itemId) => {
@@ -2516,8 +2564,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       closeShiftEnd: () => {
         // Closed before its Recap was there to read: it still goes to the Journal.
-        const writing = get().shiftEnd?.recap?.status === 'writing';
-        set({ shiftEnd: null, ...(writing && { toast: { kind: 'recapSaved' } as const }) });
+        const recap = get().shiftEnd?.recap;
+        set({ shiftEnd: null, ...(recap?.status === 'writing' && { toast: { kind: 'recapSaved' } as const }) });
+        if (recap) offerTooltip('journal');
       },
       talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
@@ -2585,17 +2634,17 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       leaveConversation: () => {
         const conversation = get().conversation;
         if (conversation?.outcome && !conversation.closed) showClosingCard();
-        else endConversation();
+        else endAndOfferJournal();
       },
       skipRecap: () => {
         const writing = get().conversation?.recap;
-        endConversation();
+        endAndOfferJournal();
         if (writing) set({ toast: { kind: 'recapSaved' } });
       },
       seeRecap: () => {
         if (get().conversation?.recap) updateConversation({ showingRecap: true });
       },
-      closeRecap: () => endConversation(),
+      closeRecap: () => endAndOfferJournal(),
       hearItSaid: (text) => {
         deps
           .hearItSaid(text, get().game.identity.targetLanguage)
@@ -2643,9 +2692,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         updateDeviceSettings((settings) => ({ ...settings, talkMode }));
       },
       setTooltips: (tooltips) => {
-        set({ tooltips });
+        set({ tooltips, ...(!tooltips && { tooltipsDue: [] }) });
+        // Those waiting their turn never showed, so they can come up again once tooltips are back on.
+        if (!tooltips) tooltipsOffered.clear();
         updateDeviceSettings((settings) => ({ ...settings, tooltips }));
       },
+      dismissTooltip: () => set({ tooltipsDue: get().tooltipsDue.slice(1) }),
       chooseTypedFallback: () => {
         micRetryRun++;
         set({ micRetry: null });
@@ -2751,6 +2803,11 @@ export const selectInputMode = (s: GameStore) => s.inputMode;
 export const selectTalkMode = (s: GameStore) => s.talkMode;
 export const selectVolumes = (s: GameStore) => s.volumes;
 export const selectTooltipsOn = (s: GameStore) => s.tooltips;
+/** The one-time tooltip showing above the dock, or null. It waits while a screen or panel is over the game. */
+export const selectTooltip = (s: GameStore): TooltipId | null =>
+  s.screen === 'playing' && !s.pauseMenu && !s.journal && !s.fainting && !s.voiceUnavailable && !s.tramChoosing && !s.shiftEnd
+    ? (s.tooltipsDue[0] ?? null)
+    : null;
 export const selectMicRetry = (s: GameStore) => s.micRetry;
 export const selectMicOffChip = (s: GameStore): MicOffChip | null => {
   if (s.inputMode !== 'typed' || !s.conversation) return null;

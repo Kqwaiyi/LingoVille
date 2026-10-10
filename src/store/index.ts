@@ -26,6 +26,8 @@ export {
   selectMicRetry,
   selectTalkMode,
   selectTooltipsOn,
+  selectTooltip,
+  type TooltipId,
   selectVolumes,
   selectHunger,
   selectInteractable,

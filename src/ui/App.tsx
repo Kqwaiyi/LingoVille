@@ -15,6 +15,7 @@ import { SetupScreen } from './SetupScreen.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
 import { ShiftEndCard } from './ShiftPanel.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
+import { TooltipCard } from './TooltipCard.tsx';
 import { TramPanel } from './TramPanel.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
@@ -61,6 +62,7 @@ function Hud() {
       <BasketPanel />
       <SignTooltip />
       <Dock />
+      <TooltipCard />
       <ConversationColumn />
       <ShiftEndCard />
       <Toast />
