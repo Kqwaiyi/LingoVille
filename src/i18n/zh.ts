@@ -162,6 +162,14 @@ export const zh: UiStrings = {
     resume: '继续',
     settings: '设置',
     back: '返回',
+    skipTutorial: '跳过教程',
+  },
+  firstMorning: {
+    label: '第一个早晨',
+    drink: '你口渴了。走到水槽边（W A S D），喝点水',
+    walkToCafe: '去咖啡馆吃早餐',
+    breakfast: '在柜台向咖啡师点早餐',
+    distance: '{{metres}} 米',
   },
   credits: {
     heading: '致谢',

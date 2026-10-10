@@ -165,6 +165,15 @@ export const en = {
     resume: 'Resume',
     settings: 'Settings',
     back: 'Back',
+    skipTutorial: 'Skip the tutorial',
+  },
+  // The First Morning: a banner at the top centre with the step to do next, an arrow and how far it is.
+  firstMorning: {
+    label: 'First Morning',
+    drink: "You're thirsty. Walk to the sink (W A S D) and drink some water",
+    walkToCafe: 'Get breakfast at the café',
+    breakfast: 'Order breakfast from the barista at the counter',
+    distance: '{{metres}} m',
   },
   credits: {
     heading: 'Credits',

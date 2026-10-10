@@ -26,6 +26,8 @@ export type NewGame = {
   name?: string;
   /** Which Appearance Preset, from 0. */
   look?: number;
+  /** Tick Skip tutorial on the mic check, so the game starts without the First Morning. */
+  skipTutorial?: boolean;
   /** Go through the title screen and setup instead of the `?newGame` shortcut, for a test about those screens. */
   throughScreens?: boolean;
 };
@@ -38,8 +40,8 @@ export type NewGame = {
  * and in whatever language the UI is in.
  */
 export async function startNewGame(page: Page, { path = '/', throughScreens = false, ...answers }: NewGame = {}) {
-  const { native, target = 'ja', level = 0, name = 'Sam', look = 0 } = answers;
-  if (!throughScreens && (native ?? 'en') === 'en' && level === 0 && name === 'Sam' && look === 0) {
+  const { native, target = 'ja', level = 0, name = 'Sam', look = 0, skipTutorial = false } = answers;
+  if (!throughScreens && (native ?? 'en') === 'en' && level === 0 && name === 'Sam' && look === 0 && !skipTutorial) {
     const url = new URL(path, 'http://localhost');
     url.searchParams.set('newGame', target);
     await page.goto(url.pathname + url.search);
@@ -52,7 +54,10 @@ export async function startNewGame(page: Page, { path = '/', throughScreens = fa
 }
 
 /** From the Native Language screen, through the rest of setup to the First Morning, skipping the mic check if it shows. */
-export async function goThroughSetup(page: Page, { native, target = 'ja', level = 0, name = 'Sam', look = 0 }: Omit<NewGame, 'path'> = {}) {
+export async function goThroughSetup(
+  page: Page,
+  { native, target = 'ja', level = 0, name = 'Sam', look = 0, skipTutorial = false }: Omit<NewGame, 'path'> = {},
+) {
   const choices = page.getByRole('radio');
   const nameField = page.getByRole('textbox');
 
@@ -71,8 +76,14 @@ export async function goThroughSetup(page: Page, { native, target = 'ja', level 
   await page.keyboard.press('Enter');
   await expect(choices).toHaveCount(0);
   // The mic check, unless this browser has passed it: Skip has focus, so Enter skips it.
-  const skipTutorial = page.getByRole('checkbox');
-  if (!(await skipTutorial.isVisible())) return;
+  const skipTutorialBox = page.getByRole('checkbox');
+  if (!(await skipTutorialBox.isVisible())) return;
+  if (skipTutorial) {
+    await skipTutorialBox.check();
+    // From the box, past Back, to Skip.
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+  }
   await page.keyboard.press('Enter');
-  await expect(skipTutorial).toBeHidden();
+  await expect(skipTutorialBox).toBeHidden();
 }

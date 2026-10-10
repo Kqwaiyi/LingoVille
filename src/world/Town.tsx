@@ -21,7 +21,7 @@ import { CharacterFigure } from './CharacterFigure.tsx';
 import { Buildings } from './Buildings.tsx';
 import { Groceries } from './Groceries.tsx';
 import { Piece } from './Kit.tsx';
-import { RouteMarker } from './Marker.tsx';
+import { FirstMorningMarker, RouteMarker } from './Marker.tsx';
 import { Outdoors } from './Outdoors.tsx';
 import { PALETTE, type PaletteColour } from './palette.ts';
 import { Props } from './Props.tsx';
@@ -173,6 +173,7 @@ export function Town() {
       <Props />
       <Groceries />
       <RouteMarker />
+      <FirstMorningMarker />
     </RigidBody>
   );
 }

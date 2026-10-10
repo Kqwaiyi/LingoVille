@@ -162,6 +162,14 @@ export const ja: UiStrings = {
     resume: '再開',
     settings: '設定',
     back: '戻る',
+    skipTutorial: 'チュートリアルをスキップ',
+  },
+  firstMorning: {
+    label: '最初の朝',
+    drink: 'のどが渇いています。流し台まで歩いて（W A S D）、水を飲みましょう',
+    walkToCafe: 'カフェで朝ごはんを食べましょう',
+    breakfast: 'カウンターのバリスタに朝ごはんを注文しましょう',
+    distance: '{{metres}} m',
   },
   credits: {
     heading: 'クレジット',

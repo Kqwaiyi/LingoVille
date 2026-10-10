@@ -29,6 +29,7 @@ export {
 export { cook } from './cook.ts';
 export { daylight, type Daylight, type LightingPreset } from './daylight.ts';
 export { faint, faintedBetween } from './faint.ts';
+export { FIRST_MORNING_STEPS, firstMorningStep, skipFirstMorning, type FirstMorningStep } from './firstMorning.ts';
 export { gymMembership, gymRefusal, gymSession, type GymMembership, type GymRefusal } from './gym.ts';
 export { fitnessIllnessFactor, jobAids, lifeSkillLevel, lifeSkillLevels, type JobAid } from './lifeSkills.ts';
 export { isGoneOff } from './inventory.ts';

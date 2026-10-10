@@ -162,6 +162,14 @@ export const de: UiStrings = {
     resume: 'Weiterspielen',
     settings: 'Einstellungen',
     back: 'Zurück',
+    skipTutorial: 'Tutorial überspringen',
+  },
+  firstMorning: {
+    label: 'Der erste Morgen',
+    drink: 'Du hast Durst. Geh zur Spüle (W A S D) und trink etwas Wasser',
+    walkToCafe: 'Frühstücke im Café',
+    breakfast: 'Bestell dein Frühstück beim Barista an der Theke',
+    distance: '{{metres}} m',
   },
   credits: {
     heading: 'Mitwirkende',

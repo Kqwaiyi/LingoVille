@@ -2167,6 +2167,52 @@ ruby {
   pointer-events: none;
 }
 
+/* --- The First Morning: its prompt at the top centre --------------------------- */
+
+.first-morning {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 15px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  /* Prompts never block: clicks go through to the scene. */
+  pointer-events: none;
+}
+
+.first-morning p {
+  margin: 0;
+}
+
+.first-morning-arrow {
+  display: inline-block;
+  color: var(--ok);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform 0.15s linear;
+}
+
+.first-morning-distance {
+  color: var(--hud-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* A toast shows under the banner rather than over it. */
+.first-morning ~ .toast {
+  top: 70px;
+}
+
 /* --- Settings, the pause menu and the credits --------------------------------- */
 
 .pause-panel {

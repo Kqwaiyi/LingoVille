@@ -108,8 +108,10 @@ import {
   endSmallTalk,
   familiarityTier,
   faintedBetween,
+  firstMorningStep,
   endShift,
   enterPlace,
+  skipFirstMorning,
   hallwayApproach,
   hallwayApproachMade,
   parkWaveDue,
@@ -754,6 +756,8 @@ export type GameStore = {
   tabHidden: boolean;
   /** The pause menu is open: time stands still, and the Character with it. */
   pauseMenu: boolean;
+  /** Where the First Morning's next step is from the Character, as the world last measured it. Never saved. */
+  firstMorningGuide: FirstMorningGuide | null;
   interactable: Interactable | null;
   /** The Player is choosing where to take the tram. */
   tramChoosing: boolean;
@@ -845,6 +849,10 @@ export type GameStore = {
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
   drinkWater: () => void;
+  /** The world measures, as the Character walks, where the First Morning's next step is. */
+  setFirstMorningGuide: (guide: FirstMorningGuide) => void;
+  /** Skip tutorial, in the pause menu: the First Morning's prompts stop, and the game resumes. */
+  skipFirstMorning: () => void;
   /** E at the stove: cooks a grocery into a meal, or says there's nothing to cook. */
   cook: () => void;
   /** E at the gym: the day's workout for a member, or why there can't be one. */
@@ -1071,7 +1079,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // A Shift from another game is over without its Recap: its customers' readings go too.
       shiftLog.forEach(({ conversationId }) => lineReadings.delete(conversationId));
       shiftLog = [];
-      set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null, routeMarker: null, pauseMenu: false, micOffReminder: null });
+      set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null, routeMarker: null, pauseMenu: false, firstMorningGuide: null, micOffReminder: null });
       // While the town loads, so the first line doesn't wait for a dictionary.
       deps.readings.preload(game.identity.targetLanguage).then(
         () => {
@@ -2200,6 +2208,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       startSmallTalkWith(waved.npcId, true);
     };
 
+    /** Sets the game after something done at home, where no door or outcome saves it: saved at once if it did a First Morning step. */
+    const setGameSavingFirstMorning = (after: GameState) => {
+      const before = get().game;
+      set({ game: after });
+      if (firstMorningStep(after) !== firstMorningStep(before)) save();
+    };
+
     /** Whether this change to the game brings an NPC over to the Character. */
     const noticeApproach = (before: GameState, after: GameState) => {
       const due = approachDue(before, after);
@@ -2219,6 +2234,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       game: initial ?? createSave(DEV_SETUP),
       tabHidden: false,
       pauseMenu: false,
+      firstMorningGuide: null,
       interactable: null,
       tramChoosing: false,
       heldStill: false,
@@ -2421,12 +2437,24 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ tramArrival: { stopId }, ...(get().routeMarker === stopId && { routeMarker: null }) });
         noticeApproach(game, after);
       },
-      drinkWater: () => set({ game: drinkWater(get().game) }),
+      drinkWater: () => setGameSavingFirstMorning(drinkWater(get().game)),
+      setFirstMorningGuide: (guide) => {
+        const shown = get().firstMorningGuide;
+        if (shown?.metres !== guide.metres || shown.bearing !== guide.bearing) set({ firstMorningGuide: guide });
+      },
+      skipFirstMorning: () => {
+        const { game } = get();
+        const after = skipFirstMorning(game);
+        if (after === game) return;
+        set({ game: after });
+        save();
+        get().closePauseMenu();
+      },
       cook: () => {
         const { game } = get();
         const after = cook(game);
         if (after === game) return set({ toast: { kind: 'nothingToCook' } });
-        set({ game: after });
+        setGameSavingFirstMorning(after);
       },
       workOut: () => {
         const { interactable, conversation, game } = get();
@@ -2803,11 +2831,24 @@ export const selectInputMode = (s: GameStore) => s.inputMode;
 export const selectTalkMode = (s: GameStore) => s.talkMode;
 export const selectVolumes = (s: GameStore) => s.volumes;
 export const selectTooltipsOn = (s: GameStore) => s.tooltips;
+/** In the town with no screen or panel over the game: what the one-time tooltips and the First Morning banner wait for. */
+const inTownUncovered = (s: GameStore) =>
+  s.screen === 'playing' && !s.pauseMenu && !s.journal && !s.fainting && !s.voiceUnavailable && !s.tramChoosing && !s.shiftEnd;
 /** The one-time tooltip showing above the dock, or null. It waits while a screen or panel is over the game. */
-export const selectTooltip = (s: GameStore): TooltipId | null =>
-  s.screen === 'playing' && !s.pauseMenu && !s.journal && !s.fainting && !s.voiceUnavailable && !s.tramChoosing && !s.shiftEnd
-    ? (s.tooltipsDue[0] ?? null)
-    : null;
+export const selectTooltip = (s: GameStore): TooltipId | null => (inTownUncovered(s) ? (s.tooltipsDue[0] ?? null) : null);
+/**
+ * Where the First Morning's next step is: the metres there, and its bearing in degrees clockwise from straight ahead on
+ * screen. Rounded by the world, so it changes only as often as the banner would show it.
+ */
+export type FirstMorningGuide = { metres: number; bearing: number };
+/**
+ * The First Morning step the banner prompts, or null once the First Morning is over or skipped. Prompts never block: the
+ * banner waits while a screen, panel or conversation is over the game.
+ */
+export const selectFirstMorningBanner = (s: GameStore) => (inTownUncovered(s) && !s.conversation ? firstMorningStep(s.game) : null);
+export const selectFirstMorningGuide = (s: GameStore) => s.firstMorningGuide;
+/** The First Morning is under way, so the pause menu offers Skip tutorial. */
+export const selectSkippableFirstMorning = (s: GameStore) => firstMorningStep(s.game) !== null;
 export const selectMicRetry = (s: GameStore) => s.micRetry;
 export const selectMicOffChip = (s: GameStore): MicOffChip | null => {
   if (s.inputMode !== 'typed' || !s.conversation) return null;

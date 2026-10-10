@@ -1,3 +1,4 @@
+import { completeFirstMorningStep } from './firstMorning.ts';
 import { isGoneOff } from './inventory.ts';
 import { gainLifeSkillXp, lifeSkillLevel, todaysCounters } from './lifeSkills.ts';
 import { clampMeter } from './meters.ts';
@@ -20,7 +21,8 @@ function groceryToCook(inventory: InventoryItem[], day: number): InventoryItem |
  * The Character cooks a meal at home from one grocery. Cooking level sets how much Hunger
  * it fills, and at max level the meal lifts Mood a little. The first few meals each day give
  * Cooking XP. Gone-off food adds to the food poisoning chance, less the better the cook.
- * Away from home, or with no groceries, nothing happens: the same state comes back.
+ * A meal cooked counts as the First Morning's breakfast. Away from home, or with no groceries, nothing happens: the
+ * same state comes back.
  */
 export function cook(state: GameState): GameState {
   if (state.placeId !== 'home') return state;
@@ -39,7 +41,7 @@ export function cook(state: GameState): GameState {
     today.homeMeals < LIFE_SKILLS.homeMealsCountingPerDay ? gainLifeSkillXp(state, 'cooking', LIFE_SKILLS.xpPerHomeMeal) : state;
   const { character } = state;
 
-  return {
+  const cooked: GameState = {
     ...learnt,
     character: {
       ...character,
@@ -55,4 +57,5 @@ export function cook(state: GameState): GameState {
         .filter((item) => item.quantity > 0),
     },
   };
+  return completeFirstMorningStep(cooked, 'breakfast');
 }

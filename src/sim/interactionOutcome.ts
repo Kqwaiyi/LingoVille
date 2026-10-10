@@ -5,6 +5,7 @@ import { refundItem, registerAddress } from './errands.ts';
 import { stockInventory } from './inventory.ts';
 import { hire, namesMatch } from './jobs.ts';
 import { goalInteractionFamiliarity } from './familiarity.ts';
+import { completeFirstMorningStep } from './firstMorning.ts';
 import { membershipBoughtUntil } from './gym.ts';
 import { clampMeter } from './meters.ts';
 import { metNpc, namedNpcOf } from './npcMemory.ts';
@@ -265,9 +266,11 @@ function applyOutcome(state: GameState, interaction: Interaction, outcome: Inter
         },
       };
       const lifted = changeMood(paid, MOOD.changes.goalInteractionSuccess + comfortMood(completion.lines));
+      // For the First Morning, food eaten anywhere, or any order at the café, is breakfast, and anything drunk is a drink.
+      const morningStep = hunger > 0 || interaction.placeId === 'cafe' ? 'breakfast' : thirst > 0 ? 'drink' : null;
       const served = completion.lines.map(({ itemId, name, glosses, quantity }) => ({ itemId, name, glosses, quantity }));
       return {
-        state: lifted.state,
+        state: morningStep ? completeFirstMorningStep(lifted.state, morningStep) : lifted.state,
         result: {
           kind: 'success',
           served,

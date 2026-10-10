@@ -1,6 +1,7 @@
 import { advanceClock, isOpen, type OpeningHours } from './clock.ts';
 import { leaveClinic } from './clinic.ts';
 import { faint } from './faint.ts';
+import { completeFirstMorningStep } from './firstMorning.ts';
 import { illnessHealthPerMinute } from './illness.ts';
 import { throwOutSpoiled } from './inventory.ts';
 import { lifeSkillShare } from './lifeSkills.ts';
@@ -92,15 +93,16 @@ function decay(state: GameState, dtGameMinutes: number): GameState {
   };
 }
 
-/** The Character walks into a place, given its hours in this pack. A closed place can't be entered. */
+/** The Character walks into a place, given its hours in this pack. A closed place can't be entered. The café is where the First Morning leads. */
 export function enterPlace(state: GameState, placeId: PlaceId, hours: OpeningHours): GameState {
   if (state.placeId === placeId || !isOpen(hours, state.clock)) return state;
   // Walking out of the restaurant gives up the table, and any unpaid bill becomes debt. Walking out of the clinic gives up a place in its queue.
-  return { ...leaveClinic(leaveTable(state)), placeId };
+  const entered: GameState = { ...leaveClinic(leaveTable(state)), placeId };
+  return placeId === 'cafe' ? completeFirstMorningStep(entered, 'walkToCafe') : entered;
 }
 
-/** Tap water at home: refills Thirst for free. There's no tap anywhere else. */
+/** Tap water at home: refills Thirst for free, and is the First Morning's drink. There's no tap anywhere else. */
 export function drinkWater(state: GameState): GameState {
   if (state.placeId !== 'home') return state;
-  return { ...state, character: { ...state.character, thirst: METER_MAX } };
+  return completeFirstMorningStep({ ...state, character: { ...state.character, thirst: METER_MAX } }, 'drink');
 }
