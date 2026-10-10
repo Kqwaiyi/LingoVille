@@ -39,6 +39,7 @@ function listen() {
     },
     onToolCall: (call) => toolCalls.push(call),
     onMicLevel: () => {},
+    onMicUnavailable: () => {},
     onUsage: () => {},
     onDisconnect: () => dropped.count++,
   };

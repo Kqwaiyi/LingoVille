@@ -61,6 +61,8 @@ export type VoiceSessionEvents = {
   onToolCall: (call: ToolCall) => void;
   /** How loud the Player is while listening, from 0 to 1. Drops to 0 when they stop. */
   onMicLevel: (level: number) => void;
+  /** The mic was refused or isn't there, so only typed replies reach the NPC. */
+  onMicUnavailable: () => void;
   /** What the NPC's latest turn cost. */
   onUsage: (usage: TokenUsage) => void;
   /** The connection dropped after `connect` succeeded. The session is dead; no events follow. */
@@ -72,6 +74,12 @@ export type VoiceSessionOptions = {
   resumeFrom?: TranscriptLine[];
   /** The Player is in the Typed Fallback: the session never asks for the mic. */
   typedOnly?: boolean;
+  /**
+   * Open mic: the mic streams from connect and automatic voice activity detection
+   * decides when the Player starts and stops. `stopTalking` and `startTalking`
+   * then only stop and resume streaming it, while the conversation waits.
+   */
+  openMic?: boolean;
 };
 
 /**

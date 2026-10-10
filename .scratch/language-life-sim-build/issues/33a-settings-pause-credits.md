@@ -6,12 +6,24 @@
 
 **Spec:** [spec.md](../spec.md): Save model (device settings); UI and HUD; Time and clock (paused)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every device setting in the spec can be changed and persists per browser.
-- [ ] Open mic uses automatic voice activity detection in `VoiceSession`.
-- [ ] Retry microphone switches from the Typed Fallback back to Speaking once the mic works.
-- [ ] The "🎤 off. Enable in Settings" chip appears at most once a day while the mic is off.
-- [ ] The pause menu has Resume and Settings, and leaves room for Skip tutorial (added in ticket 34a).
-- [ ] The clock scale is 0 while the pause menu is open.
-- [ ] A credits screen is reachable from Settings and reads from the same list as `CREDITS.md`.
+- [x] Every device setting in the spec can be changed and persists per browser.
+- [x] Open mic uses automatic voice activity detection in `VoiceSession`.
+- [x] Retry microphone switches from the Typed Fallback back to Speaking once the mic works.
+- [x] The "🎤 off. Enable in Settings" chip appears at most once a day while the mic is off.
+- [x] The pause menu has Resume and Settings, and leaves room for Skip tutorial (added in ticket 34a).
+- [x] The clock scale is 0 while the pause menu is open.
+- [x] A credits screen is reachable from Settings and reads from the same list as `CREDITS.md`.
+
+## Comments
+
+- **Store.** The device settings the store didn't hold yet are now there too: `volumes`, `talkMode` and `tooltips`, read with the rest when the title screen opens. Each has an action that keeps it on this browser (`setVolume`, clamped to 0–1, `setTalkMode`, `setTooltips`), and `chooseTypedFallback` picks the Typed Fallback. Nothing plays sound yet, so the volumes are only kept: ticket 32's buses should read `selectVolumes`.
+- **Retry microphone** (`retryMic`) asks for the mic through the mic check's `openMic`, closes it straight away, and switches to Speaking once it opens. It doesn't wait to hear the Player as the mic check does: a refusal is what it fixes. While it's still refused, `selectMicRetry` is `failed` and Settings says so. Choosing the Typed Fallback mid-retry wins. In Settings, choosing "Speak with the mic" from the Typed Fallback is the same retry.
+- **A mic lost mid-game.** `VoiceSessionEvents` has a new `onMicUnavailable`: the Live session calls it when the mic is refused or missing at connect, and the store switches to the Typed Fallback and keeps it. That closes 12c's "not handled". The mock never calls it.
+- **Open mic.** `VoiceSessionOptions.openMic`, set while the talk mode is open mic and the input mode is the mic. The Live session then sets `automaticActivityDetection: { disabled: false }`, streams the mic from connect, and push-to-talk does nothing. In the store, Space doesn't listen, the level shows all along, and since nothing marks a new turn, the first piece the NPC hears after its turn (or while it's speaking, a barge-in) starts a new Player line, and the NPC's next words a new NPC line. The input bar shows a live mic dot instead of the button. The conversation waits while Help is open and is over once the outcome is decided, so the store stops streaming the open mic then (`stopTalking`, which under open mic only pauses the stream) and starts it again back in the chat, through a store subscription; what the NPC hears meanwhile is dropped. The mock ignores it, so open mic is only tested against the fake socket.
+- **The mic-off chip.** `selectMicOffChip`: in the Typed Fallback, the first conversation of each game day says "🎤 off. Enable in Settings"; later ones that day just "🎤 off". A mic lost mid-conversation says it there too. The day is kept in the store, not the save (and forgotten on loading a save), so a reload can say it again that day. The chip isn't a button: Settings can't open mid-conversation.
+- **Pause menu.** `openPauseMenu` refuses in a conversation, the Journal, the Fainting screen, the tram panel, the voice-unavailable screen or a Shift's pay card, and on the title screen. While open, the clock scale is 0, world keys are off, and the Journal, conversations and NPC approaches wait (an approach due then comes on Resume). The Esc listener is on `window` in the capture phase, so it sees what was open before another handler's Esc closes it; the dialog's own Esc listener is too, or the Esc that opened it would bubble up and close it again. Esc steps back from the credits to Settings to the menu, then resumes. Skip tutorial should go in `.pause-actions` (34a).
+- **Settings** is one component, `SettingsPanel`, on the title screen and in the pause menu: Native Language (a select; in a game, the language it's learning is disabled), five volume sliders, Speaking (the mic or typed, Retry microphone, push-to-talk or open mic), Reading (reading aids, romaji, tooltips), and Credits.
+- **Credits.** `src/ui/credits.ts` imports `CREDITS.md?raw`, and `parseCredits` reads the table under `## CC-BY` and `## CC0`. An unknown column or an empty cell throws, so a broken table can't show an empty screen. `tooling/credits.test.ts` holds the file to that shape: every row is on the screen, and each CC-BY row has a creator, an http(s) source and a `CC BY` licence. `CREDITS.md` now names the CC-BY columns. Asset names and "Used for" stay in English, as the file has them.
+- **Smoke.** `e2e/settings.spec.ts`: Esc pauses and the clock stands still until Resume; the Native Language switches the UI live from the pause menu, and the credits open; Esc in a conversation leaves without pausing; every device setting is kept (checked from a second tab, since a reload can stop the last write); Retry microphone, with `getUserMedia` refusing until the test lets it; and the day's chip. One full run failed `shift.spec.ts`'s hiring step once (the closing card never said "You got the job"). It passed three times on its own and in the next full run (103/103).

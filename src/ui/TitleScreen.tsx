@@ -3,7 +3,6 @@ import { formatLocalMoney } from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
 import {
   nameToDelete,
-  selectReadingAids,
   selectTitle,
   useGame,
   type SlotCard,
@@ -14,6 +13,7 @@ import {
 import { formatTimeAgo } from './format.ts';
 import { PersistCallout } from './PersistCallout.tsx';
 import { usePlaceName } from './placeName.ts';
+import { CreditsScreen, SettingsPanel } from './SettingsPanel.tsx';
 
 type ReadyTitle = Extract<TitleView, { status: 'ready' }>;
 type MenuItem = 'continue' | 'load' | 'newGame' | 'import' | 'settings';
@@ -22,36 +22,10 @@ type SavedCard = Exclude<SlotCard, { status: 'empty' }>;
 
 const slotNumber = (slotId: SlotId) => slotId.replace('slot-', '');
 
-/** The device settings there are so far, kept for this browser. Volume and speaking come with ticket 33. */
-function SettingsPanel() {
-  const { t } = useTranslation();
-  const readingAids = useGame(selectReadingAids);
-  const setReadingAids = useGame((s) => s.setReadingAids);
-  return (
-    <>
-      <h2>{t('settings.heading')}</h2>
-      <p>{t('settings.kept')}</p>
-      <label className="title-toggle">
-        <input type="checkbox" checked={readingAids.show} onChange={(e) => setReadingAids({ show: e.target.checked })} />
-        <span>
-          {t('settings.readingAids')}
-          <small>{t('settings.readingAidsNote')}</small>
-        </span>
-      </label>
-      <label className="title-toggle">
-        <input
-          type="checkbox"
-          checked={readingAids.show && readingAids.romaji}
-          disabled={!readingAids.show}
-          onChange={(e) => setReadingAids({ romaji: e.target.checked })}
-        />
-        <span>
-          {t('settings.romaji')}
-          <small>{t('settings.romajiNote')}</small>
-        </span>
-      </label>
-    </>
-  );
+/** Settings, or the credits screen opened from it. */
+function TitleSettings() {
+  const [credits, setCredits] = useState(false);
+  return credits ? <CreditsScreen onBack={() => setCredits(false)} /> : <SettingsPanel onOpenCredits={() => setCredits(true)} />;
 }
 
 function NoticeText({ notice }: { notice: TitleNotice }) {
@@ -235,7 +209,7 @@ function TitleMenu({ title }: { title: ReadyTitle }) {
             {full && <p className="title-note">{t('title.fullImport')}</p>}
           </>
         )}
-        {current === 'settings' && <SettingsPanel />}
+        {current === 'settings' && <TitleSettings />}
       </section>
 
       <input

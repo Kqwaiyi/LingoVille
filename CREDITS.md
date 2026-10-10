@@ -1,6 +1,6 @@
 # Credits
 
-The art and sound the game ships with, and their licences. Sourcing is CC0 first. A CC-BY asset must be listed under **CC-BY** with its creator, title, source and licence, as the licence asks; the in-game credits screen reads the same list (ticket 33a).
+The art and sound the game ships with, and their licences. Sourcing is CC0 first. A CC-BY asset must be listed under **CC-BY** with its creator, title, source and licence, as the licence asks. The in-game credits screen (Settings → Credits) reads this file itself, so keep each list a table under its heading. The CC-BY table's columns are `Asset | Creator | Source | Licence | Used for`, with the licence as `CC BY 4.0` (or whichever version); `tooling/credits.test.ts` checks the shape.
 
 ## CC-BY
 

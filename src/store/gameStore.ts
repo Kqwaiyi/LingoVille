@@ -262,6 +262,15 @@ export type SetupStep = (typeof SETUP_STEPS)[number];
 
 /** Speaking with the mic, or the Typed Fallback. A device setting. */
 export type InputMode = DeviceSettings['inputMode'];
+/** Push-to-talk (hold Space), or open mic, where the voice session detects when the Player speaks. A device setting. */
+export type TalkMode = DeviceSettings['talkMode'];
+/** How loud each kind of sound is, from 0 to 1. Device settings. */
+export type Volumes = DeviceSettings['volumes'];
+export type VolumeBus = keyof Volumes;
+/** Retry microphone: waiting for the browser to open the mic, or it still couldn't. */
+export type MicRetry = 'trying' | 'failed';
+/** In the Typed Fallback, where the mic button would be: the day's reminder that Settings can turn the mic on, or just "off". */
+export type MicOffChip = 'enableInSettings' | 'off';
 
 /**
  * The mic check: waiting for the browser to open the mic, listening for the
@@ -730,7 +739,16 @@ export type GameStore = {
   inputMode: InputMode;
   /** This browser has heard the Player in a mic check, so New game skips it. A device setting. */
   micCheckPassed: boolean;
+  talkMode: TalkMode;
+  volumes: Volumes;
+  /** One-time tooltips show. A device setting. */
+  tooltips: boolean;
+  micRetry: MicRetry | null;
+  /** The day the mic-off chip last said to enable the mic in Settings, and the conversation it said it in. */
+  micOffReminder: { day: number; conversationId: number } | null;
   tabHidden: boolean;
+  /** The pause menu is open: time stands still, and the Character with it. */
+  pauseMenu: boolean;
   interactable: Interactable | null;
   /** The Player is choosing where to take the tram. */
   tramChoosing: boolean;
@@ -898,11 +916,25 @@ export type GameStore = {
   translateLine: (line: number) => void;
   /** Shows or hides reading aids, or romaji, and keeps the choice on this device. */
   setReadingAids: (change: Partial<ReadingAidsSettings>) => void;
+  /** Sets one volume, from 0 (silent) to 1 (full), and keeps it on this device. */
+  setVolume: (bus: VolumeBus, level: number) => void;
+  /** Push-to-talk or open mic, kept on this device. */
+  setTalkMode: (talkMode: TalkMode) => void;
+  /** Turns one-time tooltips on or off, on this device. */
+  setTooltips: (on: boolean) => void;
+  /** Types replies instead of speaking them: the Typed Fallback, kept on this device. */
+  chooseTypedFallback: () => void;
+  /** Retry microphone: asks for the mic again, and switches back to Speaking once it opens. */
+  retryMic: () => void;
   /** "+ Phrasebook" on a Recap's new word: keeps it in the personal phrasebook. */
   addToPhrasebook: (word: NewWord, glossLanguage: LanguageCode) => void;
   /** J: opens the full-screen Journal, outside conversations. */
   openJournal: () => void;
   closeJournal: () => void;
+  /** Esc outside a conversation: opens the pause menu, unless something else is open that Esc closes. */
+  openPauseMenu: () => void;
+  /** Resume: closes the pause menu, and time goes on. */
+  closePauseMenu: () => void;
   setTyping: (typing: boolean) => void;
   dismissToast: () => void;
   dismissVoiceUnavailable: () => void;
@@ -989,7 +1021,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   // the conversation's end until its Journal entry is written, so the Journal keeps the corrected readings.
   const lineReadings = new Map<number, { readings: Conversation['readings']; annotating: Promise<unknown>[] }>();
 
-  return createStore<GameStore>()((set, get) => {
+  return createStore<GameStore>()((set, get, api) => {
     /** A sign's tooltip in this game: each line with its library reading, and its gloss once translated. */
     const signTooltip = (signId: SignId, translated: boolean): SignTooltip => {
       const { game, nativeLanguage } = get();
@@ -1032,7 +1064,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // A Shift from another game is over without its Recap: its customers' readings go too.
       shiftLog.forEach(({ conversationId }) => lineReadings.delete(conversationId));
       shiftLog = [];
-      set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null, routeMarker: null });
+      set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null, routeMarker: null, pauseMenu: false, micOffReminder: null });
       // While the town loads, so the first line doesn't wait for a dictionary.
       deps.readings.preload(game.identity.targetLanguage).then(
         () => {
@@ -1095,6 +1127,29 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     let micCheckRun = 0;
     let closeMicCheck: (() => void) | null = null;
     const onMicCheck = (run: number) => run === micCheckRun && get().setup?.step === 'micCheck';
+
+    // Each Retry microphone is its own run, so one overtaken by choosing the Typed Fallback is ignored.
+    let micRetryRun = 0;
+    /** The Player speaks with the mic open, and the voice session detects when they start and stop. */
+    const openMicOn = () => get().talkMode === 'open-mic' && get().inputMode === 'mic';
+    /** With open mic, the mic streams only while the Player can take a turn in the chat: not in Help, nor once the outcome is decided. */
+    const openMicListens = (conversation: Conversation | null) => takesTurns(conversation) && conversation.tab === 'chat';
+    // Whether the open session is streaming the open mic. A new session starts out streaming it.
+    let openMicStreaming = true;
+    api.subscribe((state) => {
+      if (!voice || !openMicOn()) return;
+      const listens = openMicListens(state.conversation);
+      if (listens === openMicStreaming) return;
+      openMicStreaming = listens;
+      if (listens) voice.startTalking();
+      else voice.stopTalking();
+    });
+
+    /** In the Typed Fallback, the first conversation of the day reminds the Player that Settings can turn the mic on. */
+    const remindMicOff = (conversationId: number) => {
+      const { day } = get().game.clock;
+      if (get().inputMode === 'typed' && get().micOffReminder?.day !== day) set({ micOffReminder: { day, conversationId } });
+    };
 
     const setInputMode = (inputMode: InputMode, micCheckPassed = get().micCheckPassed) => {
       set({ inputMode, micCheckPassed });
@@ -1843,8 +1898,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             readLine(conversation, index);
           }),
           onInputTranscript: live((current, text: string) => {
-            const { lines, index } = addPiece(current.lines, current.heardLine, 'player', text);
-            set({ conversation: { ...current, lines, heardLine: index } });
+            // The conversation waits while Help is open, and is over once the outcome is decided: the open mic isn't heard then.
+            if (openMicOn() && !openMicListens(current)) return;
+            // With open mic, nothing marks a new turn but the Player starting to speak: what the NPC says next is a new line.
+            const turn =
+              openMicOn() && current.heardLine === null
+                ? { ...current, tab: 'chat' as const, npcLine: null, patience: newPlayerTurn(current.patience) }
+                : current;
+            const { lines, index } = addPiece(turn.lines, turn.heardLine, 'player', text);
+            set({ conversation: { ...turn, lines, heardLine: index } });
           }),
           onTurnComplete: live((current) => {
             const finished = current.npcLine;
@@ -1852,19 +1914,26 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
             // Once the outcome is decided, the turn that just ended was the goodbye.
             if (current.outcome) return showClosingCard();
-            updateConversation({ npcLine: null });
+            // With open mic, whatever the Player says after the NPC's turn is a new line.
+            updateConversation(openMicOn() ? { npcLine: null, heardLine: null } : { npcLine: null });
             smallTalkTurnDone();
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
           onMicLevel: live((current, level: number) => {
-            if (current.listening) set({ micLevel: level });
+            if (current.listening || openMicOn()) set({ micLevel: level });
+          }),
+          onMicUnavailable: live((current) => {
+            set({ micLevel: 0 });
+            setInputMode('typed');
+            remindMicOff(current.id);
           }),
           onUsage: live((current, turn: TokenUsage) => set({ conversation: { ...current, usage: addUsage(current.usage, turn) } })),
           onDisconnect: live((current) => connectionFailed(current, sessionFor)),
         },
-        { resumeFrom, typedOnly: get().inputMode === 'typed' },
+        { resumeFrom, typedOnly: get().inputMode === 'typed', openMic: openMicOn() },
       );
       voice = session;
+      openMicStreaming = true;
       session.connect().then(
         live(() => {
           updateConversation({ reconnecting: false });
@@ -2011,6 +2080,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       gameBeforeConversation = get().game;
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
+      remindMicOff(id);
       set({
         voiceUnavailable: false,
         conversation: {
@@ -2046,9 +2116,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     /** An NPC who is due comes up to the Character, unless the Player is busy: then they wait until the Player is free. */
     const approachIfFree = () => {
       const approach = pendingApproach;
-      const { conversation, fainting, journal, screen } = get();
+      const { conversation, fainting, journal, pauseMenu, screen } = get();
       // No one comes over during a Shift: the Character is at work.
-      if (!approach || conversation || fainting || journal || screen !== 'playing' || get().game.possessions.shift) return;
+      if (!approach || conversation || fainting || journal || pauseMenu || screen !== 'playing' || get().game.possessions.shift) return;
       pendingApproach = null;
       if (!approachStillDue(get().game, approach)) return;
       // Called in, the Character goes through to the doctor.
@@ -2101,6 +2171,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // On the title screen, a First Morning stands in until a game is chosen.
       game: initial ?? createSave(DEV_SETUP),
       tabHidden: false,
+      pauseMenu: false,
       interactable: null,
       tramChoosing: false,
       heldStill: false,
@@ -2117,6 +2188,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       readingAids: { show: DEFAULT_DEVICE_SETTINGS.readingAids, romaji: DEFAULT_DEVICE_SETTINGS.showRomaji },
       inputMode: DEFAULT_DEVICE_SETTINGS.inputMode,
       micCheckPassed: DEFAULT_DEVICE_SETTINGS.micCheckPassed,
+      talkMode: DEFAULT_DEVICE_SETTINGS.talkMode,
+      volumes: DEFAULT_DEVICE_SETTINGS.volumes,
+      tooltips: DEFAULT_DEVICE_SETTINGS.tooltips,
+      micRetry: null,
+      micOffReminder: null,
       journal: null,
       fainting: null,
       wardArrival: null,
@@ -2132,8 +2208,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         settingsWrites
           .then(() => deps.deviceSettings.load())
           .then(
-            ({ nativeLanguage, readingAids, showRomaji, inputMode, micCheckPassed }) =>
-              set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed }),
+            ({ nativeLanguage, readingAids, showRomaji, inputMode, micCheckPassed, talkMode, volumes, tooltips }) =>
+              set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed, talkMode, volumes, tooltips }),
             (error: unknown) => console.warn('[settings] could not be read:', error),
           )
           .then(() => (devTarget ? startDevNewGame(devTarget) : checkSlots()));
@@ -2445,7 +2521,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
-        if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
+        if (conversation || get().journal || get().pauseMenu || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
         if (isNamedNpc(interactable) && key === selectSmallTalkKey(get())) return startSmallTalkWith(interactable);
         if (key === 'T') return;
         const interaction = key === 'E' ? selectTalkWithE(get()) : key === 'F' ? selectTalkWithF(get()) : selectTalkWithR(get());
@@ -2486,7 +2562,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       startTalking: () => {
         const conversation = get().conversation;
-        if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed') return;
+        if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed' || openMicOn()) return;
         voice.startTalking();
         // A new turn: anything the NPC says next starts a new line, and so does what it hears.
         set({
@@ -2557,6 +2633,42 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ readingAids });
         updateDeviceSettings((settings) => ({ ...settings, readingAids: readingAids.show, showRomaji: readingAids.romaji }));
       },
+      setVolume: (bus, level) => {
+        const volumes = { ...get().volumes, [bus]: Math.min(1, Math.max(0, level)) };
+        set({ volumes });
+        updateDeviceSettings((settings) => ({ ...settings, volumes }));
+      },
+      setTalkMode: (talkMode) => {
+        set({ talkMode });
+        updateDeviceSettings((settings) => ({ ...settings, talkMode }));
+      },
+      setTooltips: (tooltips) => {
+        set({ tooltips });
+        updateDeviceSettings((settings) => ({ ...settings, tooltips }));
+      },
+      chooseTypedFallback: () => {
+        micRetryRun++;
+        set({ micRetry: null });
+        setInputMode('typed');
+      },
+      retryMic: () => {
+        if (get().micRetry === 'trying') return;
+        const run = ++micRetryRun;
+        set({ micRetry: 'trying' });
+        deps.openMic(() => {}).then(
+          (close) => {
+            // Only to see that it opens: a conversation opens its own.
+            close();
+            if (run !== micRetryRun) return;
+            set({ micRetry: null });
+            setInputMode('mic');
+          },
+          (error: unknown) => {
+            console.warn('[mic] still none to be had:', error instanceof Error ? error.message : error);
+            if (run === micRetryRun) set({ micRetry: 'failed' });
+          },
+        );
+      },
       addToPhrasebook: (word, glossLanguage) => {
         const game = addToPhrasebook(get().game, { text: word.base, reading: word.reading, gloss: word.gloss, glossLanguage });
         if (game === get().game) return;
@@ -2564,7 +2676,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         save();
       },
       openJournal: () => {
-        if (get().conversation || get().journal) return;
+        if (get().conversation || get().journal || get().pauseMenu) return;
         set({ journal: { entries: null, failed: false } });
         deps.journal.list(get().slotId).then(
           (entries) => {
@@ -2578,6 +2690,16 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       closeJournal: () => {
         set({ journal: null });
+        approachIfFree();
+      },
+      openPauseMenu: () => {
+        const { screen, conversation, journal, fainting, tramChoosing, voiceUnavailable, shiftEnd } = get();
+        if (screen !== 'playing' || conversation || journal || fainting || tramChoosing || voiceUnavailable || shiftEnd) return;
+        set({ pauseMenu: true });
+      },
+      closePauseMenu: () => {
+        if (!get().pauseMenu) return;
+        set({ pauseMenu: false });
         approachIfFree();
       },
       setTyping: (typing) => set({ typing }),
@@ -2626,6 +2748,14 @@ export const selectSetupCanGoOn = (s: GameStore) => s.setup !== null && setupAns
 /** Whether the setup screen showing is the last, so going on starts the game. */
 export const selectSetupIsLast = (s: GameStore) => s.setup !== null && !nextSetupStep(s.setup.step, s.micCheckPassed);
 export const selectInputMode = (s: GameStore) => s.inputMode;
+export const selectTalkMode = (s: GameStore) => s.talkMode;
+export const selectVolumes = (s: GameStore) => s.volumes;
+export const selectTooltipsOn = (s: GameStore) => s.tooltips;
+export const selectMicRetry = (s: GameStore) => s.micRetry;
+export const selectMicOffChip = (s: GameStore): MicOffChip | null => {
+  if (s.inputMode !== 'typed' || !s.conversation) return null;
+  return s.micOffReminder?.conversationId === s.conversation.id ? 'enableInSettings' : 'off';
+};
 const TARGET_LANGUAGES = Object.fromEntries(
   LANGUAGE_CODES.map((native) => [native, LANGUAGE_CODES.filter((language) => language !== native)]),
 ) as Record<LanguageCode, LanguageCode[]>;
@@ -2649,7 +2779,7 @@ export const selectShowcaseAppearance = (s: GameStore): AppearancePreset =>
 export const selectAppearance = (s: GameStore) => s.game.identity.appearance;
 
 export const selectTimeScale = (s: GameStore) => {
-  if (s.tabHidden || s.journal || s.fainting || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
+  if (s.tabHidden || s.pauseMenu || s.journal || s.fainting || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
   return s.conversation ? CLOCK.timeScale.conversation : CLOCK.timeScale.normal;
 };
 export const selectHealth = (s: GameStore) => s.game.character.health;
@@ -2807,7 +2937,8 @@ export const selectTyping = (s: GameStore) => s.typing;
 /** An NPC who came up to the Character has stopped them, until the walking keys held then are let go. */
 export const selectHeldStill = (s: GameStore) => s.heldStill;
 /** Keys belong to the UI, not the world: the typed field has focus, the Journal or the Fainting screen is open, or the Player is choosing a tram stop. */
-export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null || s.fainting !== null || s.tramChoosing;
+export const selectWorldKeysOff = (s: GameStore) => s.typing || s.pauseMenu || s.journal !== null || s.fainting !== null || s.tramChoosing;
+export const selectPauseMenuOpen = (s: GameStore) => s.pauseMenu;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;

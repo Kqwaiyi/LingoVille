@@ -85,12 +85,14 @@ function listen() {
   const usage: TokenUsage[] = [];
   const micLevels: number[] = [];
   let disconnects = 0;
+  let micUnavailable = 0;
   const events: VoiceSessionEvents = {
     onOutputTranscript: (text) => heard.push(`npc: ${text}`),
     onInputTranscript: (text) => heard.push(`player: ${text}`),
     onTurnComplete: () => heard.push('turn complete'),
     onToolCall: (call) => toolCalls.push(call),
     onMicLevel: (level) => micLevels.push(level),
+    onMicUnavailable: () => micUnavailable++,
     onUsage: (u) => usage.push(u),
     onDisconnect: () => disconnects++,
   };
@@ -102,6 +104,9 @@ function listen() {
     get disconnects() {
       return disconnects;
     },
+    get micUnavailable() {
+      return micUnavailable;
+    },
     events,
   };
 }
@@ -112,12 +117,13 @@ async function connected({
   resumeFrom,
   micAllowed,
   typedOnly,
+  openMic,
   session: forNpc = npcSession,
-}: { resumeFrom?: TranscriptLine[]; micAllowed?: boolean; typedOnly?: boolean; session?: NpcSession } = {}) {
+}: { resumeFrom?: TranscriptLine[]; micAllowed?: boolean; typedOnly?: boolean; openMic?: boolean; session?: NpcSession } = {}) {
   const { server, openSocket } = fakeServer();
   const { audio, createAudio } = fakeAudio({ micAllowed });
   const game = listen();
-  const session = openLiveSession(TOKEN, forNpc, game.events, { resumeFrom, typedOnly }, { openSocket, createAudio });
+  const session = openLiveSession(TOKEN, forNpc, game.events, { resumeFrom, typedOnly, openMic }, { openSocket, createAudio });
   const connecting = session.connect();
   await flush();
   server.open();
@@ -285,6 +291,39 @@ describe('Live VoiceSession', () => {
     expect(game.heard).toEqual(['player: Kaffee ', 'player: bitte']);
   });
 
+  it('with open mic, turns automatic activity detection on and streams the mic from connect, pausing it only while told to', async () => {
+    const { server, audio, game, session } = await connected({ openMic: true });
+
+    audio.speaks('PCM1', 0.4);
+    session.stopTalking();
+    audio.speaks('waiting', 0.5);
+    session.startTalking();
+    audio.speaks('PCM2', 0.6);
+
+    expect((server.sent[0]!.setup as { realtimeInputConfig: unknown }).realtimeInputConfig).toEqual({
+      automaticActivityDetection: { disabled: false },
+    });
+    const audioSent = server.sent.flatMap((m) => {
+      const input = m.realtimeInput as { audio?: { data: string } } | undefined;
+      return input?.audio ? [input.audio.data] : [];
+    });
+    expect(audioSent).toEqual(['PCM1', 'PCM2']);
+    // No activity signals: detection says when the Player speaks.
+    expect(server.conversation.slice(1)).toEqual([]);
+    expect(game.micLevels).toEqual([0.4, 0, 0.6]);
+  });
+
+  it('with open mic, keeps what the NPC says after the server says the Player cut in', async () => {
+    const { server, audio, game } = await connected({ openMic: true });
+    server.says({ serverContent: { outputTranscription: { text: 'Hallo! ' }, modelTurn: { parts: [{ inlineData: { data: 'HI' } }] } } });
+
+    server.says({ serverContent: { interrupted: true } });
+    server.says({ serverContent: { outputTranscription: { text: 'Kaffee, gern.' }, modelTurn: { parts: [{ inlineData: { data: 'REPLY' } }] } } });
+
+    expect(game.heard).toEqual(['npc: Hallo! ', 'npc: Kaffee, gern.']);
+    expect(audio.played).toEqual(['HI', 'REPLY']);
+  });
+
   it('stops the NPC mid-sentence when the Player starts talking over it', async () => {
     const { server, audio, game, session } = await connected();
     server.says({ serverContent: { modelTurn: { parts: [{ inlineData: { data: 'AAAA' } }] } } });
@@ -337,6 +376,12 @@ describe('Live VoiceSession', () => {
     expect(server.conversation.at(-1)).toEqual({
       clientContent: { turns: [{ role: 'user', parts: [{ text: 'Kaffee bitte' }] }], turnComplete: true },
     });
+  });
+
+  it('tells the game when the mic is refused or missing', async () => {
+    const { game } = await connected({ micAllowed: false });
+
+    expect(game.micUnavailable).toBe(1);
   });
 
   it('in the Typed Fallback, never asks for the mic', async () => {

@@ -11,7 +11,8 @@ import {
   selectCulturePackId,
   selectGiftsToGive,
   selectHelpOpen,
-  selectInputMode,
+  selectMicOffChip,
+  selectTalkMode,
   selectLineReading,
   selectListening,
   selectMicLevel,
@@ -344,16 +345,34 @@ function GiftButton() {
   );
 }
 
-/** In the Typed Fallback, a chip says the mic is off where the mic button would be. */
+/** With open mic there's nothing to hold: the mic listens all along, and shows how loud the Player is. */
+function OpenMic() {
+  const { t } = useTranslation();
+  const level = useGame(selectMicLevel);
+  return (
+    <span className="mic mic-open" role="img" aria-label={t('chat.openMic')} title={t('chat.openMic')} style={{ '--level': level } as CSSProperties}>
+      <span className="mic-dot" aria-hidden="true" />
+      🎤
+    </span>
+  );
+}
+
+/**
+ * The mic button, or with open mic its live level. In the Typed Fallback, a chip says the mic is off where the mic
+ * button would be, and in the first conversation of the day that Settings can turn it on.
+ */
 function InputBar() {
   const { t } = useTranslation();
-  const inputMode = useGame(selectInputMode);
+  const micOffChip = useGame(selectMicOffChip);
+  const talkMode = useGame(selectTalkMode);
   return (
     <div className="chat-input">
-      {inputMode === 'typed' ? (
+      {micOffChip ? (
         <span className="mic-off" title={t('chat.micOffHint')}>
-          {t('chat.micOff')}
+          {t(micOffChip === 'enableInSettings' ? 'chat.micOffEnable' : 'chat.micOff')}
         </span>
+      ) : talkMode === 'open-mic' ? (
+        <OpenMic />
       ) : (
         <MicButton />
       )}

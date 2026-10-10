@@ -149,6 +149,7 @@ export async function playNpcCase(
         session.sendToolResponse(id, response);
       },
       onMicLevel: () => {},
+      onMicUnavailable: () => {},
       onUsage: () => {},
       onDisconnect: () => {
         dropped = new Error('the Live connection dropped');

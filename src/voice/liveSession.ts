@@ -56,8 +56,9 @@ const contentTurn = (role: 'user' | 'model', line: string) => ({ role, parts: [{
 
 /**
  * A conversation with a Gemini Live NPC: the only code that touches the socket.
- * Push-to-talk drives the turns (automatic activity detection is off), and
- * transcription runs both ways.
+ * Push-to-talk drives the turns (automatic activity detection is off), or with
+ * open mic the mic streams all along and automatic activity detection does.
+ * Transcription runs both ways.
  */
 export function openLiveSession(
   token: LiveToken,
@@ -70,7 +71,9 @@ export function openLiveSession(
   let audio: LiveAudio | null = null;
   let connected = false;
   let closed = false;
-  let listening = false;
+  const openMic = options.openMic === true;
+  // With open mic the session listens unless the game stops it while the conversation waits; push-to-talk sets it while held.
+  let listening = openMic;
   // The NPC is partway through a turn. If the Player cuts it off, the rest of
   // that turn still in flight is dropped until the server confirms the interruption.
   let npcSpeaking = false;
@@ -144,7 +147,10 @@ export function openLiveSession(
               events.onMicLevel(level);
               send({ realtimeInput: { audio: { data: pcm, mimeType: MIC_MIME_TYPE } } });
             })
-            .catch((error) => console.warn('[voice] no mic; only the typed reply works:', error));
+            .catch((error) => {
+              console.warn('[voice] no mic; only the typed reply works:', error);
+              if (!closed) events.onMicUnavailable();
+            });
         }
 
         const timeout = setTimeout(() => fail(new Error('Live setup timed out')), SETUP_TIMEOUT_MS);
@@ -177,7 +183,7 @@ export function openLiveSession(
                   tools: [{ functionDeclarations: session.tools }],
                   inputAudioTranscription: {},
                   outputAudioTranscription: {},
-                  realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
+                  realtimeInputConfig: { automaticActivityDetection: { disabled: !openMic } },
                 },
               }),
             ),
@@ -210,7 +216,13 @@ export function openLiveSession(
       }),
 
     startTalking: () => {
-      if (!connected || closed || listening) return;
+      if (closed || listening) return;
+      // With open mic, only streams it again: activity detection says when the Player speaks.
+      if (openMic) {
+        listening = true;
+        return;
+      }
+      if (!connected) return;
       audio?.stopPlayback();
       if (npcSpeaking) droppingCutOffTurn = true;
       listening = true;
@@ -220,6 +232,8 @@ export function openLiveSession(
       if (!listening) return;
       listening = false;
       events.onMicLevel(0);
+      // With open mic, only stops streaming it, while the conversation waits.
+      if (openMic) return;
       send({ realtimeInput: { activityEnd: {} } });
     },
     sendText: (line) => {

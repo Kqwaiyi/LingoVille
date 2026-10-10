@@ -9,6 +9,7 @@ import { FaintingScreen } from './FaintingScreen.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
+import { PauseMenu } from './PauseMenu.tsx';
 import { PersistCallout } from './PersistCallout.tsx';
 import { SetupScreen } from './SetupScreen.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
@@ -67,6 +68,7 @@ function Hud() {
       <VoiceUnavailableScreen />
       <FaintingScreen />
       <PersistCallout />
+      <PauseMenu />
     </>
   );
 }
