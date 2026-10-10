@@ -22,6 +22,7 @@ export {
 export { approachInteraction, interactionStartedWithE, interactionStartedWithF, interactionStartedWithR } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {
+  AMBIENT_SOUND_IDS,
   CULTURE_PACKS,
   culturePackSchema,
   cafeAllergensIn,
@@ -32,6 +33,7 @@ export {
   localShop,
   PROP_IDS,
   SIGN_WORDS,
+  type AmbientSoundId,
   type Currency,
   type CulturePack,
   type Glosses,

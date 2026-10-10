@@ -46,6 +46,7 @@ export {
   selectJournal,
   selectLineReading,
   selectListening,
+  selectMicOpen,
   selectMicLevel,
   selectMood,
   selectMoodFace,
@@ -210,4 +211,13 @@ export {
   type DeviceSettings,
   type DeviceSettingsStore,
 } from './deviceSettings.ts';
+export {
+  selectSoundscape,
+  uiSoundsBetween,
+  type AmbientBed,
+  type BusLevels,
+  type MusicTrack,
+  type Soundscape,
+  type UiSound,
+} from './soundscape.ts';
 export { type LibraryReadings } from './libraryReadings.ts';

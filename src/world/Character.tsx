@@ -159,6 +159,7 @@ export function Character() {
   const [, getKeys] = useKeyboardControls<Control>();
   const { world } = useRapier();
   const enterPlace = useGame((s) => s.enterPlace);
+  const setOnStreet = useGame((s) => s.setOnStreet);
   const setInteractable = useGame((s) => s.setInteractable);
   // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
   const keysOff = useGame(selectWorldKeysOff);
@@ -266,6 +267,7 @@ export function Character() {
 
     const placeId = placeAt(next.x, next.z);
     if (placeId) enterPlace(placeId);
+    setOnStreet(placeId === null);
     setInteractable(interactableAt(next.x, next.z, tramRunning));
   });
 

@@ -3,7 +3,7 @@
 Pure prompt builders and schemas: NPC session, Recap, hint, annotate, and the annotate validator. `readings.ts` holds the zh and ja reading aids that need no I/O: the pinyin-pro library reading, kuromoji tokens → segments, furigana alignment and romaji.
 
 **Rules**
-- Pure functions, no network. Never import `world`, `ui` or `voice` (lint enforces it).
+- Pure functions, no network. Never import `world`, `ui`, `voice` or `audio` (lint enforces it).
 - The gateway imports the request builders and their Zod schemas from here, so the browser sends structured inputs and the gateway builds the prompt.
 - The Character's money never goes into a prompt.
 - Changes here need a passing `npm run eval` before merging. Ask the user to run it; never run it unless they explicitly ask (see `evals/AGENTS.md`).

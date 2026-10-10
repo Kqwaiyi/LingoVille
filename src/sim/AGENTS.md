@@ -3,7 +3,7 @@
 Pure TypeScript game rules: state types, `tick`, economy, proficiency, Life Skills, Familiarity, Illness.
 
 **Rules**
-- No React, Three, DOM or I/O. Never import `world`, `ui` or `voice` (lint enforces both).
+- No React, Three, DOM or I/O. Never import `world`, `ui`, `voice` or `audio` (lint enforces both).
 - Functions take state in and return state out. All randomness comes from the seeded RNG in the state.
 - Every game number lives in `tuning.ts`. Don't hard-code numbers in rules.
 - Other modules import from `index.ts`, not from inner files.

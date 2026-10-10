@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useSoundtrack } from '../audio/index.ts';
 import { useShowNativeLanguage } from '../i18n/index.ts';
 import { selectConversation, selectNativeLanguage, selectScreen, useGame } from '../store/index.ts';
 import { Scene } from '../world/index.ts';
@@ -41,6 +42,7 @@ function usePauseAndSaveWhenHidden() {
 /** The live town is always there: behind the title screen and setup first, then under the HUD. */
 export function App() {
   usePauseAndSaveWhenHidden();
+  useSoundtrack();
   useShowNativeLanguage(useGame(selectNativeLanguage));
   const screen = useGame(selectScreen);
   const talking = useGame(selectConversation) !== null;

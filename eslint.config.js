@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 
 const sim = './src/sim';
 const pureModules = [sim, './src/content', './src/ai'];
-const presentationModules = ['./src/world', './src/ui', './src/voice'];
+const presentationModules = ['./src/world', './src/ui', './src/voice', './src/audio'];
 
 export default tseslint.config(
   { ignores: ['dist', 'node_modules', 'test-results', 'playwright-report'] },
@@ -26,7 +26,7 @@ export default tseslint.config(
             {
               target: pureModules,
               from: presentationModules,
-              message: 'sim, content and ai are pure: they must not import world, ui or voice.',
+              message: 'sim, content and ai are pure: they must not import world, ui, voice or audio.',
             },
             {
               target: './src',

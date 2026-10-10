@@ -8,6 +8,7 @@
 - Mock mode uses a scripted fake NPC with the same interface. Typing `MOCK_DROP_LINE` to it drops its connection, so smoke tests can script a network failure.
 - The fake NPC waits `replyDelayMs` from the token response before each answer (600 when it's missing), and always answers from a timer, even at 0, never within the call that caused it.
 - The browser edges (WebSocket, mic worklet, playback queue, the mic check's mic) live in `browserIo.ts`. Protocol logic stays in `liveSession.ts`, so it can be tested without a browser.
+- The NPC's voice and hear-it-said play at the Voice volume under Master (`setVoiceVolume`, which the audio module sets), never ducked.
 - Hear-it-said clips come from `/api/tts` and are cached in their own IndexedDB database by a hash of (text, voice), never in saves and never exported.
 - `sim`, `content` and `ai` may not import this module.
 

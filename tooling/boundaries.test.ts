@@ -16,7 +16,7 @@ async function boundaryErrors(filePath: string, code: string) {
 // Vitest's default 5 s while the rest of the suite runs alongside it.
 describe('import boundaries', { timeout: 30_000 }, () => {
   it.each(['src/sim/violation.ts', 'src/content/violation.ts', 'src/ai/violation.ts'])(
-    '%s may not import ui, world or voice',
+    '%s may not import ui, world, voice or audio',
     async (filePath) => {
       const errors = await boundaryErrors(
         filePath,
@@ -24,9 +24,10 @@ describe('import boundaries', { timeout: 30_000 }, () => {
           "export { App } from '../ui/App.tsx';",
           "export * from '../world/index.ts';",
           "export * from '../voice/index.ts';",
+          "export * from '../audio/index.ts';",
         ].join('\n'),
       );
-      expect(errors).toHaveLength(3);
+      expect(errors).toHaveLength(4);
     },
   );
 

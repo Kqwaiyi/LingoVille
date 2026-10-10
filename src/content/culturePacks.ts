@@ -26,6 +26,25 @@ import { isPasserBy, PASSER_BY_IDS, PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type 
 /** A Native Language → the meaning in it. A pack glosses its words in the three languages other than its own. */
 export type Glosses = Partial<Record<LanguageCode, string>>;
 
+/**
+ * The ambient one-shots a pack can play now and then around the town: the local touches over the shared beds. None is
+ * intelligible speech: a street vendor's call is a wordless far-off cry.
+ */
+export const AMBIENT_SOUND_IDS = [
+  'bicycle-bell',
+  'bus-brakes',
+  'church-bells',
+  'crow-caw',
+  'evening-chime',
+  'level-crossing',
+  'pigeon-coo',
+  'scooter-horn',
+  'shop-door-chime',
+  'street-vendor-call',
+  'tram-bell',
+] as const;
+export type AmbientSoundId = (typeof AMBIENT_SOUND_IDS)[number];
+
 /** An item as this pack sells it: its local name and glosses. Its price is the catalogue's (`ITEMS`), converted. */
 export type Good = { name: string; glosses: Glosses };
 
@@ -142,8 +161,8 @@ export type CulturePack = {
   customs: string[];
   /** Opening hours that differ from the town's defaults (`PLACE_HOURS`, `SERVICE_HOURS`). */
   hours: Partial<Record<HoursId, OpeningHours>>;
-  /** Ambient one-shot sound ids, played now and then around the town (ticket 32). */
-  ambient: string[];
+  /** Ambient one-shots, played now and then out in the town. */
+  ambient: AmbientSoundId[];
   goods: Record<ItemId, Good>;
   /** How a café drink can be made (size, hot or iced, extras), as the menu grid and Shift Customers say it. */
   drinkOptions: Record<DrinkOptionId, Good>;
@@ -192,7 +211,6 @@ export function culturePackSchema(packId: LanguageCode) {
   const text = z.string().trim().min(1);
   const others = LANGUAGE_CODES.filter((language) => language !== packId);
   const glosses = z.strictObject(Object.fromEntries(others.map((language) => [language, text])));
-  const kebab = z.string().regex(/^[a-z]+(-[a-z]+)*$/);
   const openingHours = z
     .object({
       opensAt: z.int().min(0).max(DAY),
@@ -227,7 +245,7 @@ export function culturePackSchema(packId: LanguageCode) {
     }),
     customs: z.array(text),
     hours: z.partialRecord(z.enum(HOURS_IDS), openingHours),
-    ambient: z.array(kebab),
+    ambient: z.array(z.enum(AMBIENT_SOUND_IDS)).min(1),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     drinkOptions: z.record(z.enum(DRINK_OPTIONS), z.object({ name: text, glosses })),
     dietaryNotes: z.record(z.enum(DIETARY_NOTE_IDS), z.object({ name: text, glosses })),

@@ -365,3 +365,16 @@ export const GROCERIES = {
   /** Gone-off groceries stay in the inventory this many days (they can still be cooked, at a risk), then get thrown out. */
   goneOffDaysKept: 2,
 } as const;
+
+// --- Audio mix --------------------------------------------------------------
+
+/**
+ * How loud music and ambient sound play, as a share of their volume settings, while something needs hearing over
+ * them. The NPC's voice and hear-it-said always play at their own full volume.
+ */
+export const AUDIO_MIX = {
+  /** In a conversation, so NPC speech stays clear. */
+  conversation: { music: 0.2, ambient: 0.4 },
+  /** While the mic is open, so the game doesn't leak into what the NPC hears. */
+  micOpen: { music: 0, ambient: 0.1 },
+} as const;

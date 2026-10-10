@@ -767,6 +767,8 @@ export type GameStore = {
   pauseMenu: boolean;
   /** Where the First Morning's next step is from the Character, as the world last measured it. Never saved. */
   firstMorningGuide: FirstMorningGuide | null;
+  /** The Character is out on the street, in no place: the place id stays the last one they were in. Never saved. */
+  onStreet: boolean;
   /** The First Morning was just done (not skipped), so its closing card is due. Never saved. */
   firstMorningCard: boolean;
   interactable: Interactable | null;
@@ -843,6 +845,8 @@ export type GameStore = {
   advance: (realDeltaMs: number) => void;
   setTabHidden: (hidden: boolean) => void;
   enterPlace: (placeId: PlaceId) => void;
+  /** The world says, as the Character walks, whether they're out on the street or in a place. */
+  setOnStreet: (onStreet: boolean) => void;
   setInteractable: (interactable: Interactable | null) => void;
   /** E at a tram stop while the trams run: choose a stop to ride to. */
   openTram: () => void;
@@ -1107,6 +1111,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         pauseMenu: false,
         firstMorningGuide: null,
         firstMorningCard: false,
+        onStreet: false,
         micOffReminder: null,
       });
       // While the town loads, so the first line doesn't wait for a dictionary.
@@ -2311,6 +2316,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       pauseMenu: false,
       firstMorningGuide: null,
       firstMorningCard: false,
+      onStreet: false,
       interactable: null,
       tramChoosing: false,
       heldStill: false,
@@ -2482,6 +2488,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         save();
         noticeApproach(before, game);
         waveOverInThePark(before, game);
+      },
+      setOnStreet: (onStreet) => {
+        if (onStreet !== get().onStreet) set({ onStreet });
       },
       setInteractable: (interactable) => {
         if (get().interactable === interactable) return;
@@ -3136,6 +3145,16 @@ export const selectHeldStill = (s: GameStore) => s.heldStill;
 export const selectWorldKeysOff = (s: GameStore) => s.typing || s.pauseMenu || s.journal !== null || s.fainting !== null || s.tramChoosing;
 export const selectPauseMenuOpen = (s: GameStore) => s.pauseMenu;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
+/**
+ * The mic is open: push-to-talk is held, open mic is streaming (while the Player can take a turn in the chat), or the
+ * mic check is listening.
+ */
+export const selectMicOpen = (s: GameStore) => {
+  if (s.screen === 'setup') return s.setup?.step === 'micCheck' && s.setup.mic !== 'unavailable';
+  if (!s.conversation) return false;
+  const openMic = s.talkMode === 'open-mic' && s.inputMode === 'mic';
+  return s.conversation.listening || (openMic && takesTurns(s.conversation) && s.conversation.tab === 'chat');
+};
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;
 /** The Player can take a turn: not while the NPC says goodbye once the outcome is decided, nor while reconnecting. */

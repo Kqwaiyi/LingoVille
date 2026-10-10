@@ -74,8 +74,22 @@ function fromBase64(data: string) {
   return bytes.buffer;
 }
 
+// The Voice volume (under Master) that every NPC voice and hear-it-said clip plays at. It's never ducked.
+let voiceVolume = 1;
+const voiceOutputs = new Set<GainNode>();
+
+/** Sets how loud the NPC's voice and hear-it-said play, from 0 to 1, now and in every speaker opened later. */
+export function setVoiceVolume(level: number) {
+  voiceVolume = level;
+  for (const output of voiceOutputs) output.gain.value = level;
+}
+
 export function createBrowserAudio(): LiveAudio {
   const context = new AudioContext();
+  const output = context.createGain();
+  output.gain.value = voiceVolume;
+  output.connect(context.destination);
+  voiceOutputs.add(output);
   let mic: MediaStream | null = null;
   let closed = false;
   let nextStart = 0;
@@ -112,7 +126,7 @@ export function createBrowserAudio(): LiveAudio {
       for (let i = 0; i < samples.length; i++) channel[i] = samples[i]! / 0x8000;
       const source = context.createBufferSource();
       source.buffer = buffer;
-      source.connect(context.destination);
+      source.connect(output);
       // Chunks play back to back; a gap only opens if the network falls behind.
       nextStart = Math.max(nextStart, context.currentTime);
       source.start(nextStart);
@@ -144,6 +158,7 @@ export function createBrowserAudio(): LiveAudio {
     close: () => {
       if (closed) return;
       closed = true;
+      voiceOutputs.delete(output);
       mic?.getTracks().forEach((track) => track.stop());
       playing.clear();
       notifyIfDrained();

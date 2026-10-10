@@ -25,3 +25,5 @@ These are public domain (CC0 1.0). No credit is required, but they're credited h
 | Universal Animation Library | Quaternius | https://quaternius.itch.io/universal-animation-library | Everyone's animations |
 
 All of it is recoloured to the town's palette by `npm run build:town` and `npm run build:characters`.
+
+The music, ambient sound and UI sounds are synthesised by the game as it plays (`src/audio`), so there are no sound files to credit.
