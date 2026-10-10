@@ -35,7 +35,7 @@ const PACKS = [
 
 for (const p of PACKS) {
   test(`the café works in the ${p.pack} pack: local menu, local prices, local money`, async ({ page }) => {
-    await walkToTheBarista(page, p.pack);
+    await walkToTheBarista(page, { target: p.pack });
     await expect(money(page)).toHaveText(p.before);
     await page.keyboard.press('KeyE');
     await expect(npcLine(page, p.greeting)).toBeVisible();
@@ -100,7 +100,7 @@ async function pointAtASign(
 }
 
 test('pointing at a sign shows its pinyin, and Translate shows what it means', async ({ page }) => {
-  await walkToTheBarista(page, 'zh');
+  await walkToTheBarista(page, { target: 'zh' });
   await pointAtASign(page);
 
   await expect(signTooltip(page).locator('ruby rt').first()).toBeVisible();

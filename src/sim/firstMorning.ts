@@ -1,3 +1,4 @@
+import type { Interaction } from '../content/index.ts';
 import type { GameState } from './state.ts';
 
 /** The First Morning's steps, in order: drink water at the tap, walk to the café, and order breakfast there. */
@@ -25,4 +26,12 @@ export function completeFirstMorningStep(state: GameState, step: FirstMorningSte
 export function skipFirstMorning(state: GameState): GameState {
   if (firstMorningStep(state) === null) return state;
   return { ...state, onboarding: { ...state.onboarding, firstMorningSkipped: true } };
+}
+
+/**
+ * The First Morning's café order: an order at the café while the First Morning is under way. Its Patience can't run
+ * out, so the Player's first try in the language can't end in failure.
+ */
+export function isFirstMorningCafeOrder(state: GameState, interaction: Interaction): boolean {
+  return firstMorningStep(state) !== null && interaction.placeId === 'cafe' && interaction.effect.kind === 'serveOrder';
 }

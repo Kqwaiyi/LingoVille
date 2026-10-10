@@ -9,8 +9,10 @@ import {
   selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectFirstMorningOrderPrompt,
   selectGiftsToGive,
   selectHelpOpen,
+  selectHelpPulse,
   selectMicOffChip,
   selectTalkMode,
   selectLineReading,
@@ -203,6 +205,7 @@ function TypedField() {
   const canTakeTurn = useGame(selectCanTakeTurn);
   const sendTypedLine = useGame((s) => s.sendTypedLine);
   const setTyping = useGame((s) => s.setTyping);
+  const draftTypedLine = useGame((s) => s.draftTypedLine);
 
   useEffect(() => {
     if (typing) return;
@@ -233,7 +236,10 @@ function TypedField() {
       autoComplete="off"
       readOnly={!canTakeTurn}
       value={text}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => {
+        setText(e.target.value);
+        draftTypedLine();
+      }}
       onKeyDown={onKeyDown}
       onFocus={() => setTyping(true)}
       onBlur={() => setTyping(false)}
@@ -382,6 +388,20 @@ function InputBar() {
   );
 }
 
+const ORDER_PROMPTS = { type: 'firstMorning.orderType', holdSpace: 'firstMorning.orderHoldSpace', say: 'firstMorning.orderSay' } as const;
+
+/** In the First Morning's café order, until it's decided, how to answer: by typing without a mic, or holding Space with one. */
+function FirstMorningOrderPrompt() {
+  const { t } = useTranslation();
+  const prompt = useGame(selectFirstMorningOrderPrompt);
+  if (!prompt) return null;
+  return (
+    <p className="first-morning-order-prompt" role="note">
+      {t(ORDER_PROMPTS[prompt])}
+    </p>
+  );
+}
+
 /** The conversation column on the right: header, chat bubbles and the input bar. */
 export function ConversationColumn() {
   const { t } = useTranslation();
@@ -393,6 +413,7 @@ export function ConversationColumn() {
   const reconnecting = useGame(selectReconnecting);
   const recap = useGame(selectRecap);
   const helpOpen = useGame(selectHelpOpen);
+  const helpPulse = useGame(selectHelpPulse);
   const typing = useGame(selectTyping);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const toggleHelp = useGame((s) => s.toggleHelp);
@@ -459,11 +480,14 @@ export function ConversationColumn() {
               role="tab"
               aria-selected={helpOpen}
               disabled={conversation.closed}
+              data-pulse={helpPulse || undefined}
               onClick={() => !helpOpen && toggleHelp()}
             >
               {t('chat.helpTab')} <kbd>H</kbd>
             </button>
           </div>
+          {/* Help is pointed to, never opened for the Player. */}
+          {helpPulse && <span className="help-nudge">{t('firstMorning.helpNudge')}</span>}
           <button type="button" className="chat-leave" onClick={leaveConversation}>
             {t('chat.leave')} <kbd>Esc</kbd>
           </button>
@@ -488,7 +512,14 @@ export function ConversationColumn() {
             </div>
           )}
           {conversation.shiftCustomer && <JobPanel jobId={shift?.jobId} conversationId={conversation.id} />}
-          {closingCard ? <ClosingCardPanel card={closingCard} who={who} /> : <InputBar />}
+          {closingCard ? (
+            <ClosingCardPanel card={closingCard} who={who} />
+          ) : (
+            <>
+              <FirstMorningOrderPrompt />
+              <InputBar />
+            </>
+          )}
         </>
       )}
     </aside>

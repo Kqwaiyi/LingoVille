@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { startNewGame, type Language } from './title.ts';
+import { startNewGame, type NewGame } from './title.ts';
 import { walkUntil } from './walk.ts';
 
 export const column = (page: Page) => page.getByRole('complementary', { name: 'Conversation' });
@@ -16,18 +16,19 @@ export const npcLine = (page: Page, text: string) => chat(page).getByRole('butto
 export const GREETING = 'いらっしゃいませ！ご注文はお決まりですか？';
 
 /**
- * Starts a new game at the café door at 09:00 (learning Japanese, or the
- * language `target` names) and walks up to the counter until the barista can
- * be talked to. At 07:00, when the First Morning starts, the de café isn't open yet.
+ * Starts a new game at the café door at 09:00 (learning Japanese, or as `answers`
+ * say) and walks up to the counter until the barista can be talked to. At 07:00,
+ * when the First Morning starts, the de café isn't open yet. The First Morning
+ * is under way unless `answers` skip the tutorial, so the first order there can't fail.
  */
-export async function walkToTheBarista(page: Page, target?: Language) {
-  await startNewGame(page, { path: '/?spawn=cafe&at=9', target });
+export async function walkToTheBarista(page: Page, answers: Omit<NewGame, 'path'> = {}) {
+  await startNewGame(page, { path: '/?spawn=cafe&at=9', ...answers });
   await page.locator('canvas').click();
   await walkUntil(page, 'KeyW', 'to talk — barista');
 }
 
-export async function talkToTheBarista(page: Page) {
-  await walkToTheBarista(page);
+export async function talkToTheBarista(page: Page, answers: Omit<NewGame, 'path'> = {}) {
+  await walkToTheBarista(page, answers);
   await page.keyboard.press('KeyE');
   await expect(column(page)).toBeVisible();
   // The barista always speaks first.

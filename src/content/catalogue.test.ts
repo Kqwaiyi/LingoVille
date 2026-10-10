@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlaceId } from '../sim/index.ts';
-import { CULTURE_PACKS, culturePackProblems, INTERACTIONS, type Band } from './index.ts';
+import { CULTURE_PACKS, culturePackProblems, HIRING_PLACES, INTERACTIONS, type Band } from './index.ts';
 
 /** The spec's catalogue of Goal Interactions, #1–#25 (the hiring ones, #26–#28, aside): the interaction, place, completion and band. */
 const CATALOGUE: [number, keyof typeof INTERACTIONS, PlaceId, string, Band][] = [
@@ -41,6 +41,10 @@ describe('the Goal Interaction catalogue', () => {
     const interaction = INTERACTIONS[key];
     expect(interaction).toMatchObject({ placeId, band, completion: { name: completion } });
     expect(interaction.toolDeclaration.name).toBe(completion);
+  });
+
+  it('hires at three places, #26–#28: the café, the supermarket and the restaurant', () => {
+    expect(HIRING_PLACES).toEqual(['cafe', 'supermarket', 'restaurant']);
   });
 
   it('cross-references cleanly in every pack', () => {

@@ -2,6 +2,13 @@ import { expect, type Page } from '@playwright/test';
 
 export const titleMenu = (page: Page) => page.getByRole('navigation', { name: 'Title menu' });
 
+/** From now on the browser refuses the mic, as if the Player had said no. */
+export async function refuseTheMic(page: Page) {
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
+  });
+}
+
 /** Reloads the page and picks Continue on the title screen. */
 export async function reloadAndContinue(page: Page) {
   await page.reload();

@@ -7,6 +7,7 @@ import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { FaintingScreen } from './FaintingScreen.tsx';
 import { FirstMorningBanner } from './FirstMorningBanner.tsx';
+import { FirstMorningCard } from './FirstMorningCard.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
@@ -68,6 +69,7 @@ function Hud() {
       <ShiftEndCard />
       {/* Before the toast, which moves down out of its way. */}
       <FirstMorningBanner />
+      <FirstMorningCard />
       <Toast />
       <Journal />
       <VoiceUnavailableScreen />

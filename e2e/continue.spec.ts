@@ -1,10 +1,8 @@
 import { expect, test, type Page } from './test.ts';
 import { column, dock, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 import { reloadAndContinue, startNewGame, titleMenu } from './title.ts';
-import { walkUntil } from './walk.ts';
 
 const money = (page: Page) => dock(page).getByLabel('Money');
-const closingCard = (page: Page) => column(page).getByRole('region', { name: 'Conversation over' });
 
 test('a browser with no saves is offered only New game', async ({ page }) => {
   await page.goto('/');
@@ -20,22 +18,7 @@ test('the game saves itself, with a brief "Saved ✓" under the clock', async ({
   await expect(dock(page).getByText('Saved ✓')).toBeHidden({ timeout: 5_000 });
 });
 
-test('order a drink, reload, Continue: the money and the place are as they were', async ({ page }) => {
-  await talkToTheBarista(page);
-  await typeLine(page, 'ホットラテ ください');
-  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
-  await typeLine(page, 'はい');
-  await expect(closingCard(page)).toBeVisible();
-  await closingCard(page).getByRole('button', { name: 'Skip Recap' }).click();
-  await expect(money(page)).toHaveText('¥9,550');
-
-  await reloadAndContinue(page);
-
-  await expect(money(page)).toHaveText('¥9,550');
-  // Back at the café's entrance: a few steps forward reach the barista.
-  await page.locator('canvas').click();
-  await walkUntil(page, 'KeyW', 'to talk — barista');
-});
+// Order a drink, reload, Continue: the money and the place are as they were. That's the first session's smoke (`smoke.spec.ts`).
 
 test('a reload mid-conversation comes back as if the conversation never happened', async ({ page }) => {
   await talkToTheBarista(page);

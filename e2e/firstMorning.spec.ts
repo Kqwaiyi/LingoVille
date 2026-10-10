@@ -1,4 +1,6 @@
 import { expect, test, type Page } from './test.ts';
+import { PROFICIENCY_STEP_TABLE } from '../src/sim/index.ts';
+import { column, field, npcLine, talkToTheBarista, typeLine } from './barista.ts';
 import { reloadAndContinue, startNewGame } from './title.ts';
 import { walkUntil } from './walk.ts';
 
@@ -49,4 +51,32 @@ test('Skip the tutorial at setup starts the game with no First Morning', async (
 
   await expect(page.getByRole('region', { name: 'Dock' })).toBeVisible();
   await expect(banner(page)).toBeHidden();
+});
+
+test('the First Morning café order can’t fail, and points to Help without opening it', async ({ page }) => {
+  await talkToTheBarista(page);
+  const nudge = column(page).getByText('Stuck? Try Help');
+  const helpTab = column(page).getByRole('tab', { name: 'Help' });
+  // With a mic, the order is spoken: hold Space.
+  await expect(column(page).getByRole('note')).toHaveText('Order breakfast: hold Space, say what you’d like, then let go');
+  await expect(nudge).toBeHidden();
+
+  // More turns the barista can't make sense of than they'd put up with anywhere else (the dev save is at A1).
+  const turns = PROFICIENCY_STEP_TABLE.A1.startingPatience + 1;
+  for (let turn = 1; turn <= turns; turn++) {
+    await typeLine(page, 'asdf');
+    await expect(npcLine(page, 'すみません、よくわかりませんでした。')).toHaveCount(turn);
+  }
+  // The barista hasn't given up: the order goes on.
+  await expect(column(page).getByRole('region', { name: 'Conversation over' })).toHaveCount(0);
+  await expect(field(page)).toBeEditable();
+  await expect(nudge).toBeVisible();
+  await expect(helpTab).toHaveAttribute('aria-selected', 'false');
+
+  // Once found, Help stops pointing. (The typed field has focus, so H would type: the Player clicks the tab.)
+  await helpTab.click();
+  await expect(helpTab).toHaveAttribute('aria-selected', 'true');
+  await expect(nudge).toBeHidden();
+  await column(page).getByRole('tab', { name: 'Chat' }).click();
+  await expect(nudge).toBeHidden();
 });

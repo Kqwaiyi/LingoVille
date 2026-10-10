@@ -174,6 +174,18 @@ export const en = {
     walkToCafe: 'Get breakfast at the café',
     breakfast: 'Order breakfast from the barista at the counter',
     distance: '{{metres}} m',
+    // In the café order, how to answer: typed without a mic, push-to-talk with one. Open mic is never taught there.
+    orderType: 'Order breakfast: press T, type what you’d like and press Enter',
+    orderHoldSpace: 'Order breakfast: hold Space, say what you’d like, then let go',
+    orderSay: 'Order breakfast: tell the barista what you’d like',
+    /** Beside the Help tab while it pulses. */
+    helpNudge: 'Stuck? Try Help',
+    // The closing card, once the First Morning is done.
+    cardTitle: 'Your first morning is done!',
+    cardMoney: 'You have {{amount}}',
+    cardRent: 'Rent is due on day {{day}}',
+    cardHiring: '{{number}} places are hiring: {{places}}. Ask the staff about work.',
+    cardOk: 'Got it',
   },
   credits: {
     heading: 'Credits',

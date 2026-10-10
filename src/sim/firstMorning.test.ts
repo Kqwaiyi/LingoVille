@@ -8,12 +8,19 @@ import {
   enterPlace,
   FIRST_MORNING_STEPS,
   firstMorningStep,
+  isFirstMorningCafeOrder,
+  isOutOfPatience,
+  losePatience,
+  newPlayerTurn,
+  npcExpression,
+  PROFICIENCY_STEP_TABLE,
   skipFirstMorning,
+  startPatience,
   type GameState,
 } from './index.ts';
 import { TEST_SETUP } from './testSetup.ts';
 
-const { orderDrink, buyCounterFood, getATable, orderAMeal, payForGroceries } = INTERACTIONS;
+const { orderDrink, orderWithOptions, askBaristaForWork, buyCounterFood, getATable, orderAMeal, payForGroceries } = INTERACTIONS;
 const firstMorning = () => createSave(TEST_SETUP);
 const at = (state: GameState, placeId: GameState['placeId']): GameState => ({ ...state, placeId });
 const succeed = (state: GameState, interaction: (typeof INTERACTIONS)[keyof typeof INTERACTIONS], args: unknown) =>
@@ -95,5 +102,40 @@ describe('the First Morning', () => {
     expect(firstMorningStep(skipped)).toBeNull();
     expect(skipped.onboarding).toEqual({ firstMorningStepsDone: 1, firstMorningSkipped: true });
     expect(enterPlace(skipped, 'cafe', cafeHours).onboarding).toEqual(skipped.onboarding);
+  });
+});
+
+describe('the First Morning café order', () => {
+  const inTheCafe = () => enterPlace(drinkWater(firstMorning()), 'cafe', cafeHours);
+
+  it('is any order at the café while the First Morning is under way', () => {
+    expect(isFirstMorningCafeOrder(inTheCafe(), orderDrink)).toBe(true);
+    expect(isFirstMorningCafeOrder(inTheCafe(), orderWithOptions)).toBe(true);
+    expect(isFirstMorningCafeOrder(at(firstMorning(), 'cafe'), orderDrink)).toBe(true);
+  });
+
+  it('is no other conversation, and no order once the First Morning is over or skipped', () => {
+    expect(isFirstMorningCafeOrder(inTheCafe(), askBaristaForWork)).toBe(false);
+    expect(isFirstMorningCafeOrder(at(firstMorning(), 'convenience-store'), buyCounterFood)).toBe(false);
+    const breakfasted = succeed(inTheCafe(), orderDrink, { items: [{ item: 'tea', quantity: 1 }] });
+    expect(isFirstMorningCafeOrder(breakfasted, orderDrink)).toBe(false);
+    expect(isFirstMorningCafeOrder(skipFirstMorning(inTheCafe()), orderDrink)).toBe(false);
+  });
+
+  it('has Patience that can’t run out, though the barista’s face still shows the strain', () => {
+    const turns = PROFICIENCY_STEP_TABLE.A1.startingPatience * 3;
+    let patience = startPatience('A1', 'stranger', { canRunOut: false });
+    for (let turn = 0; turn < turns; turn++) patience = losePatience(newPlayerTurn(patience));
+
+    expect(isOutOfPatience(patience)).toBe(false);
+    expect(npcExpression(patience)).toBe('strained');
+    // Every turn still counts as evidence for Proficiency.
+    expect(patience.turnsNotUnderstood).toBe(turns);
+  });
+
+  it('is unlike any other conversation, whose Patience runs out', () => {
+    let patience = startPatience('A1');
+    for (let turn = 0; turn < PROFICIENCY_STEP_TABLE.A1.startingPatience; turn++) patience = losePatience(newPlayerTurn(patience));
+    expect(isOutOfPatience(patience)).toBe(true);
   });
 });

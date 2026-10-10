@@ -101,6 +101,8 @@ export const FIRST_MORNING = {
   thirst: 0.4 * METER_MAX,
   /** Rent is first due at the end of this day. */
   rentDueDay: 7,
+  /** In the café order, the Help tab pulses once the Player has been quiet this many real seconds since the barista spoke. */
+  helpPulseAfterSilentSeconds: 10,
 } as const;
 
 // --- Well-being -------------------------------------------------------------

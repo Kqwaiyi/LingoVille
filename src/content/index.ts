@@ -76,7 +76,7 @@ export {
   readRentOwed,
   type FactsContext,
 } from './facts.ts';
-export { INTERACTIONS, START_WHEN } from './interactions.ts';
+export { HIRING_PLACES, INTERACTIONS, START_WHEN } from './interactions.ts';
 export {
   DEFAULT_DRINK,
   isCheckout,

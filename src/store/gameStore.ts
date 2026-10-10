@@ -108,7 +108,9 @@ import {
   endSmallTalk,
   familiarityTier,
   faintedBetween,
+  FIRST_MORNING,
   firstMorningStep,
+  isFirstMorningCafeOrder,
   endShift,
   enterPlace,
   skipFirstMorning,
@@ -530,6 +532,13 @@ type ConversationState = {
   showingRecap: boolean;
   /** Which tab of the column shows. While Help shows, the conversation waits: no time passes and Patience is frozen. */
   tab: 'chat' | 'help';
+  /** The First Morning's café order, which can't fail, and where Help is pointed to. */
+  firstMorningOrder: boolean;
+  /**
+   * In the First Morning's café order, the Help tab pulses after a while of the Player being quiet, or at the first
+   * turn not understood, until the Player opens Help: from then on it's found, and never pulses again.
+   */
+  helpPulse: 'waiting' | 'pulsing' | 'found';
   /** The hints for the moment Help was last opened at: `atLine` is how many lines the conversation had then. */
   hints: { atLine: number; view: HintsView } | null;
   /** Each finished NPC line's annotation, by line index, asked for as the line finished. */
@@ -758,6 +767,8 @@ export type GameStore = {
   pauseMenu: boolean;
   /** Where the First Morning's next step is from the Character, as the world last measured it. Never saved. */
   firstMorningGuide: FirstMorningGuide | null;
+  /** The First Morning was just done (not skipped), so its closing card is due. Never saved. */
+  firstMorningCard: boolean;
   interactable: Interactable | null;
   /** The Player is choosing where to take the tram. */
   tramChoosing: boolean;
@@ -853,6 +864,8 @@ export type GameStore = {
   setFirstMorningGuide: (guide: FirstMorningGuide) => void;
   /** Skip tutorial, in the pause menu: the First Morning's prompts stop, and the game resumes. */
   skipFirstMorning: () => void;
+  /** Closes the First Morning's closing card, for good. */
+  dismissFirstMorningCard: () => void;
   /** E at the stove: cooks a grocery into a meal, or says there's nothing to cook. */
   cook: () => void;
   /** E at the gym: the day's workout for a member, or why there can't be one. */
@@ -951,6 +964,8 @@ export type GameStore = {
   /** Resume: closes the pause menu, and time goes on. */
   closePauseMenu: () => void;
   setTyping: (typing: boolean) => void;
+  /** The Player is typing a reply in the field: that isn't being quiet. */
+  draftTypedLine: () => void;
   dismissToast: () => void;
   dismissVoiceUnavailable: () => void;
 };
@@ -1079,7 +1094,21 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       // A Shift from another game is over without its Recap: its customers' readings go too.
       shiftLog.forEach(({ conversationId }) => lineReadings.delete(conversationId));
       shiftLog = [];
-      set({ screen: 'playing', title: null, game, slotId, arrival, toast, basket: [], shelfMarker: null, routeMarker: null, pauseMenu: false, firstMorningGuide: null, micOffReminder: null });
+      set({
+        screen: 'playing',
+        title: null,
+        game,
+        slotId,
+        arrival,
+        toast,
+        basket: [],
+        shelfMarker: null,
+        routeMarker: null,
+        pauseMenu: false,
+        firstMorningGuide: null,
+        firstMorningCard: false,
+        micOffReminder: null,
+      });
       // While the town loads, so the first line doesn't wait for a dictionary.
       deps.readings.preload(game.identity.targetLanguage).then(
         () => {
@@ -1143,6 +1172,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     api.subscribe((state, before) => {
       const shown = selectTooltip(state);
       if (shown && shown !== selectTooltip(before)) markSeen(shown);
+    });
+
+    // The First Morning is done, however its last step was: its closing card is due. Not for a game just loaded or started.
+    api.subscribe((state, before) => {
+      if (state.game === before.game || before.screen !== 'playing' || state.screen !== 'playing') return;
+      const done = firstMorningStep(before.game) !== null && firstMorningStep(state.game) === null;
+      if (done && !state.game.onboarding.firstMorningSkipped) set({ firstMorningCard: true });
     });
     /** A system has come up: its tooltip shows, or waits for the one showing, unless it has shown before or tooltips are off. */
     const offerTooltip = (id: TooltipId) => {
@@ -1474,6 +1510,33 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         .finally(() => lineReadings.delete(conversation.id));
     };
 
+    /** In the First Morning's café order, the Help tab starts pulsing, unless Help was opened already or the outcome is decided. */
+    const pointToHelp = () => {
+      const conversation = get().conversation;
+      if (conversation?.firstMorningOrder && conversation.helpPulse === 'waiting' && !conversation.outcome) updateConversation({ helpPulse: 'pulsing' });
+    };
+
+    // In the First Morning's café order, the conversation waiting for the Player's turn since the NPC last spoke, and the
+    // Player's quiet in it, which points to Help if it goes on. Typing a reply isn't quiet, and a hidden tab doesn't count.
+    let waitingFor: number | null = null;
+    let silence: ReturnType<typeof setTimeout> | undefined;
+    /** Times the Player's quiet from now, while the conversation waits for their turn and the tab shows. */
+    const timeSilence = () => {
+      clearTimeout(silence);
+      if (waitingFor === null || waitingFor !== get().conversation?.id || get().tabHidden) return;
+      silence = setTimeout(pointToHelp, FIRST_MORNING.helpPulseAfterSilentSeconds * 1000);
+    };
+    const stopWaitingForPlayer = () => {
+      clearTimeout(silence);
+      waitingFor = null;
+    };
+    const waitForPlayer = (conversation: Conversation) => {
+      stopWaitingForPlayer();
+      if (!conversation.firstMorningOrder || conversation.helpPulse !== 'waiting') return;
+      waitingFor = conversation.id;
+      timeSilence();
+    };
+
     /**
      * The NPC couldn't make sense of the Player's latest turn. Running out fails
      * the interaction. Returns whether the NPC is now out of Patience.
@@ -1488,6 +1551,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (conversation.outcome || conversation.tab === 'help') return isOutOfPatience(conversation.patience);
       const patience = losePatience(conversation.patience);
       updateConversation({ patience });
+      pointToHelp();
       if (!isOutOfPatience(patience)) return false;
       // A Shift Customer out of Patience gives up unserved.
       if (conversation.shiftCustomer) {
@@ -1670,6 +1734,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     const closeSession = () => {
+      stopWaitingForPlayer();
       voice?.close();
       voice = null;
     };
@@ -1958,6 +2023,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
               openMicOn() && current.heardLine === null
                 ? { ...current, tab: 'chat' as const, npcLine: null, patience: newPlayerTurn(current.patience) }
                 : current;
+            stopWaitingForPlayer();
             const { lines, index } = addPiece(turn.lines, turn.heardLine, 'player', text);
             set({ conversation: { ...turn, lines, heardLine: index } });
           }),
@@ -1969,6 +2035,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             if (current.outcome) return showClosingCard();
             // With open mic, whatever the Player says after the NPC's turn is a new line.
             updateConversation(openMicOn() ? { npcLine: null, heardLine: null } : { npcLine: null });
+            waitForPlayer(get().conversation!);
             smallTalkTurnDone();
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
@@ -2134,8 +2201,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
       remindMicOff(id);
+      const firstMorningOrder = partner.interaction !== null && isFirstMorningCafeOrder(get().game, partner.interaction);
       if (get().inputMode === 'typed') offerTooltip('typedFallback');
-      else if (openMicOn()) offerTooltip('openMic');
+      // Open mic is never taught in the First Morning: its tooltip waits for a later conversation.
+      else if (openMicOn() && !firstMorningOrder) offerTooltip('openMic');
       set({
         voiceUnavailable: false,
         conversation: {
@@ -2148,14 +2217,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           reconnecting: false,
           retried: false,
           usage: NO_USAGE,
-          // A friend has more Patience.
-          patience: startPatience(get().game.proficiencyStep, isNamedNpc(partner.npcId) ? familiarityTier(memoryOf(get().game, partner.npcId)) : 'stranger'),
+          // A friend has more Patience. The First Morning's café order can't fail.
+          patience: startPatience(
+            get().game.proficiencyStep,
+            isNamedNpc(partner.npcId) ? familiarityTier(memoryOf(get().game, partner.npcId)) : 'stranger',
+            { canRunOut: !firstMorningOrder },
+          ),
           basket,
           outcome: null,
           closed: false,
           recap: null,
           showingRecap: false,
           tab: 'chat',
+          firstMorningOrder,
+          helpPulse: 'waiting',
           hints: null,
           annotations: {},
           translated: [],
@@ -2235,6 +2310,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       tabHidden: false,
       pauseMenu: false,
       firstMorningGuide: null,
+      firstMorningCard: false,
       interactable: null,
       tramChoosing: false,
       heldStill: false,
@@ -2388,6 +2464,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       setTabHidden: (tabHidden) => {
         set({ tabHidden });
+        timeSilence();
         if (tabHidden) save();
       },
       // The world calls these every frame, so they only notify on a change.
@@ -2450,6 +2527,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         save();
         get().closePauseMenu();
       },
+      dismissFirstMorningCard: () => set({ firstMorningCard: false }),
       cook: () => {
         const { game } = get();
         const after = cook(game);
@@ -2620,6 +2698,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           heardLine: null,
           patience: newPlayerTurn(conversation.patience),
         };
+        stopWaitingForPlayer();
         set({ conversation: turn });
         // The backstop: a turn with nothing to make sense of costs Patience whatever the NPC does.
         if (isUnreadableTranscript(line) && notUnderstood(turn)) {
@@ -2641,6 +2720,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const conversation = get().conversation;
         if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed' || openMicOn()) return;
         voice.startTalking();
+        stopWaitingForPlayer();
         // A new turn: anything the NPC says next starts a new line, and so does what it hears.
         set({
           conversation: {
@@ -2685,8 +2765,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const { game } = get();
         const { hints } = conversation;
         const fresh = hints?.atLine === conversation.lines.length && hints.view.status !== 'failed';
-        // Opening Help shows the place's phrasebook and the personal one, then this moment's hints.
-        const open = logHelp({ ...conversation, tab: 'help' }, 'phrasebook', [
+        // Opening Help shows the place's phrasebook and the personal one, then this moment's hints. Help is found: it stops pulsing.
+        const open = logHelp({ ...conversation, tab: 'help', helpPulse: 'found' }, 'phrasebook', [
           ...placePhrasebook(game.identity.culturePackId, game.placeId).map((phrase) => phrase.text),
           ...game.phrasebook.map((entry) => entry.text),
         ]);
@@ -2783,6 +2863,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         approachIfFree();
       },
       setTyping: (typing) => set({ typing }),
+      draftTypedLine: timeSilence,
       dismissToast: () => set({ toast: null }),
       dismissVoiceUnavailable: () => set({ voiceUnavailable: false }),
     };
@@ -2847,6 +2928,23 @@ export type FirstMorningGuide = { metres: number; bearing: number };
  */
 export const selectFirstMorningBanner = (s: GameStore) => (inTownUncovered(s) && !s.conversation ? firstMorningStep(s.game) : null);
 export const selectFirstMorningGuide = (s: GameStore) => s.firstMorningGuide;
+/**
+ * The First Morning's closing card shows: once it's done (not skipped), back in the town after the conversation, until
+ * closed. It shows the money (`selectMoneyInShifts`), the day rent is due (`selectRentDueDay`) and where's hiring (`HIRING_PLACES`, content).
+ */
+export const selectFirstMorningCard = (s: GameStore) => s.firstMorningCard && inTownUncovered(s) && !s.conversation;
+export const selectRentDueDay = (s: GameStore) => s.game.rent.dueDay;
+/** In the First Morning's café order, the Help tab pulses, until opened. */
+export const selectHelpPulse = (s: GameStore) => s.conversation?.helpPulse === 'pulsing' && !s.conversation.outcome;
+/**
+ * How the First Morning's café order says to answer, until the order is decided: without a mic, it teaches the Typed
+ * Fallback (`type`); with one, holding Space (`holdSpace`). Open mic is never taught there: with it, it just says to order (`say`).
+ */
+export const selectFirstMorningOrderPrompt = (s: GameStore): 'type' | 'holdSpace' | 'say' | null => {
+  if (!s.conversation?.firstMorningOrder || s.conversation.outcome) return null;
+  if (s.inputMode === 'typed') return 'type';
+  return s.talkMode === 'open-mic' ? 'say' : 'holdSpace';
+};
 /** The First Morning is under way, so the pause menu offers Skip tutorial. */
 export const selectSkippableFirstMorning = (s: GameStore) => firstMorningStep(s.game) !== null;
 export const selectMicRetry = (s: GameStore) => s.micRetry;

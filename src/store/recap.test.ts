@@ -35,7 +35,7 @@ let databases = 0;
  * A store whose NPC the test speaks for, whose Recaps arrive when the test says,
  * and whose Journal is a fresh IndexedDB database.
  */
-function cafe() {
+function cafe(game = createSave(DEV_SETUP)) {
   const npc = {
     events: null as VoiceSessionEvents | null,
     closed: false,
@@ -79,7 +79,7 @@ function cafe() {
   const autosaves: { game: GameState; closingCardShown: boolean }[] = [];
   const said: { text: string; targetLanguage: LanguageCode }[] = [];
   const journal = createJournal(() => createStore(`recap-test-${++databases}`, 'entries'));
-  const store = createGameStore(createSave(DEV_SETUP), {
+  const store = createGameStore(game, {
     openVoiceSession,
     requestRecap,
     journal,
@@ -269,7 +269,8 @@ describe('the Recap', () => {
   });
 
   it('gives a failed Goal Interaction a Recap too', () => {
-    const { store, npc, recaps } = cafe();
+    // Past the First Morning, whose café order can't fail.
+    const { store, npc, recaps } = cafe(createSave({ ...DEV_SETUP, skipFirstMorning: true }));
     store.getState().talk();
     for (let i = 0; i < 10 && !selectConversation(store.getState())?.outcome; i++) {
       store.getState().sendTypedLine('asdf');

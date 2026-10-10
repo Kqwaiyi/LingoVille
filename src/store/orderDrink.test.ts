@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OUT_OF_PATIENCE_SCENE, type ToolResponse } from '../ai/index.ts';
 import { CULTURE_PACKS, menuPrice } from '../content/index.ts';
-import { createSave, MOOD, PROFICIENCY_STEP_TABLE, WELL_BEING, type GameState } from '../sim/index.ts';
+import { createSave, MOOD, PROFICIENCY_STEP_TABLE, WELL_BEING, type GameState, type NewGameSetup } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
   createGameStore,
@@ -49,9 +49,12 @@ function fakeVoice() {
   return { fake, open };
 }
 
-function orderingADrink(game: Partial<GameState['character']> = {}) {
+/** Past the First Morning, whose café order can't fail. */
+const PAST_THE_FIRST_MORNING = { ...DEV_SETUP, skipFirstMorning: true };
+
+function orderingADrink(game: Partial<GameState['character']> = {}, setup: NewGameSetup = DEV_SETUP) {
   const { fake, open } = fakeVoice();
-  const save = createSave(DEV_SETUP);
+  const save = createSave(setup);
   const store = createGameStore({ ...save, character: { ...save.character, ...game } }, { openVoiceSession: open });
   store.getState().enterPlace('cafe');
   store.getState().setInteractable('barista');
@@ -220,7 +223,7 @@ describe('Patience', () => {
   });
 
   it('runs out after the starting Patience for the step: the NPC ends politely and the interaction fails', () => {
-    const { store, fake } = orderingADrink();
+    const { store, fake } = orderingADrink({}, PAST_THE_FIRST_MORNING);
     const before = store.getState().game;
 
     for (let i = 1; i < patience; i++) {
@@ -244,7 +247,7 @@ describe('Patience', () => {
   });
 
   it('when an unreadable turn uses up the last of it, tells the NPC to end the conversation', () => {
-    const { store, fake } = orderingADrink();
+    const { store, fake } = orderingADrink({}, PAST_THE_FIRST_MORNING);
     for (let i = 1; i < patience; i++) store.getState().sendTypedLine('...');
 
     store.getState().sendTypedLine('...');

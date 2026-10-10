@@ -15,7 +15,8 @@ async function orderALatte(page: Page) {
   await expect(closingCard(page)).toBeVisible();
 }
 
-test('See Recap shows a lined Journal page in the column, and J opens it in the Journal', async ({ page }) => {
+// See Recap, Done, then J opening the Journal on it, is the first session's smoke (`smoke.spec.ts`).
+test('See Recap shows a lined Journal page in the column', async ({ page }) => {
   await orderALatte(page);
 
   await closingCard(page).getByRole('button', { name: 'See Recap' }).click();
@@ -33,14 +34,6 @@ test('See Recap shows a lined Journal page in the column, and J opens it in the 
 
   await recap.getByRole('button', { name: 'Done' }).click();
   await expect(column(page)).toBeHidden();
-
-  await page.keyboard.press('KeyJ');
-  await expect(journal(page)).toBeVisible();
-  await expect(journal(page).getByRole('navigation', { name: 'Journal entries' }).getByRole('button')).toHaveCount(1);
-  await expect(journal(page).getByText(OUTCOME)).toBeVisible();
-
-  await page.keyboard.press('Escape');
-  await expect(journal(page)).toBeHidden();
 });
 
 test('Skip Recap says the Recap is saved, and it is in the Journal', async ({ page }) => {

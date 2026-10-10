@@ -9,6 +9,8 @@ import { FAMILIARITY, PATIENCE, PROFICIENCY_STEP_TABLE, type ProficiencyStep } f
 export type Patience = {
   left: number;
   starting: number;
+  /** False in the First Morning's café order: Patience stops one short of running out. */
+  canRunOut: boolean;
   /** The Player's latest turn already cost Patience, so it can't cost it twice. */
   spentThisTurn: boolean;
   /** Player turns the NPC couldn't make sense of at all, counted even once Patience has run out. Proficiency evidence. */
@@ -18,10 +20,10 @@ export type Patience = {
 /** A placeholder for the NPC's face, the only way Patience shows. Real faces come in ticket 30. */
 export type NpcExpression = 'relaxed' | 'puzzled' | 'strained';
 
-/** Patience at the start of a conversation: from the step table, and one more with a friend. */
-export function startPatience(step: ProficiencyStep, tier: FamiliarityTier = 'stranger'): Patience {
+/** Patience at the start of a conversation: from the step table, and one more with a friend. In the First Morning's café order it can't run out. */
+export function startPatience(step: ProficiencyStep, tier: FamiliarityTier = 'stranger', { canRunOut = true } = {}): Patience {
   const starting = PROFICIENCY_STEP_TABLE[step].startingPatience + (tier === 'friend' ? FAMILIARITY.friendPatienceBonus : 0);
-  return { left: starting, starting, spentThisTurn: false, turnsNotUnderstood: 0 };
+  return { left: starting, starting, canRunOut, spentThisTurn: false, turnsNotUnderstood: 0 };
 }
 
 /** The Player takes a new turn, which may cost Patience once. */
@@ -31,13 +33,13 @@ export function newPlayerTurn(patience: Patience): Patience {
 
 /**
  * The NPC couldn't make sense of the Player's latest turn at all. Costs one
- * Patience, at most once per turn, never below zero. Clarifying re-asks never call this.
+ * Patience, at most once per turn, never below zero (or one, where it can't run out). Clarifying re-asks never call this.
  */
 export function losePatience(patience: Patience): Patience {
   if (patience.spentThisTurn) return patience;
   return {
     ...patience,
-    left: Math.max(0, patience.left - 1),
+    left: Math.max(patience.canRunOut ? 0 : 1, patience.left - 1),
     spentThisTurn: true,
     turnsNotUnderstood: patience.turnsNotUnderstood + 1,
   };

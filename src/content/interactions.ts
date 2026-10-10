@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ECONOMY, ILLNESS_IDS } from '../sim/index.ts';
+import { ECONOMY, ILLNESS_IDS, type PlaceId } from '../sim/index.ts';
 import { defineInteraction, PASSER_BY, SHIPPING_SPEEDS, type Interaction } from './defineInteraction.ts';
 import { MEDICINE_IDS } from './illnesses.ts';
 import {
@@ -719,3 +719,8 @@ export const INTERACTIONS = {
     effect: { kind: 'none' },
   }),
 } satisfies Record<string, Interaction>;
+
+/** Where the Character can be hired: the places of the Goal Interactions that hire. */
+export const HIRING_PLACES: readonly PlaceId[] = Object.values(INTERACTIONS).flatMap((interaction) =>
+  interaction.effect.kind === 'hire' ? [interaction.placeId] : [],
+);

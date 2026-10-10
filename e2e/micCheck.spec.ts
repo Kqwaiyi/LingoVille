@@ -1,22 +1,13 @@
 import { expect, test, type Page } from './test.ts';
-import { column, field, GREETING, npcLine, typeLine } from './barista.ts';
-import { languageChoice, titleMenu } from './title.ts';
-import { walkUntil } from './walk.ts';
+import { languageChoice, refuseTheMic, titleMenu } from './title.ts';
 
 const heading = (page: Page) => page.getByRole('heading', { name: 'Let’s check your mic' });
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const status = (page: Page, text: string) => page.getByRole('status').filter({ hasText: text });
 
-/** From now on the browser refuses the mic, as if the Player had said no. */
-async function refuseTheMic(page: Page) {
-  await page.addInitScript(() => {
-    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
-  });
-}
-
-/** New game, through setup's other screens to the mic check, at the café door. */
+/** New game, through setup's other screens to the mic check. */
 async function toTheMicCheck(page: Page) {
-  await page.goto('/?spawn=cafe');
+  await page.goto('/');
   await titleMenu(page).getByRole('button', { name: 'New game' }).click();
   await button(page, 'Next').click();
   await languageChoice(page, 'ja').check();
@@ -28,7 +19,8 @@ async function toTheMicCheck(page: Page) {
   await expect(heading(page)).toBeVisible();
 }
 
-test('a refused mic lands in the Typed Fallback, with nothing locked', async ({ page }) => {
+// The order at the counter that follows, typed with nothing locked, is the first session's smoke (`smoke.spec.ts`).
+test('a refused mic lands in the Typed Fallback', async ({ page }) => {
   await refuseTheMic(page);
   await toTheMicCheck(page);
 
@@ -36,19 +28,7 @@ test('a refused mic lands in the Typed Fallback, with nothing locked', async ({ 
   await expect(page.getByRole('meter', { name: 'Mic level' })).toBeHidden();
   await button(page, 'Start').click();
 
-  // At the counter, the mic is off and the order goes through typed.
-  await page.locator('canvas').click();
-  await walkUntil(page, 'KeyW', 'to talk — barista');
-  await page.keyboard.press('KeyE');
-  await expect(npcLine(page, GREETING)).toBeVisible();
-  await expect(column(page).getByText('🎤 off')).toBeVisible();
-  await expect(column(page).getByRole('button', { name: 'Hold to talk (Space)' })).toBeHidden();
-
-  await typeLine(page, 'ホットラテ ください');
-  await expect(npcLine(page, 'ホットラテですね。450円です。よろしいですか？')).toBeVisible();
-  await typeLine(page, 'はい');
-  await expect(column(page).getByRole('region', { name: 'Conversation over' })).toBeVisible();
-  await expect(field(page)).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Dock' })).toBeVisible();
 });
 
 test('a browser that has passed the mic check skips it on its next New game', async ({ page }) => {

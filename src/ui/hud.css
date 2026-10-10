@@ -2213,6 +2213,82 @@ ruby {
   top: 70px;
 }
 
+/*
+ * The First Morning's end: what matters next, where the banner was, until Got it. Under a toast's place, and clear of
+ * the middle of the scene, so it doesn't block: the town goes on around it.
+ */
+.first-morning-card {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 18px 22px;
+  border-radius: 14px;
+  background: #fffaf2;
+  color: #1d2433;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.first-morning-card h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.first-morning-card ul {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
+.first-morning-card button {
+  padding: 9px 18px;
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  background: var(--ok);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* In the First Morning's café order, how to answer, over the input bar. */
+.first-morning-order-prompt {
+  margin: 0;
+  padding: 8px 12px 0;
+  color: #6b6458;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* Help is pointed to, never opened: the tab pulses, with a word beside it. */
+.chat-tabs [role='tab'][data-pulse] {
+  color: var(--accent);
+  animation: help-pulse 1.4s ease-in-out infinite;
+}
+
+.help-nudge {
+  align-self: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff1e6;
+  color: #b45a1c;
+  font-size: 12px;
+}
+
+@keyframes help-pulse {
+  50% {
+    border-bottom-color: var(--accent);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-tabs [role='tab'][data-pulse] {
+    animation: none;
+    border-bottom-color: var(--accent);
+  }
+}
+
 /* --- Settings, the pause menu and the credits --------------------------------- */
 
 .pause-panel {

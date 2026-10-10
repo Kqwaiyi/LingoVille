@@ -62,8 +62,8 @@ function playing(game: GameState, browser = browserSettings(), deps: Partial<Gam
   return { store, npc, browser };
 }
 
-function atTheCafe(browser = browserSettings()) {
-  const setup = playing(createSave(DEV_SETUP), browser);
+function atTheCafe(browser = browserSettings(), game = createSave(DEV_SETUP)) {
+  const setup = playing(game, browser);
   setup.store.getState().enterPlace('cafe');
   setup.store.getState().setInteractable('barista');
   return setup;
@@ -146,7 +146,8 @@ describe('one-time tooltips', () => {
     await flush();
     expect(tooltip(pushToTalk.store)).toBeNull();
 
-    const openMic = atTheCafe();
+    // Past the First Morning, which never teaches open mic.
+    const openMic = atTheCafe(browserSettings(), createSave({ ...DEV_SETUP, skipFirstMorning: true }));
     openMic.store.getState().setTalkMode('open-mic');
     openMic.store.getState().talk();
     await vi.waitFor(() => expect(tooltip(openMic.store)).toBe('openMic'));
