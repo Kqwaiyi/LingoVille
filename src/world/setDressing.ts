@@ -1,6 +1,6 @@
 import { GROCERIES_SOLD, TRAM_LINE, type CulturePack, type PropId } from '../content/index.ts';
 import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
-import { buildingOf, frontOf, PLATFORM, TRAM_STOPS, type Building, type Vec3 } from './town.ts';
+import { buildingOf, frontOf, inPark, inside, PLATFORM, TRAM_STOPS, type Building, type Vec3 } from './town.ts';
 
 // Where each Culture Pack's props stand. The layout keeps the same spots in every pack, each for one kind of prop;
 // a pack only says which props it sets out at each place (`props` in its content), and each takes the next free spot of
@@ -15,46 +15,44 @@ export type Spot = { at: Vec3; rotation?: number };
 /** A place's spots, by kind. */
 type PlaceSpots = Partial<Record<SpotKind, readonly Spot[]>>;
 
-const FACING_NORTH = Math.PI;
-
 /** At the foot of a building's front door, outside, facing the street: what hangs over the door is up in the prop. */
 function doorSpot(building: Building): Spot {
   const { x, z, facing, rotation } = frontOf(building);
   return { at: [x, 0, z + facing * 0.05], rotation };
 }
 
-/** Each place's spots, by kind. Counter spots are on the counter top, either side of whoever stands behind it. */
+/** Points in a building's own frame (`inside`), turned with it. */
+function spotsIn(placeId: PlaceId, spots: readonly { at: Vec3; rotation?: number }[]): Spot[] {
+  const { at, turn } = inside(placeId);
+  return spots.map((spot) => ({ at: at(spot.at), rotation: turn(spot.rotation) }));
+}
+
+/** Each place's spots, by kind, in its building's frame. Counter spots are on the counter top, either side of whoever stands behind it. */
 const SPOTS: Record<PlaceId, PlaceSpots> = {
   // The stove top, and beside the bed against the back wall.
-  home: { counter: [{ at: [-7.6, 1.03, -2.85] }], floor: [{ at: [-11.2, 0, -2.85] }] },
-  cafe: { counter: [{ at: [10.6, 1.1, -3] }, { at: [13.6, 1.1, -3] }] },
+  home: { counter: spotsIn('home', [{ at: [2.4, 1.03, -2.85] }]), floor: spotsIn('home', [{ at: [-1.2, 0, -2.85] }]) },
+  cafe: { counter: spotsIn('cafe', [{ at: [-1.4, 1.1, -2] }, { at: [1.6, 1.1, -2] }]) },
   // The till, and inside the door, east of the aisles.
-  supermarket: { counter: [{ at: [23.4, 1.1, 0.4] }], floor: [{ at: [32.4, 0, 1.8] }] },
-  'convenience-store': { counter: [{ at: [-0.4, 1.1, -2.2] }, { at: [1.4, 1.1, -2.2] }] },
+  supermarket: { counter: spotsIn('supermarket', [{ at: [-3.6, 1.1, 1.9] }]), floor: spotsIn('supermarket', [{ at: [5.4, 0, 3.3] }]) },
+  'convenience-store': { counter: spotsIn('convenience-store', [{ at: [-0.9, 1.1, -1.7] }, { at: [0.9, 1.1, -1.7] }]) },
   // A dish on each table, the server's included.
-  restaurant: { table: [{ at: [39.5, 0.8, -3] }, { at: [44.5, 0.8, -3] }, { at: [39.5, 0.8, -0.3] }] },
-  // Reception's counter and the pharmacy's, facing the door; and the waiting room, west of the bench.
+  restaurant: { table: spotsIn('restaurant', [{ at: [-2.5, 0.8, -2] }, { at: [2.5, 0.8, -2] }, { at: [-2.5, 0.8, 0.7] }]) },
+  // Reception's counter and the pharmacy's, facing the door; and the waiting room, beside the bench.
   clinic: {
-    counter: [
-      { at: [-30.8, 1.1, 13.5], rotation: FACING_NORTH },
-      { at: [-20.2, 1.1, 13.5], rotation: FACING_NORTH },
-    ],
-    floor: [{ at: [-28.3, 0, 17.6], rotation: FACING_NORTH }],
+    counter: spotsIn('clinic', [{ at: [4.8, 1.1, 2.5] }, { at: [-5.8, 1.1, 2.5] }]),
+    floor: spotsIn('clinic', [{ at: [2.3, 0, -1.6] }]),
   },
   // Open lawn, clear of the trees, the benches and the way in.
-  park: { lawn: [{ at: [2, 0.01, 17] }, { at: [-4.5, 0.01, 20.6], rotation: 0.5 }] },
+  park: { lawn: [{ at: inPark([2, 0.01, -1]) }, { at: inPark([-4.5, 0.01, 2.6]), rotation: 0.5 }] },
   // The west end of each platform, clear of the shelter's posts and of where the tram sets the Character down.
   'tram-stop': { platform: TRAM_LINE.map((stopId): Spot => ({ at: [TRAM_STOPS[stopId].centre[0] - 3.65, PLATFORM.height, TRAM_STOPS[stopId].centre[1] + 0.3] })) },
-  bookshop: { counter: [{ at: [-30.9, 1.1, -2] }, { at: [-29.1, 1.1, -2] }] },
-  // The front desk, facing the door; and the corner east of the door.
+  bookshop: { counter: spotsIn('bookshop', [{ at: [-0.9, 1.1, -1.5] }, { at: [0.9, 1.1, -1.5] }]) },
+  // The front desk, facing the door; and the corner beside the door.
   bathhouse: {
-    counter: [
-      { at: [25.1, 1.1, 13.5], rotation: FACING_NORTH },
-      { at: [22.9, 1.1, 13.5], rotation: FACING_NORTH },
-    ],
-    floor: [{ at: [28, 0, 12.4], rotation: FACING_NORTH }],
+    counter: spotsIn('bathhouse', [{ at: [-1.1, 1.1, 2] }, { at: [1.1, 1.1, 2] }]),
+    floor: spotsIn('bathhouse', [{ at: [-4, 0, 3.1] }]),
   },
-  'town-office': { counter: [{ at: [-45.8, 1.1, -2.5] }, { at: [-42.2, 1.1, -2.5] }] },
+  'town-office': { counter: spotsIn('town-office', [{ at: [-1.8, 1.1, -1.5] }, { at: [1.8, 1.1, -1.5] }]) },
 };
 
 /** Every place's spots, each building's door included. */

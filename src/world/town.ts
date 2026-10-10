@@ -36,28 +36,62 @@ export const BUILDINGS: readonly Building[] = [
   { placeId: 'bathhouse', centre: [24, 15.5], size: [12, 9], facing: -1, facade: 'sky', roof: { shape: 'gable', colour: 'denim' } },
 ];
 
+/** The building a place is in, if it has one. */
+export const buildingOf = (placeId: PlaceId) => BUILDINGS.find((b) => b.placeId === placeId);
+const building = (placeId: PlaceId) => buildingOf(placeId)!;
+
+/**
+ * A building's own frame, for what stands inside it: from its centre, x along the front wall and z out through the
+ * front door, with rotation 0 facing the door. So a building can move, or face the other way, and keep its insides.
+ */
+export function inside(placeId: PlaceId) {
+  const { centre: [cx, cz], facing } = building(placeId);
+  return {
+    /** A point in the building's frame, in the town. */
+    at: ([x, y, z]: Vec3): Vec3 => [cx + facing * x, y, cz + facing * z],
+    /** A turn in the building's frame (radians about y; 0 faces the door), in the town. */
+    turn: (rotation = 0) => rotation + (facing === 1 ? 0 : Math.PI),
+  };
+}
+
+const home = inside('home');
+const cafe = inside('cafe');
+const supermarket = inside('supermarket');
+const convenienceStore = inside('convenience-store');
+const restaurant = inside('restaurant');
+const clinic = inside('clinic');
+const bookshop = inside('bookshop');
+const bathhouse = inside('bathhouse');
+const townOffice = inside('town-office');
+
 export const STREET = { z: 7, width: 5 } as const;
 export const GROUND_HALF_SIZE = 60;
 
 /** The park: open grass on the south side of the street, with no walls or door. */
 export const PARK = { centre: [0, 18] as Vec2, size: [22, 13] as Vec2 } as const;
 
+/** A point in the park, from its centre. */
+export const inPark = ([x, y, z]: Vec3): Vec3 => [PARK.centre[0] + x, y, PARK.centre[1] + z];
+const onPark = ([x, z]: Vec2): Vec2 => [PARK.centre[0] + x, PARK.centre[1] + z];
+
 /** Bushes and flowers around the park's edges and by its benches, clear of the way in from the street. */
-export const PARK_PLANTING: readonly { at: Vec2; piece: TownPiece }[] = [
-  { at: [-10.2, 15], piece: 'bush' },
-  { at: [-10.2, 19.5], piece: 'bush' },
-  { at: [10.2, 16.5], piece: 'bush' },
-  { at: [10.2, 20.5], piece: 'bush' },
-  { at: [-4.5, 24], piece: 'bush' },
-  { at: [0.5, 24], piece: 'bush' },
-  { at: [6, 24], piece: 'bush' },
-  { at: [-4.6, 18.3], piece: 'flowers-red' },
-  { at: [-7.4, 18.3], piece: 'flowers-yellow' },
-  { at: [1.6, 23.3], piece: 'flowers-purple' },
-  { at: [4.4, 23.3], piece: 'flowers-red' },
-  { at: [-9.6, 17.2], piece: 'flowers-purple' },
-  { at: [9.6, 18.5], piece: 'flowers-yellow' },
-];
+export const PARK_PLANTING: readonly { at: Vec2; piece: TownPiece }[] = (
+  [
+    { at: [-10.2, -3], piece: 'bush' },
+    { at: [-10.2, 1.5], piece: 'bush' },
+    { at: [10.2, -1.5], piece: 'bush' },
+    { at: [10.2, 2.5], piece: 'bush' },
+    { at: [-4.5, 6], piece: 'bush' },
+    { at: [0.5, 6], piece: 'bush' },
+    { at: [6, 6], piece: 'bush' },
+    { at: [-4.6, 0.3], piece: 'flowers-red' },
+    { at: [-7.4, 0.3], piece: 'flowers-yellow' },
+    { at: [1.6, 5.3], piece: 'flowers-purple' },
+    { at: [4.4, 5.3], piece: 'flowers-red' },
+    { at: [-9.6, -0.8], piece: 'flowers-purple' },
+    { at: [9.6, 0.5], piece: 'flowers-yellow' },
+  ] as const
+).map(({ at, piece }) => ({ at: onPark(at), piece }));
 
 /** Street lights, as where each pole stands: along the pavement either side of the street, clear of doors and stops. */
 export const STREET_LIGHTS: readonly Vec2[] = [
@@ -80,25 +114,25 @@ export const PLATFORM = { size: [8, 1.6] as Vec2, height: 0.12 } as const;
 export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
   // In the hallway beside the front door, so the Character passes within talking range on the way out
   // (and the landlord can catch them), but not from where a new game starts.
-  landlord: [-11.4, 1, 2.7],
-  barista: [12, 1, -4.1],
-  cashier: [24, 1, -0.7],
-  'convenience-clerk': [0.5, 1, -3.2],
-  server: [43.5, 1, 0.5],
-  receptionist: [-30, 1, 14.6],
-  pharmacist: [-21, 1, 14.6],
-  doctor: [-31, 1, 19.2],
-  nurse: [-23, 1, 19.2],
-  'park-regular-1': [-6, 1, 16],
-  'park-regular-2': [3, 1, 21],
-  'park-regular-3': [8, 1, 14.5],
+  landlord: home.at([-1.4, 1, 2.7]),
+  barista: cafe.at([0, 1, -3.1]),
+  cashier: supermarket.at([-3, 1, 0.8]),
+  'convenience-clerk': convenienceStore.at([0, 1, -2.7]),
+  server: restaurant.at([1.5, 1, 1.5]),
+  receptionist: clinic.at([4, 1, 1.4]),
+  pharmacist: clinic.at([-5, 1, 1.4]),
+  doctor: clinic.at([5, 1, -3.2]),
+  nurse: clinic.at([-3, 1, -3.2]),
+  'park-regular-1': inPark([-6, 1, -2]),
+  'park-regular-2': inPark([3, 1, 3]),
+  'park-regular-3': inPark([8, 1, -3.5]),
   // At the east end of the platform each waits at, clear of the pole.
   'passer-by-1': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-1']].centre[0] + 3.2, 1, STREET.z],
   'passer-by-2': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-2']].centre[0] + 3.2, 1, STREET.z],
   'passer-by-3': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-3']].centre[0] + 3.2, 1, STREET.z],
-  shopkeeper: [-30, 1, -3.1],
-  attendant: [24, 1, 14.6],
-  'office-clerk': [-44, 1, -3.7],
+  shopkeeper: bookshop.at([0, 1, -2.6]),
+  attendant: bathhouse.at([0, 1, 0.9]),
+  'office-clerk': townOffice.at([0, 1, -2.7]),
 };
 
 /** Passers-by wait on the platforms only while the trams run. */
@@ -109,31 +143,33 @@ export const isWaitingForTram = (npcId: TownNpcId) => TOWN_NPCS[npcId].role === 
  * The vegetables and eggs face the door; the noodles are down the aisle between the shelves.
  */
 export const SHELF_SPOTS: Record<GroceryId, Vec3> = {
-  vegetables: [27, 1, -0.05],
-  eggs: [30.5, 1, -0.05],
-  noodles: [29, 1, -2.55],
+  vegetables: supermarket.at([0, 1, 1.45]),
+  eggs: supermarket.at([3.5, 1, 1.45]),
+  noodles: supermarket.at([2, 1, -1.05]),
 };
 
 /** Park trees: trunk positions on the ground. */
-export const TREES: readonly Vec2[] = [
-  [-9, 13],
-  [-2, 22],
-  [6, 18],
-  [9, 23],
-  [-8, 22],
-];
+export const TREES: readonly Vec2[] = (
+  [
+    [-9, -5],
+    [-2, 4],
+    [6, 0],
+    [9, 5],
+    [-8, 4],
+  ] as const
+).map(onPark);
 
 /** The tap at home, against the back wall straight ahead of the spawn point. */
-export const HOME_TAP: Vec3 = [-10, 0.5, -2.85];
-export const HOME_BED: Vec3 = [-12.4, 0.25, -1.4];
+export const HOME_TAP: Vec3 = home.at([0, 0.5, -2.85]);
+export const HOME_BED: Vec3 = home.at([-2.4, 0.25, -1.4]);
 /** The stove at home, along the back wall to the right of the tap. */
-export const HOME_STOVE: Vec3 = [-7.6, 0.5, -2.85];
+export const HOME_STOVE: Vec3 = home.at([2.4, 0.5, -2.85]);
 
 /** The gym at the bathhouse: a running machine against the west wall beside the door, out of talking range of the attendant. */
-export const BATHHOUSE_GYM: Vec3 = [20.5, 0.5, 13];
+export const BATHHOUSE_GYM: Vec3 = bathhouse.at([3.5, 0.5, 2.5]);
 
 /** The Fainting ward's bed, at the back of the clinic, within talking range of the nurse. */
-export const WARD_BED: Vec3 = [-21.2, 0.25, 19.4];
+export const WARD_BED: Vec3 = clinic.at([-4.8, 0.25, -3.4]);
 
 /**
  * The furniture: solid to the Character, as centre and size, each drawn by a kit piece turned by `rotation` (radians about
@@ -142,55 +178,56 @@ export const WARD_BED: Vec3 = [-21.2, 0.25, 19.4];
  */
 export const FURNITURE: readonly { position: Vec3; size: Vec3; piece: TownPiece; rotation?: number; height?: number }[] = [
   // Café counter.
-  { position: [12, 0.55, -3], size: [4, 1.1, 0.8], piece: 'counter' },
+  { position: cafe.at([0, 0.55, -2]), size: [4, 1.1, 0.8], piece: 'counter', rotation: cafe.turn() },
   // Convenience store counter and shelves.
-  { position: [0.5, 0.55, -2.2], size: [3, 1.1, 0.7], piece: 'counter' },
-  { position: [-1.8, 0.8, 1], size: [0.6, 1.6, 2.4], piece: 'shelf', rotation: Math.PI / 2 },
+  { position: convenienceStore.at([0, 0.55, -1.7]), size: [3, 1.1, 0.7], piece: 'counter', rotation: convenienceStore.turn() },
+  { position: convenienceStore.at([-2.3, 0.8, 1.5]), size: [0.6, 1.6, 2.4], piece: 'shelf', rotation: convenienceStore.turn(Math.PI / 2) },
   // Supermarket checkout and aisles.
-  { position: [24, 0.55, 0.4], size: [2.4, 1.1, 0.8], piece: 'counter' },
-  { position: [29, 0.8, -3], size: [6, 1.6, 0.7], piece: 'shelf' },
-  { position: [29, 0.8, -0.5], size: [6, 1.6, 0.7], piece: 'shelf' },
+  { position: supermarket.at([-3, 0.55, 1.9]), size: [2.4, 1.1, 0.8], piece: 'counter', rotation: supermarket.turn() },
+  { position: supermarket.at([2, 0.8, -1.5]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
+  { position: supermarket.at([2, 0.8, 1]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
   // Restaurant tables.
-  { position: [39.5, 0.4, -3], size: [1.4, 0.8, 1.4], piece: 'table' },
-  { position: [44.5, 0.4, -3], size: [1.4, 0.8, 1.4], piece: 'table' },
+  { position: restaurant.at([-2.5, 0.4, -2]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
+  { position: restaurant.at([2.5, 0.4, -2]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
   // The server's table on a Shift, west of the door and clear of the way from the door to the staff door.
-  { position: [39.5, 0.4, -0.3], size: [1.4, 0.8, 1.4], piece: 'table' },
+  { position: restaurant.at([-2.5, 0.4, 0.7]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
   // Clinic reception and pharmacy counters, and the waiting room bench.
-  { position: [-30, 0.55, 13.5], size: [3, 1.1, 0.8], piece: 'counter', rotation: Math.PI },
-  { position: [-21, 0.55, 13.5], size: [3, 1.1, 0.8], piece: 'counter', rotation: Math.PI },
-  { position: [-26, 0.25, 17], size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: Math.PI, height: 1 },
+  { position: clinic.at([4, 0.55, 2.5]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
+  { position: clinic.at([-5, 0.55, 2.5]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
+  { position: clinic.at([0, 0.25, -1]), size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: clinic.turn(), height: 1 },
   // Bookshop counter and shelves.
-  { position: [-30, 0.55, -2], size: [2.6, 1.1, 0.7], piece: 'counter' },
-  { position: [-33, 1, 0], size: [0.6, 2, 3], piece: 'bookcase', rotation: Math.PI / 2 },
-  { position: [-27, 1, 0], size: [0.6, 2, 3], piece: 'bookcase', rotation: -Math.PI / 2 },
+  { position: bookshop.at([0, 0.55, -1.5]), size: [2.6, 1.1, 0.7], piece: 'counter', rotation: bookshop.turn() },
+  { position: bookshop.at([-3, 1, 0.5]), size: [0.6, 2, 3], piece: 'bookcase', rotation: bookshop.turn(Math.PI / 2) },
+  { position: bookshop.at([3, 1, 0.5]), size: [0.6, 2, 3], piece: 'bookcase', rotation: bookshop.turn(-Math.PI / 2) },
   // Bathhouse front desk.
-  { position: [24, 0.55, 13.5], size: [3, 1.1, 0.8], piece: 'counter', rotation: Math.PI },
+  { position: bathhouse.at([0, 0.55, 2]), size: [3, 1.1, 0.8], piece: 'counter', rotation: bathhouse.turn() },
   // Town office counter.
-  { position: [-44, 0.55, -2.5], size: [5, 1.1, 0.8], piece: 'counter' },
+  { position: townOffice.at([0, 0.55, -1.5]), size: [5, 1.1, 0.8], piece: 'counter', rotation: townOffice.turn() },
   // Park benches, facing the park regulars who sit by them.
-  { position: [-6, 0.25, 17.4], size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
-  { position: [3, 0.25, 22.4], size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
+  { position: inPark([-6, 0.25, -0.6]), size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
+  { position: inPark([3, 0.25, 4.4]), size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
   // Home: the tap and the stove against the back wall, and the bed.
-  { position: HOME_TAP, size: [1.2, 1, 0.6], piece: 'sink' },
-  { position: HOME_STOVE, size: [1.2, 1, 0.6], piece: 'stove' },
-  { position: HOME_BED, size: [1.4, 0.5, 2.2], piece: 'bed', height: 0.9 },
+  { position: HOME_TAP, size: [1.2, 1, 0.6], piece: 'sink', rotation: home.turn() },
+  { position: HOME_STOVE, size: [1.2, 1, 0.6], piece: 'stove', rotation: home.turn() },
+  { position: HOME_BED, size: [1.4, 0.5, 2.2], piece: 'bed', rotation: home.turn(), height: 0.9 },
   // The clinic's ward bed and the bathhouse's running machine.
-  { position: WARD_BED, size: [1.4, 0.5, 2.2], piece: 'bed', height: 0.9 },
-  { position: BATHHOUSE_GYM, size: [1, 1, 2], piece: 'treadmill', height: 1.4 },
+  { position: WARD_BED, size: [1.4, 0.5, 2.2], piece: 'bed', rotation: clinic.turn(Math.PI), height: 0.9 },
+  { position: BATHHOUSE_GYM, size: [1, 1, 2], piece: 'treadmill', rotation: bathhouse.turn(Math.PI), height: 1.4 },
 ];
 
 /** Set dressing nobody bumps into: rugs, plants and fridges, as where each stands, its piece, and how it's turned. */
 export const DECOR: readonly { position: Vec3; piece: TownPiece; rotation?: number }[] = [
-  { position: [-10, 0.02, -0.4], piece: 'rug' },
-  { position: [-6.6, 0, -2.8], piece: 'plant' },
-  { position: [9.4, 0, -4.4], piece: 'fridge' },
-  { position: [7.8, 0, 2.2], piece: 'plant' },
-  { position: [16.2, 0, 2.2], piece: 'plant' },
-  { position: [46.2, 0, 2.2], piece: 'plant' },
-  { position: [-36.6, 0, 2.2], piece: 'plant' },
-  { position: [-49.2, 0, 2.2], piece: 'plant' },
-  { position: [-33.4, 0, 19.8], piece: 'plant', rotation: Math.PI },
-  { position: [-18.8, 0, 11.6], piece: 'plant', rotation: Math.PI },
+  { position: home.at([0, 0.02, -0.4]), piece: 'rug', rotation: home.turn() },
+  { position: home.at([3.4, 0, -2.8]), piece: 'plant', rotation: home.turn() },
+  { position: cafe.at([-2.6, 0, -3.4]), piece: 'fridge', rotation: cafe.turn() },
+  { position: cafe.at([-4.2, 0, 3.2]), piece: 'plant', rotation: cafe.turn() },
+  { position: cafe.at([4.2, 0, 3.2]), piece: 'plant', rotation: cafe.turn() },
+  { position: restaurant.at([4.2, 0, 3.2]), piece: 'plant', rotation: restaurant.turn() },
+  // Out on the pavement, west of the bookshop.
+  { position: bookshop.at([-6.6, 0, 2.7]), piece: 'plant', rotation: bookshop.turn() },
+  { position: townOffice.at([-5.2, 0, 3.2]), piece: 'plant', rotation: townOffice.turn() },
+  { position: clinic.at([7.4, 0, -3.8]), piece: 'plant', rotation: clinic.turn() },
+  { position: clinic.at([-7.2, 0, 4.4]), piece: 'plant', rotation: clinic.turn() },
 ];
 
 /**
@@ -200,18 +237,31 @@ export const DECOR: readonly { position: Vec3; piece: TownPiece; rotation?: numb
  * At the restaurant the staff door is level with the front door; the Character stands at the table by the west wall,
  * and the customer is seated across it, with the rest of their table (`otherSeats`) on either side.
  */
-export const WORKPLACES: Record<JobId, { door: Vec3; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3; otherSeats?: readonly Vec3[] }> = {
-  barista: { door: [7.22, 1.1, -2.2], usedFrom: [7.7, 1, -2.2], behindTheCounter: [13.4, 1, -4], customerSpot: [13.4, 1, -1.8] },
-  cashier: { door: [20.22, 1.1, 1], usedFrom: [20.7, 1, 1], behindTheCounter: [25, 1, -0.6], customerSpot: [25, 1, 1.6] },
+export const WORKPLACES: Record<
+  JobId,
+  { door: Vec3; doorRotation: number; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3; otherSeats?: readonly Vec3[] }
+> = {
+  barista: {
+    door: cafe.at([-4.78, 1.1, -1.2]),
+    doorRotation: cafe.turn(Math.PI / 2),
+    usedFrom: cafe.at([-4.3, 1, -1.2]),
+    behindTheCounter: cafe.at([1.4, 1, -3]),
+    customerSpot: cafe.at([1.4, 1, -0.8]),
+  },
+  cashier: {
+    door: supermarket.at([-6.78, 1.1, 2.5]),
+    doorRotation: supermarket.turn(Math.PI / 2),
+    usedFrom: supermarket.at([-6.3, 1, 2.5]),
+    behindTheCounter: supermarket.at([-2, 1, 0.9]),
+    customerSpot: supermarket.at([-2, 1, 3.1]),
+  },
   server: {
-    door: [37.22, 1.1, 1.5],
-    usedFrom: [37.7, 1, 1.5],
-    behindTheCounter: [41, 1, -0.3],
-    customerSpot: [38.3, 1, -0.3],
-    otherSeats: [
-      [39.5, 1, -1.35],
-      [39.5, 1, 0.75],
-    ],
+    door: restaurant.at([-4.78, 1.1, 2.5]),
+    doorRotation: restaurant.turn(Math.PI / 2),
+    usedFrom: restaurant.at([-4.3, 1, 2.5]),
+    behindTheCounter: restaurant.at([-1, 1, 0.7]),
+    customerSpot: restaurant.at([-3.7, 1, 0.7]),
+    otherSeats: [restaurant.at([-2.5, 1, -0.35]), restaurant.at([-2.5, 1, 1.75])],
   },
 };
 
@@ -245,10 +295,6 @@ function stopBoard(stopId: TramStopId): SignSpot {
   return { position: [x, 2.45, z + 0.17], size: [1.3, 0.4] };
 }
 
-/** The building a place is in, if it has one. */
-export const buildingOf = (placeId: PlaceId) => BUILDINGS.find((b) => b.placeId === placeId);
-const building = (placeId: PlaceId) => buildingOf(placeId)!;
-
 /** Where each sign hangs. The park's name stands on two posts at its way in; each tram stop's hangs on its pole. */
 export const SIGNS: Record<SignId, SignSpot> = {
   'home-name': nameBoard(building('home')),
@@ -257,7 +303,7 @@ export const SIGNS: Record<SignId, SignSpot> = {
   'convenience-store-name': nameBoard(building('convenience-store')),
   'restaurant-name': nameBoard(building('restaurant')),
   'clinic-name': nameBoard(building('clinic')),
-  'park-name': { position: [-3.2, 1.6, PARK.centre[1] - PARK.size[1] / 2 + 0.1], size: [2, 0.5] },
+  'park-name': { position: inPark([-3.2, 1.6, -PARK.size[1] / 2 + 0.1]), size: [2, 0.5] },
   'bookshop-name': nameBoard(building('bookshop')),
   'bathhouse-name': nameBoard(building('bathhouse')),
   'town-office-name': nameBoard(building('town-office')),
@@ -272,9 +318,9 @@ export const SIGNS: Record<SignId, SignSpot> = {
   'bathhouse-hours': hoursBoard(building('bathhouse')),
   'town-office-hours': hoursBoard(building('town-office')),
   // On the back wall behind the counter, to the barista's left.
-  'cafe-menu': { position: [14.3, 1.65, -4.68], size: [1.7, 1.5] },
+  'cafe-menu': { position: cafe.at([2.3, 1.65, -3.68]), size: [1.7, 1.5], rotation: cafe.turn() },
   // On the back wall, between the two tables.
-  'restaurant-menu': { position: [42, 1.65, -4.68], size: [1.7, 1.5] },
+  'restaurant-menu': { position: restaurant.at([0, 1.65, -3.68]), size: [1.7, 1.5], rotation: restaurant.turn() },
 };
 
 /** The posts the park's name board stands on. */
@@ -300,7 +346,7 @@ function insideTheDoor({ centre: [x, z], size: [, depth], facing }: Building): V
 export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
   ...(Object.fromEntries(BUILDINGS.map((building) => [building.placeId, insideTheDoor(building)])) as Record<PlaceId, Vec3>),
   home: [-10, 1, 0.5],
-  park: [PARK.centre[0], 1, PARK.centre[1] - PARK.size[1] / 2 + 1.5],
+  park: inPark([0, 1, -PARK.size[1] / 2 + 1.5]),
   'tram-stop': tramStopSpawn(TRAM_LINE[0]),
 };
 
@@ -315,7 +361,7 @@ export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
 export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
 
 /** In front of the doctor: where the Character goes when the doctor calls their name from the waiting room. */
-export const BEFORE_THE_DOCTOR: Vec3 = [NPC_SPOTS.doctor[0], 1.5, NPC_SPOTS.doctor[2] - 1.8];
+export const BEFORE_THE_DOCTOR: Vec3 = clinic.at([5, 1.5, -3.2 + 1.8]);
 
 const within = (x: number, z: number, [cx, cz]: Vec2, [w, d]: Vec2) => Math.abs(x - cx) < w / 2 && Math.abs(z - cz) < d / 2;
 

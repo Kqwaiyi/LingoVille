@@ -153,9 +153,9 @@ function ShiftCustomer() {
   );
 }
 
-/** The staff doors at the café, the supermarket and the restaurant: each a door set flat against the inside of the west wall. */
+/** The staff doors at the café, the supermarket and the restaurant: each a door set flat against the inside of a side wall. */
 function StaffDoors() {
-  return Object.values(WORKPLACES).map(({ door: [x, , z] }) => <Piece key={`${x},${z}`} piece="door" position={[x, 0, z]} rotation={Math.PI / 2} />);
+  return Object.values(WORKPLACES).map(({ door: [x, , z], doorRotation }) => <Piece key={`${x},${z}`} piece="door" position={[x, 0, z]} rotation={doorRotation} />);
 }
 
 export function Town() {
