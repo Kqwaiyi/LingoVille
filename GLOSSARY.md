@@ -134,3 +134,7 @@ _Avoid_: Treat, luxury item
 **Appearance Preset**:
 One look on the shared character body (build and face, hair, skin tone, clothing), drawn from a single pool that the Character, Named NPCs, Shift Customers and passers-by all use. The player picks the Character's once, at setup. A Named NPC's comes from the persona × pack table; a Shift Customer's or passer-by's is drawn with the pack's weights.
 _Avoid_: Skin, avatar, outfit
+
+**NPC Voice**:
+The voice an NPC speaks in, which always suits the build of their Appearance Preset. Each Named NPC has their own, the same in every Culture Pack. A Shift Customer or Passer-by gets one suited to their build that no Named NPC uses, so they never sound like the staff.
+_Avoid_: Speaker, TTS voice

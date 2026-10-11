@@ -17,6 +17,8 @@ import {
   type Recap,
   type Segment,
 } from '../src/ai/index.ts';
+import { NAMED_NPC_IDS } from '../src/content/index.ts';
+import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import {
   DEFAULT_GATEWAY_PORT,
   ENDPOINT_VERSIONS,
@@ -24,9 +26,11 @@ import {
   GEMINI_LIVE_WS_BASE,
   LIVE_ENDPOINT,
   MODELS,
+  NAMED_NPC_VOICES,
   SHIFT_CUSTOMER_VOICES,
   VOICES,
   type TargetLanguage,
+  type VoiceName,
 } from './config.ts';
 
 export type GatewayEnv = {
@@ -101,22 +105,22 @@ const TOKEN_LIFETIME_MS = 30 * 60_000;
 
 const MOCK_TOKEN = 'mock-ephemeral-token';
 
-/**
- * The prebuilt voice a token request asks for: the Target Language's, or for a Shift Customer
- * (`shiftCustomerVoice`, a whole number from the sim's RNG), one of the Shift Customer voices. Undefined if neither.
- */
-function requestedVoice(body: unknown): string | undefined {
-  const voice = (body as { voice?: { targetLanguage?: unknown; shiftCustomerVoice?: unknown } } | undefined)?.voice;
-  const language = voice?.targetLanguage;
-  if (typeof language !== 'string' || !Object.hasOwn(VOICES, language)) return undefined;
-  const seed = voice?.shiftCustomerVoice;
-  if (seed === undefined) return VOICES[language as TargetLanguage];
-  if (typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0) return undefined;
-  return SHIFT_CUSTOMER_VOICES[seed % SHIFT_CUSTOMER_VOICES.length];
+// A token request: for a Shift Customer, a whole-number seed from the sim's RNG; for a Named NPC, their id.
+const TokenRequestSchema = z.object({
+  voice: z.union([
+    z.object({ targetLanguage: z.enum(LANGUAGE_CODES), shiftCustomerVoice: z.number().int().min(0) }),
+    z.object({ targetLanguage: z.enum(LANGUAGE_CODES), npcId: z.enum(NAMED_NPC_IDS) }),
+  ]),
+});
+
+/** The prebuilt voice a token request asks for: a Named NPC's own, or one of the Shift Customer voices by the customer's seed. */
+function requestedVoice({ voice }: z.infer<typeof TokenRequestSchema>): VoiceName {
+  if ('npcId' in voice) return NAMED_NPC_VOICES[voice.npcId];
+  return SHIFT_CUSTOMER_VOICES[voice.shiftCustomerVoice % SHIFT_CUSTOMER_VOICES.length]!;
 }
 
 /** Where and how a Live session with this prebuilt voice opens. */
-export const liveSessionTarget = (voiceName: string) => ({
+export const liveSessionTarget = (voiceName: VoiceName) => ({
   model: MODELS.live,
   voiceName,
   url: `${GEMINI_LIVE_WS_BASE}${ENDPOINT_VERSIONS.live}.${LIVE_ENDPOINT}`,
@@ -141,8 +145,9 @@ export async function mintLiveToken(apiKey: string, deps: GatewayDeps): Promise<
 
 /** POST /api/token: a one-use ephemeral token for one Live session, with everything the browser needs to open it. */
 async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
-  const voiceName = requestedVoice(await readJson(req));
-  if (!voiceName) return sendJson(res, 400, { error: 'bad_request' });
+  const request = TokenRequestSchema.safeParse(await readJson(req));
+  if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
+  const voiceName = requestedVoice(request.data);
 
   const session = liveSessionTarget(voiceName);
   if (env.mock) return sendJson(res, 200, { mock: true, token: MOCK_TOKEN, ...session, replyDelayMs: env.mockReplyDelayMs });

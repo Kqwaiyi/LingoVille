@@ -1,6 +1,8 @@
 // The one place for Gemini model IDs, voices and endpoint versions.
 // Swapping a model is a change to this file only.
 
+import type { Build, NamedNpcId } from '../src/content/index.ts';
+
 export const DEFAULT_GATEWAY_PORT = 8787;
 
 export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com';
@@ -25,9 +27,54 @@ export const MODELS = {
 
 export type TargetLanguage = 'ja' | 'zh' | 'en' | 'de';
 
-// Default prebuilt voice per Target Language. Voices are not language-specific;
-// these were picked by ear and can be overridden per NPC later.
-export const VOICES: Record<TargetLanguage, string> = {
+// Every prebuilt voice the game uses, tagged with the build it suits. Voices are not language-specific.
+export const VOICE_BUILDS = {
+  Kore: 'feminine',
+  Leda: 'feminine',
+  Despina: 'feminine',
+  Sulafat: 'feminine',
+  Vindemiatrix: 'feminine',
+  Gacrux: 'feminine',
+  Achernar: 'feminine',
+  Callirrhoe: 'feminine',
+  Erinome: 'feminine',
+  Aoede: 'feminine',
+  Zephyr: 'feminine',
+  Puck: 'masculine',
+  Sadachbia: 'masculine',
+  Algieba: 'masculine',
+  Iapetus: 'masculine',
+  Achird: 'masculine',
+  Algenib: 'masculine',
+  Charon: 'masculine',
+  Fenrir: 'masculine',
+  Orus: 'masculine',
+} as const satisfies Record<string, Build>;
+
+export type VoiceName = keyof typeof VOICE_BUILDS;
+
+// Each Named NPC's own voice, the same in every Culture Pack. It must suit the build of their look.
+// First picks from Gemini's voice descriptions; tune by ear.
+export const NAMED_NPC_VOICES: Record<NamedNpcId, VoiceName> = {
+  landlord: 'Kore',
+  'convenience-clerk': 'Leda',
+  receptionist: 'Despina',
+  doctor: 'Sulafat',
+  nurse: 'Vindemiatrix',
+  'park-regular-1': 'Gacrux',
+  'park-regular-2': 'Achernar',
+  attendant: 'Callirrhoe',
+  'office-clerk': 'Erinome',
+  barista: 'Puck',
+  cashier: 'Sadachbia',
+  server: 'Algieba',
+  pharmacist: 'Iapetus',
+  'park-regular-3': 'Achird',
+  shopkeeper: 'Algenib',
+};
+
+// Hear-it-said's voice per Target Language, picked by ear.
+export const VOICES: Record<TargetLanguage, VoiceName> = {
   ja: 'Kore',
   zh: 'Leda',
   en: 'Puck',
@@ -36,4 +83,4 @@ export const VOICES: Record<TargetLanguage, string> = {
 
 // Shift Customers are anonymous, so each gets one of these by its seed, from the sim's RNG.
 // None is a Named NPC's voice, so a customer never sounds like the staff.
-export const SHIFT_CUSTOMER_VOICES: readonly string[] = ['Aoede', 'Fenrir', 'Orus', 'Zephyr'];
+export const SHIFT_CUSTOMER_VOICES: readonly VoiceName[] = ['Aoede', 'Fenrir', 'Orus', 'Zephyr'];

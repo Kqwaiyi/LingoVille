@@ -8,7 +8,9 @@ import {
   LIVE_ENDPOINT,
   MODELS,
   SHIFT_CUSTOMER_VOICES,
+  VOICE_BUILDS,
   VOICES,
+  type VoiceName,
 } from './config.ts';
 import {
   annotationSchemaFor,
@@ -24,6 +26,7 @@ import {
   type Recap,
   type RecapRequest,
 } from '../src/ai/index.ts';
+import { BODY_PRESETS, CULTURE_PACKS, NAMED_NPC_IDS, type NamedNpcId } from '../src/content/index.ts';
 import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import { createGateway, readGatewayEnv } from './gateway.ts';
 
@@ -137,6 +140,27 @@ describe('POST /api/token', () => {
   const askForToken = (base: string, body: unknown = { voice: { targetLanguage: 'de', npcId: 'barista' } }) =>
     fetch(`${base}/api/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
+  const voiceOf = async (res: Response) => ((await res.json()) as { voiceName: string }).voiceName;
+
+  // The spec's first picks, from Gemini's voice descriptions.
+  const NAMED_NPC_VOICE_TABLE: Record<NamedNpcId, string> = {
+    landlord: 'Kore',
+    'convenience-clerk': 'Leda',
+    receptionist: 'Despina',
+    doctor: 'Sulafat',
+    nurse: 'Vindemiatrix',
+    'park-regular-1': 'Gacrux',
+    'park-regular-2': 'Achernar',
+    attendant: 'Callirrhoe',
+    'office-clerk': 'Erinome',
+    barista: 'Puck',
+    cashier: 'Sadachbia',
+    server: 'Algieba',
+    pharmacist: 'Iapetus',
+    'park-regular-3': 'Achird',
+    shopkeeper: 'Algenib',
+  };
+
   it('mints a one-use ephemeral token and returns it with the Live model, voice and endpoint', async () => {
     const gemini = fakeGemini(() => Response.json({ name: 'auth_tokens/abc' }));
     const base = await start({ GEMINI_API_KEY: 'secret-key-value' }, gemini);
@@ -149,7 +173,7 @@ describe('POST /api/token', () => {
       mock: false,
       token: 'auth_tokens/abc',
       model: MODELS.live,
-      voiceName: VOICES.de,
+      voiceName: NAMED_NPC_VOICE_TABLE.barista,
       url: `${GEMINI_LIVE_WS_BASE}${ENDPOINT_VERSIONS.live}.${LIVE_ENDPOINT}`,
     });
     expect(text).not.toContain('secret-key-value');
@@ -175,7 +199,7 @@ describe('POST /api/token', () => {
     const res = await askForToken(base, { voice: { targetLanguage: 'ja', npcId: 'barista' } });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ mock: true, model: MODELS.live, voiceName: VOICES.ja, token: expect.any(String) });
+    expect(await res.json()).toMatchObject({ mock: true, model: MODELS.live, voiceName: NAMED_NPC_VOICE_TABLE.barista, token: expect.any(String) });
     expect(gemini.calls).toEqual([]);
   });
 
@@ -242,6 +266,43 @@ describe('POST /api/token', () => {
     expect(await voiceFor(SHIFT_CUSTOMER_VOICES.length + 1)).toBe(SHIFT_CUSTOMER_VOICES[1]);
     expect((await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: -1 } })).status).toBe(400);
     expect((await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: 1.5 } })).status).toBe(400);
+  });
+
+  it('gives each Named NPC their own voice', async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+
+    const voices = await Promise.all(NAMED_NPC_IDS.map(async (npcId) => voiceOf(await askForToken(base, { voice: { targetLanguage: 'en', npcId } }))));
+
+    expect(Object.fromEntries(NAMED_NPC_IDS.map((npcId, i) => [npcId, voices[i]]))).toEqual(NAMED_NPC_VOICE_TABLE);
+    expect(new Set(voices).size).toBe(NAMED_NPC_IDS.length);
+  });
+
+  it('gives a Named NPC the same voice whatever the Target Language', async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+
+    for (const npcId of NAMED_NPC_IDS) {
+      const voices = await Promise.all(LANGUAGE_CODES.map(async (targetLanguage) => voiceOf(await askForToken(base, { voice: { targetLanguage, npcId } }))));
+      expect(voices).toEqual(LANGUAGE_CODES.map(() => NAMED_NPC_VOICE_TABLE[npcId]));
+    }
+  });
+
+  it("gives each Named NPC a voice that suits the build of their look, in every Culture Pack", async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+
+    for (const pack of Object.values(CULTURE_PACKS)) {
+      for (const npcId of NAMED_NPC_IDS) {
+        const voice = (await voiceOf(await askForToken(base, { voice: { targetLanguage: pack.id, npcId } }))) as VoiceName;
+        expect({ pack: pack.id, npcId, build: VOICE_BUILDS[voice] }).toEqual({ pack: pack.id, npcId, build: BODY_PRESETS[pack.appearances.npcs[npcId].body].build });
+      }
+    }
+  });
+
+  it('rejects a request for a Named NPC it does not know', async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+
+    expect((await askForToken(base, { voice: { targetLanguage: 'en', npcId: 'stranger' } })).status).toBe(400);
+    expect((await askForToken(base, { voice: { targetLanguage: 'en', npcId: 'toString' } })).status).toBe(400);
+    expect((await askForToken(base, { voice: { targetLanguage: 'en' } })).status).toBe(400);
   });
 
   it('rejects a request for a language it has no voice for', async () => {
