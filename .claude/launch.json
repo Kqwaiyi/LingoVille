@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev-mock",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set GEMINI_MOCK=1&& set WEB_PORT=5191&& set GATEWAY_PORT=8796&& npm run dev"
+      ],
+      "port": 5191
+    }
+  ]
+}

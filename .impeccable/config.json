@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "src/ui/hud.css"
+        ],
+        "createdAt": "2026-10-08T08:08:53.443Z",
+        "reason": "Claude: pre-existing .appearance-placeholder::before draws a character's hair as a thick top border on a round head (comment says so); not a card accent"
+      }
+    ]
+  }
+}

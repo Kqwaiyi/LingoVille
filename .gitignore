@@ -18,3 +18,7 @@ evals/recordings/*
 
 # Blender's backups of art/town/town.blend
 *.blend1
+
+# Agent tools' runtime state
+.claude/scheduled_tasks.lock
+.impeccable/hook.cache.json

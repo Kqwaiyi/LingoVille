@@ -1,0 +1,8 @@
+[mcp_servers.blender]
+command = "uv"
+args = [
+    "--directory",
+    'C:\Users\steve\blender_mcp\mcp',
+    "run",
+    "blender-mcp",
+]
