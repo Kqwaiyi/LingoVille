@@ -25,6 +25,7 @@ import { FirstMorningMarker, RouteMarker } from './Marker.tsx';
 import { Outdoors } from './Outdoors.tsx';
 import { PALETTE, type PaletteColour } from './palette.ts';
 import { Props } from './Props.tsx';
+import { Scenery } from './Scenery.tsx';
 import { Signs } from './Signs.tsx';
 import { isWaitingForTram, NPC_SPOTS, type Vec3, WORKPLACES } from './town.ts';
 
@@ -163,6 +164,7 @@ export function Town() {
   return (
     <RigidBody type="fixed" colliders={false}>
       <Outdoors />
+      <Scenery />
       <Buildings />
       <StaffDoors />
       <ShiftCustomer />

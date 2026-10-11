@@ -15,3 +15,6 @@ playwright-report/
 evals/reports/
 evals/recordings/*
 !evals/recordings/manifest.json
+
+# Blender's backups of art/town/town.blend
+*.blend1

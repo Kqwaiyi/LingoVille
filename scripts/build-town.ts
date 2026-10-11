@@ -19,6 +19,10 @@
  * - food-kit: https://kenney.nl/assets/food-kit
  * - fantasy-town-kit: https://kenney.nl/assets/fantasy-town-kit
  *
+ * What no kit has is modelled for the town in Blender, and kept in the repo: `art/town/glb/`, exported from
+ * `art/town/town.blend` by `art/town/pieces.py` (see `art/town/README.md`), read here as the `town-art` kit. Its
+ * pieces and the rest of the scenery are put together in `scripts/town-scenery.ts`.
+ *
  * `npm run build:town -- <folder>`
  */
 import { Document, NodeIO, type Material, type Node } from '@gltf-transform/core';
@@ -30,13 +34,17 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
 import { fromLinear, hexRgb, nearest, toLinear, type Rgb } from './palette.ts';
-import { KIT_FACADE, KIT_ROOF, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type TownMaterial, type TownPiece } from '../src/world/townArt.ts';
+import { KIT_FACADE, KIT_ROOF, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type SceneryPiece, type TownMaterial, type TownPiece } from '../src/world/townArt.ts';
 import { PROP_PARTS } from './town-props.ts';
+import { SCENERY_PARTS } from './town-scenery.ts';
 
 const source = process.argv[2];
 if (!source) throw new Error('Pass the folder the Kenney kits were unzipped into.');
 
-type Kit = 'building-kit' | 'modular-buildings' | 'city-kit-roads' | 'train-kit' | 'furniture-kit' | 'nature-kit' | 'food-kit' | 'fantasy-town-kit';
+type Kit = 'building-kit' | 'modular-buildings' | 'city-kit-roads' | 'train-kit' | 'furniture-kit' | 'nature-kit' | 'food-kit' | 'fantasy-town-kit' | 'town-art';
+
+/** The town's own pieces, made in Blender: kept in the repo, not downloaded. */
+const TOWN_ART = join('art', 'town', 'glb');
 export type Vec3 = [number, number, number];
 
 /**
@@ -79,7 +87,7 @@ const NATURE_SCALE = 2.6;
 /** Wall pieces are 0.1 m thick, their frames 0.2 m: thickened to sit in the town's 0.3 m walls without bulging out. */
 const WALL_DEPTH = 2;
 
-const TOWN: Record<TownPiece, Part[]> = {
+const TOWN: Record<Exclude<TownPiece, SceneryPiece>, Part[]> = {
   wall: [{ kit: 'building-kit', model: 'wall', turns: 1, scale: [1, 1, WALL_DEPTH], repaint: WALL_COLOURS }],
   'wall-window': [{ kit: 'building-kit', model: 'wall-window-square', turns: 1, scale: [1, 1, WALL_DEPTH], glass: true, repaint: WALL_COLOURS }],
   // The wide doorway, narrowed so its opening is the town's 1.8 m door.
@@ -90,7 +98,6 @@ const TOWN: Record<TownPiece, Part[]> = {
   'roof-gable-end': [{ kit: 'modular-buildings', model: 'roof-gable-end', turns: 1, repaint: ROOF_COLOURS }],
   'roof-flat': [{ kit: 'building-kit', model: 'roof-flat-center', repaint: FLAT_ROOF_COLOURS }],
   'roof-edge': [{ kit: 'building-kit', model: 'border', turns: 1, repaint: { slate: KIT_FACADE, stone: KIT_FACADE, lavender: KIT_FACADE, charcoal: KIT_FACADE, cream: 'cream' } }],
-  road: [{ kit: 'city-kit-roads', model: 'road-straight', repaint: { plum: 'slate', lavender: 'cream', slate: 'stone' } }],
   rail: [{ kit: 'train-kit', model: 'railroad-rail-straight', turns: 1, scale: 1.15, repaint: { lavender: 'stone' } }],
   'street-light': [{ kit: 'city-kit-roads', model: 'light-square', scale: 6, repaint: METAL_COLOURS }],
   'stop-pole': [{ kit: 'city-kit-roads', model: 'road-sign-empty', scale: 6, repaint: { lavender: 'denim', slate: 'denim' } }],
@@ -125,12 +132,13 @@ const TOWN: Record<TownPiece, Part[]> = {
   ],
 };
 
-const PIECES: Record<ArtPiece, Part[]> = { ...TOWN, ...PROP_PARTS };
+const PIECES: Record<ArtPiece, Part[]> = { ...TOWN, ...SCENERY_PARTS, ...PROP_PARTS };
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ sharp });
 
 /** A kit model's file: the GLB, wherever its kit keeps them. */
 function modelPath(kit: Kit, model: string) {
+  if (kit === 'town-art') return join(TOWN_ART, `${model}.glb`);
   for (const folder of ['GLB format', 'GLTF format']) {
     const path = join(source!, kit, 'Models', folder, `${model}.glb`);
     if (existsSync(path)) return path;

@@ -6,10 +6,15 @@ import { gameStore, selectDaylight } from '../store/index.ts';
 import { setLampGlow } from './Kit.tsx';
 import { PALETTE, type PaletteColour } from './palette.ts';
 
-/** Gentle distance fog, into the sky's colour: the street clear, the far end of town softened. No weather. */
-const FOG = { near: 35, far: 95 } as const;
-/** How far from the middle of town the key light shines from: its shadow camera reaches 60 m from there. */
-const KEY_LIGHT_DISTANCE = 26;
+/** Gentle distance fog, into the sky's colour: the street clear, the ends of town softened, the hills and mountains faded. No weather. */
+const FOG = { near: 45, far: 230 } as const;
+/**
+ * How far from what the camera looks at the key light shines from, and how far its shadows reach round that spot. The
+ * light follows the camera, in steps (`SHADOW_STEP`), so its shadows don't shimmer as it moves.
+ */
+const KEY_LIGHT_DISTANCE = 40;
+const SHADOW_REACH = 38;
+const SHADOW_STEP = 4;
 
 type Preset = {
   /** The sky, and the fog that fades into it. */
@@ -46,7 +51,7 @@ export function Lighting() {
   const fog = useRef<Fog>(null);
   const ambient = useRef<HemisphereLight>(null);
   const key = useRef<DirectionalLight>(null);
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const { from, to, blend, keyLight } = selectDaylight(gameStore.getState());
     const [a, b] = [PRESETS[from], PRESETS[to]];
     blendColour(background.current!, a.sky, b.sky, blend);
@@ -59,7 +64,10 @@ export function Lighting() {
     // Azimuth 0 is east (+x) and π/2 south (+z).
     const { azimuth, elevation } = keyLight;
     const across = Math.cos(elevation) * KEY_LIGHT_DISTANCE;
-    key.current!.position.set(Math.cos(azimuth) * across, Math.sin(elevation) * KEY_LIGHT_DISTANCE, Math.sin(azimuth) * across);
+    const [cx, cz] = [Math.round(camera.position.x / SHADOW_STEP) * SHADOW_STEP, Math.round(camera.position.z / SHADOW_STEP) * SHADOW_STEP];
+    key.current!.position.set(cx + Math.cos(azimuth) * across, Math.sin(elevation) * KEY_LIGHT_DISTANCE, cz + Math.sin(azimuth) * across);
+    key.current!.target.position.set(cx, 0, cz);
+    key.current!.target.updateMatrixWorld();
     setLampGlow(lerp(a.lampGlow, b.lampGlow, blend));
   });
   return (
@@ -68,7 +76,7 @@ export function Lighting() {
       <fog ref={fog} attach="fog" args={[PALETTE.sky, FOG.near, FOG.far]} />
       <hemisphereLight ref={ambient} />
       <directionalLight ref={key} castShadow shadow-mapSize={[2048, 2048]}>
-        <orthographicCamera attach="shadow-camera" args={[-30, 30, 30, -30, 1, 60]} />
+        <orthographicCamera attach="shadow-camera" args={[-SHADOW_REACH, SHADOW_REACH, SHADOW_REACH, -SHADOW_REACH, 1, KEY_LIGHT_DISTANCE * 2.5]} />
       </directionalLight>
     </>
   );

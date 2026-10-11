@@ -4,7 +4,8 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_ART_URLS } from '../src/world/characterArt.ts';
 import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
-import { ART_PIECES, LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS } from '../src/world/townArt.ts';
+import { PROP_IDS } from '../src/content/index.ts';
+import { ART_PIECES, LAMP_BULBS, TOWN_ART_URL, TOWN_PIECES, WINDOW_GLASS } from '../src/world/townArt.ts';
 
 // Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from and every
 // Culture Pack's props, a bulb in each piece that lights up, and nothing but flat colours from the one shared palette.
@@ -130,7 +131,24 @@ describe('the town art', () => {
       "town.glb's colormap material is not a palette colour.",
       'town.glb has images.',
       "town.glb's street-light has no white bulb.",
+      "town.glb's wall-lamp has no lamplight bulb.",
+      "town.glb's floor-lamp has no lamplight bulb.",
+      "town.glb's table-lamp has no lamplight bulb.",
+      "town.glb's tram has no lamplight bulb.",
     ]);
+  });
+});
+
+describe('the town art’s names', () => {
+  /** Names the town and a Culture Pack's props both use: the build would draw only one of them. */
+  const clashes = (town: readonly string[], props: readonly string[]) => town.filter((piece) => props.includes(piece));
+
+  it('never give a town piece and a prop the same name', () => {
+    expect(clashes(TOWN_PIECES, PROP_IDS)).toEqual([]);
+  });
+
+  it('catch a town piece named like a prop', () => {
+    expect(clashes(['bench', 'bunting'], ['bunting', 'noren'])).toEqual(['bunting']);
   });
 });
 

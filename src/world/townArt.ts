@@ -6,6 +6,80 @@ import type { PaletteColour } from './palette.ts';
 export const TOWN_ART_URL = '/town/town.glb';
 
 /**
+ * The town's scenery: what dresses the streets, the park, the backdrop and the rooms, beyond walls and counters. Some
+ * are modelled in Blender for the town (`art/town/`), where no kit has them.
+ */
+export const SCENERY_PIECES = [
+  // Made in Blender.
+  'awning',
+  'pennants',
+  'window-box',
+  'bicycle',
+  'parasol',
+  'street-clock',
+  'hill',
+  'mountain',
+  'bath',
+  'planter',
+  'catenary-pole',
+  'boat',
+  'gazebo',
+  'cottage',
+  'townhouse',
+  // What's on the roofs.
+  'chimney',
+  'ac-unit',
+  // The street.
+  'tram',
+  'fountain',
+  'market-stall',
+  'cart',
+  'bin',
+  'hedge',
+  'fence',
+  'wall-lamp',
+  // Trees, rocks and plants.
+  'tree-pine',
+  'tree-fat',
+  'tree-cone',
+  'tree-small',
+  'bush-large',
+  'rock',
+  'grass-tuft',
+  'lily',
+  'pot-plant',
+  // The rooms.
+  'chair',
+  'stool',
+  'table-round',
+  'table-plain',
+  'sofa',
+  'armchair',
+  'coffee-table',
+  'floor-lamp',
+  'table-lamp',
+  'tv',
+  'desk',
+  'computer',
+  'coat-rack',
+  'fridge-tall',
+  'wall-cabinet',
+  'coffee-machine',
+  'ceiling-lamp',
+  'rug-round',
+  'books',
+  'plant-small',
+  'side-table',
+  'boxes',
+  'shower',
+  'washer',
+  'mirror',
+  'basin',
+  'bookcase-low',
+] as const;
+export type SceneryPiece = (typeof SCENERY_PIECES)[number];
+
+/**
  * The kit pieces the town is built from, each a node of `town.glb`: in metres, standing on the ground (y = 0) and
  * centred on its footprint, its front facing +z. Wall pieces run along x, 2 m long and 2.4 m high.
  */
@@ -21,7 +95,6 @@ export const TOWN_PIECES = [
   'roof-flat',
   'roof-edge',
   // The street and the tram stops.
-  'road',
   'rail',
   'street-light',
   'stop-pole',
@@ -49,6 +122,7 @@ export const TOWN_PIECES = [
   'plant',
   'rug',
   'treadmill',
+  ...SCENERY_PIECES,
 ] as const;
 export type TownPiece = (typeof TOWN_PIECES)[number];
 
@@ -62,8 +136,20 @@ export type ArtPiece = TownPiece | PropId;
 /** The glass in a window, lit while its place is open. Every other material is named for its palette colour. */
 export const WINDOW_GLASS = 'window';
 export type TownMaterial = PaletteColour | typeof WINDOW_GLASS;
-/** The material of each piece's bulb, which glows while it's lit: a street light's, from dusk. */
-export const LAMP_BULBS: Partial<Record<ArtPiece, TownMaterial>> = { 'street-light': 'white' };
+/** The material of each piece's bulb, which glows while it's lit: a street light's, the lamps by the doors and in the rooms, and a tram's headlights, from dusk. */
+export const LAMP_BULBS: Partial<Record<ArtPiece, TownMaterial>> = {
+  'street-light': 'white',
+  'wall-lamp': 'lamplight',
+  'floor-lamp': 'lamplight',
+  'table-lamp': 'lamplight',
+  tram: 'lamplight',
+};
+
+/** Swaps one palette colour of a piece for another: how each building wears its own façade and roof. */
+export type Repaint = Partial<Record<PaletteColour, PaletteColour>>;
+
+/** A size in metres to fit a piece to, along x, y and z; `null` keeps the piece's own size along that axis. */
+export type Size = readonly [x: number | null, y: number | null, z: number | null];
 
 /** The colour the kit's walls come in, which each building repaints with its own façade colour. */
 export const KIT_FACADE: PaletteColour = 'lavender';

@@ -13,17 +13,19 @@ These are public domain (CC0 1.0). No credit is required, but they're credited h
 | Asset | Creator | Source | Used for |
 | --- | --- | --- | --- |
 | Building Kit | Kenney | https://kenney.nl/assets/building-kit | Walls, doors, windows, floors, flat roofs, columns |
-| Modular Buildings | Kenney | https://kenney.nl/assets/modular-buildings | Gable roofs |
-| City Kit (Roads) | Kenney | https://kenney.nl/assets/city-kit-roads | The street, street lights, tram stop poles |
-| Train Kit | Kenney | https://kenney.nl/assets/train-kit | Tram rails |
+| Modular Buildings | Kenney | https://kenney.nl/assets/modular-buildings | Gable roofs, rooftop air-conditioning units |
+| City Kit (Roads) | Kenney | https://kenney.nl/assets/city-kit-roads | Street lights, tram stop poles |
+| Train Kit | Kenney | https://kenney.nl/assets/train-kit | Tram rails, and the trams |
 | Furniture Kit | Kenney | https://kenney.nl/assets/furniture-kit | Furniture, and parts of the Culture Packs' props |
-| Nature Kit | Kenney | https://kenney.nl/assets/nature-kit | Trees, bushes and flowers |
+| Nature Kit | Kenney | https://kenney.nl/assets/nature-kit | Trees, bushes, flowers, rocks, lilies and fences |
 | Food Kit | Kenney | https://kenney.nl/assets/food-kit | Food, dishes, pots and packaging in the Culture Packs' props |
-| Fantasy Town Kit | Kenney | https://kenney.nl/assets/fantasy-town-kit | Stools, benches and pointed roofs in the Culture Packs' props |
+| Fantasy Town Kit | Kenney | https://kenney.nl/assets/fantasy-town-kit | The fountain, market stalls, a cart, hedges and chimneys; stools, benches and pointed roofs in the Culture Packs' props |
 | Universal Base Characters | Quaternius | https://quaternius.itch.io/universal-base-characters | Everyone's bodies, heads and hair |
 | Modular Character Outfits – Fantasy | Quaternius | https://quaternius.itch.io/modular-character-outfits-fantasy | Everyone's everyday clothes |
 | Universal Animation Library | Quaternius | https://quaternius.itch.io/universal-animation-library | Everyone's animations |
 
 All of it is recoloured to the town's palette by `npm run build:town` and `npm run build:characters`.
+
+What no kit has (awnings, pennants, window boxes, bicycles, parasols, the town clock, the bandstand, the bath, planters, tram poles, boats, the backdrop's houses, hills and mountains) is modelled for the game in Blender, in `art/town/`.
 
 The music, ambient sound and UI sounds are synthesised by the game as it plays (`src/audio`), so there are no sound files to credit.

@@ -1,20 +1,20 @@
 import { useGLTF } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import { CuboidCollider } from '@react-three/rapier';
-import { useMemo } from 'react';
-import { Box3, MeshStandardMaterial, Vector3, type Mesh, type Object3D } from 'three';
+import { useEffect, useMemo, useRef } from 'react';
+import { Box3, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type BufferGeometry, type Mesh, type Object3D } from 'three';
+import { selectLampsOn, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
+import { characterPosition } from './Character.tsx';
 import { PALETTE, type PaletteColour } from './palette.ts';
-import { LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece } from './townArt.ts';
-import type { Vec3 } from './town.ts';
+import { LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type Repaint, type Size } from './townArt.ts';
+
+export type { Repaint, Size };
+import { spawnAt, type Vec2, type Vec3 } from './town.ts';
 
 // The town's kit pieces, built by `npm run build:town`: every building, street piece and stick of furniture is one of
 // these, flat shaded in palette colours.
 useGLTF.preload(TOWN_ART_URL);
 
-/** Swaps one palette colour of a piece for another: how each building wears its own façade and roof. */
-export type Repaint = Partial<Record<PaletteColour, PaletteColour>>;
-
-/** A size in metres to fit a piece to, along x, y and z; `null` keeps the piece's own size along that axis. */
-export type Size = readonly [x: number | null, y: number | null, z: number | null];
 
 /** Window glass while its place is open, and while it's closed. Once the lamps are on, an open place's glass is lit. */
 const GLASS = { open: 'sky', closed: 'charcoal' } as const satisfies Record<string, PaletteColour>;
@@ -23,8 +23,8 @@ const GLASS = { open: 'sky', closed: 'charcoal' } as const satisfies Record<stri
 const FLAT = { roughness: 0.9, flatShading: true } as const;
 
 const materials = new Map<PaletteColour, MeshStandardMaterial>();
-/** One shared material per palette colour, made once. */
-function paletteMaterial(colour: PaletteColour) {
+/** One shared material per palette colour, made once: for the town's plain shapes too (kerbs, water, wires). */
+export function paletteMaterial(colour: PaletteColour) {
   if (!materials.has(colour)) materials.set(colour, new MeshStandardMaterial({ color: PALETTE[colour], ...FLAT }));
   return materials.get(colour)!;
 }
@@ -59,6 +59,12 @@ function useTownArt(): TownArt {
 /** A piece's size in metres, as the art has it: width (x), height (y) and depth (z). */
 export function usePieceSize(piece: ArtPiece): Vec3 {
   return useTownArt().get(piece)!.size;
+}
+
+/** Every piece's size in metres, for laying out many pieces at once. */
+export function usePieceSizes(): (piece: ArtPiece) => Vec3 {
+  const art = useTownArt();
+  return useMemo(() => (piece: ArtPiece) => art.get(piece)!.size, [art]);
 }
 
 /** Where each of `length / pieceLength` pieces (at least one, each stretched a little) goes along a run centred on 0. */
@@ -107,4 +113,144 @@ export function Piece({ piece, position = [0, 0, 0], rotation = 0, size, repaint
 /** Something solid the Character collides with, as centre and size. What it looks like is drawn separately. */
 export function Solid({ position, size }: { position: Vec3; size: Vec3 }) {
   return <CuboidCollider position={position} args={[size[0] / 2, size[1] / 2, size[2] / 2]} />;
+}
+
+/** A footprint seen from above: its centre and its width (x) and depth (z). */
+export type Footprint = { centre: Vec2; size: Vec2 };
+/** A point seen from above, as three.js vectors give it. */
+type Point = { x: number; z: number };
+
+/**
+ * Whether the line from `from` to `to`, seen from above, crosses a footprint (grown by `margin`): clipped against the
+ * footprint's sides in turn, as Liang and Barsky do. What does stands between the camera and the Character.
+ */
+export function crossesFootprint(from: Point, to: Point, { centre: [cx, cz], size: [w, d] }: Footprint, margin: number) {
+  const [dx, dz] = [to.x - from.x, to.z - from.z];
+  let [enter, leave] = [0, 1];
+  const sides: [number, number][] = [
+    [-dx, from.x - (cx - w / 2 - margin)],
+    [dx, cx + w / 2 + margin - from.x],
+    [-dz, from.z - (cz - d / 2 - margin)],
+    [dz, cz + d / 2 + margin - from.z],
+  ];
+  for (const [p, q] of sides) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) enter = Math.max(enter, t);
+    else leave = Math.min(leave, t);
+    if (enter > leave) return false;
+  }
+  return true;
+}
+
+/** Where the camera looks: at the Character, or on the title screen at the place the save was left. */
+function useLookedAt() {
+  const playing = useGame(selectScreen) === 'playing';
+  const titlePlaceId = useGame(selectTitlePlaceId);
+  return (): Point => {
+    if (playing) return characterPosition;
+    const [x, , z] = spawnAt(titlePlaceId);
+    return { x, z };
+  };
+}
+
+/**
+ * One kit piece among many drawn together (`Instances`): where it stands, how it's turned, sized and repainted, as a
+ * `Piece` takes them. `lit` lights its window glass and bulb once the lamps are on; `lift` names the footprint (an
+ * index into `lifts`) it lifts off with while that stands between the camera and the Character.
+ */
+export type Placement = { piece: ArtPiece; position: Vec3; rotation?: number; size?: Size; repaint?: Repaint; lit?: boolean; lift?: number };
+
+const HIDDEN = new Matrix4().makeScale(0, 0, 0);
+/** How far round a lifting footprint the camera's line still lifts it. */
+const LIFT_MARGIN = 0.4;
+
+const parts = new WeakMap<Object3D, { geometry: BufferGeometry; local: Matrix4; name: string }[]>();
+/** A piece's size, and its meshes: each one's geometry, where it stands in the piece, and its material's name. */
+function partsOf(art: TownArt, piece: ArtPiece) {
+  const { object, size } = art.get(piece)!;
+  if (!parts.has(object)) {
+    object.updateWorldMatrix(true, true);
+    const root = object.matrixWorld.clone().invert();
+    const meshes: { geometry: BufferGeometry; local: Matrix4; name: string }[] = [];
+    object.traverse((child) => {
+      if (isMesh(child)) meshes.push({ geometry: child.geometry, local: root.clone().multiply(child.matrixWorld), name: (child.material as MeshStandardMaterial).name });
+    });
+    parts.set(object, meshes);
+  }
+  return { size, meshes: parts.get(object)! };
+}
+
+type Batch = { mesh: InstancedMesh; matrices: Matrix4[]; lifts: (number | undefined)[]; glass: boolean; bulb: boolean; lit: boolean; colour: PaletteColour };
+
+/**
+ * Many kit pieces drawn as one instanced mesh per piece and colour: the town's scenery, its houses, trees and street
+ * furniture, in a handful of draw calls. Nothing here is solid; colliders are the caller's.
+ */
+export function Instances({ placements, lifts = [], liftMargin = LIFT_MARGIN }: { placements: readonly Placement[]; lifts?: readonly Footprint[]; liftMargin?: number }) {
+  const art = useTownArt();
+  const lampsOn = useGame(selectLampsOn);
+  const lookedAt = useLookedAt();
+  const batches = useMemo(() => {
+    // Batched by mesh, not by piece: a piece's parts that aren't repainted (its trim, its frames) are drawn together
+    // across every repaint of it, and only glass and bulbs care whether they light up.
+    const byKey = new Map<string, { geometry: BufferGeometry; colour: PaletteColour; glass: boolean; bulb: boolean; lit: boolean; matrices: Matrix4[]; lifts: (number | undefined)[] }>();
+    const turn = new Quaternion();
+    const up = new Vector3(0, 1, 0);
+    for (const { piece, position, rotation = 0, size: fit, repaint = {}, lit = false, lift } of placements) {
+      const { size, meshes } = partsOf(art, piece);
+      const scale = fit ? ([0, 1, 2] as const).map((axis) => (fit[axis] ?? size[axis]) / size[axis]) : [1, 1, 1];
+      const placed = new Matrix4().compose(new Vector3(...position), turn.setFromAxisAngle(up, rotation), new Vector3(...scale));
+      meshes.forEach(({ geometry, local, name }, i) => {
+        const glass = name === WINDOW_GLASS;
+        const bulb = LAMP_BULBS[piece] === name;
+        const colour = glass ? GLASS.open : (repaint[name as PaletteColour] ?? (name as PaletteColour));
+        const key = `${piece}|${i}|${colour}|${(glass || bulb) && lit}`;
+        const batch = byKey.get(key) ?? byKey.set(key, { geometry, colour, glass, bulb, lit: (glass || bulb) && lit, matrices: [], lifts: [] }).get(key)!;
+        batch.matrices.push(placed.clone().multiply(local));
+        batch.lifts.push(lift);
+      });
+    }
+    return [...byKey.values()].map(({ geometry, colour, glass, bulb, lit, matrices, lifts }): Batch => {
+      const mesh = new InstancedMesh(geometry, paletteMaterial(colour), matrices.length);
+      matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix));
+      mesh.computeBoundingSphere();
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return { mesh, matrices, lifts, glass, bulb, lit, colour };
+    });
+  }, [art, placements]);
+  useEffect(() => () => batches.forEach(({ mesh }) => mesh.dispose()), [batches]);
+
+  // Window glass is clear by day and dark at night, unless it's lit; bulbs that light up glow once the lamps are on.
+  useEffect(() => {
+    for (const { mesh, glass, bulb, lit, colour } of batches) {
+      if (glass) mesh.material = lit && lampsOn ? LAMP : paletteMaterial(lampsOn ? GLASS.closed : GLASS.open);
+      else if (bulb) mesh.material = lit && lampsOn ? LAMP : paletteMaterial(colour);
+    }
+  }, [batches, lampsOn]);
+
+  // What stands in the camera's way lifts off, as a roof does.
+  const lifted = useRef('');
+  useFrame(({ camera }) => {
+    if (lifts.length === 0) return;
+    const target = lookedAt();
+    const inTheWay = lifts.map((footprint) => crossesFootprint(camera.position, target, footprint, liftMargin));
+    const key = inTheWay.map(Number).join('');
+    if (key === lifted.current) return;
+    lifted.current = key;
+    for (const { mesh, matrices, lifts: liftOf } of batches) {
+      if (liftOf.every((lift) => lift === undefined)) continue;
+      matrices.forEach((matrix, i) => {
+        const lift = liftOf[i];
+        mesh.setMatrixAt(i, lift !== undefined && inTheWay[lift] ? HIDDEN : matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  });
+
+  return batches.map(({ mesh }, i) => <primitive key={i} object={mesh} />);
 }

@@ -1,11 +1,15 @@
 import { PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type GroceryId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
 import type { JobId, PlaceId } from '../sim/index.ts';
 import type { PaletteColour } from './palette.ts';
-import type { TownPiece } from './townArt.ts';
+import type { Repaint, Size, TownPiece } from './townArt.ts';
 
-// The town's layout: one long street along the x axis, with a tram line down its middle and three island platforms for
-// the stops. Seven buildings face it from the north (doors on +z) and the clinic and bathhouse from the south (doors on
-// -z), with the park, open to the street, between them. The layout, façades and roofs are the same in every Culture Pack.
+// The town's layout: one long high street along the x axis, with a double tram line down its middle and three island
+// platforms between the tracks for the stops, Old Town in the west, the Town Centre and Market Street in the east. Seven
+// buildings face it from the north (doors on +z) and the clinic and bathhouse from the south (doors on -z), with the
+// park, open to the street, between them, running down to the canal. Everything in a building stands in the building's
+// own frame (`inside`), and everything in the park from its centre. What only dresses the town (the buildings nobody goes
+// into, the street furniture, the backdrop) is in `scenery.ts`. The layout, façades and roofs are the same in every
+// Culture Pack.
 
 export type Vec2 = readonly [x: number, z: number];
 export type Vec3 = readonly [x: number, y: number, z: number];
@@ -20,20 +24,42 @@ export type Building = {
   /** The walls' colour outside, and the roof's shape and colour. */
   facade: PaletteColour;
   roof: { shape: 'gable' | 'flat'; colour: PaletteColour };
+  /** How many storeys it stands: the Character only ever goes in the ground floor; the floors above lift off with the roof. */
+  storeys: 1 | 2 | 3;
+  /** Striped awnings over the front windows, in this colour and white. */
+  awnings?: PaletteColour;
+  /** Flower boxes under the windows of the floors above. */
+  windowBoxes?: boolean;
 };
 
 export const WALL = { height: 2.4, thickness: 0.3, doorWidth: 1.8 } as const;
 
+/**
+ * The high street: its middle, where the island platforms stand between the two tracks, the width from kerb to kerb,
+ * the pavements' width either side, and how far each track runs from the middle.
+ */
+export const STREET = { z: 8, width: 9, pavement: 2.7, track: 2.5 } as const;
+/** Where the buildings' front walls stand: north of the street, and south of it. */
+export const NORTH_FRONT = STREET.z - STREET.width / 2 - STREET.pavement;
+export const SOUTH_FRONT = STREET.z + STREET.width / 2 + STREET.pavement;
+
+/** A building on the street: its door in the middle of its front wall, on the north side (facing the street) or the south. */
+export function onStreet(x: number, side: 'north' | 'south', [width, depth]: Vec2): Pick<Building, 'centre' | 'size' | 'facing'> {
+  return side === 'north'
+    ? { centre: [x, NORTH_FRONT - depth / 2], size: [width, depth], facing: 1 }
+    : { centre: [x, SOUTH_FRONT + depth / 2], size: [width, depth], facing: -1 };
+}
+
 export const BUILDINGS: readonly Building[] = [
-  { placeId: 'town-office', centre: [-44, -1], size: [12, 8], facing: 1, facade: 'linen', roof: { shape: 'flat', colour: 'slate' } },
-  { placeId: 'bookshop', centre: [-30, -0.5], size: [8, 7], facing: 1, facade: 'lavender', roof: { shape: 'gable', colour: 'plum' } },
-  { placeId: 'home', centre: [-10, 0], size: [8, 7], facing: 1, facade: 'sky', roof: { shape: 'gable', colour: 'terracotta' } },
-  { placeId: 'convenience-store', centre: [0.5, -0.5], size: [7, 7], facing: 1, facade: 'mint', roof: { shape: 'flat', colour: 'denim' } },
-  { placeId: 'cafe', centre: [12, -1], size: [10, 8], facing: 1, facade: 'peach', roof: { shape: 'gable', colour: 'brick' } },
-  { placeId: 'supermarket', centre: [27, -1.5], size: [14, 9], facing: 1, facade: 'butter', roof: { shape: 'flat', colour: 'terracotta' } },
-  { placeId: 'restaurant', centre: [42, -1], size: [10, 8], facing: 1, facade: 'blush', roof: { shape: 'gable', colour: 'brick' } },
-  { placeId: 'clinic', centre: [-26, 16], size: [16, 10], facing: -1, facade: 'white', roof: { shape: 'flat', colour: 'sky' } },
-  { placeId: 'bathhouse', centre: [24, 15.5], size: [12, 9], facing: -1, facade: 'sky', roof: { shape: 'gable', colour: 'denim' } },
+  { placeId: 'town-office', ...onStreet(-58, 'north', [14, 10]), facade: 'linen', roof: { shape: 'flat', colour: 'slate' }, storeys: 2 },
+  { placeId: 'bookshop', ...onStreet(-42.5, 'north', [9, 8]), facade: 'lavender', roof: { shape: 'gable', colour: 'plum' }, storeys: 2, windowBoxes: true },
+  { placeId: 'home', ...onStreet(-9, 'north', [10, 9]), facade: 'sky', roof: { shape: 'gable', colour: 'terracotta' }, storeys: 3, windowBoxes: true },
+  { placeId: 'convenience-store', ...onStreet(1, 'north', [8, 8]), facade: 'mint', roof: { shape: 'flat', colour: 'denim' }, storeys: 1 },
+  { placeId: 'cafe', ...onStreet(14, 'north', [12, 9]), facade: 'peach', roof: { shape: 'gable', colour: 'brick' }, storeys: 2, awnings: 'teal', windowBoxes: true },
+  { placeId: 'supermarket', ...onStreet(36, 'north', [16, 11]), facade: 'butter', roof: { shape: 'flat', colour: 'terracotta' }, storeys: 1, awnings: 'mustard' },
+  { placeId: 'restaurant', ...onStreet(53, 'north', [12, 9]), facade: 'blush', roof: { shape: 'gable', colour: 'brick' }, storeys: 2, awnings: 'red', windowBoxes: true },
+  { placeId: 'clinic', ...onStreet(-40, 'south', [18, 11]), facade: 'white', roof: { shape: 'flat', colour: 'sky' }, storeys: 2 },
+  { placeId: 'bathhouse', ...onStreet(36, 'south', [14, 10]), facade: 'sky', roof: { shape: 'gable', colour: 'denim' }, storeys: 1 },
 ];
 
 /** The building a place is in, if it has one. */
@@ -64,75 +90,96 @@ const bookshop = inside('bookshop');
 const bathhouse = inside('bathhouse');
 const townOffice = inside('town-office');
 
-export const STREET = { z: 7, width: 5 } as const;
-export const GROUND_HALF_SIZE = 60;
+/** The ground the town stands on: x from west to east, z from north to south. Past it, only the backdrop. */
+export const GROUND = { x: [-320, 320], z: [-320, 320] } as const;
+/** Where the Character can walk: from the back gardens' fence in the north to the canal's railing in the south, and between the ends of town. */
+export const TOWN_BOUNDS = { x: [-96, 96], z: [-16, 39.6] } as const;
 
-/** The park: open grass on the south side of the street, with no walls or door. */
-export const PARK = { centre: [0, 18] as Vec2, size: [22, 13] as Vec2 } as const;
+/** The park: open grass on the south side of the street, with no walls or door, running down to the canal. */
+export const PARK = { centre: [0, 26] as Vec2, size: [28, 21] as Vec2 } as const;
 
-/** A point in the park, from its centre. */
+/** A point in the park, from its centre: its way in, from the street, is at -z. */
 export const inPark = ([x, y, z]: Vec3): Vec3 => [PARK.centre[0] + x, y, PARK.centre[1] + z];
 const onPark = ([x, z]: Vec2): Vec2 => [PARK.centre[0] + x, PARK.centre[1] + z];
 
-/** Bushes and flowers around the park's edges and by its benches, clear of the way in from the street. */
-export const PARK_PLANTING: readonly { at: Vec2; piece: TownPiece }[] = (
-  [
-    { at: [-10.2, -3], piece: 'bush' },
-    { at: [-10.2, 1.5], piece: 'bush' },
-    { at: [10.2, -1.5], piece: 'bush' },
-    { at: [10.2, 2.5], piece: 'bush' },
-    { at: [-4.5, 6], piece: 'bush' },
-    { at: [0.5, 6], piece: 'bush' },
-    { at: [6, 6], piece: 'bush' },
-    { at: [-4.6, 0.3], piece: 'flowers-red' },
-    { at: [-7.4, 0.3], piece: 'flowers-yellow' },
-    { at: [1.6, 5.3], piece: 'flowers-purple' },
-    { at: [4.4, 5.3], piece: 'flowers-red' },
-    { at: [-9.6, -0.8], piece: 'flowers-purple' },
-    { at: [9.6, 0.5], piece: 'flowers-yellow' },
-  ] as const
-).map(({ at, piece }) => ({ at: onPark(at), piece }));
+/** The park's gravel paths, as centre and size: one from the way in down to the canal, one across past the bandstand. */
+export const PARK_PATHS: readonly { centre: Vec2; size: Vec2 }[] = [
+  { centre: onPark([0, 0]), size: [2.2, PARK.size[1]] },
+  { centre: onPark([0, -5]), size: [PARK.size[0] - 2, 2] },
+];
 
-/** Street lights, as where each pole stands: along the pavement either side of the street, clear of doors and stops. */
+/** The bandstand, east of the path in, its steps facing the way in; and the pond, west of the path, with lilies on it. */
+export const BANDSTAND: Vec2 = onPark([7, -0.5]);
+export const POND = { centre: onPark([-6, 4.5]), radius: 2.6 } as const;
+
+/** Hedges, bushes and flowers around the park's edges and by its benches, clear of the way in and the paths. */
+export const PARK_PLANTING: readonly { at: Vec2; piece: TownPiece; rotation?: number }[] = (
+  [
+    // Hedges along the street, either side of the way in.
+    ...[-12.5, -10.5, -8.5, -6.5].map((x) => ({ at: [x, -10] as const, piece: 'hedge' as const })),
+    ...[3.5, 5.5, 7.5, 9.5, 11.5].map((x) => ({ at: [x, -10] as const, piece: 'hedge' as const })),
+    { at: [-13.2, -6.5], piece: 'bush' },
+    { at: [-13.2, 1.5], piece: 'bush-large' },
+    { at: [13.2, -2.5], piece: 'bush' },
+    { at: [13.2, 4.5], piece: 'bush-large' },
+    { at: [-4.5, 9.5], piece: 'bush' },
+    { at: [4.5, 9.5], piece: 'bush' },
+    { at: [9.5, 9.5], piece: 'bush-large' },
+    { at: [-8.5, -2.8], piece: 'flowers-red' },
+    { at: [-5.5, -2.8], piece: 'flowers-yellow' },
+    { at: [1.8, 7.3], piece: 'flowers-purple' },
+    { at: [5.8, 6.8], piece: 'flowers-red' },
+    { at: [-12.6, -3.6], piece: 'flowers-purple' },
+    { at: [12.6, 1.5], piece: 'flowers-yellow' },
+    { at: [-2.2, -8.5], piece: 'flowers-red' },
+    { at: [2.2, -8.5], piece: 'flowers-yellow' },
+    { at: [-9.3, 3.2], piece: 'rock' },
+    { at: [-3.4, 6.4], piece: 'grass-tuft' },
+    { at: [-8.6, 6.6], piece: 'grass-tuft' },
+  ] as const
+).map(({ at, piece }, i) => ({ at: onPark(at), piece, rotation: piece === 'hedge' ? 0 : i * 1.3 }));
+
+/** Street lights, as where each pole stands: along the pavement either side of the street, clear of doors, terraces and the ways onto the platforms. */
 export const STREET_LIGHTS: readonly Vec2[] = [
-  ...[-50.5, -37, -20, 6, 19.5, 34.5, 50.5].map((x): Vec2 => [x, STREET.z - STREET.width / 2 - 0.5]),
-  ...[-40, -15, 14, 34, 48].map((x): Vec2 => [x, STREET.z + STREET.width / 2 + 0.5]),
+  ...[-80, -64, -49, -34, -19, 6, 22, 45, 62, 78].map((x): Vec2 => [x, NORTH_FRONT + STREET.pavement - 0.5]),
+  ...[-85, -70, -54, -33, -22, -12, 12, 24, 46, 60, 75].map((x): Vec2 => [x, SOUTH_FRONT - STREET.pavement + 0.5]),
 ];
 
 /**
- * Each tram stop: an island platform in the middle of the street, with a pole at its centre. Passers-by name the stop
- * nearest each building (`STOP_PLACES`), so moving a stop or a building means checking that list still holds.
+ * Each tram stop: an island platform between the tracks, with a pole at its centre. Passers-by name the stop nearest
+ * each building (`STOP_PLACES`), so moving a stop or a building means checking that list still holds
+ * (`tooling/stopPlaces.test.ts` checks it).
  */
 export const TRAM_STOPS: Record<TramStopId, { centre: Vec2 }> = {
-  'west-stop': { centre: [-30, STREET.z] },
-  'central-stop': { centre: [-4, STREET.z] },
-  'east-stop': { centre: [35, STREET.z] },
+  'west-stop': { centre: [-45, STREET.z] },
+  'central-stop': { centre: [-2, STREET.z] },
+  'east-stop': { centre: [44, STREET.z] },
 };
-export const PLATFORM = { size: [8, 1.6] as Vec2, height: 0.12 } as const;
+export const PLATFORM = { size: [10, 2.2] as Vec2, height: 0.15 } as const;
 
 /** Where each person in town stands. Staff stand behind their counter, facing the door. */
 export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
   // In the hallway beside the front door, so the Character passes within talking range on the way out
   // (and the landlord can catch them), but not from where a new game starts.
-  landlord: home.at([-1.4, 1, 2.7]),
-  barista: cafe.at([0, 1, -3.1]),
-  cashier: supermarket.at([-3, 1, 0.8]),
-  'convenience-clerk': convenienceStore.at([0, 1, -2.7]),
-  server: restaurant.at([1.5, 1, 1.5]),
-  receptionist: clinic.at([4, 1, 1.4]),
-  pharmacist: clinic.at([-5, 1, 1.4]),
-  doctor: clinic.at([5, 1, -3.2]),
-  nurse: clinic.at([-3, 1, -3.2]),
-  'park-regular-1': inPark([-6, 1, -2]),
-  'park-regular-2': inPark([3, 1, 3]),
-  'park-regular-3': inPark([8, 1, -3.5]),
+  landlord: home.at([-1.6, 1, 3.4]),
+  barista: cafe.at([0, 1, -3.4]),
+  cashier: supermarket.at([-4, 1, 1.6]),
+  'convenience-clerk': convenienceStore.at([0, 1, -3]),
+  server: restaurant.at([1.8, 1, 2]),
+  receptionist: clinic.at([4.5, 1, 1.7]),
+  pharmacist: clinic.at([-5.5, 1, 1.7]),
+  doctor: clinic.at([5.5, 1, -3.8]),
+  nurse: clinic.at([-3.5, 1, -3.7]),
+  'park-regular-1': inPark([-7, 1, -3]),
+  'park-regular-2': inPark([4, 1, 4]),
+  'park-regular-3': inPark([10.5, 1, -4.6]),
   // At the east end of the platform each waits at, clear of the pole.
-  'passer-by-1': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-1']].centre[0] + 3.2, 1, STREET.z],
-  'passer-by-2': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-2']].centre[0] + 3.2, 1, STREET.z],
-  'passer-by-3': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-3']].centre[0] + 3.2, 1, STREET.z],
-  shopkeeper: bookshop.at([0, 1, -2.6]),
-  attendant: bathhouse.at([0, 1, 0.9]),
-  'office-clerk': townOffice.at([0, 1, -2.7]),
+  'passer-by-1': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-1']].centre[0] + 3.8, 1, STREET.z],
+  'passer-by-2': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-2']].centre[0] + 3.8, 1, STREET.z],
+  'passer-by-3': [TRAM_STOPS[PASSER_BY_STOPS['passer-by-3']].centre[0] + 3.8, 1, STREET.z],
+  shopkeeper: bookshop.at([0, 1, -2.9]),
+  attendant: bathhouse.at([0, 1, 1.1]),
+  'office-clerk': townOffice.at([0, 1, -3]),
 };
 
 /** Passers-by wait on the platforms only while the trams run. */
@@ -143,98 +190,213 @@ export const isWaitingForTram = (npcId: TownNpcId) => TOWN_NPCS[npcId].role === 
  * The vegetables and eggs face the door; the noodles are down the aisle between the shelves.
  */
 export const SHELF_SPOTS: Record<GroceryId, Vec3> = {
-  vegetables: supermarket.at([0, 1, 1.45]),
-  eggs: supermarket.at([3.5, 1, 1.45]),
-  noodles: supermarket.at([2, 1, -1.05]),
+  vegetables: supermarket.at([0, 1, 1.6]),
+  eggs: supermarket.at([3.5, 1, 1.6]),
+  noodles: supermarket.at([2, 1, -1.0]),
 };
 
-/** Park trees: trunk positions on the ground. */
+/** Park trees: trunk positions on the ground, around the edges and by the paths. */
 export const TREES: readonly Vec2[] = (
   [
-    [-9, -5],
-    [-2, 4],
-    [6, 0],
-    [9, 5],
-    [-8, 4],
+    [-11, -7.5],
+    [-11.5, 4],
+    [-3.5, 9],
+    [11.5, 8],
+    [12, -7],
+    [-12, 9],
+    [3, 9.5],
+    [-9.6, 0.6],
   ] as const
 ).map(onPark);
 
 /** The tap at home, against the back wall straight ahead of the spawn point. */
-export const HOME_TAP: Vec3 = home.at([0, 0.5, -2.85]);
-export const HOME_BED: Vec3 = home.at([-2.4, 0.25, -1.4]);
+export const HOME_TAP: Vec3 = home.at([0, 0.5, -3.85]);
+export const HOME_BED: Vec3 = home.at([-3.9, 0.25, -3]);
 /** The stove at home, along the back wall to the right of the tap. */
-export const HOME_STOVE: Vec3 = home.at([2.4, 0.5, -2.85]);
+export const HOME_STOVE: Vec3 = home.at([2.4, 0.5, -3.85]);
 
-/** The gym at the bathhouse: a running machine against the west wall beside the door, out of talking range of the attendant. */
-export const BATHHOUSE_GYM: Vec3 = bathhouse.at([3.5, 0.5, 2.5]);
+/** The gym at the bathhouse: a running machine by the side wall beside the door, out of talking range of the attendant. */
+export const BATHHOUSE_GYM: Vec3 = bathhouse.at([5.5, 0.5, 2.2]);
 
 /** The Fainting ward's bed, at the back of the clinic, within talking range of the nurse. */
-export const WARD_BED: Vec3 = clinic.at([-4.8, 0.25, -3.4]);
+export const WARD_BED: Vec3 = clinic.at([-5.5, 0.25, -3.9]);
+
+type Furniture = { position: Vec3; size: Vec3; piece: TownPiece; rotation?: number; height?: number; repaint?: Repaint };
+
+/** Something solid that's drawn as something else, or not at all: a table among its chairs, the bandstand, the pond. */
+type SolidBox = { position: Vec3; size: Vec3 };
+
+/** A round table for two or four, with its chairs round it, their cushions in `colour`: table and chairs solid together, as one box. */
+function tableFor(at: ReturnType<typeof inside>, [x, z]: Vec2, seats: 2 | 4, colour: PaletteColour): { solid: SolidBox; decor: Decor[] } {
+  const sides: Vec2[] = seats === 2 ? [[-0.95, 0], [0.95, 0]] : [[-0.95, 0], [0.95, 0], [0, -0.95], [0, 0.95]];
+  return {
+    solid: { position: at.at([x, 0.4, z]), size: seats === 2 ? [2.4, 0.8, 1.1] : [2.4, 0.8, 2.4] },
+    decor: [
+      { position: at.at([x, 0, z]), piece: 'table-round', rotation: at.turn(), size: [1.1, 0.8, 1.1] },
+      ...sides.map(([dx, dz]) => ({ position: at.at([x + dx, 0, z + dz]), piece: 'chair' as const, rotation: at.turn(Math.atan2(-dx, -dz)), repaint: { red: colour } })),
+    ],
+  };
+}
+
+const cafeTables = [tableFor(cafe, [-3.9, 2], 2, 'teal'), tableFor(cafe, [3.9, 2], 2, 'teal'), tableFor(cafe, [4.3, -0.4], 2, 'teal')];
+const restaurantTables = [tableFor(restaurant, [-3, -2.6], 4, 'brick'), tableFor(restaurant, [1, -2.6], 4, 'brick'), tableFor(restaurant, [4.3, 0.4], 2, 'brick')];
 
 /**
  * The furniture: solid to the Character, as centre and size, each drawn by a kit piece turned by `rotation` (radians about
  * y; 0 faces +z). A piece fills its box, repeated along the box's length if it's long, unless `height` keeps the piece taller
- * than what's solid (a bed's headboard, a bench's back).
+ * than what's solid (a bed's headboard, a bench's back), or shorter (a table among its chairs).
  */
-export const FURNITURE: readonly { position: Vec3; size: Vec3; piece: TownPiece; rotation?: number; height?: number }[] = [
-  // Café counter.
-  { position: cafe.at([0, 0.55, -2]), size: [4, 1.1, 0.8], piece: 'counter', rotation: cafe.turn() },
-  // Convenience store counter and shelves.
-  { position: convenienceStore.at([0, 0.55, -1.7]), size: [3, 1.1, 0.7], piece: 'counter', rotation: convenienceStore.turn() },
-  { position: convenienceStore.at([-2.3, 0.8, 1.5]), size: [0.6, 1.6, 2.4], piece: 'shelf', rotation: convenienceStore.turn(Math.PI / 2) },
-  // Supermarket checkout and aisles.
-  { position: supermarket.at([-3, 0.55, 1.9]), size: [2.4, 1.1, 0.8], piece: 'counter', rotation: supermarket.turn() },
-  { position: supermarket.at([2, 0.8, -1.5]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
-  { position: supermarket.at([2, 0.8, 1]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
-  // Restaurant tables.
-  { position: restaurant.at([-2.5, 0.4, -2]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
-  { position: restaurant.at([2.5, 0.4, -2]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
-  // The server's table on a Shift, west of the door and clear of the way from the door to the staff door.
-  { position: restaurant.at([-2.5, 0.4, 0.7]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
-  // Clinic reception and pharmacy counters, and the waiting room bench.
-  { position: clinic.at([4, 0.55, 2.5]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
-  { position: clinic.at([-5, 0.55, 2.5]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
-  { position: clinic.at([0, 0.25, -1]), size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: clinic.turn(), height: 1 },
-  // Bookshop counter and shelves.
-  { position: bookshop.at([0, 0.55, -1.5]), size: [2.6, 1.1, 0.7], piece: 'counter', rotation: bookshop.turn() },
-  { position: bookshop.at([-3, 1, 0.5]), size: [0.6, 2, 3], piece: 'bookcase', rotation: bookshop.turn(Math.PI / 2) },
-  { position: bookshop.at([3, 1, 0.5]), size: [0.6, 2, 3], piece: 'bookcase', rotation: bookshop.turn(-Math.PI / 2) },
-  // Bathhouse front desk.
-  { position: bathhouse.at([0, 0.55, 2]), size: [3, 1.1, 0.8], piece: 'counter', rotation: bathhouse.turn() },
-  // Town office counter.
-  { position: townOffice.at([0, 0.55, -1.5]), size: [5, 1.1, 0.8], piece: 'counter', rotation: townOffice.turn() },
+export const FURNITURE: readonly Furniture[] = [
+  // Café: the counter, with the back counter and its coffee machine behind it, and tables in the window.
+  { position: cafe.at([0, 0.55, -2.3]), size: [4.4, 1.1, 0.8], piece: 'counter', rotation: cafe.turn() },
+  { position: cafe.at([-2.6, 0.55, -3.85]), size: [2.4, 1.1, 0.6], piece: 'counter', rotation: cafe.turn() },
+  // Convenience store: the counter, shelves down both sides and a drinks fridge at the back.
+  { position: convenienceStore.at([0, 0.55, -2]), size: [3, 1.1, 0.7], piece: 'counter', rotation: convenienceStore.turn() },
+  { position: convenienceStore.at([-3.3, 0.8, 0.6]), size: [0.6, 1.6, 2.6], piece: 'shelf', rotation: convenienceStore.turn(Math.PI / 2) },
+  { position: convenienceStore.at([3.3, 0.8, 0.6]), size: [0.6, 1.6, 2.6], piece: 'shelf', rotation: convenienceStore.turn(-Math.PI / 2) },
+  { position: convenienceStore.at([-2.6, 1.05, -3.2]), size: [1.2, 2.1, 0.9], piece: 'fridge-tall', rotation: convenienceStore.turn() },
+  { position: convenienceStore.at([2.7, 0.45, -3.3]), size: [1.6, 0.9, 0.6], piece: 'bookcase-low', rotation: convenienceStore.turn() },
+  // Supermarket: the checkout, two aisles of shelves, a shelf along the side wall and chiller cabinets along the back.
+  { position: supermarket.at([-4, 0.55, 2.6]), size: [2.4, 1.1, 0.8], piece: 'counter', rotation: supermarket.turn() },
+  { position: supermarket.at([2, 0.8, -1.4]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
+  { position: supermarket.at([2, 0.8, 1.2]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
+  { position: supermarket.at([-7.3, 0.8, -2]), size: [0.6, 1.6, 3.6], piece: 'shelf', rotation: supermarket.turn(Math.PI / 2) },
+  { position: supermarket.at([2.6, 1.05, -4.7]), size: [6, 2.1, 0.9], piece: 'fridge-tall', rotation: supermarket.turn() },
+  // Restaurant: tables, and the server's table on a Shift, west of the door and clear of the way from the door to the staff door.
+  { position: restaurant.at([-3, 0.4, 1]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
+  // Clinic: reception and pharmacy counters, the pharmacy's shelves, the waiting room bench and the doctor's desk.
+  { position: clinic.at([4.5, 0.55, 2.8]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
+  { position: clinic.at([-5.5, 0.55, 2.8]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
+  { position: clinic.at([-8.3, 0.8, 1.6]), size: [0.6, 1.6, 2.4], piece: 'shelf', rotation: clinic.turn(Math.PI / 2) },
+  { position: clinic.at([0, 0.25, -0.5]), size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: clinic.turn(), height: 1 },
+  { position: clinic.at([5.5, 0.44, -4.65]), size: [1.7, 0.88, 0.8], piece: 'desk', rotation: clinic.turn(Math.PI) },
+  { position: clinic.at([-7.8, 0.25, -3.9]), size: [1.4, 0.5, 2.2], piece: 'bed', rotation: clinic.turn(Math.PI), height: 0.9 },
+  // Bookshop: the counter, bookcases down both sides and either side of the counter.
+  { position: bookshop.at([0, 0.55, -2]), size: [2.6, 1.1, 0.7], piece: 'counter', rotation: bookshop.turn() },
+  { position: bookshop.at([-3.9, 1, 0.3]), size: [0.6, 2, 3.6], piece: 'bookcase', rotation: bookshop.turn(Math.PI / 2) },
+  { position: bookshop.at([3.9, 1, 0.3]), size: [0.6, 2, 3.6], piece: 'bookcase', rotation: bookshop.turn(-Math.PI / 2) },
+  { position: bookshop.at([-2.8, 1, -3.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: bookshop.turn() },
+  { position: bookshop.at([2.8, 1, -3.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: bookshop.turn() },
+  // Bathhouse: the front desk, the two baths, a bench between them, the showers and the lockers.
+  { position: bathhouse.at([0, 0.55, 2.2]), size: [3, 1.1, 0.8], piece: 'counter', rotation: bathhouse.turn() },
+  { position: bathhouse.at([-3.2, 0.5, -2.8]), size: [3.5, 1, 2.85], piece: 'bath', rotation: bathhouse.turn() },
+  { position: bathhouse.at([3.2, 0.5, -2.8]), size: [3.5, 1, 2.85], piece: 'bath', rotation: bathhouse.turn() },
+  { position: bathhouse.at([0, 0.25, -0.2]), size: [2, 0.5, 0.6], piece: 'bench', rotation: bathhouse.turn(), height: 1 },
+  { position: bathhouse.at([-6, 1.25, 0.1]), size: [1.3, 2.5, 2.7], piece: 'shower', rotation: bathhouse.turn(Math.PI / 2) },
+  { position: bathhouse.at([6.3, 1, -0.6]), size: [0.6, 2, 2], piece: 'bookcase', rotation: bathhouse.turn(-Math.PI / 2), repaint: { wood: 'sky' } },
+  // Town office: the counter, the clerks' desks and the filing behind it, and a bench to wait on.
+  { position: townOffice.at([0, 0.55, -2]), size: [5, 1.1, 0.8], piece: 'counter', rotation: townOffice.turn() },
+  { position: townOffice.at([-4.5, 0.44, -3.9]), size: [1.7, 0.88, 0.9], piece: 'desk', rotation: townOffice.turn() },
+  { position: townOffice.at([4.5, 0.44, -3.9]), size: [1.7, 0.88, 0.9], piece: 'desk', rotation: townOffice.turn() },
+  { position: townOffice.at([-2, 1, -4.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: townOffice.turn() },
+  { position: townOffice.at([2, 1, -4.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: townOffice.turn() },
+  { position: townOffice.at([-6.1, 0.25, 1]), size: [0.7, 0.5, 3], piece: 'cushioned-bench', rotation: townOffice.turn(Math.PI / 2), height: 1 },
   // Park benches, facing the park regulars who sit by them.
-  { position: inPark([-6, 0.25, -0.6]), size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
-  { position: inPark([3, 0.25, 4.4]), size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
-  // Home: the tap and the stove against the back wall, and the bed.
+  { position: inPark([-7, 0.25, -1.6]), size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
+  { position: inPark([4, 0.25, 5.4]), size: [2, 0.5, 0.6], piece: 'bench', rotation: Math.PI, height: 1 },
+  { position: inPark([-1.9, 0.25, 6]), size: [0.6, 0.5, 2], piece: 'bench', rotation: Math.PI / 2, height: 1 },
+  // Home: the sink with its tap, the worktop and the stove along the back wall, the fridge, the bed, the table and the sofa.
   { position: HOME_TAP, size: [1.2, 1, 0.6], piece: 'sink', rotation: home.turn() },
+  { position: home.at([1.2, 0.5, -3.85]), size: [1.2, 1, 0.6], piece: 'counter', rotation: home.turn() },
   { position: HOME_STOVE, size: [1.2, 1, 0.6], piece: 'stove', rotation: home.turn() },
+  { position: home.at([4, 1.05, -3.7]), size: [1.2, 2.1, 0.9], piece: 'fridge-tall', rotation: home.turn() },
   { position: HOME_BED, size: [1.4, 0.5, 2.2], piece: 'bed', rotation: home.turn(), height: 0.9 },
+  { position: home.at([-3.4, 0.375, 0.8]), size: [0.8, 0.75, 1.2], piece: 'table-plain', rotation: home.turn(Math.PI / 2) },
+  { position: home.at([3.9, 0.45, 1.4]), size: [0.94, 0.9, 2.2], piece: 'sofa', rotation: home.turn(-Math.PI / 2), height: 1.06, repaint: { red: 'denim' } },
+  { position: home.at([4.3, 0.45, -1.4]), size: [0.57, 0.9, 1.6], piece: 'bookcase-low', rotation: home.turn(-Math.PI / 2) },
   // The clinic's ward bed and the bathhouse's running machine.
   { position: WARD_BED, size: [1.4, 0.5, 2.2], piece: 'bed', rotation: clinic.turn(Math.PI), height: 0.9 },
   { position: BATHHOUSE_GYM, size: [1, 1, 2], piece: 'treadmill', rotation: bathhouse.turn(Math.PI), height: 1.4 },
 ];
 
-/** Set dressing nobody bumps into: rugs, plants and fridges, as where each stands, its piece, and how it's turned. */
-export const DECOR: readonly { position: Vec3; piece: TownPiece; rotation?: number }[] = [
-  { position: home.at([0, 0.02, -0.4]), piece: 'rug', rotation: home.turn() },
-  { position: home.at([3.4, 0, -2.8]), piece: 'plant', rotation: home.turn() },
-  { position: cafe.at([-2.6, 0, -3.4]), piece: 'fridge', rotation: cafe.turn() },
-  { position: cafe.at([-4.2, 0, 3.2]), piece: 'plant', rotation: cafe.turn() },
-  { position: cafe.at([4.2, 0, 3.2]), piece: 'plant', rotation: cafe.turn() },
-  { position: restaurant.at([4.2, 0, 3.2]), piece: 'plant', rotation: restaurant.turn() },
-  // Out on the pavement, west of the bookshop.
-  { position: bookshop.at([-6.6, 0, 2.7]), piece: 'plant', rotation: bookshop.turn() },
-  { position: townOffice.at([-5.2, 0, 3.2]), piece: 'plant', rotation: townOffice.turn() },
+type Decor = { position: Vec3; piece: TownPiece; rotation?: number; size?: Size; repaint?: Repaint };
+
+/** Set dressing nobody bumps into: rugs, plants, lamps, chairs and what stands on the furniture, as where each stands, its piece, and how it's turned. */
+export const DECOR: readonly Decor[] = [
+  // Home.
+  { position: home.at([0, 0.02, -1.2]), piece: 'rug', rotation: home.turn() },
+  { position: home.at([2.6, 0.02, 1.4]), piece: 'rug-round', rotation: home.turn(), repaint: { red: 'mustard', brick: 'wood' } },
+  { position: home.at([2.6, 0, 1.4]), piece: 'coffee-table', rotation: home.turn(Math.PI / 2), size: [0.9, 0.45, 1.3] },
+  { position: home.at([4.3, 0, 3.7]), piece: 'floor-lamp', rotation: home.turn() },
+  { position: home.at([-4.3, 0, 3.7]), piece: 'plant', rotation: home.turn() },
+  { position: home.at([-2.6, 0, 0.8]), piece: 'chair', rotation: home.turn(-Math.PI / 2), repaint: { red: 'sky' } },
+  { position: home.at([-4.2, 0, 0.8]), piece: 'chair', rotation: home.turn(Math.PI / 2), repaint: { red: 'sky' } },
+  { position: home.at([-3.4, 0.75, 0.8]), piece: 'table-lamp', rotation: home.turn() },
+  { position: home.at([1.2, 1.5, -4.0]), piece: 'wall-cabinet', rotation: home.turn() },
+  { position: home.at([4.3, 0.9, -1.4]), piece: 'books', rotation: home.turn(-Math.PI / 2) },
+  { position: home.at([3.5, 0, 3.8]), piece: 'coat-rack', rotation: home.turn() },
+  // Café.
+  ...cafeTables.flatMap(({ decor }) => decor),
+  { position: cafe.at([-4.8, 0, -3.6]), piece: 'fridge', rotation: cafe.turn() },
+  { position: cafe.at([-2.2, 1.1, -3.85]), piece: 'coffee-machine', rotation: cafe.turn() },
+  { position: cafe.at([-3.2, 1.1, -3.85]), piece: 'coffee-machine', rotation: cafe.turn() },
+  { position: cafe.at([-2.6, 1.55, -4.0]), piece: 'wall-cabinet', rotation: cafe.turn() },
+  { position: cafe.at([-5.2, 0, 3.7]), piece: 'plant', rotation: cafe.turn() },
+  { position: cafe.at([5.2, 0, 3.7]), piece: 'plant', rotation: cafe.turn() },
+  { position: cafe.at([5.2, 0, -3.7]), piece: 'pot-plant', rotation: cafe.turn() },
+  { position: cafe.at([-3.9, 0.8, 2]), piece: 'plant-small', rotation: cafe.turn() },
+  { position: cafe.at([3.9, 0.8, 2]), piece: 'plant-small', rotation: cafe.turn() },
+  // Convenience store.
+  { position: convenienceStore.at([2.9, 0, 3.3]), piece: 'boxes', rotation: convenienceStore.turn(0.3) },
+  { position: convenienceStore.at([2.4, 0, 3.4]), piece: 'boxes', rotation: convenienceStore.turn(-0.4) },
+  { position: convenienceStore.at([-2.9, 0, 3.3]), piece: 'bin', rotation: convenienceStore.turn() },
+  // Supermarket.
+  { position: supermarket.at([-1.6, 0, 4.4]), piece: 'boxes', rotation: supermarket.turn(0.2) },
+  { position: supermarket.at([-2.1, 0, 4.6]), piece: 'boxes', rotation: supermarket.turn(-0.3) },
+  { position: supermarket.at([-7.1, 0, -4.6]), piece: 'boxes', rotation: supermarket.turn() },
+  { position: supermarket.at([7.2, 0, -1.5]), piece: 'pot-plant', rotation: supermarket.turn() },
+  { position: supermarket.at([-5.3, 1.1, 2.6]), piece: 'computer', rotation: supermarket.turn(Math.PI), size: [0.6, 0.45, 0.35] },
+  // Restaurant.
+  ...restaurantTables.flatMap(({ decor }) => decor),
+  { position: restaurant.at([5.2, 0, 3.7]), piece: 'plant', rotation: restaurant.turn() },
+  { position: restaurant.at([-5.2, 0, -3.7]), piece: 'pot-plant', rotation: restaurant.turn() },
+  { position: restaurant.at([5.2, 0, -3.7]), piece: 'floor-lamp', rotation: restaurant.turn() },
+  { position: restaurant.at([-3, 0.8, 1]), piece: 'table-lamp', rotation: restaurant.turn() },
+  // Clinic.
   { position: clinic.at([7.4, 0, -3.8]), piece: 'plant', rotation: clinic.turn() },
-  { position: clinic.at([-7.2, 0, 4.4]), piece: 'plant', rotation: clinic.turn() },
+  { position: clinic.at([-8.1, 0, 4.4]), piece: 'plant', rotation: clinic.turn() },
+  { position: clinic.at([8.1, 0, 4.4]), piece: 'plant', rotation: clinic.turn() },
+  { position: clinic.at([3.6, 1.1, 2.8]), piece: 'computer', rotation: clinic.turn(Math.PI), size: [0.6, 0.45, 0.35] },
+  { position: clinic.at([5.5, 0.88, -4.65]), piece: 'computer', rotation: clinic.turn(), size: [0.6, 0.45, 0.35] },
+  { position: clinic.at([-2.2, 0, -0.5]), piece: 'chair', rotation: clinic.turn(), repaint: { red: 'sky' } },
+  { position: clinic.at([2.2, 0, -0.5]), piece: 'chair', rotation: clinic.turn(), repaint: { red: 'sky' } },
+  { position: clinic.at([-6.6, 0, -2.6]), piece: 'side-table', rotation: clinic.turn(Math.PI), size: [0.6, 0.6, 0.45] },
+  { position: clinic.at([0, 0.02, 1.4]), piece: 'rug', rotation: clinic.turn(), repaint: { red: 'sky' } },
+  // Bookshop.
+  { position: bookshop.at([0, 0.02, 0.6]), piece: 'rug-round', rotation: bookshop.turn(), repaint: { red: 'plum', brick: 'lavender' } },
+  { position: bookshop.at([-2.7, 0, 2.6]), piece: 'armchair', rotation: bookshop.turn(Math.PI / 2 + 0.4), repaint: { red: 'plum' } },
+  { position: bookshop.at([-3.5, 0, 3.4]), piece: 'floor-lamp', rotation: bookshop.turn() },
+  { position: bookshop.at([3.3, 0, 3.3]), piece: 'plant', rotation: bookshop.turn() },
+  { position: bookshop.at([-2.8, 2, -3.4]), piece: 'books', rotation: bookshop.turn() },
+  { position: bookshop.at([2.8, 2, -3.4]), piece: 'books', rotation: bookshop.turn(0.3) },
+  // Bathhouse.
+  { position: bathhouse.at([-6, 0, -4.2]), piece: 'plant', rotation: bathhouse.turn() },
+  { position: bathhouse.at([6.2, 0, -4.2]), piece: 'pot-plant', rotation: bathhouse.turn() },
+  { position: bathhouse.at([-6.45, 1, -2.2]), piece: 'mirror', rotation: bathhouse.turn(Math.PI / 2) },
+  { position: bathhouse.at([0, 0.02, 3.4]), piece: 'rug', rotation: bathhouse.turn(), repaint: { red: 'denim' } },
+  // Town office.
+  { position: townOffice.at([-4.5, 0.88, -3.9]), piece: 'computer', rotation: townOffice.turn(), size: [0.6, 0.45, 0.35] },
+  { position: townOffice.at([4.5, 0.88, -3.9]), piece: 'computer', rotation: townOffice.turn(), size: [0.6, 0.45, 0.35] },
+  { position: townOffice.at([-4.5, 0, -3]), piece: 'chair', rotation: townOffice.turn(Math.PI), repaint: { red: 'slate' } },
+  { position: townOffice.at([4.5, 0, -3]), piece: 'chair', rotation: townOffice.turn(Math.PI), repaint: { red: 'slate' } },
+  { position: townOffice.at([-6.2, 0, 4.2]), piece: 'plant', rotation: townOffice.turn() },
+  { position: townOffice.at([6.2, 0, 4.2]), piece: 'coat-rack', rotation: townOffice.turn() },
+  { position: townOffice.at([6.2, 0, -4.2]), piece: 'pot-plant', rotation: townOffice.turn() },
+  { position: townOffice.at([0, 0.02, 2]), piece: 'rug', rotation: townOffice.turn(), repaint: { red: 'slate' } },
+];
+
+/** What's solid but drawn otherwise: the tables among their chairs, the bandstand and the pond. */
+export const SOLIDS: readonly SolidBox[] = [
+  ...[...cafeTables, ...restaurantTables].map(({ solid }) => solid),
+  { position: [BANDSTAND[0], 1.5, BANDSTAND[1]], size: [4.4, 3, 4.4] },
+  { position: [POND.centre[0], 0.3, POND.centre[1]], size: [POND.radius * 1.7, 0.6, POND.radius * 1.7] },
 ];
 
 /**
- * Where each Job is worked: its staff door, set in its place's west wall (and where the Character stands to use it);
+ * Where each Job is worked: its staff door, set in its place's side wall (and where the Character stands to use it);
  * where the Character stands through a Shift, behind the counter beside its staff; and where a Shift Customer stands,
  * across the counter. The café's is level with its counter; the supermarket's, with the customers' side of its till.
- * At the restaurant the staff door is level with the front door; the Character stands at the table by the west wall,
+ * At the restaurant the staff door is level with the front door; the Character stands at the table by the side wall,
  * and the customer is seated across it, with the rest of their table (`otherSeats`) on either side.
  */
 export const WORKPLACES: Record<
@@ -242,26 +404,26 @@ export const WORKPLACES: Record<
   { door: Vec3; doorRotation: number; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3; otherSeats?: readonly Vec3[] }
 > = {
   barista: {
-    door: cafe.at([-4.78, 1.1, -1.2]),
+    door: cafe.at([-5.78, 1.1, -1]),
     doorRotation: cafe.turn(Math.PI / 2),
-    usedFrom: cafe.at([-4.3, 1, -1.2]),
-    behindTheCounter: cafe.at([1.4, 1, -3]),
-    customerSpot: cafe.at([1.4, 1, -0.8]),
+    usedFrom: cafe.at([-5.3, 1, -1]),
+    behindTheCounter: cafe.at([1.5, 1, -3.4]),
+    customerSpot: cafe.at([1.5, 1, -1.2]),
   },
   cashier: {
-    door: supermarket.at([-6.78, 1.1, 2.5]),
+    door: supermarket.at([-7.78, 1.1, 3.4]),
     doorRotation: supermarket.turn(Math.PI / 2),
-    usedFrom: supermarket.at([-6.3, 1, 2.5]),
-    behindTheCounter: supermarket.at([-2, 1, 0.9]),
-    customerSpot: supermarket.at([-2, 1, 3.1]),
+    usedFrom: supermarket.at([-7.3, 1, 3.4]),
+    behindTheCounter: supermarket.at([-3, 1, 1.6]),
+    customerSpot: supermarket.at([-3, 1, 3.8]),
   },
   server: {
-    door: restaurant.at([-4.78, 1.1, 2.5]),
+    door: restaurant.at([-5.78, 1.1, 3]),
     doorRotation: restaurant.turn(Math.PI / 2),
-    usedFrom: restaurant.at([-4.3, 1, 2.5]),
-    behindTheCounter: restaurant.at([-1, 1, 0.7]),
-    customerSpot: restaurant.at([-3.7, 1, 0.7]),
-    otherSeats: [restaurant.at([-2.5, 1, -0.35]), restaurant.at([-2.5, 1, 1.75])],
+    usedFrom: restaurant.at([-5.3, 1, 3]),
+    behindTheCounter: restaurant.at([-1.6, 1, 1]),
+    customerSpot: restaurant.at([-4.3, 1, 1]),
+    otherSeats: [restaurant.at([-3, 1, -0.05]), restaurant.at([-3, 1, 2.05])],
   },
 };
 
@@ -276,7 +438,7 @@ export function frontOf({ centre: [x, z], size: [width, depth], facing }: Buildi
   return { x, z: z + (facing * depth) / 2, width, facing, rotation: facing === 1 ? 0 : Math.PI };
 }
 
-/** Over a building's door, hung from the eaves in front of the roof. */
+/** Over a building's door, hung just in front of the wall above it. */
 function nameBoard(building: Building): SignSpot {
   const { x, z, facing, rotation } = frontOf(building);
   return { position: [x, 2.75, z + facing * 0.32], size: [3.4, 0.7], rotation, liftsInside: building.placeId };
@@ -295,6 +457,9 @@ function stopBoard(stopId: TramStopId): SignSpot {
   return { position: [x, 2.45, z + 0.17], size: [1.3, 0.4] };
 }
 
+/** On a building's back wall, inside, at eye height. */
+const onTheBackWall = (placeId: PlaceId, x: number): Vec3 => [x, 1.65, -building(placeId).size[1] / 2 + WALL.thickness + 0.02];
+
 /** Where each sign hangs. The park's name stands on two posts at its way in; each tram stop's hangs on its pole. */
 export const SIGNS: Record<SignId, SignSpot> = {
   'home-name': nameBoard(building('home')),
@@ -303,7 +468,7 @@ export const SIGNS: Record<SignId, SignSpot> = {
   'convenience-store-name': nameBoard(building('convenience-store')),
   'restaurant-name': nameBoard(building('restaurant')),
   'clinic-name': nameBoard(building('clinic')),
-  'park-name': { position: inPark([-3.2, 1.6, -PARK.size[1] / 2 + 0.1]), size: [2, 0.5] },
+  'park-name': { position: inPark([-3.6, 1.6, -PARK.size[1] / 2 + 0.1]), size: [2, 0.5] },
   'bookshop-name': nameBoard(building('bookshop')),
   'bathhouse-name': nameBoard(building('bathhouse')),
   'town-office-name': nameBoard(building('town-office')),
@@ -318,9 +483,9 @@ export const SIGNS: Record<SignId, SignSpot> = {
   'bathhouse-hours': hoursBoard(building('bathhouse')),
   'town-office-hours': hoursBoard(building('town-office')),
   // On the back wall behind the counter, to the barista's left.
-  'cafe-menu': { position: cafe.at([2.3, 1.65, -3.68]), size: [1.7, 1.5], rotation: cafe.turn() },
-  // On the back wall, between the two tables.
-  'restaurant-menu': { position: restaurant.at([0, 1.65, -3.68]), size: [1.7, 1.5], rotation: restaurant.turn() },
+  'cafe-menu': { position: cafe.at(onTheBackWall('cafe', 2.6)), size: [1.7, 1.5], rotation: cafe.turn() },
+  // On the back wall, between the two back tables.
+  'restaurant-menu': { position: restaurant.at(onTheBackWall('restaurant', -1)), size: [1.7, 1.5], rotation: restaurant.turn() },
 };
 
 /** The posts the park's name board stands on. */
@@ -345,7 +510,7 @@ function insideTheDoor({ centre: [x, z], size: [, depth], facing }: Building): V
  */
 export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
   ...(Object.fromEntries(BUILDINGS.map((building) => [building.placeId, insideTheDoor(building)])) as Record<PlaceId, Vec3>),
-  home: [-10, 1, 0.5],
+  home: home.at([0, 1, 0.5]),
   park: inPark([0, 1, -PARK.size[1] / 2 + 1.5]),
   'tram-stop': tramStopSpawn(TRAM_LINE[0]),
 };
@@ -361,7 +526,7 @@ export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
 export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
 
 /** In front of the doctor: where the Character goes when the doctor calls their name from the waiting room. */
-export const BEFORE_THE_DOCTOR: Vec3 = clinic.at([5, 1.5, -3.2 + 1.8]);
+export const BEFORE_THE_DOCTOR: Vec3 = clinic.at([5.5, 1.5, -3.8 + 1.8]);
 
 const within = (x: number, z: number, [cx, cz]: Vec2, [w, d]: Vec2) => Math.abs(x - cx) < w / 2 && Math.abs(z - cz) < d / 2;
 

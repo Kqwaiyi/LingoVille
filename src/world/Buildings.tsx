@@ -1,32 +1,46 @@
 import { useFrame } from '@react-three/fiber';
-import { useRef, useState } from 'react';
-import type { Group } from 'three';
-import { selectIsOpen, selectLampsOn, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
+import { useMemo, useState } from 'react';
+import { selectIsOpen, selectLampsOn, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
-import { laidAlong, Piece, Solid, usePieceSize, type Repaint } from './Kit.tsx';
-import { BUILDINGS, DECOR, FURNITURE, placeAt, WALL, type Building, type Vec2 } from './town.ts';
-import { KIT_FACADE, KIT_ROOF } from './townArt.ts';
+import { Instances, laidAlong, Piece, Solid, usePieceSize, usePieceSizes, type Placement, type Repaint } from './Kit.tsx';
+import { BUILDINGS, DECOR, FURNITURE, placeAt, SOLIDS, WALL, type Building, type Vec2, type Vec3 } from './town.ts';
+import { KIT_FACADE, KIT_ROOF, type ArtPiece } from './townArt.ts';
 
 /** How near the doorway the Character can be before a closing door would shut on them. */
 const DOORWAY_CLEARANCE = 1.5;
 /** Wall pieces are this long in the kit; a run of them is stretched a little to fit its wall. */
-const WALL_PIECE_LENGTH = 2;
+export const WALL_PIECE_LENGTH = 2;
 /** How far a roof reaches past the walls, and how steep a gable roof is (its height over the building's depth). */
-const ROOF = { overhang: 0.2, pitch: 0.28, gableEnd: 0.6 } as const;
+export const ROOF = { overhang: 0.2, pitch: 0.28, gableEnd: 0.6 } as const;
 /** How thick a building's floor is: just proud of the ground. */
 const FLOOR_THICKNESS = 0.015;
+/** The band between storeys, standing just proud of the wall. */
+const BAND = { height: 0.14, proud: 0.06 } as const;
+/** An awning over a window, its top just under the name board, and how far it may reach towards the door before it would. */
+const AWNING = { top: 2.35, height: 0.62, clearOfBoard: 2.75 } as const;
+/** A lamp either side of the front door, over head height. */
+const DOOR_LAMP = { out: 1.25, height: 2.0 } as const;
+
+/** Which pieces of a wall run are windows: none, the one in the middle, or every one. */
+export type Windows = 'none' | 'middle' | 'all';
+
+/** Where the middle piece of a run of wall pieces stands, along the run: the one that's a window. */
+export function middleOfRun(length: number) {
+  const { centres } = laidAlong(length, WALL_PIECE_LENGTH);
+  return centres[Math.floor(centres.length / 2)]!;
+}
 
 /**
- * A straight run of wall pieces, centred on `centre` and `length` long, turned by `rotation`. With `windows`, the piece
- * in the middle of the run is a window: clear while the place is open, and lit too once the lamps are on.
+ * A straight run of wall pieces, centred on `centre` and `length` long, turned by `rotation`. Its windows are clear
+ * while `open`, and lit too once the lamps are on.
  */
-function WallRun({ centre: [x, z], length, rotation = 0, windows = false, open = false, repaint }: { centre: Vec2; length: number; rotation?: number; windows?: boolean; open?: boolean; repaint: Repaint }) {
+function WallRun({ centre: [x, z], y = 0, length, rotation = 0, windows = 'none', open = false, repaint }: { centre: Vec2; y?: number; length: number; rotation?: number; windows?: Windows; open?: boolean; repaint: Repaint }) {
   const lampsOn = useGame(selectLampsOn);
   const { each, centres } = laidAlong(length, WALL_PIECE_LENGTH);
   return (
-    <group position={[x, 0, z]} rotation-y={rotation}>
+    <group position={[x, y, z]} rotation-y={rotation}>
       {centres.map((along, i) => {
-        const isWindow = windows && i === Math.floor(centres.length / 2);
+        const isWindow = windows === 'all' || (windows === 'middle' && i === Math.floor(centres.length / 2));
         return (
           <Piece
             key={i}
@@ -60,11 +74,11 @@ function Walls({ building }: { building: Building }) {
   return (
     <>
       <Piece piece="floor" position={[cx, 0, cz]} size={[w, FLOOR_THICKNESS, d]} />
-      <WallRun centre={[cx, back]} length={w} rotation={turn + Math.PI} repaint={repaint} />
+      <WallRun centre={[cx, back]} length={w} rotation={turn + Math.PI} windows="middle" open repaint={repaint} />
       <WallRun centre={[cx - w / 2 + t / 2, cz]} length={d - 2 * t} rotation={-Math.PI / 2} repaint={repaint} />
       <WallRun centre={[cx + w / 2 - t / 2, cz]} length={d - 2 * t} rotation={Math.PI / 2} repaint={repaint} />
-      <WallRun centre={[cx - w / 2 + run / 2, front]} length={run} rotation={turn} windows open={open} repaint={repaint} />
-      <WallRun centre={[cx + w / 2 - run / 2, front]} length={run} rotation={turn} windows open={open} repaint={repaint} />
+      <WallRun centre={[cx - w / 2 + run / 2, front]} length={run} rotation={turn} windows="middle" open={open} repaint={repaint} />
+      <WallRun centre={[cx + w / 2 - run / 2, front]} length={run} rotation={turn} windows="middle" open={open} repaint={repaint} />
       <Piece piece="wall-doorway" position={[cx, 0, front]} rotation={turn} repaint={repaint} />
 
       <Solid position={[cx, WALL.height / 2, back]} size={[w, WALL.height, t]} />
@@ -73,6 +87,37 @@ function Walls({ building }: { building: Building }) {
       <Solid position={[cx - w / 2 + solidRun / 2, WALL.height / 2, front]} size={[solidRun, WALL.height, t]} />
       <Solid position={[cx + w / 2 - solidRun / 2, WALL.height / 2, front]} size={[solidRun, WALL.height, t]} />
       <ClosedDoor building={building} front={front} rotation={turn} />
+      <Frontage building={building} run={run} front={cz + (facing * d) / 2} />
+    </>
+  );
+}
+
+/**
+ * What dresses a building's front at street level: a lamp either side of the door, lit from dusk, and striped awnings
+ * over the windows where it has them and they'd stand clear of the name board.
+ */
+function Frontage({ building, run, front }: { building: Building; run: number; front: number }) {
+  const lampsOn = useGame(selectLampsOn);
+  const { centre: [cx], size: [w], facing, awnings } = building;
+  const turn = facing === 1 ? 0 : Math.PI;
+  const windowX = w / 2 - run / 2 - middleOfRun(run);
+  const awningFits = awnings && Math.abs(windowX) - 1 >= AWNING.clearOfBoard - 1.05;
+  return (
+    <>
+      {[-1, 1].map((side) => (
+        <Piece key={`lamp${side}`} piece="wall-lamp" position={[cx + side * DOOR_LAMP.out, DOOR_LAMP.height, front + facing * 0.05]} rotation={turn} lit={lampsOn} />
+      ))}
+      {awningFits &&
+        [-1, 1].map((side) => (
+          <Piece
+            key={`awning${side}`}
+            piece="awning"
+            position={[cx + side * Math.abs(windowX), AWNING.top - AWNING.height, front + facing * 0.52]}
+            rotation={turn}
+            size={[1.9, AWNING.height, null]}
+            repaint={{ red: awnings }}
+          />
+        ))}
     </>
   );
 }
@@ -104,103 +149,138 @@ function ClosedDoor({ building, front, rotation }: { building: Building; front: 
   );
 }
 
-/** A point seen from above, as three.js vectors give it. */
-type Point = { x: number; z: number };
+/** What a building's walls and roof are laid out by: the doorway piece's width, a door leaf's, and the roof edge's depth. */
+export type PieceSizes = { doorway: number; leaf: number; edgeDepth: number };
+/** A building's shape and look, whether the Character can go in or not. */
+export type BuildingShape = Pick<Building, 'centre' | 'size' | 'facing' | 'facade' | 'roof' | 'storeys' | 'windowBoxes'>;
 
-/**
- * Whether the line from `from` to `to`, seen from above, crosses a building's footprint (grown by `margin`): clipped
- * against the footprint's sides in turn, as Liang and Barsky do.
- */
-function crossesFootprint(from: Point, to: Point, { centre: [cx, cz], size: [w, d] }: Building, margin: number) {
-  const [dx, dz] = [to.x - from.x, to.z - from.z];
-  let [enter, leave] = [0, 1];
-  const sides: [number, number][] = [
-    [-dx, from.x - (cx - w / 2 - margin)],
-    [dx, cx + w / 2 + margin - from.x],
-    [-dz, from.z - (cz - d / 2 - margin)],
-    [dz, cz + d / 2 + margin - from.z],
-  ];
-  for (const [p, q] of sides) {
-    if (p === 0) {
-      if (q < 0) return false;
-      continue;
-    }
-    const t = q / p;
-    if (p < 0) enter = Math.max(enter, t);
-    else leave = Math.min(leave, t);
-    if (enter > leave) return false;
-  }
-  return true;
+/** A run of wall pieces, as `WallRun` lays them, to draw with `Instances`: centred on (x, z) at height y, turned by `rotation`. */
+export function wallRunPlacements([x, z]: Vec2, y: number, length: number, rotation: number, windows: Windows, repaint: Repaint, lit: (i: number) => boolean, lift?: number): Placement[] {
+  const { each, centres } = laidAlong(length, WALL_PIECE_LENGTH);
+  return centres.map((along, i): Placement => {
+    const isWindow = windows === 'all' || (windows === 'middle' && i === Math.floor(centres.length / 2));
+    return {
+      piece: isWindow ? 'wall-window' : 'wall',
+      position: [x + along * Math.cos(rotation), y, z - along * Math.sin(rotation)],
+      rotation,
+      size: [each, null, null],
+      repaint,
+      lit: isWindow && lit(i),
+      lift,
+    };
+  });
 }
 
 /**
- * A building's roof: gabled, its ridge along the street, or flat behind a low parapet. It lifts off while it stands
- * between the camera and the Character (inside included), so they're always in view; on the title screen, off the
- * place the Character stands in.
+ * The floors above a building's ground floor and its roof, to draw with `Instances`, lifting off together (`lift`) when
+ * they're in the camera's way. Upstairs: windows all round, most lit at night (people live up there), flower boxes under
+ * the front ones if the building has them, and a cream band under each storey. On top: a gable, its ridge along the
+ * street, with a chimney; or a flat roof behind a parapet, with a unit or two on it.
  */
-function Roof({ building }: { building: Building }) {
-  const roof = useRef<Group>(null);
-  const playing = useGame(selectScreen) === 'playing';
-  const titlePlaceId = useGame(selectTitlePlaceId);
-  const [, , edgeDepth] = usePieceSize('roof-edge');
-  useFrame(({ camera }) => {
-    if (!roof.current) return;
-    const inTheWay = playing ? crossesFootprint(camera.position, characterPosition, building, ROOF.overhang) : titlePlaceId === building.placeId;
-    roof.current.visible = !inTheWay;
-  });
-
-  const { centre: [cx, cz], size: [w, d], roof: { shape, colour } } = building;
-  const [length, depth] = [w + 2 * ROOF.overhang, d + 2 * ROOF.overhang];
-  const repaint: Repaint = { [KIT_ROOF]: colour, [KIT_FACADE]: building.facade };
-  if (shape === 'flat') {
-    return (
-      <group ref={roof} position={[cx, WALL.height, cz]}>
-        <Piece piece="roof-flat" size={[length, null, depth]} repaint={repaint} />
-        {[-1, 1].map((side) => (
-          <group key={side}>
-            <Piece piece="roof-edge" position={[0, 0, (side * (depth - edgeDepth)) / 2]} size={[length, null, null]} repaint={repaint} />
-            <Piece piece="roof-edge" position={[(side * (length - edgeDepth)) / 2, 0, 0]} rotation={Math.PI / 2} size={[depth, null, null]} repaint={repaint} />
-          </group>
-        ))}
-      </group>
+export function upstairsAndRoof(building: BuildingShape, lift: number, { edgeDepth }: PieceSizes): Placement[] {
+  const { centre: [cx, cz], size: [w, d], facing, storeys, facade, roof, windowBoxes } = building;
+  const t = WALL.thickness;
+  const turn = facing === 1 ? 0 : Math.PI;
+  const walls: Repaint = { [KIT_FACADE]: facade };
+  const front = cz + facing * (d / 2 - t / 2);
+  const back = cz - facing * (d / 2 - t / 2);
+  let lights = Math.round(Math.abs(cx * 7 + cz * 3));
+  const lit = () => lights++ % 3 !== 0;
+  const placements: Placement[] = [];
+  for (let k = 1; k < storeys; k++) {
+    const y = WALL.height * k;
+    const band = (length: number) => [length + 2 * BAND.proud, BAND.height, edgeDepth] as const;
+    for (const s of [-1, 1]) {
+      placements.push({ piece: 'roof-edge', position: [cx, y - BAND.height / 2, cz + s * (d / 2 + BAND.proud - edgeDepth / 2)], size: band(w), repaint: { [KIT_FACADE]: 'cream' }, lift });
+      placements.push({ piece: 'roof-edge', position: [cx + s * (w / 2 + BAND.proud - edgeDepth / 2), y - BAND.height / 2, cz], rotation: Math.PI / 2, size: band(d), repaint: { [KIT_FACADE]: 'cream' }, lift });
+    }
+    placements.push(
+      ...wallRunPlacements([cx, front], y, w, turn, 'all', walls, lit, lift),
+      ...wallRunPlacements([cx, back], y, w, turn + Math.PI, 'all', walls, lit, lift),
+      ...wallRunPlacements([cx - w / 2 + t / 2, cz], y, d - 2 * t, -Math.PI / 2, 'middle', walls, lit, lift),
+      ...wallRunPlacements([cx + w / 2 - t / 2, cz], y, d - 2 * t, Math.PI / 2, 'middle', walls, lit, lift),
     );
+    if (windowBoxes) {
+      for (const along of laidAlong(w, WALL_PIECE_LENGTH).centres) {
+        placements.push({ piece: 'window-box', position: [cx + facing * along, y + 0.62, cz + facing * (d / 2 + 0.14)], rotation: turn, size: [1.1, null, null], lift });
+      }
+    }
   }
-  const height = d * ROOF.pitch;
-  const middle = length - 2 * ROOF.gableEnd;
-  return (
-    <group ref={roof} position={[cx, WALL.height, cz]}>
-      <Piece piece="roof-gable" size={[middle, height, depth]} repaint={repaint} />
-      {[-1, 1].map((side) => (
-        <Piece
-          key={side}
-          piece="roof-gable-end"
-          position={[(side * (length - ROOF.gableEnd)) / 2, 0, 0]}
-          rotation={side === 1 ? 0 : Math.PI}
-          size={[ROOF.gableEnd, height, depth]}
-          repaint={repaint}
-        />
-      ))}
-    </group>
-  );
+  const top = WALL.height * storeys;
+  const [length, depth] = [w + 2 * ROOF.overhang, d + 2 * ROOF.overhang];
+  const roofs: Repaint = { [KIT_ROOF]: roof.colour, [KIT_FACADE]: facade };
+  if (roof.shape === 'flat') {
+    placements.push({ piece: 'roof-flat', position: [cx, top, cz], size: [length, null, depth], repaint: roofs, lift });
+    for (const s of [-1, 1]) {
+      placements.push({ piece: 'roof-edge', position: [cx, top, cz + (s * (depth - edgeDepth)) / 2], size: [length, null, null], repaint: roofs, lift });
+      placements.push({ piece: 'roof-edge', position: [cx + (s * (length - edgeDepth)) / 2, top, cz], rotation: Math.PI / 2, size: [depth, null, null], repaint: roofs, lift });
+    }
+    placements.push({ piece: 'ac-unit', position: [cx + w / 4, top + 0.05, cz - facing * d * 0.2], rotation: 0.2, lift });
+    if (w > 12) placements.push({ piece: 'ac-unit', position: [cx - w / 3, top + 0.05, cz - facing * d * 0.25], rotation: -0.3, lift });
+  } else {
+    const height = d * ROOF.pitch;
+    placements.push({ piece: 'roof-gable', position: [cx, top, cz], size: [length - 2 * ROOF.gableEnd, height, depth], repaint: roofs, lift });
+    for (const s of [-1, 1]) {
+      placements.push({ piece: 'roof-gable-end', position: [cx + (s * (length - ROOF.gableEnd)) / 2, top, cz], rotation: s === 1 ? 0 : Math.PI, size: [ROOF.gableEnd, height, depth], repaint: roofs, lift });
+    }
+    placements.push({ piece: 'chimney', position: [cx + w * 0.3, top + height * 0.35, cz - facing * d * 0.18], size: [null, height * 0.9, null], lift });
+  }
+  return placements;
+}
+
+/** The roof's pieces' sizes, as `upstairsAndRoof` and the fillers lay them out. */
+export function usePieceSizesForBuildings(): PieceSizes {
+  const [doorway] = usePieceSize('wall-doorway');
+  const [leaf] = usePieceSize('door');
+  const [, , edgeDepth] = usePieceSize('roof-edge');
+  return useMemo(() => ({ doorway, leaf, edgeDepth }), [doorway, leaf, edgeDepth]);
+}
+
+/**
+ * Every building's floors above the ground floor, and its roof. Each lifts off while it stands between the camera and
+ * the Character (inside included), so they're always in view; on the title screen, off the place the save was left at.
+ */
+function UpstairsAndRoofs() {
+  const sizes = usePieceSizesForBuildings();
+  const placements = useMemo(() => BUILDINGS.flatMap((building, i) => upstairsAndRoof(building, i, sizes)), [sizes]);
+  return <Instances placements={placements} lifts={BUILDINGS} liftMargin={ROOF.overhang} />;
 }
 
 /**
  * A piece of furniture filling its box: as many pieces side by side as fit along the box's length (across the way it
- * faces), each stretched a little to fill it. Solid to the Character.
+ * faces), each stretched a little to fill it. What's solid is the box, drawn separately.
  */
-function Furniture({ position: [x, y, z], size, piece, rotation = 0, height }: (typeof FURNITURE)[number]) {
-  const [pieceWidth] = usePieceSize(piece);
+function furniturePlacements({ position: [x, y, z], size, piece, rotation = 0, height, repaint }: (typeof FURNITURE)[number], sizeOf: (piece: ArtPiece) => Vec3): Placement[] {
+  const [pieceWidth] = sizeOf(piece);
   const sideways = Math.abs(Math.sin(rotation)) > 0.5;
   const [length, depth] = sideways ? [size[2], size[0]] : [size[0], size[2]];
   const { each, centres } = laidAlong(length, pieceWidth);
+  return centres.map((along) => ({
+    piece,
+    position: [x + along * Math.cos(rotation), y - size[1] / 2, z - along * Math.sin(rotation)],
+    rotation,
+    size: [each, height ?? size[1], depth],
+    repaint,
+    lit: true,
+  }));
+}
+
+/** All the furniture and set dressing, drawn together; the furniture solid to the Character. Lamps light up at night. */
+function Furnishings() {
+  const sizeOf = usePieceSizes();
+  const placements = useMemo(
+    () => [
+      ...FURNITURE.flatMap((furniture) => furniturePlacements(furniture, sizeOf)),
+      ...DECOR.map(({ position, piece, rotation, size, repaint }): Placement => ({ piece, position, rotation, size, repaint, lit: true })),
+    ],
+    [sizeOf],
+  );
   return (
     <>
-      <group position={[x, y - size[1] / 2, z]} rotation-y={rotation}>
-        {centres.map((along) => (
-          <Piece key={along} piece={piece} position={[along, 0, 0]} size={[each, height ?? size[1], depth]} />
-        ))}
-      </group>
-      <Solid position={[x, y, z]} size={size} />
+      <Instances placements={placements} />
+      {[...FURNITURE, ...SOLIDS].map(({ position, size }) => (
+        <Solid key={position.join()} position={position} size={size} />
+      ))}
     </>
   );
 }
@@ -212,15 +292,10 @@ export function Buildings() {
       {BUILDINGS.map((building) => (
         <group key={building.placeId}>
           <Walls building={building} />
-          <Roof building={building} />
         </group>
       ))}
-      {FURNITURE.map((furniture) => (
-        <Furniture key={furniture.position.join()} {...furniture} />
-      ))}
-      {DECOR.map(({ position, piece, rotation }) => (
-        <Piece key={position.join()} piece={piece} position={position} rotation={rotation} />
-      ))}
+      <UpstairsAndRoofs />
+      <Furnishings />
     </>
   );
 }
