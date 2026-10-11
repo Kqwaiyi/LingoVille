@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { selectScreen, useGame } from '../store/index.ts';
 import { CONTROLS } from './controls.ts';
 import { Character } from './Character.tsx';
+import { Effects } from './Effects.tsx';
 import { TitleShowcase } from './TitleShowcase.tsx';
 import { Town } from './Town.tsx';
 import { Lighting } from './Lighting.tsx';
@@ -21,7 +22,8 @@ export function Scene() {
   const screen = useGame(selectScreen);
   return (
     <KeyboardControls map={CONTROLS}>
-      <Canvas shadows="percentage" camera={{ fov: 55, position: [-10, 5, 7] }}>
+      {/* No multisampling of its own: the frame is drawn into the effects' buffers, which anti-alias it at the end. */}
+      <Canvas shadows="percentage" gl={{ antialias: false }} camera={{ fov: 55, position: [-10, 5, 7] }}>
         <Lighting />
         <ClockDriver />
         <Suspense fallback={null}>
@@ -30,6 +32,7 @@ export function Scene() {
             {screen === 'playing' ? <Character /> : <TitleShowcase />}
           </Physics>
         </Suspense>
+        <Effects />
       </Canvas>
     </KeyboardControls>
   );

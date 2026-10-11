@@ -38,3 +38,25 @@ export const PALETTE = {
 
 export type PaletteColour = keyof typeof PALETTE;
 export const PALETTE_COLOURS = Object.keys(PALETTE) as PaletteColour[];
+
+// The sky's own colours, and its light's: deeper blues, the glow of sunrise and sunset, night, sunlight and moonlight.
+// Nothing in the town is painted in them, so they're kept out of `PALETTE`, which the art builds snap colours to.
+export const SKY_PALETTE = {
+  // By day.
+  azure: '#5d9de2',
+  cornflower: '#8cb6e6',
+  mist: '#dbe9f3',
+  sunlight: '#fff3dd',
+  // Sunrise and sunset.
+  apricot: '#f8b47a',
+  rose: '#ec9aa2',
+  mauve: '#a68cc4',
+  // Night.
+  indigo: '#34457c',
+  navy: '#17213f',
+  moonlight: '#a8bfe8',
+} as const;
+
+/** Every colour the world draws, the town's and the sky's, by name. */
+export const WORLD_COLOURS = { ...PALETTE, ...SKY_PALETTE } as const;
+export type WorldColour = keyof typeof WORLD_COLOURS;

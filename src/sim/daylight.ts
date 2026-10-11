@@ -3,6 +3,9 @@ import { CLOCK, DAYLIGHT } from './tuning.ts';
 /** The four keyframed lighting presets a day passes through. */
 export type LightingPreset = (typeof DAYLIGHT.keyframes)[number]['preset'];
 
+/** Where something stands in the sky: in radians round from east (0) through south (π/2), and above the horizon (below it if negative). */
+export type SkyPosition = { azimuth: number; elevation: number };
+
 /** How the town is lit at one moment of the day. */
 export type Daylight = {
   /** The preset this moment blends from, the one it blends into, and how far along (0 is all `from`, 1 all `to`). */
@@ -14,6 +17,10 @@ export type Daylight = {
    * the sky from east (0) through south (π/2), west (π) and north (3π/2); its elevation, in radians above the horizon.
    */
   keyLight: { sun: boolean; azimuth: number; elevation: number };
+  /** Where the sun stands, for drawing it: where the key light is by day, but free to sink below the horizon. */
+  sun: SkyPosition;
+  /** Where the moon stands, for drawing it: where the key light is at night, but free to sink below the horizon. */
+  moon: SkyPosition;
   /** The street lights and the windows of open places: on from dusk until after dawn. */
   lampsOn: boolean;
 };
@@ -40,6 +47,23 @@ function keyLight(minuteOfDay: number): Daylight['keyLight'] {
 }
 
 /**
+ * The sun and the moon, for drawing the sky. The sun rises in the east, crosses the southern sky and sets in the west,
+ * then carries on round below the northern horizon. The moon rides above it all night, where the key light is, and
+ * below it all day.
+ */
+function sunAndMoon(minuteOfDay: number): Pick<Daylight, 'sun' | 'moon'> {
+  const { sunriseAt, sunsetAt, sunHighestElevation, moonHighestElevation } = DAYLIGHT;
+  const day = isBetween(minuteOfDay, sunriseAt, sunsetAt);
+  const [from, to] = day ? [sunriseAt, sunsetAt] : [sunsetAt, sunriseAt];
+  // Half a turn round the sky by day, and the other half by night.
+  const round = Math.PI * ((day ? 0 : 1) + minutesOnFrom(from, minuteOfDay) / minutesOnFrom(from, to));
+  return {
+    sun: { azimuth: round, elevation: sunHighestElevation * Math.sin(round) },
+    moon: { azimuth: round, elevation: -moonHighestElevation * Math.sin(round) },
+  };
+}
+
+/**
  * The lighting at this minute of the day: the last preset's keyframe passed, how far on towards the next, the key light
  * and whether the lamps are on.
  */
@@ -51,5 +75,5 @@ export function daylight(minuteOfDay: number): Daylight {
   const to = frames[(index + 1) % frames.length]!;
   const blend = minutesOnFrom(from.at, minuteOfDay) / minutesOnFrom(from.at, to.at);
   const lampsOn = isBetween(minuteOfDay, DAYLIGHT.lampsOnAt, DAYLIGHT.lampsOffAt);
-  return { from: from.preset, to: to.preset, blend, keyLight: keyLight(minuteOfDay), lampsOn };
+  return { from: from.preset, to: to.preset, blend, keyLight: keyLight(minuteOfDay), ...sunAndMoon(minuteOfDay), lampsOn };
 }

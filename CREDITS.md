@@ -29,3 +29,5 @@ All of it is recoloured to the town's palette by `npm run build:town` and `npm r
 What no kit has (awnings, pennants, window boxes, bicycles, parasols, the town clock, the bandstand, the bath, planters, tram poles, boats, door lanterns, the shelves' books and goods, the bathhouse's cubbies, the backdrop's houses, hills and mountains) is modelled for the game in Blender, in `art/town/`.
 
 The music, ambient sound and UI sounds are synthesised by the game as it plays (`src/audio`), so there are no sound files to credit.
+
+The sky, with its sun, moon and stars, is drawn by the game's own shaders (`src/world/Sky.tsx`), so there are no sky textures to credit.

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { DataTexture } from 'three';
+import { DataTexture, Path, Shape, ShapeGeometry, Vector2 } from 'three';
 import { TRAM_LINE, type TramStopId } from '../content/index.ts';
 import { selectLampsOn, useGame } from '../store/index.ts';
 import { Instances, laidAlong, paletteMaterial, Piece, Solid, usePieceSize, type Placement } from './Kit.tsx';
@@ -50,15 +50,32 @@ function Slab({ centre: [x, z], size: [w, d], colour, y }: { centre: Vec2; size:
   );
 }
 
-/** The grass, either side of the canal, and solid ground under the whole town. */
+/**
+ * How far the land runs on round the ground, out to: past the camera's far plane (1000 m), by when the haze has hidden
+ * it entirely, so the ground never shows an edge.
+ */
+const LAND_BEYOND = 1200;
+
+/** The grass beyond the ground, all round it out to the horizon: a disc with the ground's square cut out of it. */
+function landBeyond() {
+  const [x0, x1] = GROUND.x;
+  const [z0, z1] = GROUND.z;
+  const land = new Shape().absarc(0, 0, LAND_BEYOND, 0, Math.PI * 2, false);
+  land.holes.push(new Path([new Vector2(x0, z0), new Vector2(x1, z0), new Vector2(x1, z1), new Vector2(x0, z1)]));
+  return new ShapeGeometry(land, 64);
+}
+
+/** The grass, either side of the canal and on beyond the ground to the horizon, and solid ground under the whole town. */
 function Ground() {
   const [x0, x1] = GROUND.x;
   const [z0, z1] = GROUND.z;
   const [c0, c1] = CANAL.z;
+  const beyond = useMemo(landBeyond, []);
   return (
     <>
       <Slab centre={[(x0 + x1) / 2, (z0 + c0) / 2]} size={[x1 - x0, c0 - z0]} colour="grass" y={0} />
       <Slab centre={[(x0 + x1) / 2, (c1 + z1) / 2]} size={[x1 - x0, z1 - c1]} colour="grass" y={0} />
+      <mesh geometry={beyond} rotation-x={-Math.PI / 2} material={paletteMaterial('grass')} />
       <Solid position={[0, -0.5, 0]} size={[x1 - x0, 1, z1 - z0]} />
     </>
   );

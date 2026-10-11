@@ -245,6 +245,12 @@ function Canal() {
           <boxGeometry args={[length, CANAL.waterBelow + 0.12, 0.4]} />
         </mesh>
       ))}
+      {/* And at either end of the ground, a wall across it, so nothing shows through under the land beyond. */}
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[(side * length) / 2, -CANAL.waterBelow / 2, (z0 + z1) / 2]} material={paletteMaterial('stone')}>
+          <boxGeometry args={[0.4, CANAL.waterBelow, z1 - z0]} />
+        </mesh>
+      ))}
       <Props props={BOATS} />
     </>
   );

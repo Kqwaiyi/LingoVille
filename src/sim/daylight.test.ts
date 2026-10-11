@@ -41,6 +41,30 @@ describe('daylight', () => {
     expect(daylight(middle).keyLight.azimuth).toBeCloseTo(north);
   });
 
+  it('draws the sun rising in the east, where the key light is all day, and setting in the west, below the horizon all night', () => {
+    const east = 0;
+    const west = Math.PI;
+    expect(daylight(DAYLIGHT.sunriseAt).sun).toMatchObject({ azimuth: east, elevation: 0 });
+    expect(daylight(DAYLIGHT.sunsetAt).sun.azimuth).toBeCloseTo(west);
+    expect(daylight(DAYLIGHT.sunsetAt).sun.elevation).toBeCloseTo(0);
+    const middle = halfwayOn(DAYLIGHT.sunriseAt, DAYLIGHT.sunsetAt);
+    expect(daylight(middle).sun.elevation).toBeCloseTo(DAYLIGHT.sunHighestElevation);
+    expect(daylight(middle).sun.azimuth).toBeCloseTo(daylight(middle).keyLight.azimuth);
+    expect(daylight(deepNight).sun.elevation).toBeLessThan(0);
+    expect(daylight(DAYLIGHT.sunsetAt + 1).sun.elevation).toBeLessThan(0);
+  });
+
+  it('draws the moon where the key light is at night, up from sunset to sunrise and below the horizon all day', () => {
+    const north = (3 * Math.PI) / 2;
+    expect(daylight(DAYLIGHT.sunsetAt).moon.elevation).toBeCloseTo(0);
+    expect(daylight(DAYLIGHT.sunriseAt).moon.elevation).toBeCloseTo(0);
+    expect(daylight(deepNight).moon.azimuth).toBeCloseTo(north);
+    expect(daylight(deepNight).moon.elevation).toBeCloseTo(DAYLIGHT.moonHighestElevation);
+    expect(daylight(deepNight).moon.azimuth).toBeCloseTo(daylight(deepNight).keyLight.azimuth);
+    expect(daylight(keyframe('midday')).moon.elevation).toBeLessThan(0);
+    expect(daylight(DAYLIGHT.sunriseAt + 1).moon.elevation).toBeLessThan(0);
+  });
+
   it('switches the lamps on at dusk and off after dawn', () => {
     const { lampsOnAt, lampsOffAt } = DAYLIGHT;
     expect(daylight(lampsOnAt - 1).lampsOn).toBe(false);
@@ -61,6 +85,20 @@ describe('daylight', () => {
       const turned = Math.abs(now.azimuth - last.azimuth) % (2 * Math.PI);
       expect(Math.min(turned, 2 * Math.PI - turned)).toBeLessThan(smallStep);
       last = now;
+    }
+  });
+
+  it('moves the sun and the moon smoothly all day, through the horizon and round midnight', () => {
+    const smallStep = 0.02;
+    for (const body of ['sun', 'moon'] as const) {
+      let last = daylight(0)[body];
+      for (let minute = 1; minute <= CLOCK.minutesPerDay; minute++) {
+        const now = daylight(minute % CLOCK.minutesPerDay)[body];
+        expect(Math.abs(now.elevation - last.elevation)).toBeLessThan(smallStep);
+        const turned = Math.abs(now.azimuth - last.azimuth) % (2 * Math.PI);
+        expect(Math.min(turned, 2 * Math.PI - turned)).toBeLessThan(smallStep);
+        last = now;
+      }
     }
   });
 });
