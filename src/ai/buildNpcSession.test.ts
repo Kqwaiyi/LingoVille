@@ -725,17 +725,17 @@ describe('buildNpcSession: the town office and post office', () => {
 describe('buildPasserBySession: asking the way at a tram stop', () => {
   const EVENING = { day: 3, minuteOfDay: 18 * 60 };
   const passerBySession = (packId: LanguageCode, step: ProficiencyStep = 'A1') =>
-    buildPasserBySession(INTERACTIONS.askForDirections, CULTURE_PACKS[packId], step, { clock: EVENING, tramStop: 'west-stop', voiceSeed: 7 });
+    buildPasserBySession(INTERACTIONS.askForDirections, CULTURE_PACKS[packId], step, { clock: EVENING, tramStop: 'west-stop', voiceSeed: 7, build: 'feminine' });
 
   it.each(LANGUAGE_CODES)('builds the passer-by session in the %s pack', (packId) => {
     expect(passerBySession(packId)).toMatchSnapshot();
   });
 
-  it('plays a nameless local waiting at the stop, who speaks first, with a Shift Customer’s voice', () => {
+  it('plays a nameless local waiting at the stop, who speaks first, in a voice for their seed and build', () => {
     const session = passerBySession('ja');
     expect(session.systemInstruction).toContain(`waiting for the tram at ${CULTURE_PACKS.ja.tramStops['west-stop'].name}`);
     expect(session.systemInstruction).toContain(`You are waiting at ${CULTURE_PACKS.ja.tramStops['west-stop'].name} (stop id "west-stop").`);
-    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: 7 });
+    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: 7, build: 'feminine' });
     expect(session.openingScene).toMatch(/^\[SCENE: .*Greet them first\.\]$/);
   });
 

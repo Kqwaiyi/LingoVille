@@ -104,7 +104,7 @@ export type ShiftCustomer = {
    * `order` is all of it together, for the kitchen. Null elsewhere. One Shift Customer speaks for the whole table.
    */
   table: readonly Diner[] | null;
-  /** Picks their voice: the gateway turns it into one of its Shift Customer voices. */
+  /** Picks their voice: the gateway turns it into one of the anonymous voices for the build of the one who speaks. */
   voiceSeed: number;
   /** How they look, drawn with the pack's weights: the one who speaks, then the rest of their table. */
   appearances: readonly AppearancePreset[];

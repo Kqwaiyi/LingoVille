@@ -17,9 +17,10 @@ import {
   type Recap,
   type Segment,
 } from '../src/ai/index.ts';
-import { NAMED_NPC_IDS } from '../src/content/index.ts';
+import { BUILDS, NAMED_NPC_IDS } from '../src/content/index.ts';
 import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import {
+  ANONYMOUS_VOICES,
   DEFAULT_GATEWAY_PORT,
   ENDPOINT_VERSIONS,
   GEMINI_API_BASE,
@@ -27,7 +28,6 @@ import {
   LIVE_ENDPOINT,
   MODELS,
   NAMED_NPC_VOICES,
-  SHIFT_CUSTOMER_VOICES,
   VOICES,
   type TargetLanguage,
   type VoiceName,
@@ -105,18 +105,19 @@ const TOKEN_LIFETIME_MS = 30 * 60_000;
 
 const MOCK_TOKEN = 'mock-ephemeral-token';
 
-// A token request: for a Shift Customer, a whole-number seed from the sim's RNG; for a Named NPC, their id.
+// A token request: for a Named NPC, their id; for a Shift Customer or Passer-by, their build and a whole-number seed.
 const TokenRequestSchema = z.object({
   voice: z.union([
-    z.object({ targetLanguage: z.enum(LANGUAGE_CODES), shiftCustomerVoice: z.number().int().min(0) }),
+    z.object({ targetLanguage: z.enum(LANGUAGE_CODES), shiftCustomerVoice: z.number().int().min(0), build: z.enum(BUILDS) }),
     z.object({ targetLanguage: z.enum(LANGUAGE_CODES), npcId: z.enum(NAMED_NPC_IDS) }),
   ]),
 });
 
-/** The prebuilt voice a token request asks for: a Named NPC's own, or one of the Shift Customer voices by the customer's seed. */
+/** The prebuilt voice a token request asks for: a Named NPC's own, or one from the anonymous NPC's build's pool by their seed. */
 function requestedVoice({ voice }: z.infer<typeof TokenRequestSchema>): VoiceName {
   if ('npcId' in voice) return NAMED_NPC_VOICES[voice.npcId];
-  return SHIFT_CUSTOMER_VOICES[voice.shiftCustomerVoice % SHIFT_CUSTOMER_VOICES.length]!;
+  const pool = ANONYMOUS_VOICES[voice.build];
+  return pool[voice.shiftCustomerVoice % pool.length]!;
 }
 
 /** Where and how a Live session with this prebuilt voice opens. */

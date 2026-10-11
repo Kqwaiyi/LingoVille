@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import type { NpcSession, ToolResponse } from '../ai/index.ts';
-import { CULTURE_PACKS, INTERACTIONS, menuPrice, placeHours, type TownNpcId } from '../content/index.ts';
+import { BODY_PRESETS, CULTURE_PACKS, INTERACTIONS, menuPrice, PASSER_BY_IDS, placeHours, townNpcLook, type TownNpcId } from '../content/index.ts';
 import { createSave, weekdayOf, type GameState, type InventoryItem, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -160,6 +160,13 @@ describe('asking a passer-by which tram goes to a place (#25)', () => {
     expect(selectConversation(store.getState())).toMatchObject({ npcId: 'passer-by-1', interaction: INTERACTIONS.askForDirections });
     expect(npc.session!.systemInstruction).toContain(`You are waiting at ${CULTURE_PACKS.ja.tramStops['west-stop'].name}`);
     expect(npc.session!.voice).toMatchObject({ shiftCustomerVoice: expect.any(Number) });
+  });
+
+  it.each(PASSER_BY_IDS)('asks for a voice that suits the build of %s’s look', (npcId) => {
+    const { store, npc } = nextTo({ placeId: 'tram-stop', npcId });
+    store.getState().talk('E');
+
+    expect(npc.session!.voice).toMatchObject({ build: BODY_PRESETS[townNpcLook(npcId, DEV_SETUP.culturePackId).body].build });
   });
 
   it('marks the stop to get off at, and leaves no memory of the Character', () => {

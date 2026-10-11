@@ -185,10 +185,24 @@ describe('buildShiftCustomerSession', () => {
     expect(customerSession('en', 'A2', SINGLE_ORDER).systemInstruction).not.toMatch(/dietary need/i);
   });
 
-  it('is anonymous, with no memory, and the voice its seed picks', () => {
+  it('is anonymous, with no memory, and asks for a voice by its seed and the build of its look', () => {
     const { systemInstruction, voice } = customerSession('de');
     expect(systemInstruction).toMatch(/never met/);
-    expect(voice).toEqual({ targetLanguage: 'de', shiftCustomerVoice: WANTS_A_LATTE.voiceSeed });
+    expect(voice).toEqual({ targetLanguage: 'de', shiftCustomerVoice: WANTS_A_LATTE.voiceSeed, build: 'masculine' });
+    const feminine = { ...WANTS_A_LATTE, appearances: [{ ...DEFAULT_APPEARANCE, body: 'body-3' as const }] };
+    expect(customerSession('de', 'A1', feminine).voice).toEqual({ targetLanguage: 'de', shiftCustomerVoice: WANTS_A_LATTE.voiceSeed, build: 'feminine' });
+  });
+
+  it('asks for a voice that suits the first diner at a table, who is the one who speaks', () => {
+    const table = {
+      ...TABLE_OF_THREE,
+      appearances: [
+        { ...DEFAULT_APPEARANCE, body: 'body-4' as const },
+        { ...DEFAULT_APPEARANCE, body: 'body-1' as const },
+        { ...DEFAULT_APPEARANCE, body: 'body-2' as const },
+      ],
+    };
+    expect(customerSession('ja', 'B1', table).voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: TABLE_OF_THREE.voiceSeed, build: 'feminine' });
   });
 
   it('offers only not_understood: what is served is checked by the game, not the model', () => {

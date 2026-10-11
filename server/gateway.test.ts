@@ -7,7 +7,6 @@ import {
   GEMINI_LIVE_WS_BASE,
   LIVE_ENDPOINT,
   MODELS,
-  SHIFT_CUSTOMER_VOICES,
   VOICE_BUILDS,
   VOICES,
   type VoiceName,
@@ -26,7 +25,7 @@ import {
   type Recap,
   type RecapRequest,
 } from '../src/ai/index.ts';
-import { BODY_PRESETS, CULTURE_PACKS, NAMED_NPC_IDS, type NamedNpcId } from '../src/content/index.ts';
+import { BODY_PRESETS, BUILDS, CULTURE_PACKS, NAMED_NPC_IDS, type Build, type NamedNpcId } from '../src/content/index.ts';
 import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import { createGateway, readGatewayEnv } from './gateway.ts';
 
@@ -256,16 +255,47 @@ describe('POST /api/token', () => {
     expect(await res.json()).toEqual({ error: 'token_unavailable' });
   });
 
-  it("gives a Shift Customer one of the Shift Customer voices, picked by the customer's seed", async () => {
-    const base = await start({ GEMINI_MOCK: '1' });
-    const voiceFor = async (seed: number) =>
-      ((await (await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: seed } })).json()) as { voiceName: string }).voiceName;
+  // The spec's anonymous pools: voices no Named NPC uses, one pool per build.
+  const ANONYMOUS_POOLS: Record<Build, string[]> = {
+    feminine: ['Zephyr', 'Aoede', 'Autonoe', 'Laomedeia', 'Pulcherrima'],
+    masculine: ['Charon', 'Fenrir', 'Orus', 'Enceladus', 'Umbriel', 'Rasalgethi', 'Alnilam', 'Schedar', 'Zubenelgenubi', 'Sadaltager'],
+  };
 
-    const voices = await Promise.all(SHIFT_CUSTOMER_VOICES.map((_, seed) => voiceFor(seed)));
-    expect(voices).toEqual(SHIFT_CUSTOMER_VOICES);
-    expect(await voiceFor(SHIFT_CUSTOMER_VOICES.length + 1)).toBe(SHIFT_CUSTOMER_VOICES[1]);
-    expect((await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: -1 } })).status).toBe(400);
-    expect((await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: 1.5 } })).status).toBe(400);
+  it("gives a Shift Customer or Passer-by a voice from their build's pool, picked by their seed", async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+    const voiceFor = async (build: Build, seed: number) =>
+      voiceOf(await askForToken(base, { voice: { targetLanguage: 'de', shiftCustomerVoice: seed, build } }));
+
+    for (const build of BUILDS) {
+      const pool = ANONYMOUS_POOLS[build];
+      expect(await Promise.all(pool.map((_, seed) => voiceFor(build, seed)))).toEqual(pool);
+      expect(await voiceFor(build, pool.length + 1)).toBe(pool[1]);
+      expect(await voiceFor(build, 1000 * pool.length + 2)).toBe(pool[2]);
+    }
+  });
+
+  it('never gives a Shift Customer or Passer-by a Named NPC’s voice', async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+    const named = new Set(await Promise.all(NAMED_NPC_IDS.map(async (npcId) => voiceOf(await askForToken(base, { voice: { targetLanguage: 'ja', npcId } })))));
+    const seeds = Array.from({ length: 20 }, (_, seed) => seed);
+
+    for (const build of BUILDS) {
+      const anonymous = await Promise.all(seeds.map(async (seed) => voiceOf(await askForToken(base, { voice: { targetLanguage: 'ja', shiftCustomerVoice: seed, build } }))));
+      expect(anonymous.filter((voice) => named.has(voice))).toEqual([]);
+    }
+  });
+
+  it('rejects a request for a Shift Customer or Passer-by with a missing or unknown build, or a bad seed', async () => {
+    const base = await start({ GEMINI_MOCK: '1' });
+    const statusOf = async (voice: unknown) => (await askForToken(base, { voice })).status;
+
+    expect(await statusOf({ targetLanguage: 'de', shiftCustomerVoice: 3 })).toBe(400);
+    expect(await statusOf({ targetLanguage: 'de', shiftCustomerVoice: 3, build: 'androgynous' })).toBe(400);
+    expect(await statusOf({ targetLanguage: 'de', shiftCustomerVoice: 3, build: 'toString' })).toBe(400);
+    expect(await statusOf({ targetLanguage: 'de', shiftCustomerVoice: -1, build: 'feminine' })).toBe(400);
+    expect(await statusOf({ targetLanguage: 'de', shiftCustomerVoice: 1.5, build: 'masculine' })).toBe(400);
+    expect(await statusOf({ targetLanguage: 'de', shiftCustomerVoice: '3', build: 'masculine' })).toBe(400);
+    expect(await statusOf({ targetLanguage: 'fr', shiftCustomerVoice: 3, build: 'masculine' })).toBe(400);
   });
 
   it('gives each Named NPC their own voice', async () => {

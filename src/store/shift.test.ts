@@ -153,7 +153,8 @@ describe('the staff door', () => {
     expect(selectShift(store.getState())).toMatchObject({ jobId: 'barista', done: 0 });
     expect(selectConversation(store.getState())).toMatchObject({ shiftCustomer: { tray: [] } });
     const { session } = customers.current();
-    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: store.getState().game.possessions.shift!.customer!.voiceSeed });
+    const customer = store.getState().game.possessions.shift!.customer!;
+    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: customer.voiceSeed, build: BODY_PRESETS[customer.appearances[0]!.body].build });
     expect(session.openingScene).toMatch(/walk up to the counter/);
     expect(session.systemInstruction).toContain('YOUR ORDER');
   });

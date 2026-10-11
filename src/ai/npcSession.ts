@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   basketFacts,
+  type Build,
   interactionFacts,
   localPlaceName,
   toToolDeclaration,
@@ -32,10 +33,13 @@ import {
 } from '../sim/index.ts';
 
 /**
- * Which voice the NPC speaks with: a Named NPC's, or a Shift Customer's drawn by its seed (which passers-by borrow too).
+ * Which voice the NPC speaks with: a Named NPC's own, or, for a Shift Customer or Passer-by, one that suits the build
+ * of their look, drawn by their seed.
  * The gateway resolves it to a prebuilt voice, because voices live only in the gateway config.
  */
-export type VoiceRequest = { targetLanguage: LanguageCode; npcId: NamedNpcId } | { targetLanguage: LanguageCode; shiftCustomerVoice: number };
+export type VoiceRequest =
+  | { targetLanguage: LanguageCode; npcId: NamedNpcId }
+  | { targetLanguage: LanguageCode; shiftCustomerVoice: number; build: Build };
 
 export type NpcSession = {
   systemInstruction: string;
@@ -706,13 +710,14 @@ const ASKER = 'person';
 
 /**
  * Everything a Live session needs to play a passer-by waiting at a tram stop in a Goal Interaction: anyone local, with
- * no name, persona or memory of the Character, who speaks with one of the Shift Customer voices (`voiceSeed`). Pure.
+ * no name, persona or memory of the Character, who speaks in an anonymous voice that suits the `build` of their look,
+ * picked by `voiceSeed`. Pure.
  */
 export function buildPasserBySession(
   interaction: Interaction,
   culturePack: CulturePack,
   proficiencyStep: ProficiencyStep,
-  context: Pick<NpcSessionContext, 'clock'> & { tramStop: TramStopId; voiceSeed: number },
+  context: Pick<NpcSessionContext, 'clock'> & { tramStop: TramStopId; voiceSeed: number; build: Build },
 ): NpcSession {
   const stop = culturePack.tramStops[context.tramStop].name;
   const systemInstruction = [
@@ -735,7 +740,7 @@ export function buildPasserBySession(
   return {
     systemInstruction,
     tools: [interaction.toolDeclaration, notUnderstoodTool(ASKER)],
-    voice: { targetLanguage: culturePack.id, shiftCustomerVoice: context.voiceSeed },
+    voice: { targetLanguage: culturePack.id, shiftCustomerVoice: context.voiceSeed, build: context.build },
     openingScene: `[SCENE: A ${ASKER} waiting for the tram beside you turns to you, as if to ask you something. Greet them first.]`,
   };
 }

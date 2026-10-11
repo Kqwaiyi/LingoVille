@@ -1481,7 +1481,7 @@ const returningAnItem = (packId: LanguageCode) =>
 const atTheTownOffice = (packId: LanguageCode, interaction: Interaction) =>
   open(buildNpcSession(interaction, CULTURE_PACKS[packId], 'B1', NAMED_NPCS['office-clerk'], CLOCK_10AM));
 const atTheTramStop = (packId: LanguageCode) =>
-  open(buildPasserBySession(INTERACTIONS.askForDirections, CULTURE_PACKS[packId], 'A1', { ...CLOCK_10AM, tramStop: 'west-stop', voiceSeed: 1 }));
+  open(buildPasserBySession(INTERACTIONS.askForDirections, CULTURE_PACKS[packId], 'A1', { ...CLOCK_10AM, tramStop: 'west-stop', voiceSeed: 1, build: 'masculine' }));
 
 /** What the Player says on errands in each pack, and the name the mock should hear in it. */
 const ERRANDS_SAID = {

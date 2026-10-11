@@ -1,4 +1,4 @@
-import { DIETARY_NOTES, formatLocalAmount, type CulturePack } from '../content/index.ts';
+import { BODY_PRESETS, DIETARY_NOTES, formatLocalAmount, type CulturePack } from '../content/index.ts';
 import {
   weekdayOf,
   type Checkout,
@@ -15,6 +15,9 @@ import { capitalise, dayPart, formatTime, languageRulesBlock, notUnderstoodTool,
 
 /** What a Shift Customer's session is built from besides the customer: the time of day. */
 export type ShiftCustomerContext = { clock: GameState['clock'] };
+
+/** The look of whoever speaks for the customer: the customer, or the first diner at a table. A customer always has at least one look. */
+const speaker = (customer: ShiftCustomer) => customer.appearances[0]!;
 
 /** Where a Shift Customer is served, and by whom: the Player, behind the café counter, at the supermarket till or at a restaurant table. */
 type Counter = {
@@ -351,7 +354,7 @@ export function buildShiftCustomerSession(
   return {
     systemInstruction,
     tools: [notUnderstoodTool(who)],
-    voice: { targetLanguage: pack.id, shiftCustomerVoice: customer.voiceSeed },
+    voice: { targetLanguage: pack.id, shiftCustomerVoice: customer.voiceSeed, build: BODY_PRESETS[speaker(customer).body].build },
     openingScene: openingScene(customer, who),
   };
 }

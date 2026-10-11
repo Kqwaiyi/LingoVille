@@ -40,6 +40,9 @@ export const VOICE_BUILDS = {
   Erinome: 'feminine',
   Aoede: 'feminine',
   Zephyr: 'feminine',
+  Autonoe: 'feminine',
+  Laomedeia: 'feminine',
+  Pulcherrima: 'feminine',
   Puck: 'masculine',
   Sadachbia: 'masculine',
   Algieba: 'masculine',
@@ -49,6 +52,13 @@ export const VOICE_BUILDS = {
   Charon: 'masculine',
   Fenrir: 'masculine',
   Orus: 'masculine',
+  Enceladus: 'masculine',
+  Umbriel: 'masculine',
+  Rasalgethi: 'masculine',
+  Alnilam: 'masculine',
+  Schedar: 'masculine',
+  Zubenelgenubi: 'masculine',
+  Sadaltager: 'masculine',
 } as const satisfies Record<string, Build>;
 
 export type VoiceName = keyof typeof VOICE_BUILDS;
@@ -81,6 +91,10 @@ export const VOICES: Record<TargetLanguage, VoiceName> = {
   de: 'Charon',
 };
 
-// Shift Customers are anonymous, so each gets one of these by its seed, from the sim's RNG.
-// None is a Named NPC's voice, so a customer never sounds like the staff.
-export const SHIFT_CUSTOMER_VOICES: readonly VoiceName[] = ['Aoede', 'Fenrir', 'Orus', 'Zephyr'];
+// Shift Customers and Passers-by are anonymous, so each gets a voice from their build's pool by their seed.
+// None is a Named NPC's voice, so a stranger never sounds like someone the Player knows.
+type VoiceFor<B extends Build> = { [V in VoiceName]: (typeof VOICE_BUILDS)[V] extends B ? V : never }[VoiceName];
+export const ANONYMOUS_VOICES: { [B in Build]: readonly VoiceFor<B>[] } = {
+  feminine: ['Zephyr', 'Aoede', 'Autonoe', 'Laomedeia', 'Pulcherrima'],
+  masculine: ['Charon', 'Fenrir', 'Orus', 'Enceladus', 'Umbriel', 'Rasalgethi', 'Alnilam', 'Schedar', 'Zubenelgenubi', 'Sadaltager'],
+};

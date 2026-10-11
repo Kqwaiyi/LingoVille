@@ -13,12 +13,12 @@ Work test-first at the spec's two seams: the gateway's `/api/token` (mock mode),
 
 **Blocked by:** 01 (Each Named NPC speaks in their own voice that suits their build). The pools are the voices left over after the Named NPC table, and both tickets edit the gateway's voice config.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A token request with a build and a seed answers with a voice from that build's pool. The pick wraps by seed.
-- [ ] No pool voice is any Named NPC's voice.
-- [ ] A token request for an anonymous NPC with a missing or unknown build, or a seed that isn't a whole number of 0 or more, gets a 400.
-- [ ] A Shift Customer session's voice request carries the customer's build. At a table, it carries the first diner's build.
-- [ ] A Passer-by session's voice request carries the build it was given, and the store gives it the build of that Passer-by's look.
-- [ ] Named NPC sessions still ask for a voice by NPC id, unchanged.
-- [ ] `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:e2e` pass. Don't run `npm run eval`: the user waived it for this feature.
+- [x] A token request with a build and a seed answers with a voice from that build's pool. The pick wraps by seed.
+- [x] No pool voice is any Named NPC's voice.
+- [x] A token request for an anonymous NPC with a missing or unknown build, or a seed that isn't a whole number of 0 or more, gets a 400.
+- [x] A Shift Customer session's voice request carries the customer's build. At a table, it carries the first diner's build.
+- [x] A Passer-by session's voice request carries the build it was given, and the store gives it the build of that Passer-by's look.
+- [x] Named NPC sessions still ask for a voice by NPC id, unchanged.
+- [x] `npm run typecheck`, `npm run lint`, `npm test` and `npm run test:e2e` pass. Don't run `npm run eval`: the user waived it for this feature.

@@ -35,6 +35,7 @@ import {
 } from '../ai/index.ts';
 import {
   approachInteraction,
+  BODY_PRESETS,
   CULTURE_PACKS,
   customerLookWeights,
   DEFAULT_APPEARANCE,
@@ -2162,15 +2163,17 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       });
     };
 
-    /** Opens a Goal Interaction with a passer-by at the stop they wait at, who greets the Character first in a Shift Customer's voice. */
+    /** Opens a Goal Interaction with a passer-by at the stop they wait at, who greets the Character first in a voice that suits their look. */
     const startWithPasserBy = (npcId: PasserById, interaction: Interaction) => {
       const { game } = get();
+      const packId = game.identity.culturePackId;
       const sessionFor: SessionFor = () =>
-        buildPasserBySession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, {
+        buildPasserBySession(interaction, CULTURE_PACKS[packId], game.proficiencyStep, {
           clock: game.clock,
           tramStop: PASSER_BY_STOPS[npcId],
-          // Each borrows a Shift Customer's voice by their place in the list.
+          // Each gets an anonymous voice for their build by their place in the list, so it's the same every day, like their look.
           voiceSeed: PASSER_BY_IDS.indexOf(npcId),
+          build: BODY_PRESETS[townNpcLook(npcId, packId).body].build,
         });
       openConversation({ npcId, interaction, shiftCustomer: null, smallTalk: null }, sessionFor);
     };

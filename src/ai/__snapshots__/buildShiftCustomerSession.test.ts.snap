@@ -942,6 +942,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "de",
   },
@@ -1006,6 +1007,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "de",
   },
@@ -1069,6 +1071,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "de",
   },
@@ -1132,6 +1135,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "de",
   },
@@ -1195,6 +1199,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "de",
   },
@@ -1258,6 +1263,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "de",
   },
@@ -1322,6 +1328,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "en",
   },
@@ -1386,6 +1393,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "en",
   },
@@ -1449,6 +1457,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "en",
   },
@@ -1512,6 +1521,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "en",
   },
@@ -1575,6 +1585,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "en",
   },
@@ -1638,6 +1649,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "en",
   },
@@ -1702,6 +1714,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "ja",
   },
@@ -1766,6 +1779,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "ja",
   },
@@ -1829,6 +1843,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "ja",
   },
@@ -1892,6 +1907,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "ja",
   },
@@ -1955,6 +1971,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "ja",
   },
@@ -2018,6 +2035,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "ja",
   },
@@ -2082,6 +2100,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "zh",
   },
@@ -2146,6 +2165,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "zh",
   },
@@ -2209,6 +2229,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "zh",
   },
@@ -2272,6 +2293,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "zh",
   },
@@ -2335,6 +2357,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "zh",
   },
@@ -2398,6 +2421,7 @@ A "[SCENE: ...]" message tells you what is happening; it is not the barista spea
     },
   ],
   "voice": {
+    "build": "masculine",
     "shiftCustomerVoice": 4242,
     "targetLanguage": "zh",
   },
