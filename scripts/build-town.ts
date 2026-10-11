@@ -107,9 +107,10 @@ const TOWN: Record<Exclude<TownPiece, SceneryPiece>, Part[]> = {
   'tree-oak': [{ kit: 'nature-kit', model: 'tree_oak', scale: NATURE_SCALE * 1.2, repaint: NATURE_COLOURS }],
   'tree-tall': [{ kit: 'nature-kit', model: 'tree_tall', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
   bush: [{ kit: 'nature-kit', model: 'plant_bushDetailed', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
-  'flowers-red': [{ kit: 'nature-kit', model: 'flower_redA', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
-  'flowers-yellow': [{ kit: 'nature-kit', model: 'flower_yellowA', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
-  'flowers-purple': [{ kit: 'nature-kit', model: 'flower_purpleA', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
+  // Flowers at about knee height.
+  'flowers-red': [{ kit: 'nature-kit', model: 'flower_redA', scale: NATURE_SCALE * 0.6, repaint: NATURE_COLOURS }],
+  'flowers-yellow': [{ kit: 'nature-kit', model: 'flower_yellowA', scale: NATURE_SCALE * 0.6, repaint: NATURE_COLOURS }],
+  'flowers-purple': [{ kit: 'nature-kit', model: 'flower_purpleA', scale: NATURE_SCALE * 0.6, repaint: NATURE_COLOURS }],
   bench: [{ kit: 'furniture-kit', model: 'bench', scale: FURNITURE_SCALE }],
   counter: [{ kit: 'furniture-kit', model: 'kitchenCabinet', scale: FURNITURE_SCALE }],
   shelf: [{ kit: 'furniture-kit', model: 'bookcaseOpen', scale: FURNITURE_SCALE }],

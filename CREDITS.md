@@ -13,7 +13,7 @@ These are public domain (CC0 1.0). No credit is required, but they're credited h
 | Asset | Creator | Source | Used for |
 | --- | --- | --- | --- |
 | Building Kit | Kenney | https://kenney.nl/assets/building-kit | Walls, doors, windows, floors, flat roofs, columns |
-| Modular Buildings | Kenney | https://kenney.nl/assets/modular-buildings | Gable roofs, rooftop air-conditioning units |
+| Modular Buildings | Kenney | https://kenney.nl/assets/modular-buildings | Gable roofs |
 | City Kit (Roads) | Kenney | https://kenney.nl/assets/city-kit-roads | Street lights, tram stop poles |
 | Train Kit | Kenney | https://kenney.nl/assets/train-kit | Tram rails, and the trams |
 | Furniture Kit | Kenney | https://kenney.nl/assets/furniture-kit | Furniture, and parts of the Culture Packs' props |
@@ -26,6 +26,6 @@ These are public domain (CC0 1.0). No credit is required, but they're credited h
 
 All of it is recoloured to the town's palette by `npm run build:town` and `npm run build:characters`.
 
-What no kit has (awnings, pennants, window boxes, bicycles, parasols, the town clock, the bandstand, the bath, planters, tram poles, boats, the backdrop's houses, hills and mountains) is modelled for the game in Blender, in `art/town/`.
+What no kit has (awnings, pennants, window boxes, bicycles, parasols, the town clock, the bandstand, the bath, planters, tram poles, boats, door lanterns, the shelves' books and goods, the bathhouse's cubbies, the backdrop's houses, hills and mountains) is modelled for the game in Blender, in `art/town/`.
 
 The music, ambient sound and UI sounds are synthesised by the game as it plays (`src/audio`), so there are no sound files to credit.

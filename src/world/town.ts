@@ -189,10 +189,11 @@ export const isWaitingForTram = (npcId: TownNpcId) => TOWN_NPCS[npcId].role === 
  * Where each grocery sits on the supermarket's aisle shelves, facing the aisle south of it.
  * The vegetables and eggs face the door; the noodles are down the aisle between the shelves.
  */
+const SHELF_SPOTS_LOCAL: Record<GroceryId, Vec3> = { vegetables: [0, 1, 1.6], eggs: [3.5, 1, 1.6], noodles: [2, 1, -1.0] };
 export const SHELF_SPOTS: Record<GroceryId, Vec3> = {
-  vegetables: supermarket.at([0, 1, 1.6]),
-  eggs: supermarket.at([3.5, 1, 1.6]),
-  noodles: supermarket.at([2, 1, -1.0]),
+  vegetables: supermarket.at(SHELF_SPOTS_LOCAL.vegetables),
+  eggs: supermarket.at(SHELF_SPOTS_LOCAL.eggs),
+  noodles: supermarket.at(SHELF_SPOTS_LOCAL.noodles),
 };
 
 /** Park trees: trunk positions on the ground, around the edges and by the paths. */
@@ -226,20 +227,41 @@ type Furniture = { position: Vec3; size: Vec3; piece: TownPiece; rotation?: numb
 /** Something solid that's drawn as something else, or not at all: a table among its chairs, the bandstand, the pond. */
 type SolidBox = { position: Vec3; size: Vec3 };
 
-/** A round table for two or four, with its chairs round it, their cushions in `colour`: table and chairs solid together, as one box. */
-function tableFor(at: ReturnType<typeof inside>, [x, z]: Vec2, seats: 2 | 4, colour: PaletteColour): { solid: SolidBox; decor: Decor[] } {
+/** A table for two or four (round, or square under a cloth), with its chairs round it, their cushions in `colour`: table and chairs solid together, as one box. */
+function tableFor(at: ReturnType<typeof inside>, [x, z]: Vec2, seats: 2 | 4, colour: PaletteColour, piece: 'table-round' | 'table' = 'table-round'): { solid: SolidBox; decor: Decor[] } {
   const sides: Vec2[] = seats === 2 ? [[-0.95, 0], [0.95, 0]] : [[-0.95, 0], [0.95, 0], [0, -0.95], [0, 0.95]];
   return {
     solid: { position: at.at([x, 0.4, z]), size: seats === 2 ? [2.4, 0.8, 1.1] : [2.4, 0.8, 2.4] },
     decor: [
-      { position: at.at([x, 0, z]), piece: 'table-round', rotation: at.turn(), size: [1.1, 0.8, 1.1] },
+      { position: at.at([x, 0, z]), piece, rotation: at.turn(), size: [1.1, 0.8, 1.1] },
       ...sides.map(([dx, dz]) => ({ position: at.at([x + dx, 0, z + dz]), piece: 'chair' as const, rotation: at.turn(Math.atan2(-dx, -dz)), repaint: { red: colour } })),
     ],
   };
 }
 
 const cafeTables = [tableFor(cafe, [-3.9, 2], 2, 'teal'), tableFor(cafe, [3.9, 2], 2, 'teal'), tableFor(cafe, [4.3, -0.4], 2, 'teal')];
-const restaurantTables = [tableFor(restaurant, [-3, -2.6], 4, 'brick'), tableFor(restaurant, [1, -2.6], 4, 'brick'), tableFor(restaurant, [4.3, 0.4], 2, 'brick')];
+const restaurantTables = [tableFor(restaurant, [-3, -2.6], 4, 'brick', 'table'), tableFor(restaurant, [1, -2.6], 4, 'brick', 'table'), tableFor(restaurant, [4.3, 0.4], 2, 'brick', 'table')];
+
+/**
+ * A shelf's stock, in a building's frame: rows of books or goods (a metre each) from one end of the shelf to the other,
+ * at each of its shelves' heights, facing the way the shelf does; none where `keepClear` says (where the groceries are).
+ */
+function stock(at: ReturnType<typeof inside>, piece: 'shelf-books' | 'shelf-goods', [x0, z0]: Vec2, [x1, z1]: Vec2, levels: readonly number[], facing: number, keepClear: (x: number, y: number) => boolean = () => false): Decor[] {
+  const length = Math.hypot(x1 - x0, z1 - z0);
+  const count = Math.max(1, Math.round(length));
+  return levels.flatMap((y) =>
+    Array.from({ length: count }, (_, i) => (i + 0.5) / count)
+      .map((t): [number, number] => [x0 + (x1 - x0) * t, z0 + (z1 - z0) * t])
+      .filter(([x]) => !keepClear(x, y))
+      .map(([x, z]): Decor => ({ position: at.at([x, y, z]), piece, rotation: at.turn(facing), size: [(length / count) * 0.95, null, null] })),
+  );
+}
+/** The heights of the shelves in a 2 m bookcase, and in a 1.6 m open shelf unit. */
+const BOOKCASE_SHELVES = [0.17, 0.7, 1.22] as const;
+const SHELF_LEVELS = [0.18, 0.66, 1.09] as const;
+/** Where the groceries sit on an aisle shelf (its grocery spots' z), which its stock leaves clear. */
+const nearGroceries = (z: number) => (x: number, y: number) =>
+  y > 0.5 && y < 1.2 && Object.values(SHELF_SPOTS_LOCAL).some(([gx, , gz]) => Math.abs(gz - z) < 0.8 && Math.abs(gx - x) < 0.9);
 
 /**
  * The furniture: solid to the Character, as centre and size, each drawn by a kit piece turned by `rotation` (radians about
@@ -271,6 +293,8 @@ export const FURNITURE: readonly Furniture[] = [
   { position: clinic.at([0, 0.25, -0.5]), size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: clinic.turn(), height: 1 },
   { position: clinic.at([5.5, 0.44, -4.65]), size: [1.7, 0.88, 0.8], piece: 'desk', rotation: clinic.turn(Math.PI) },
   { position: clinic.at([-7.8, 0.25, -3.9]), size: [1.4, 0.5, 2.2], piece: 'bed', rotation: clinic.turn(Math.PI), height: 0.9 },
+  // A rack of leaflets by the way in.
+  { position: clinic.at([6.5, 0.45, 4.85]), size: [1.6, 0.9, 0.57], piece: 'bookcase-low', rotation: clinic.turn(Math.PI) },
   // Bookshop: the counter, bookcases down both sides and either side of the counter.
   { position: bookshop.at([0, 0.55, -2]), size: [2.6, 1.1, 0.7], piece: 'counter', rotation: bookshop.turn() },
   { position: bookshop.at([-3.9, 1, 0.3]), size: [0.6, 2, 3.6], piece: 'bookcase', rotation: bookshop.turn(Math.PI / 2) },
@@ -284,6 +308,9 @@ export const FURNITURE: readonly Furniture[] = [
   { position: bathhouse.at([0, 0.25, -0.2]), size: [2, 0.5, 0.6], piece: 'bench', rotation: bathhouse.turn(), height: 1 },
   { position: bathhouse.at([-6, 1.25, 0.1]), size: [1.3, 2.5, 2.7], piece: 'shower', rotation: bathhouse.turn(Math.PI / 2) },
   { position: bathhouse.at([6.3, 1, -0.6]), size: [0.6, 2, 2], piece: 'bookcase', rotation: bathhouse.turn(-Math.PI / 2), repaint: { wood: 'sky' } },
+  // Cubbies of rolled towels either side of the way in.
+  { position: bathhouse.at([-3.8, 0.45, 4.4]), size: [1.6, 0.9, 0.5], piece: 'cubbies', rotation: bathhouse.turn(Math.PI) },
+  { position: bathhouse.at([4.2, 0.45, 4.4]), size: [1.6, 0.9, 0.5], piece: 'cubbies', rotation: bathhouse.turn(Math.PI) },
   // Town office: the counter, the clerks' desks and the filing behind it, and a bench to wait on.
   { position: townOffice.at([0, 0.55, -2]), size: [5, 1.1, 0.8], piece: 'counter', rotation: townOffice.turn() },
   { position: townOffice.at([-4.5, 0.44, -3.9]), size: [1.7, 0.88, 0.9], piece: 'desk', rotation: townOffice.turn() },
@@ -315,8 +342,8 @@ type Decor = { position: Vec3; piece: TownPiece; rotation?: number; size?: Size;
 export const DECOR: readonly Decor[] = [
   // Home.
   { position: home.at([0, 0.02, -1.2]), piece: 'rug', rotation: home.turn() },
-  { position: home.at([2.6, 0.02, 1.4]), piece: 'rug-round', rotation: home.turn(), repaint: { red: 'mustard', brick: 'wood' } },
-  { position: home.at([2.6, 0, 1.4]), piece: 'coffee-table', rotation: home.turn(Math.PI / 2), size: [0.9, 0.45, 1.3] },
+  { position: home.at([2.2, 0.02, 1.4]), piece: 'rug-round', rotation: home.turn(), size: [1.8, null, 1.8], repaint: { red: 'mustard', brick: 'wood' } },
+  { position: home.at([2.3, 0, 1.4]), piece: 'coffee-table', rotation: home.turn(Math.PI / 2), size: [0.8, 0.45, 1.2] },
   { position: home.at([4.3, 0, 3.7]), piece: 'floor-lamp', rotation: home.turn() },
   { position: home.at([-4.3, 0, 3.7]), piece: 'plant', rotation: home.turn() },
   { position: home.at([-2.6, 0, 0.8]), piece: 'chair', rotation: home.turn(-Math.PI / 2), repaint: { red: 'sky' } },
@@ -333,25 +360,30 @@ export const DECOR: readonly Decor[] = [
   { position: cafe.at([-2.6, 1.55, -4.0]), piece: 'wall-cabinet', rotation: cafe.turn() },
   { position: cafe.at([-5.2, 0, 3.7]), piece: 'plant', rotation: cafe.turn() },
   { position: cafe.at([5.2, 0, 3.7]), piece: 'plant', rotation: cafe.turn() },
-  { position: cafe.at([5.2, 0, -3.7]), piece: 'pot-plant', rotation: cafe.turn() },
+  { position: cafe.at([5.2, 0, -3.7]), piece: 'floor-lamp', rotation: cafe.turn() },
   { position: cafe.at([-3.9, 0.8, 2]), piece: 'plant-small', rotation: cafe.turn() },
   { position: cafe.at([3.9, 0.8, 2]), piece: 'plant-small', rotation: cafe.turn() },
   // Convenience store.
   { position: convenienceStore.at([2.9, 0, 3.3]), piece: 'boxes', rotation: convenienceStore.turn(0.3) },
   { position: convenienceStore.at([2.4, 0, 3.4]), piece: 'boxes', rotation: convenienceStore.turn(-0.4) },
   { position: convenienceStore.at([-2.9, 0, 3.3]), piece: 'bin', rotation: convenienceStore.turn() },
+  ...stock(convenienceStore, 'shelf-goods', [-3.3, -0.6], [-3.3, 1.8], SHELF_LEVELS, Math.PI / 2),
+  ...stock(convenienceStore, 'shelf-goods', [3.3, -0.6], [3.3, 1.8], SHELF_LEVELS, -Math.PI / 2),
+  ...stock(convenienceStore, 'shelf-goods', [2, -3.3], [3.4, -3.3], [0.05, 0.5], 0),
   // Supermarket.
   { position: supermarket.at([-1.6, 0, 4.4]), piece: 'boxes', rotation: supermarket.turn(0.2) },
   { position: supermarket.at([-2.1, 0, 4.6]), piece: 'boxes', rotation: supermarket.turn(-0.3) },
   { position: supermarket.at([-7.1, 0, -4.6]), piece: 'boxes', rotation: supermarket.turn() },
-  { position: supermarket.at([7.2, 0, -1.5]), piece: 'pot-plant', rotation: supermarket.turn() },
-  { position: supermarket.at([-5.3, 1.1, 2.6]), piece: 'computer', rotation: supermarket.turn(Math.PI), size: [0.6, 0.45, 0.35] },
+  { position: supermarket.at([7.2, 0, -1.5]), piece: 'plant', rotation: supermarket.turn() },
+  { position: supermarket.at([-4.9, 1.1, 2.6]), piece: 'computer', rotation: supermarket.turn(Math.PI), size: [0.6, 0.45, 0.35] },
+  ...stock(supermarket, 'shelf-goods', [-0.9, 1.2], [4.9, 1.2], SHELF_LEVELS, 0, nearGroceries(1.6)),
+  ...stock(supermarket, 'shelf-goods', [-0.9, -1.4], [4.9, -1.4], SHELF_LEVELS, 0, nearGroceries(-1.0)),
+  ...stock(supermarket, 'shelf-goods', [-7.3, -3.7], [-7.3, -0.3], SHELF_LEVELS, Math.PI / 2),
   // Restaurant.
   ...restaurantTables.flatMap(({ decor }) => decor),
   { position: restaurant.at([5.2, 0, 3.7]), piece: 'plant', rotation: restaurant.turn() },
   { position: restaurant.at([-5.2, 0, -3.7]), piece: 'pot-plant', rotation: restaurant.turn() },
-  { position: restaurant.at([5.2, 0, -3.7]), piece: 'floor-lamp', rotation: restaurant.turn() },
-  { position: restaurant.at([-3, 0.8, 1]), piece: 'table-lamp', rotation: restaurant.turn() },
+  { position: restaurant.at([5.2, 0, -3.7]), piece: 'coat-rack', rotation: restaurant.turn() },
   // Clinic.
   { position: clinic.at([7.4, 0, -3.8]), piece: 'plant', rotation: clinic.turn() },
   { position: clinic.at([-8.1, 0, 4.4]), piece: 'plant', rotation: clinic.turn() },
@@ -362,6 +394,10 @@ export const DECOR: readonly Decor[] = [
   { position: clinic.at([2.2, 0, -0.5]), piece: 'chair', rotation: clinic.turn(), repaint: { red: 'sky' } },
   { position: clinic.at([-6.6, 0, -2.6]), piece: 'side-table', rotation: clinic.turn(Math.PI), size: [0.6, 0.6, 0.45] },
   { position: clinic.at([0, 0.02, 1.4]), piece: 'rug', rotation: clinic.turn(), repaint: { red: 'sky' } },
+  ...stock(clinic, 'shelf-goods', [-8.2, 0.5], [-8.2, 2.7], SHELF_LEVELS, Math.PI / 2),
+  ...[-2.4, -1.5, 1.5, 2.4].map((x): Decor => ({ position: clinic.at([x, 0, 4.75]), piece: 'chair', rotation: clinic.turn(Math.PI), repaint: { red: 'sky' } })),
+  { position: clinic.at([6.5, 0.9, 4.85]), piece: 'books', rotation: clinic.turn(Math.PI) },
+  { position: clinic.at([-6.6, 0, 4.6]), piece: 'pot-plant', rotation: clinic.turn() },
   // Bookshop.
   { position: bookshop.at([0, 0.02, 0.6]), piece: 'rug-round', rotation: bookshop.turn(), repaint: { red: 'plum', brick: 'lavender' } },
   { position: bookshop.at([-2.7, 0, 2.6]), piece: 'armchair', rotation: bookshop.turn(Math.PI / 2 + 0.4), repaint: { red: 'plum' } },
@@ -369,11 +405,17 @@ export const DECOR: readonly Decor[] = [
   { position: bookshop.at([3.3, 0, 3.3]), piece: 'plant', rotation: bookshop.turn() },
   { position: bookshop.at([-2.8, 2, -3.4]), piece: 'books', rotation: bookshop.turn() },
   { position: bookshop.at([2.8, 2, -3.4]), piece: 'books', rotation: bookshop.turn(0.3) },
+  ...stock(bookshop, 'shelf-books', [-3.8, -1.4], [-3.8, 2], BOOKCASE_SHELVES, Math.PI / 2),
+  ...stock(bookshop, 'shelf-books', [3.8, -1.4], [3.8, 2], BOOKCASE_SHELVES, -Math.PI / 2),
+  ...stock(bookshop, 'shelf-books', [-3.7, -3.3], [-1.9, -3.3], BOOKCASE_SHELVES, 0),
+  ...stock(bookshop, 'shelf-books', [1.9, -3.3], [3.7, -3.3], BOOKCASE_SHELVES, 0),
   // Bathhouse.
   { position: bathhouse.at([-6, 0, -4.2]), piece: 'plant', rotation: bathhouse.turn() },
   { position: bathhouse.at([6.2, 0, -4.2]), piece: 'pot-plant', rotation: bathhouse.turn() },
   { position: bathhouse.at([-6.45, 1, -2.2]), piece: 'mirror', rotation: bathhouse.turn(Math.PI / 2) },
   { position: bathhouse.at([0, 0.02, 3.4]), piece: 'rug', rotation: bathhouse.turn(), repaint: { red: 'denim' } },
+  { position: bathhouse.at([-2.2, 0, 4.2]), piece: 'stool', rotation: bathhouse.turn(), repaint: { red: 'denim' } },
+  { position: bathhouse.at([6.2, 0, 4.2]), piece: 'plant', rotation: bathhouse.turn() },
   // Town office.
   { position: townOffice.at([-4.5, 0.88, -3.9]), piece: 'computer', rotation: townOffice.turn(), size: [0.6, 0.45, 0.35] },
   { position: townOffice.at([4.5, 0.88, -3.9]), piece: 'computer', rotation: townOffice.turn(), size: [0.6, 0.45, 0.35] },
@@ -381,7 +423,9 @@ export const DECOR: readonly Decor[] = [
   { position: townOffice.at([4.5, 0, -3]), piece: 'chair', rotation: townOffice.turn(Math.PI), repaint: { red: 'slate' } },
   { position: townOffice.at([-6.2, 0, 4.2]), piece: 'plant', rotation: townOffice.turn() },
   { position: townOffice.at([6.2, 0, 4.2]), piece: 'coat-rack', rotation: townOffice.turn() },
-  { position: townOffice.at([6.2, 0, -4.2]), piece: 'pot-plant', rotation: townOffice.turn() },
+  { position: townOffice.at([6.2, 0, -4.2]), piece: 'floor-lamp', rotation: townOffice.turn() },
+  ...stock(townOffice, 'shelf-books', [-2.9, -4.3], [-1.1, -4.3], BOOKCASE_SHELVES, 0),
+  ...stock(townOffice, 'shelf-books', [1.1, -4.3], [2.9, -4.3], BOOKCASE_SHELVES, 0),
   { position: townOffice.at([0, 0.02, 2]), piece: 'rug', rotation: townOffice.turn(), repaint: { red: 'slate' } },
 ];
 

@@ -26,9 +26,12 @@ export const SCENERY_PIECES = [
   'gazebo',
   'cottage',
   'townhouse',
+  'wall-lantern',
+  'shelf-books',
+  'shelf-goods',
+  'cubbies',
   // What's on the roofs.
   'chimney',
-  'ac-unit',
   // The street.
   'tram',
   'fountain',
@@ -37,7 +40,6 @@ export const SCENERY_PIECES = [
   'bin',
   'hedge',
   'fence',
-  'wall-lamp',
   // Trees, rocks and plants.
   'tree-pine',
   'tree-fat',
@@ -136,12 +138,13 @@ export type ArtPiece = TownPiece | PropId;
 /** The glass in a window, lit while its place is open. Every other material is named for its palette colour. */
 export const WINDOW_GLASS = 'window';
 export type TownMaterial = PaletteColour | typeof WINDOW_GLASS;
-/** The material of each piece's bulb, which glows while it's lit: a street light's, the lamps by the doors and in the rooms, and a tram's headlights, from dusk. */
+/** The material of each piece's bulb, which glows while it's lit: a street light's, the lamps by the doors, under the tram shelters and in the rooms, and a tram's headlights, from dusk. */
 export const LAMP_BULBS: Partial<Record<ArtPiece, TownMaterial>> = {
   'street-light': 'white',
-  'wall-lamp': 'lamplight',
+  'wall-lantern': 'lamplight',
   'floor-lamp': 'lamplight',
   'table-lamp': 'lamplight',
+  'ceiling-lamp': 'lamplight',
   tram: 'lamplight',
 };
 

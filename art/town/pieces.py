@@ -179,9 +179,9 @@ def awning(p):
         p.box(colour, (each, length, 0.04), at=(x, -out / 2, top - drop / 2), rot=(slope, 0, 0))
         # The valance, hanging from the front edge, scalloped by turns.
         p.box(colour, (each, 0.03, 0.22 if i % 2 == 0 else 0.17), at=(x, -out - 0.01, top - drop - (0.11 if i % 2 == 0 else 0.085)))
+    # Its arms, light and thin, under each end.
     for side in (-1, 1):
-        p.box("ink", (0.03, out, 0.03), at=(side * (width / 2 - 0.03), -out / 2, top - drop - 0.02))
-        p.rod("ink", (side * (width / 2 - 0.03), 0, top - drop - 0.35), (side * (width / 2 - 0.03), -out * 0.95, top - drop - 0.02), 0.015)
+        p.box("stone", (0.02, out, 0.02), at=(side * (width / 2 - 0.03), -out / 2, top - drop - 0.02))
 
 
 def pennants(p):
@@ -453,6 +453,78 @@ def townhouse(p):
     house(p, 5.0, 6.0, 3, 1.8)
 
 
+def wall_lantern(p):
+    """A lantern on a bracket beside a door: a black frame round glowing panes, under a little roof, 0.5 m tall."""
+    p.box("ink", (0.16, 0.06, 0.22), at=(0, 0.03, 0.2))
+    p.rod("ink", (0, 0.04, 0.3), (0, -0.2, 0.3), 0.018, segments=4)
+    p.rod("ink", (0, 0.04, 0.12), (0, -0.2, 0.3), 0.014, segments=4)
+    p.box("lamplight", (0.15, 0.15, 0.22), at=(0, -0.24, 0.18))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            p.box("ink", (0.025, 0.025, 0.26), at=(sx * 0.08, -0.24 + sy * 0.08, 0.18))
+    p.box("ink", (0.2, 0.2, 0.04), at=(0, -0.24, 0.06))
+    p.cylinder("ink", 0.15, 0.12, at=(0, -0.24, 0.36), top=0.02, segments=4, rot=(0, 0, math.pi / 4))
+    p.ball("ink", 0.025, at=(0, -0.24, 0.44))
+
+
+def shelf_books(p):
+    """A shelf's worth of books, 1 m along, spines out to the front: all heights and colours, one or two leaning."""
+    colours = ["brick", "denim", "teal", "mustard", "plum", "pine", "cream", "terracotta", "sky", "walnut", "red", "linen"]
+    x, i = -0.5, 0
+    while x < 0.46:
+        thick = 0.045 + 0.03 * ((i * 7) % 5) / 4
+        tall = 0.19 + 0.07 * ((i * 3) % 4) / 3
+        lean = 0.22 if i % 9 == 8 else 0.0
+        p.box(colours[(i * 5) % len(colours)], (thick, 0.2, tall), at=(x + thick / 2 + (tall / 2) * math.sin(lean), 0, tall / 2 * math.cos(lean)), rot=(0, lean, 0))
+        x += thick + 0.004 + (0.06 if lean else 0)
+        i += 1
+
+
+def shelf_goods(p):
+    """A shelf's worth of shop goods, 1 m along: packets, tins and bottles, faced up to the front in bright packaging."""
+    colours = ["red", "mustard", "teal", "denim", "peach", "mint", "blush", "butter", "plum", "white"]
+    x, i = -0.5, 0
+    while x < 0.42:
+        kind = i % 3
+        colour = colours[(i * 3) % len(colours)]
+        if kind == 0:
+            w = 0.16
+            p.box(colour, (w, 0.08, 0.24), at=(x + w / 2, -0.06, 0.12))
+            p.box(colour, (w, 0.08, 0.24), at=(x + w / 2, 0.04, 0.12))
+            p.box("white", (w * 0.7, 0.005, 0.07), at=(x + w / 2, -0.1, 0.15))
+        elif kind == 1:
+            w = 0.18
+            for k in range(3):
+                p.cylinder(colour, 0.03, 0.11, at=(x + 0.03 + k * 0.06, -0.05, 0.055), segments=8)
+                p.cylinder("stone", 0.03, 0.11, at=(x + 0.03 + k * 0.06, 0.05, 0.055), segments=8)
+        else:
+            w = 0.14
+            for k in range(2):
+                p.cylinder(colour, 0.032, 0.2, at=(x + 0.035 + k * 0.07, -0.04, 0.1), segments=8)
+                p.cylinder(colour, 0.012, 0.06, at=(x + 0.035 + k * 0.07, -0.04, 0.23), segments=6)
+        x += w + 0.02
+        i += 1
+
+
+def cubbies(p):
+    """The bathhouse's cubbies by the way in: a low cedar unit of open boxes, rolled towels in each, 1.6 m long."""
+    w, h, d, cols, rows, t = 1.6, 0.9, 0.5, 4, 2, 0.04
+    p.box("wood", (w, d, t), at=(0, 0, t / 2))
+    p.box("wood", (w, d, t), at=(0, 0, h - t / 2))
+    p.box("walnut", (w, t, h), at=(0, d / 2 - t / 2, h / 2))
+    for k in range(cols + 1):
+        p.box("wood", (t, d, h), at=(-w / 2 + k * (w - t) / cols + t / 2, 0, h / 2))
+    for r in range(1, rows):
+        p.box("wood", (w, d, t), at=(0, 0, r * h / rows))
+    colours = ["white", "sky", "blush", "mint", "white", "butter", "sky", "white"]
+    for r in range(rows):
+        for k in range(cols):
+            x = -w / 2 + (k + 0.5) * w / cols
+            z = r * h / rows + t + 0.07
+            for j in range(2):
+                p.cylinder(colours[(r * cols + k + j) % len(colours)], 0.07, d * 0.8, at=(x - 0.08 + j * 0.16, -0.02, z), rot=(math.pi / 2, 0, 0), segments=8)
+
+
 PIECES = {
     "awning": awning,
     "pennants": pennants,
@@ -469,6 +541,10 @@ PIECES = {
     "gazebo": gazebo,
     "cottage": cottage,
     "townhouse": townhouse,
+    "wall-lantern": wall_lantern,
+    "shelf-books": shelf_books,
+    "shelf-goods": shelf_goods,
+    "cubbies": cubbies,
 }
 
 

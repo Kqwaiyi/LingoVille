@@ -18,8 +18,8 @@ const FLOOR_THICKNESS = 0.015;
 const BAND = { height: 0.14, proud: 0.06 } as const;
 /** An awning over a window, its top just under the name board, and how far it may reach towards the door before it would. */
 const AWNING = { top: 2.35, height: 0.62, clearOfBoard: 2.75 } as const;
-/** A lamp either side of the front door, over head height. */
-const DOOR_LAMP = { out: 1.25, height: 2.0 } as const;
+/** A lantern either side of the front door, over head height. */
+export const DOOR_LAMP = { out: 1.25, height: 1.95 } as const;
 
 /** Which pieces of a wall run are windows: none, the one in the middle, or every one. */
 export type Windows = 'none' | 'middle' | 'all';
@@ -74,7 +74,7 @@ function Walls({ building }: { building: Building }) {
   return (
     <>
       <Piece piece="floor" position={[cx, 0, cz]} size={[w, FLOOR_THICKNESS, d]} />
-      <WallRun centre={[cx, back]} length={w} rotation={turn + Math.PI} windows="middle" open repaint={repaint} />
+      <WallRun centre={[cx, back]} length={w} rotation={turn + Math.PI} repaint={repaint} />
       <WallRun centre={[cx - w / 2 + t / 2, cz]} length={d - 2 * t} rotation={-Math.PI / 2} repaint={repaint} />
       <WallRun centre={[cx + w / 2 - t / 2, cz]} length={d - 2 * t} rotation={Math.PI / 2} repaint={repaint} />
       <WallRun centre={[cx - w / 2 + run / 2, front]} length={run} rotation={turn} windows="middle" open={open} repaint={repaint} />
@@ -93,7 +93,7 @@ function Walls({ building }: { building: Building }) {
 }
 
 /**
- * What dresses a building's front at street level: a lamp either side of the door, lit from dusk, and striped awnings
+ * What dresses a building's front at street level: a lantern either side of the door, lit from dusk, and striped awnings
  * over the windows where it has them and they'd stand clear of the name board.
  */
 function Frontage({ building, run, front }: { building: Building; run: number; front: number }) {
@@ -105,7 +105,7 @@ function Frontage({ building, run, front }: { building: Building; run: number; f
   return (
     <>
       {[-1, 1].map((side) => (
-        <Piece key={`lamp${side}`} piece="wall-lamp" position={[cx + side * DOOR_LAMP.out, DOOR_LAMP.height, front + facing * 0.05]} rotation={turn} lit={lampsOn} />
+        <Piece key={`lamp${side}`} piece="wall-lantern" position={[cx + side * DOOR_LAMP.out, DOOR_LAMP.height, front + facing * 0.05]} rotation={turn} lit={lampsOn} />
       ))}
       {awningFits &&
         [-1, 1].map((side) => (
@@ -175,7 +175,7 @@ export function wallRunPlacements([x, z]: Vec2, y: number, length: number, rotat
  * The floors above a building's ground floor and its roof, to draw with `Instances`, lifting off together (`lift`) when
  * they're in the camera's way. Upstairs: windows all round, most lit at night (people live up there), flower boxes under
  * the front ones if the building has them, and a cream band under each storey. On top: a gable, its ridge along the
- * street, with a chimney; or a flat roof behind a parapet, with a unit or two on it.
+ * street, with a chimney; or a flat roof behind a parapet.
  */
 export function upstairsAndRoof(building: BuildingShape, lift: number, { edgeDepth }: PieceSizes): Placement[] {
   const { centre: [cx, cz], size: [w, d], facing, storeys, facade, roof, windowBoxes } = building;
@@ -215,15 +215,13 @@ export function upstairsAndRoof(building: BuildingShape, lift: number, { edgeDep
       placements.push({ piece: 'roof-edge', position: [cx, top, cz + (s * (depth - edgeDepth)) / 2], size: [length, null, null], repaint: roofs, lift });
       placements.push({ piece: 'roof-edge', position: [cx + (s * (length - edgeDepth)) / 2, top, cz], rotation: Math.PI / 2, size: [depth, null, null], repaint: roofs, lift });
     }
-    placements.push({ piece: 'ac-unit', position: [cx + w / 4, top + 0.05, cz - facing * d * 0.2], rotation: 0.2, lift });
-    if (w > 12) placements.push({ piece: 'ac-unit', position: [cx - w / 3, top + 0.05, cz - facing * d * 0.25], rotation: -0.3, lift });
   } else {
     const height = d * ROOF.pitch;
     placements.push({ piece: 'roof-gable', position: [cx, top, cz], size: [length - 2 * ROOF.gableEnd, height, depth], repaint: roofs, lift });
     for (const s of [-1, 1]) {
       placements.push({ piece: 'roof-gable-end', position: [cx + (s * (length - ROOF.gableEnd)) / 2, top, cz], rotation: s === 1 ? 0 : Math.PI, size: [ROOF.gableEnd, height, depth], repaint: roofs, lift });
     }
-    placements.push({ piece: 'chimney', position: [cx + w * 0.3, top + height * 0.35, cz - facing * d * 0.18], size: [null, height * 0.9, null], lift });
+    placements.push({ piece: 'chimney', position: [cx + w * 0.3, top + height * 0.55, cz - facing * d * 0.1], size: [0.3, height * 0.6, 0.5], lift });
   }
   return placements;
 }

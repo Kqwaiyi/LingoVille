@@ -131,9 +131,10 @@ describe('the town art', () => {
       "town.glb's colormap material is not a palette colour.",
       'town.glb has images.',
       "town.glb's street-light has no white bulb.",
-      "town.glb's wall-lamp has no lamplight bulb.",
+      "town.glb's wall-lantern has no lamplight bulb.",
       "town.glb's floor-lamp has no lamplight bulb.",
       "town.glb's table-lamp has no lamplight bulb.",
+      "town.glb's ceiling-lamp has no lamplight bulb.",
       "town.glb's tram has no lamplight bulb.",
     ]);
   });

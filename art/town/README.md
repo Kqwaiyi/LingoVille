@@ -1,6 +1,6 @@
 # The town's own pieces
 
-What Kenney's kits don't have, modelled for the town in Blender: shop awnings, strings of pennants, window boxes, bicycles, café parasols, the town clock, the park's bandstand, the bathhouse's soaking tub, street planters, the tram line's poles, rowing boats, and the backdrop's cottages, townhouses, hills and mountains.
+What Kenney's kits don't have, modelled for the town in Blender: shop awnings, strings of pennants, window boxes, bicycles, café parasols, the town clock, the park's bandstand, the bathhouse's soaking tub, street planters, the tram line's poles, rowing boats, door lanterns, books and goods to stock the shelves, the bathhouse's towel cubbies, and the backdrop's cottages, townhouses, hills and mountains.
 
 - `pieces.py` is the source: each piece is put together in code, one function each, in the palette's colours.
 - `town.blend` is what it builds, one object per piece in the `pieces` collection, to look at and tweak by eye.

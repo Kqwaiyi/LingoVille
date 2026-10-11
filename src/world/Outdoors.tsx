@@ -157,8 +157,12 @@ function StreetLights() {
   );
 }
 
-/** An island platform between the tracks, with a stop pole, a shelter with a bench under it, and white lines along its edges. Walked onto, not stepped up. */
+/**
+ * An island platform between the tracks, with a stop pole, a shelter with a bench and a lamp under it (lighting the
+ * platform from dusk), and white lines along its edges. Walked onto, not stepped up.
+ */
 function TramStop({ stopId }: { stopId: TramStopId }) {
+  const lit = useGame(selectLampsOn);
   const [x, z] = TRAM_STOPS[stopId].centre;
   const [length, width] = PLATFORM.size;
   return (
@@ -179,6 +183,13 @@ function TramStop({ stopId }: { stopId: TramStopId }) {
         </group>
       ))}
       <Piece piece="bench" position={[SHELTER.centreX, PLATFORM.height, SHELTER.postZ + 0.1]} size={[1.6, null, 0.55]} />
+      <Piece piece="ceiling-lamp" position={[SHELTER.centreX, SHELTER.height - 0.5, 0]} lit={lit} />
+      {lit && (
+        <mesh position={[SHELTER.centreX, PLATFORM.height + 0.02, 0]} rotation-x={-Math.PI / 2}>
+          <circleGeometry args={[LIGHT_POOL.radius * 1.4, 24]} />
+          <meshBasicMaterial color={PALETTE.lamplight} alphaMap={POOL_FALLOFF} transparent opacity={LIGHT_POOL.opacity} depthWrite={false} />
+        </mesh>
+      )}
       <Solid position={[SHELTER.centreX, 0.5, SHELTER.postZ + 0.1]} size={[1.6, 1, 0.5]} />
     </group>
   );

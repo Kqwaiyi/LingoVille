@@ -22,7 +22,7 @@ export const FILLERS: readonly Filler[] = [
   filler(-20, 'north', [10, 9], { facade: 'blush', roof: flat('slate'), storeys: 2, awnings: 'red' }),
   filler(23.5, 'north', [5, 8], { facade: 'lavender', roof: gable('plum'), storeys: 3, windowBoxes: true }),
   filler(64, 'north', [8, 9], { facade: 'sky', roof: gable('denim'), storeys: 2, awnings: 'teal' }),
-  filler(74, 'north', [10, 10], { facade: 'linen', roof: flat('charcoal'), storeys: 3, windowBoxes: true }),
+  filler(74, 'north', [10, 10], { facade: 'linen', roof: flat('slate'), storeys: 3, windowBoxes: true }),
   filler(85.5, 'north', [9, 9], { facade: 'peach', roof: gable('terracotta'), storeys: 2, awnings: 'mustard' }),
   // South side, west to east.
   filler(-82, 'south', [10, 9], { facade: 'sky', roof: gable('denim'), storeys: 2 }),
@@ -79,7 +79,6 @@ export const STREET_PROPS: readonly Prop[] = [
   ...([
     [-67.5, 'denim'],
     [-28.6, 'red'],
-    [7.2, 'teal'],
     [26.6, 'mustard'],
     [46, 'plum'],
     [61.6, 'pine'],
@@ -91,13 +90,13 @@ export const STREET_PROPS: readonly Prop[] = [
   ] as const).map(([x, colour]): Prop => ({ piece: 'bicycle', at: south(x, 0.45), rotation: Math.PI - 0.08, repaint: { denim: colour } })),
   ...[-65, -35.2, 28.9, 61.8, 79].map((x): Prop => ({ piece: 'bin', at: north(x, 1.1), solid: [0.5, 1, 0.5] })),
   ...[-79.6, -32, 19.4, 65].map((x): Prop => ({ piece: 'bin', at: south(x, 1.1), solid: [0.5, 1, 0.5] })),
-  ...[-73, -62, -46, -36, -27, -18, 17, 31, 42, 52, 70, 80.5].map((x, i): Prop => ({ piece: TREE_KINDS[i % TREE_KINDS.length]!, at: south(x, 1.6), rotation: i, solid: TRUNK })),
+  ...[-73, -62, -27, -18, 17, 52, 70, 80.5].map((x, i): Prop => ({ piece: TREE_KINDS[i % TREE_KINDS.length]!, at: south(x, 1.6), rotation: i, solid: TRUNK })),
 ];
 
-/** The café's terrace on the pavement: parasol tables either side of the door. */
+/** The café's terrace on the pavement: parasol tables at either end of its front, clear of the view in from the door. */
 export const CAFE_TERRACE: readonly Vec2[] = [
-  [10.4, NORTH_FRONT + 1.7],
-  [17.6, NORTH_FRONT + 1.7],
+  [9.2, NORTH_FRONT + 1.6],
+  [18.8, NORTH_FRONT + 1.6],
 ];
 
 /** The tram line's poles, between the tracks, clear of the platforms and the walk off their ends. */
@@ -118,7 +117,7 @@ export const SQUARE_PROPS: readonly Prop[] = (() => {
       [4.4, 0, -Math.PI / 2],
       [0, 4.4, Math.PI],
     ] as const).map(([dx, dz, rotation]): Prop => ({ piece: 'bench', at: [fx + dx, 0, fz + dz], rotation, solid: Math.abs(dx) > 0 ? [0.6, 0.5, 2] : BENCH })),
-    ...[-1, 1].flatMap((sx) => [1, -1].map((sz, i): Prop => ({ piece: i === 0 ? 'tree-cone' : 'tree-oak', at: [cx + sx * (w / 2 - 1.5), 0, cz + sz * (d / 2 - 1.5)], rotation: sx + sz, solid: TRUNK }))),
+    ...[-1, 1].flatMap((sx) => [1, -1].map((sz, i): Prop => ({ piece: i === 0 ? 'tree-cone' : 'tree-oak', at: [cx + sx * (w / 2 - 3), 0, cz + sz * (d / 2 - 3.2)], rotation: sx + sz, solid: TRUNK }))),
     ...[-1, 1].map((sx): Prop => ({ piece: 'flowers-red', at: [fx + sx * 2.8, 0, fz - 3.4] })),
     ...[-1, 1].map((sx): Prop => ({ piece: 'flowers-yellow', at: [fx + sx * 3.2, 0, fz + 3] })),
   ];
@@ -175,6 +174,35 @@ export const GARDEN_PROPS: readonly Prop[] = (() => {
   return props;
 })();
 
+/**
+ * Along the canal: benches looking over the water, lamps and planters on the promenade; and behind the south side's
+ * buildings, a hedge along the promenade with flower beds and bushes in the gardens behind it.
+ */
+export const CANAL_SIDE_PROPS: readonly Prop[] = (() => {
+  const random = seeded(53);
+  const [p0] = CANAL.promenade;
+  const props: Prop[] = [];
+  for (let x = -90; x <= 90; x += 12) {
+    props.push({ piece: 'bench', at: [x, 0, p0 + 0.7], rotation: 0, solid: BENCH });
+    props.push({ piece: 'planter', at: [x + 6, 0, p0 + 0.5], solid: PLANTER });
+  }
+  // Behind the buildings on the south side, but not behind the park or the buildings set back there.
+  const open = (x: number) => Math.abs(x) > 15 && !(x > -64 && x < -50) && !(x > 45 && x < 63);
+  for (let x = -94; x <= 94; x += 2) {
+    if (open(x) && open(x + 1)) props.push({ piece: 'hedge', at: [x + 1, 0, p0 - 0.6], solid: [2, 1.2, 0.8] });
+  }
+  const flowers = ['flowers-red', 'flowers-yellow', 'flowers-purple'] as const;
+  for (let x = -92; x <= 92; x += 2.6 + random() * 2) {
+    if (!open(x)) continue;
+    const z = p0 - 2.2 - random() * 5;
+    props.push(random() < 0.6 ? { piece: flowers[Math.floor(random() * 3)]!, at: [x, 0, z], rotation: random() * 6 } : { piece: random() < 0.5 ? 'bush' : 'bush-large', at: [x, 0, z], rotation: random() * 6 });
+  }
+  return props;
+})();
+
+/** Lamps along the promenade, reaching out over the walk. */
+export const PROMENADE_LIGHTS: readonly Vec2[] = along(-84, 84, 24).map((x): Vec2 => [x + 3, CANAL.promenade[0] + 0.3]);
+
 /** The fence along the back gardens and the railing along the canal, as runs of fence pieces: solid, so the Character stays in town. */
 export const FENCES: readonly { from: Vec2; to: Vec2; piece: TownPiece; repaint?: Repaint }[] = [
   { from: [TOWN_BOUNDS.x[0], TOWN_BOUNDS.z[0]], to: [TOWN_BOUNDS.x[1], TOWN_BOUNDS.z[0]], piece: 'fence', repaint: { wood: 'white', red: 'white' } },
@@ -199,7 +227,7 @@ export const BOATS: readonly Prop[] = [-78, -51, -33, -8, 9, 27, 48, 71, 88].map
 export const BACKDROP: readonly Prop[] = (() => {
   const random = seeded(31);
   const facades: PaletteColour[] = ['peach', 'butter', 'mint', 'sky', 'lavender', 'blush', 'linen', 'white', 'cream'];
-  const roofs: PaletteColour[] = ['brick', 'terracotta', 'slate', 'denim', 'plum', 'charcoal'];
+  const roofs: PaletteColour[] = ['brick', 'terracotta', 'slate', 'denim', 'plum'];
   const house = (piece: 'townhouse' | 'cottage', at: Vec3, rotation: number): Prop => ({
     piece,
     at,
@@ -228,13 +256,13 @@ export const BACKDROP: readonly Prop[] = (() => {
   // Cottages and pines up on the hillsides.
   for (let i = 0; i < 70; i++) {
     const x = -180 + random() * 360;
-    const z = TOWN_BOUNDS.z[0] - 16 - random() * 40;
-    props.push(random() < 0.35 ? house('cottage', [x, 0, z], (random() - 0.5) * 0.6) : { piece: random() < 0.6 ? 'tree-pine' : 'tree-cone', at: [x, 0, z], rotation: random() * 6, size: [null, 3 + random() * 3, null] });
+    const z = TOWN_BOUNDS.z[0] - 16 - random() * 28;
+    props.push(random() < 0.35 ? house('cottage', [x, 0, z], (random() - 0.5) * 0.25) : { piece: random() < 0.6 ? 'tree-pine' : 'tree-cone', at: [x, 0, z], rotation: random() * 6, size: [null, 3 + random() * 3, null] });
   }
   for (let i = 0; i < 50; i++) {
     const x = -180 + random() * 360;
-    const z = CANAL.z[1] + 14 + random() * 40;
-    props.push(random() < 0.3 ? house('cottage', [x, 0, z], Math.PI + (random() - 0.5) * 0.6) : { piece: random() < 0.5 ? 'tree-pine' : 'tree-fat', at: [x, 0, z], rotation: random() * 6 });
+    const z = CANAL.z[1] + 14 + random() * 32;
+    props.push(random() < 0.3 ? house('cottage', [x, 0, z], Math.PI + (random() - 0.5) * 0.25) : { piece: random() < 0.5 ? 'tree-pine' : 'tree-fat', at: [x, 0, z], rotation: random() * 6 });
   }
   // The hills, behind the houses, and the mountains far off, north and south.
   for (let x = -260; x <= 260; x += 55) {

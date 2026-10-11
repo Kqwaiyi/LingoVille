@@ -2,12 +2,13 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import type { Group } from 'three';
 import { selectLampsOn, selectTramRunning, useGame } from '../store/index.ts';
-import { upstairsAndRoof, usePieceSizesForBuildings, wallRunPlacements, WALL_PIECE_LENGTH, type PieceSizes } from './Buildings.tsx';
-import { Instances, laidAlong, paletteMaterial, Piece, Solid, usePieceSize, type Placement, type Repaint } from './Kit.tsx';
+import { DOOR_LAMP, upstairsAndRoof, usePieceSizesForBuildings, wallRunPlacements, WALL_PIECE_LENGTH, type PieceSizes } from './Buildings.tsx';
+import { Instances, laidAlong, paletteMaterial, Piece, Solid, usePieceSize, type Footprint, type Placement, type Repaint } from './Kit.tsx';
 import {
   BACKDROP,
   BOATS,
   CAFE_TERRACE,
+  CANAL_SIDE_PROPS,
   CANAL,
   CATENARY_POLES,
   FENCES,
@@ -18,6 +19,7 @@ import {
   OLD_TOWN_SQUARE,
   PENNANT_POST,
   PENNANTS,
+  PROMENADE_LIGHTS,
   SQUARE_PROPS,
   STREET_PROPS,
   TOWN_ENDS,
@@ -57,6 +59,7 @@ function fillerPlacements(f: Filler, lift: number, sizes: PieceSizes): Placement
     ...wallRunPlacements([cx + w / 2 - t / 2, cz], 0, d - 2 * t, Math.PI / 2, 'none', walls, lit),
     { piece: 'wall-doorway', position: [cx, 0, front], rotation: turn, repaint: walls },
     ...[-1, 1].map((s): Placement => ({ piece: 'door', position: [cx + (s * leaf) / 2, 0, front], rotation: turn })),
+    ...[-1, 1].map((s): Placement => ({ piece: 'wall-lantern', position: [cx + s * DOOR_LAMP.out, DOOR_LAMP.height, cz + facing * (d / 2 + 0.05)], rotation: turn, lit: true })),
     ...upstairsAndRoof(f, lift, sizes),
   ];
   if (shop) {
@@ -83,12 +86,24 @@ function Fillers() {
   );
 }
 
-/** Props drawn together, each solid where it says so. */
+/** What stands tall enough to hide the Character from the camera, so lifts off while it's in the way: trees and parasols. */
+const TALL = (piece: TownPiece) => piece.startsWith('tree') || piece === 'parasol';
+/** How much ground round a tree or a parasol stands in the camera's way. */
+const CANOPY = 2.6;
+
+/** Props drawn together, each solid where it says so; trees and parasols lift off while they're in the camera's way. */
 function Props({ props }: { props: readonly Prop[] }) {
-  const placements = useMemo(() => props.map(({ piece, at, rotation, size, repaint, lit }): Placement => ({ piece, position: at, rotation, size, repaint, lit })), [props]);
+  const { placements, lifts } = useMemo(() => {
+    const lifts: Footprint[] = [];
+    const placements = props.map(({ piece, at, rotation, size, repaint, lit }): Placement => {
+      const lift = TALL(piece) ? lifts.push({ centre: [at[0], at[2]], size: [CANOPY, CANOPY] }) - 1 : undefined;
+      return { piece, position: at, rotation, size, repaint, lit, lift };
+    });
+    return { placements, lifts };
+  }, [props]);
   return (
     <>
-      <Instances placements={placements} />
+      <Instances placements={placements} lifts={lifts} />
       {props.map(({ at: [x, y, z], solid }, i) => solid && <Solid key={i} position={[x, y + solid[1] / 2, z]} size={solid} />)}
     </>
   );
@@ -168,7 +183,7 @@ function CafeTerrace() {
   const placements = useMemo(
     () =>
       CAFE_TERRACE.flatMap(([x, z]): Placement[] => [
-        { piece: 'parasol', position: [x, 0, z], repaint: { red: 'teal' } },
+        { piece: 'parasol', position: [x, 0, z], repaint: { red: 'teal' }, lift: CAFE_TERRACE.findIndex(([px]) => px === x) },
         { piece: 'table-round', position: [x, 0, z], size: [1, 0.78, 1] },
         { piece: 'chair', position: [x - 0.9, 0, z], rotation: Math.PI / 2, repaint: { red: 'teal' } },
         { piece: 'chair', position: [x + 0.9, 0, z], rotation: -Math.PI / 2, repaint: { red: 'teal' } },
@@ -177,7 +192,7 @@ function CafeTerrace() {
   );
   return (
     <>
-      <Instances placements={placements} />
+      <Instances placements={placements} lifts={CAFE_TERRACE.map(([x, z]) => ({ centre: [x, z] as const, size: [CANOPY, CANOPY] as const }))} />
       {CAFE_TERRACE.map(([x, z]) => (
         <Solid key={x} position={[x, 0.45, z]} size={[2.4, 0.9, 1]} />
       ))}
@@ -231,6 +246,19 @@ function Canal() {
         </mesh>
       ))}
       <Props props={BOATS} />
+    </>
+  );
+}
+
+/** Lamps along the promenade, lit from dusk, reaching out over the walk towards the water. */
+function PromenadeLights() {
+  const placements = useMemo(() => PROMENADE_LIGHTS.map(([x, z]): Placement => ({ piece: 'street-light', position: [x, 0, z + 0.73], rotation: 0, lit: true })), []);
+  return (
+    <>
+      <Instances placements={placements} />
+      {PROMENADE_LIGHTS.map(([x, z]) => (
+        <Solid key={x} position={[x, 2, z]} size={[0.2, 4, 0.2]} />
+      ))}
     </>
   );
 }
@@ -297,6 +325,8 @@ export function Scenery() {
       <Props props={SQUARE_PROPS} />
       <Props props={MARKET_PROPS} />
       <Props props={GARDEN_PROPS} />
+      <Props props={CANAL_SIDE_PROPS} />
+      <PromenadeLights />
       <Props props={BACKDROP} />
       <Pennants />
       <CafeTerrace />

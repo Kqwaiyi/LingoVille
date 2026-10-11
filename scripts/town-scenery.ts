@@ -41,8 +41,11 @@ export const SCENERY_PARTS: Record<SceneryPiece, Part[]> = {
   // Houses for the backdrop, and what's on the town's roofs.
   cottage: [art('cottage', { glass: true })],
   townhouse: [art('townhouse', { glass: true })],
-  chimney: [fantasy('chimney', { scale: 1.8, repaint: { plum: 'brick', lavender: 'brick', denim: 'charcoal' } })],
-  'ac-unit': [{ kit: 'modular-buildings', model: 'detail-ac-a', scale: 2.5 }],
+  'wall-lantern': [art('wall-lantern')],
+  'shelf-books': [art('shelf-books')],
+  'shelf-goods': [art('shelf-goods')],
+  cubbies: [art('cubbies')],
+  chimney: [fantasy('chimney', { scale: 1.8, repaint: { plum: 'brick', lavender: 'brick', denim: 'stone', slate: 'stone' } })],
 
   // The street.
   tram: [{ kit: 'train-kit', model: 'train-tram-classic', turns: 1, scale: 2, repaint: { mustard: 'butter' } }],
@@ -52,7 +55,6 @@ export const SCENERY_PARTS: Record<SceneryPiece, Part[]> = {
   bin: [furniture('trashcan', { repaint: { stone: 'pine', slate: 'pine', white: 'pine' } })],
   hedge: [fantasy('hedge-large', { scale: 2, turns: 1, repaint: { lavender: 'stone', slate: 'stone', teal: 'leaf' } })],
   fence: [nature('fence_simple', { repaint: NATURE_COLOURS })],
-  'wall-lamp': [furniture('lampWall')],
 
   // Trees, rocks and plants.
   'tree-pine': [nature('tree_pineRoundC', { repaint: NATURE_COLOURS })],
