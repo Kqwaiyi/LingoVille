@@ -49,6 +49,8 @@ export default defineConfig(({ mode }) => {
       port: Number(env.WEB_PORT ?? 5173),
       strictPort: true,
       proxy: { '/api': `http://127.0.0.1:${gatewayPort}` },
+      // Transformed as the server starts, rather than on the first page's requests, so the first load is as quick as the rest.
+      warmup: { clientFiles: ['./src/main.tsx'] },
     },
   };
 });

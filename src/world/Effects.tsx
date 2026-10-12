@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/postprocessing';
+import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { useEffect, useRef, useState } from 'react';
 import { afterWindow, GRAPHICS_LEVELS, GRAPHICS_TUNING, START } from './graphicsLevel.ts';
@@ -16,6 +16,9 @@ const AO: { radius: number; falloff: number; intensity: number; colour: WorldCol
  * but the lamplight material once night falls (`lampGlow` in `Lighting`). Sunlit walls and the sky stay under it.
  */
 const BLOOM = { threshold: 1.3, smoothing: 0.25, intensity: 0.6, radius: 0.6, levels: 6 } as const;
+
+/** The grade on the finished picture: a touch more contrast and colour than the tone mapping leaves, and a soft vignette. */
+const GRADE = { contrast: 0.04, saturation: 0.05, vignette: { offset: 0.32, darkness: 0.42 } } as const;
 
 /** The part of N8AO's pass used here (`n8ao` ships no types). */
 type AmbientOcclusionPass = { autoDetectTransparency: boolean };
@@ -74,7 +77,10 @@ export function Effects() {
         <></>
       )}
       <Bloom mipmapBlur luminanceThreshold={BLOOM.threshold} luminanceSmoothing={BLOOM.smoothing} intensity={BLOOM.intensity} radius={BLOOM.radius} levels={BLOOM.levels} />
-      <ToneMapping mode={ToneMappingMode.NEUTRAL} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      <BrightnessContrast contrast={GRADE.contrast} />
+      <HueSaturation saturation={GRADE.saturation} />
+      <Vignette offset={GRADE.vignette.offset} darkness={GRADE.vignette.darkness} />
       <SMAA />
     </EffectComposer>
   );

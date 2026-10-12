@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "eval": "tsx evals/index.ts",
     "build:characters": "tsx scripts/build-characters.ts",
-    "build:town": "tsx scripts/build-town.ts"
+    "build:town": "tsx scripts/build-town.ts",
+    "build:surfaces": "tsx scripts/build-surfaces.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

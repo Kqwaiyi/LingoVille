@@ -16,8 +16,9 @@ evals/reports/
 evals/recordings/*
 !evals/recordings/manifest.json
 
-# Blender's backups of art/town/town.blend
+# Blender's backups of art/town/town.blend, and Python's caches of the modules pieces.py imports
 *.blend1
+__pycache__/
 
 # Agent tools' runtime state
 .claude/scheduled_tasks.lock

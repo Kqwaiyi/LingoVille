@@ -64,6 +64,16 @@ function devSpawnPlace(search: string): PlaceId {
   return import.meta.env.DEV && (PLACE_IDS as readonly (string | null)[]).includes(place) ? (place as PlaceId) : 'home';
 }
 
+/**
+ * Dev only: `?camera=x,y,z,tx,ty,tz` holds the camera at (x, y, z) looking at (tx, ty, tz) instead of following the
+ * Character, to look at the town from the same spot each time.
+ */
+function devCamera(search: string): { at: Vector3; looking: Vector3 } | null {
+  const numbers = new URLSearchParams(search).get('camera')?.split(',').map(Number) ?? [];
+  if (!import.meta.env.DEV || numbers.length !== 6 || numbers.some((n) => !Number.isFinite(n))) return null;
+  return { at: new Vector3(numbers[0], numbers[1], numbers[2]), looking: new Vector3(numbers[3], numbers[4], numbers[5]) };
+}
+
 const CAPSULE = { halfHeight: 0.5, radius: 0.35 } as const;
 const GRAVITY = 20;
 const NO_ROTATION: [boolean, boolean, boolean] = [false, false, false];
@@ -222,6 +232,7 @@ export function Character() {
   }, [world]);
 
   const scratch = useMemo(() => ({ move: new Vector3(), target: new Vector3(), camera: new Vector3() }), []);
+  const [fixedCamera] = useState(() => devCamera(window.location.search));
 
   useFrame(({ camera }, delta) => {
     if (!body.current || !collider.current || !controller.current) return;
@@ -264,6 +275,10 @@ export function Character() {
     camera.position.lerp(wanted, snapCamera.current ? 1 : Math.min(1, CAMERA.follow * dt));
     snapCamera.current = false;
     camera.lookAt(target);
+    if (fixedCamera) {
+      camera.position.copy(fixedCamera.at);
+      camera.lookAt(fixedCamera.looking);
+    }
 
     const placeId = placeAt(next.x, next.z);
     if (placeId) enterPlace(placeId);

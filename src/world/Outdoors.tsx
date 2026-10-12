@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { DataTexture, Path, Shape, ShapeGeometry, Vector2 } from 'three';
 import { TRAM_LINE, type TramStopId } from '../content/index.ts';
 import { selectLampsOn, useGame } from '../store/index.ts';
-import { Instances, laidAlong, paletteMaterial, Piece, Solid, usePieceSize, type Placement } from './Kit.tsx';
+import { Instances, laidAlong, Piece, Solid, usePieceSize, type Placement } from './Kit.tsx';
+import { townMaterial, WATER } from './materials.ts';
 import { PALETTE, type PaletteColour } from './palette.ts';
+import type { Surface } from './surfaces.ts';
 import { CANAL } from './scenery.ts';
 import {
   BANDSTAND,
@@ -41,10 +43,10 @@ const LIGHT_POOL = { reach: 1.14, radius: 2.6, opacity: 0.5 } as const;
 /** The park's trees, in turn. */
 const TREE_KINDS: readonly TownPiece[] = ['tree-round', 'tree-oak', 'tree-tall', 'tree-fat'];
 
-/** A flat slab of one colour, just proud of the ground. */
-function Slab({ centre: [x, z], size: [w, d], colour, y }: { centre: Vec2; size: Vec2; colour: PaletteColour; y: number }) {
+/** A flat slab of one colour and surface, just proud of the ground. */
+function Slab({ centre: [x, z], size: [w, d], colour, surface = 'matte', y }: { centre: Vec2; size: Vec2; colour: PaletteColour; surface?: Surface; y: number }) {
   return (
-    <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow material={paletteMaterial(colour)}>
+    <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow material={townMaterial(colour, surface)}>
       <planeGeometry args={[w, d]} />
     </mesh>
   );
@@ -73,9 +75,9 @@ function Ground() {
   const beyond = useMemo(landBeyond, []);
   return (
     <>
-      <Slab centre={[(x0 + x1) / 2, (z0 + c0) / 2]} size={[x1 - x0, c0 - z0]} colour="grass" y={0} />
-      <Slab centre={[(x0 + x1) / 2, (c1 + z1) / 2]} size={[x1 - x0, z1 - c1]} colour="grass" y={0} />
-      <mesh geometry={beyond} rotation-x={-Math.PI / 2} material={paletteMaterial('grass')} />
+      <Slab centre={[(x0 + x1) / 2, (z0 + c0) / 2]} size={[x1 - x0, c0 - z0]} colour="grass" surface="grass" y={0} />
+      <Slab centre={[(x0 + x1) / 2, (c1 + z1) / 2]} size={[x1 - x0, z1 - c1]} colour="grass" surface="grass" y={0} />
+      <mesh geometry={beyond} rotation-x={-Math.PI / 2} material={townMaterial('grass', 'grass')} receiveShadow />
       <Solid position={[0, -0.5, 0]} size={[x1 - x0, 1, z1 - z0]} />
     </>
   );
@@ -110,22 +112,22 @@ function Street() {
   const roadWidth = STREET.width;
   return (
     <>
-      <Slab centre={[(OLD_TOWN_ENDS + x1) / 2, STREET.z]} size={[x1 - OLD_TOWN_ENDS, roadWidth]} colour="slate" y={0.01} />
-      <Slab centre={[(x0 + OLD_TOWN_ENDS) / 2, STREET.z]} size={[OLD_TOWN_ENDS - x0, roadWidth]} colour="stone" y={0.01} />
+      <Slab centre={[(OLD_TOWN_ENDS + x1) / 2, STREET.z]} size={[x1 - OLD_TOWN_ENDS, roadWidth]} colour="slate" surface="asphalt" y={0.01} />
+      <Slab centre={[(x0 + OLD_TOWN_ENDS) / 2, STREET.z]} size={[OLD_TOWN_ENDS - x0, roadWidth]} colour="stone" surface="cobbles" y={0.01} />
       {[-1, 1].map((side) => (
-        <Slab key={side} centre={[(x0 + x1) / 2, STREET.z + side * STREET.track]} size={[x1 - x0, TRACK_BED]} colour="charcoal" y={0.015} />
+        <Slab key={side} centre={[(x0 + x1) / 2, STREET.z + side * STREET.track]} size={[x1 - x0, TRACK_BED]} colour="charcoal" surface="gravel" y={0.015} />
       ))}
       <Instances placements={rails} />
       {kerbs.map((z, i) => (
         <group key={z}>
-          <mesh position={[(x0 + x1) / 2, KERB.height / 2, z + (i === 0 ? -KERB.width / 2 : KERB.width / 2)]} material={paletteMaterial('stone')} receiveShadow>
+          <mesh position={[(x0 + x1) / 2, KERB.height / 2, z + (i === 0 ? -KERB.width / 2 : KERB.width / 2)]} material={townMaterial('stone', 'stone')} receiveShadow>
             <boxGeometry args={[x1 - x0, KERB.height, KERB.width]} />
           </mesh>
-          <Slab centre={[(x0 + x1) / 2, z + (i === 0 ? -1 : 1) * (STREET.pavement / 2 + KERB.width / 2)]} size={[x1 - x0, STREET.pavement - KERB.width]} colour="linen" y={0.02} />
+          <Slab centre={[(x0 + x1) / 2, z + (i === 0 ? -1 : 1) * (STREET.pavement / 2 + KERB.width / 2)]} size={[x1 - x0, STREET.pavement - KERB.width]} colour="linen" surface="paving" y={0.02} />
         </group>
       ))}
       {zebras.map(([x, z]) => (
-        <Slab key={`${x},${z}`} centre={[x, z]} size={[ZEBRA.stripe[0], ZEBRA.stripe[1]]} colour="white" y={0.02} />
+        <Slab key={`${x},${z}`} centre={[x, z]} size={[ZEBRA.stripe[0], ZEBRA.stripe[1]]} colour="white" surface="paint" y={0.021} />
       ))}
     </>
   );
@@ -184,9 +186,11 @@ function TramStop({ stopId }: { stopId: TramStopId }) {
   const [length, width] = PLATFORM.size;
   return (
     <group position={[x, 0, z]}>
-      <Piece piece="floor" size={[length, PLATFORM.height, width]} repaint={{ linen: 'sand' }} />
+      <mesh position={[0, PLATFORM.height / 2, 0]} material={townMaterial('sand', 'paving')} receiveShadow castShadow>
+        <boxGeometry args={[length, PLATFORM.height, width]} />
+      </mesh>
       {[-1, 1].map((side) => (
-        <mesh key={side} position={[0, PLATFORM.height + 0.005, side * (width / 2 - 0.12)]} rotation-x={-Math.PI / 2} material={paletteMaterial('white')}>
+        <mesh key={side} position={[0, PLATFORM.height + 0.005, side * (width / 2 - 0.12)]} rotation-x={-Math.PI / 2} material={townMaterial('white', 'paint')}>
           <planeGeometry args={[length, 0.12]} />
         </mesh>
       ))}
@@ -229,9 +233,9 @@ function Park() {
   const [px, pz] = POND.centre;
   return (
     <>
-      <Slab centre={PARK.centre} size={PARK.size} colour="leaf" y={0.008} />
+      <Slab centre={PARK.centre} size={PARK.size} colour="leaf" surface="grass" y={0.008} />
       {PARK_PATHS.map(({ centre, size }) => (
-        <Slab key={centre.join()} centre={centre} size={size} colour="sand" y={0.014} />
+        <Slab key={centre.join()} centre={centre} size={size} colour="sand" surface="gravel" y={0.014} />
       ))}
       {TREES.map(([x, z]) => (
         <Solid key={`${x},${z}`} position={[x, 0.9, z]} size={[0.35, 1.8, 0.35]} />
@@ -241,10 +245,10 @@ function Park() {
         <Solid key={`${x},${z}`} position={[x, 0.6, z]} size={[hedgeLength, 1.2, hedgeDepth]} />
       ))}
       <Piece piece="gazebo" position={[BANDSTAND[0], 0, BANDSTAND[1]]} rotation={Math.PI} />
-      <mesh position={[px, 0.12, pz]} material={paletteMaterial('stone')} castShadow receiveShadow>
+      <mesh position={[px, 0.12, pz]} material={townMaterial('stone', 'stone')} castShadow receiveShadow>
         <cylinderGeometry args={[POND.radius + 0.3, POND.radius + 0.35, 0.24, 20]} />
       </mesh>
-      <mesh position={[px, 0.245, pz]} rotation-x={-Math.PI / 2} material={paletteMaterial('teal')}>
+      <mesh position={[px, 0.245, pz]} rotation-x={-Math.PI / 2} material={WATER}>
         <circleGeometry args={[POND.radius, 20]} />
       </mesh>
       {[

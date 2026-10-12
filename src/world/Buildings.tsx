@@ -142,7 +142,8 @@ function ClosedDoor({ building, front, rotation }: { building: Building; front: 
   return (
     <>
       {[-1, 1].map((side) => (
-        <Piece key={side} piece="door" position={[cx + (side * leaf) / 2, 0, front]} rotation={rotation} />
+        // The leaves are one piece, its knob by its +x edge: the right-hand leaf is turned round, so both knobs meet.
+        <Piece key={side} piece="door" position={[cx + (side * leaf) / 2, 0, front]} rotation={rotation + (side === 1 ? Math.PI : 0)} />
       ))}
       <Solid position={[cx, WALL.height / 2, front]} size={[WALL.doorWidth, WALL.height, WALL.thickness / 2]} />
     </>
@@ -150,7 +151,7 @@ function ClosedDoor({ building, front, rotation }: { building: Building; front: 
 }
 
 /** What a building's walls and roof are laid out by: the doorway piece's width, a door leaf's, and the roof edge's depth. */
-export type PieceSizes = { doorway: number; leaf: number; edgeDepth: number };
+export type PieceSizes = { doorway: number; leaf: number; edgeDepth: number; quoin: number };
 /** A building's shape and look, whether the Character can go in or not. */
 export type BuildingShape = Pick<Building, 'centre' | 'size' | 'facing' | 'facade' | 'roof' | 'storeys' | 'windowBoxes'>;
 
@@ -226,21 +227,52 @@ export function upstairsAndRoof(building: BuildingShape, lift: number, { edgeDep
   return placements;
 }
 
-/** The roof's pieces' sizes, as `upstairsAndRoof` and the fillers lay them out. */
+/**
+ * A quoin's stones stand this far proud of the walls at the corner they wrap (`quoin` in `art/town/architecture.py`).
+ * A downpipe runs down each side wall this far behind the front and this far off the wall.
+ */
+const QUOIN_PROUD = 0.025;
+const DOWNPIPE = { back: 0.35, off: 0.07 } as const;
+
+/**
+ * A building's corners, storey by storey: dressed stones up all four, and a rainwater pipe down each side near the
+ * front. The ground floor's stay put; the floors above lift off with the roof (`lift`).
+ */
+export function corners(building: BuildingShape, lift: number, { quoin }: PieceSizes): Placement[] {
+  const { centre: [cx, cz], size: [w, d], facing, storeys } = building;
+  const reach = quoin / 2 - QUOIN_PROUD;
+  const placements: Placement[] = [];
+  for (let k = 0; k < storeys; k++) {
+    const y = WALL.height * k;
+    const lifted = k === 0 ? undefined : lift;
+    // Each corner's quoin faces out along both its walls: turned so its +x and +z point out of the building.
+    for (const [sx, sz, rotation] of [[1, 1, 0], [-1, 1, -Math.PI / 2], [-1, -1, Math.PI], [1, -1, Math.PI / 2]] as const) {
+      placements.push({ piece: 'quoin', position: [cx + sx * (w / 2 - reach), y, cz + sz * (d / 2 - reach)], rotation, lift: lifted });
+    }
+    for (const side of [-1, 1]) {
+      placements.push({ piece: 'downpipe', position: [cx + side * (w / 2 + DOWNPIPE.off), y, cz + facing * (d / 2 - DOWNPIPE.back)], lift: lifted });
+    }
+  }
+  return placements;
+}
+
+/** The pieces' sizes that `upstairsAndRoof`, `corners` and the fillers lay buildings out by. */
 export function usePieceSizesForBuildings(): PieceSizes {
   const [doorway] = usePieceSize('wall-doorway');
   const [leaf] = usePieceSize('door');
   const [, , edgeDepth] = usePieceSize('roof-edge');
-  return useMemo(() => ({ doorway, leaf, edgeDepth }), [doorway, leaf, edgeDepth]);
+  const [quoin] = usePieceSize('quoin');
+  return useMemo(() => ({ doorway, leaf, edgeDepth, quoin }), [doorway, leaf, edgeDepth, quoin]);
 }
 
 /**
- * Every building's floors above the ground floor, and its roof. Each lifts off while it stands between the camera and
- * the Character (inside included), so they're always in view; on the title screen, off the place the save was left at.
+ * Every building's floors above the ground floor, its roof and its corners' stones and pipes. The floors above lift off
+ * while they stand between the camera and the Character (inside included), so they're always in view; on the title
+ * screen, off the place the save was left at.
  */
 function UpstairsAndRoofs() {
   const sizes = usePieceSizesForBuildings();
-  const placements = useMemo(() => BUILDINGS.flatMap((building, i) => upstairsAndRoof(building, i, sizes)), [sizes]);
+  const placements = useMemo(() => BUILDINGS.flatMap((building, i) => [...upstairsAndRoof(building, i, sizes), ...corners(building, i, sizes)]), [sizes]);
   return <Instances placements={placements} lifts={BUILDINGS} liftMargin={ROOF.overhang} />;
 }
 

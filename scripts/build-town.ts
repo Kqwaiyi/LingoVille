@@ -5,13 +5,17 @@
  *
  * Every colour is snapped to the one shared palette (`src/world/palette.ts`): a textured kit's colour map is read under
  * each triangle, a plain kit's material colour is taken as it is, and either becomes the nearest palette colour. Each
- * palette colour is one flat material named after it, with no textures. Window glass keeps a material of its own,
- * `window`, which the game lights while a place is open.
+ * material is a palette colour and a surface (`src/world/surfaces.ts`), named `colour:surface` (or just `colour`, matte),
+ * with no textures: the game draws each surface's detail itself. The town's own Blender pieces name their surfaces;
+ * the kits' pieces get theirs from `scripts/town-surfaces.ts`. Window glass keeps a material of its own, `window`, which
+ * the game lights while a place is open. Faces meeting at a shallow angle are shaded as one curve, sharper ones as edges.
  *
  * The kits are free downloads (CC0), too big to keep in the repo. Download each from its page's "Download" link (or
- * `scripts/fetch-itch.ts` on kenney.itch.io), unzip each into a folder named for its page, all in one folder, and pass it:
+ * `scripts/fetch-itch.ts` on kenney.itch.io), unzip each into a folder named for its page, all in one folder, and pass it.
+ * Without the folder, or with a kit missing from it, a piece that needs a missing kit is carried over from the
+ * `public/town/town.glb` already built, its surfaces and shading made afresh: so the town's own pieces can be rebuilt
+ * without downloading the kits:
  * - building-kit: https://kenney.nl/assets/building-kit
- * - modular-buildings: https://kenney.nl/assets/modular-buildings
  * - city-kit-roads: https://kenney.nl/assets/city-kit-roads
  * - train-kit: https://kenney.nl/assets/train-kit
  * - furniture-kit: https://kenney.nl/assets/furniture-kit
@@ -23,7 +27,7 @@
  * `art/town/town.blend` by `art/town/pieces.py` (see `art/town/README.md`), read here as the `town-art` kit. Its
  * pieces and the rest of the scenery are put together in `scripts/town-scenery.ts`.
  *
- * `npm run build:town -- <folder>`
+ * `npm run build:town -- [folder]`
  */
 import { Document, NodeIO, type Material, type Node } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
@@ -34,14 +38,16 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
 import { fromLinear, hexRgb, nearest, toLinear, type Rgb } from './palette.ts';
-import { KIT_FACADE, KIT_ROOF, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type SceneryPiece, type TownMaterial, type TownPiece } from '../src/world/townArt.ts';
+import { materialName, SURFACE_LOOKS, type Surface } from '../src/world/surfaces.ts';
+import { TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type SceneryPiece, type TownMaterial, type TownPiece } from '../src/world/townArt.ts';
 import { PROP_PARTS } from './town-props.ts';
 import { SCENERY_PARTS } from './town-scenery.ts';
+import { PIECE_SURFACES, SMOOTH_ANGLE, SMOOTHER } from './town-surfaces.ts';
 
+/** The folder the Kenney kits were unzipped into, if any. */
 const source = process.argv[2];
-if (!source) throw new Error('Pass the folder the Kenney kits were unzipped into.');
 
-type Kit = 'building-kit' | 'modular-buildings' | 'city-kit-roads' | 'train-kit' | 'furniture-kit' | 'nature-kit' | 'food-kit' | 'fantasy-town-kit' | 'town-art';
+type Kit = 'building-kit' | 'city-kit-roads' | 'train-kit' | 'furniture-kit' | 'nature-kit' | 'food-kit' | 'fantasy-town-kit' | 'town-art';
 
 /** The town's own pieces, made in Blender: kept in the repo, not downloaded. */
 const TOWN_ART = join('art', 'town', 'glb');
@@ -51,7 +57,7 @@ export type Vec3 = [number, number, number];
  * One kit model in a piece. It is turned (`turns`, quarter turns about y, anticlockwise from above), then stood on the
  * ground and centred on its footprint, then sized (`scale`, or `fit` to an exact size in metres) and moved (`at`).
  * `flip` turns it upside down first. `glass` makes the model's glass the window glass. `repaint` swaps palette colours
- * after snapping; `paint` makes the whole model one palette colour instead.
+ * after snapping; `paint` makes the whole model one palette colour instead. `surface` makes it all one surface.
  */
 export type Part = {
   kit: Kit;
@@ -64,19 +70,12 @@ export type Part = {
   glass?: boolean;
   repaint?: Partial<Record<PaletteColour, PaletteColour>>;
   paint?: PaletteColour;
+  surface?: Surface;
 };
 
 /** Kenney's furniture and nature kits store their material colours as sRGB, where glTF expects linear. */
 const SRGB_FACTORS = new Set<Kit>(['furniture-kit', 'nature-kit']);
 
-/**
- * The building kit's colour map shades each face from a gradient, so a wall's two sides snap to different greys. These
- * settle each kind of piece on one colour per surface: walls on the façade colour outside (`KIT_FACADE`, which each
- * building repaints) and cream inside, with cream frames and stone trim; roofs on the roof colour (`KIT_ROOF`, likewise).
- */
-const WALL_COLOURS = { slate: KIT_FACADE, stone: KIT_FACADE, charcoal: 'cream', sky: 'cream', linen: 'cream', denim: 'stone', plum: 'stone' } as const;
-const ROOF_COLOURS = { ink: KIT_ROOF, charcoal: KIT_ROOF, slate: KIT_ROOF, peach: KIT_FACADE, lavender: 'stone' } as const;
-const FLAT_ROOF_COLOURS = { slate: KIT_ROOF, stone: KIT_ROOF, lavender: KIT_ROOF, charcoal: KIT_ROOF, cream: KIT_ROOF } as const;
 const METAL_COLOURS = { lavender: 'slate', stone: 'slate', charcoal: 'slate', sky: 'white', cream: 'white' } as const;
 /** The nature kit's aqua leaves and grass, made leaf green; its bark, wood. */
 const NATURE_COLOURS = { mint: 'leaf', teal: 'leaf', grass: 'leaf', peach: 'wood', terracotta: 'wood' } as const;
@@ -84,45 +83,48 @@ const NATURE_COLOURS = { mint: 'leaf', teal: 'leaf', grass: 'leaf', peach: 'wood
 /** Kenney's furniture and nature kits are modelled small: this brings them to life size. */
 const FURNITURE_SCALE = 2.3;
 const NATURE_SCALE = 2.6;
-/** Wall pieces are 0.1 m thick, their frames 0.2 m: thickened to sit in the town's 0.3 m walls without bulging out. */
-const WALL_DEPTH = 2;
+const art = (model: string, extra: Omit<Part, 'kit' | 'model'> = {}): Part => ({ kit: 'town-art', model, ...extra });
 
 const TOWN: Record<Exclude<TownPiece, SceneryPiece>, Part[]> = {
-  wall: [{ kit: 'building-kit', model: 'wall', turns: 1, scale: [1, 1, WALL_DEPTH], repaint: WALL_COLOURS }],
-  'wall-window': [{ kit: 'building-kit', model: 'wall-window-square', turns: 1, scale: [1, 1, WALL_DEPTH], glass: true, repaint: WALL_COLOURS }],
-  // The wide doorway, narrowed so its opening is the town's 1.8 m door.
-  'wall-doorway': [{ kit: 'building-kit', model: 'wall-doorway-wide-square', turns: 1, scale: [1.8 / 2.9, 1, WALL_DEPTH], repaint: WALL_COLOURS }],
-  door: [{ kit: 'building-kit', model: 'door-rotate-square-a', turns: 1, fit: [0.9, 2.1, 0.1], repaint: { slate: 'walnut', stone: 'wood', lavender: 'wood', charcoal: 'ink' } }],
-  floor: [{ kit: 'building-kit', model: 'floor', repaint: { slate: 'linen', stone: 'linen', cream: 'linen' } }],
-  'roof-gable': [{ kit: 'modular-buildings', model: 'roof-gable', turns: 1, repaint: ROOF_COLOURS }],
-  'roof-gable-end': [{ kit: 'modular-buildings', model: 'roof-gable-end', turns: 1, repaint: ROOF_COLOURS }],
-  'roof-flat': [{ kit: 'building-kit', model: 'roof-flat-center', repaint: FLAT_ROOF_COLOURS }],
-  'roof-edge': [{ kit: 'building-kit', model: 'border', turns: 1, repaint: { slate: KIT_FACADE, stone: KIT_FACADE, lavender: KIT_FACADE, charcoal: KIT_FACADE, cream: 'cream' } }],
-  rail: [{ kit: 'train-kit', model: 'railroad-rail-straight', turns: 1, scale: 1.15, repaint: { lavender: 'stone' } }],
-  'street-light': [{ kit: 'city-kit-roads', model: 'light-square', scale: 6, repaint: METAL_COLOURS }],
-  'stop-pole': [{ kit: 'city-kit-roads', model: 'road-sign-empty', scale: 6, repaint: { lavender: 'denim', slate: 'denim' } }],
-  'shelter-post': [{ kit: 'building-kit', model: 'column-thin', scale: [0.4, 1, 0.4], repaint: { ...METAL_COLOURS, lavender: 'white', charcoal: 'stone', slate: 'stone' } }],
-  'shelter-roof': [{ kit: 'building-kit', model: 'roof-flat-center', repaint: FLAT_ROOF_COLOURS }],
-  'tree-round': [{ kit: 'nature-kit', model: 'tree_default', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
-  'tree-oak': [{ kit: 'nature-kit', model: 'tree_oak', scale: NATURE_SCALE * 1.2, repaint: NATURE_COLOURS }],
-  'tree-tall': [{ kit: 'nature-kit', model: 'tree_tall', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
-  bush: [{ kit: 'nature-kit', model: 'plant_bushDetailed', scale: NATURE_SCALE, repaint: NATURE_COLOURS }],
+  // The buildings, modelled in Blender (`art/town/architecture.py`).
+  wall: [art('wall')],
+  'wall-window': [art('wall-window', { glass: true })],
+  'wall-doorway': [art('wall-doorway')],
+  door: [art('door', { glass: true })],
+  floor: [art('floor')],
+  'roof-gable': [art('roof-gable')],
+  'roof-gable-end': [art('roof-gable-end')],
+  'roof-flat': [art('roof-flat')],
+  'roof-edge': [art('roof-edge')],
+  quoin: [art('quoin')],
+  downpipe: [art('downpipe')],
+  rail: [art('rail')],
+  'street-light': [art('street-light')],
+  'stop-pole': [art('stop-pole')],
+  'shelter-post': [art('shelter-post')],
+  'shelter-roof': [art('shelter-roof')],
+  // Trees and shrubs, modelled in Blender (`art/town/nature.py`).
+  'tree-round': [art('tree-round')],
+  'tree-oak': [art('tree-oak')],
+  'tree-tall': [art('tree-tall')],
+  bush: [art('bush')],
   // Flowers at about knee height.
   'flowers-red': [{ kit: 'nature-kit', model: 'flower_redA', scale: NATURE_SCALE * 0.6, repaint: NATURE_COLOURS }],
   'flowers-yellow': [{ kit: 'nature-kit', model: 'flower_yellowA', scale: NATURE_SCALE * 0.6, repaint: NATURE_COLOURS }],
   'flowers-purple': [{ kit: 'nature-kit', model: 'flower_purpleA', scale: NATURE_SCALE * 0.6, repaint: NATURE_COLOURS }],
-  bench: [{ kit: 'furniture-kit', model: 'bench', scale: FURNITURE_SCALE }],
-  counter: [{ kit: 'furniture-kit', model: 'kitchenCabinet', scale: FURNITURE_SCALE }],
+  bench: [art('bench')],
+  // Furniture modelled in Blender (`art/town/furnishings.py`), and some still from the kit.
+  counter: [art('counter')],
   shelf: [{ kit: 'furniture-kit', model: 'bookcaseOpen', scale: FURNITURE_SCALE }],
   bookcase: [{ kit: 'furniture-kit', model: 'bookcaseClosed', scale: FURNITURE_SCALE }],
-  table: [{ kit: 'furniture-kit', model: 'tableCrossCloth', scale: FURNITURE_SCALE }],
-  bed: [{ kit: 'furniture-kit', model: 'bedSingle', scale: FURNITURE_SCALE }],
-  sink: [{ kit: 'furniture-kit', model: 'kitchenSink', scale: FURNITURE_SCALE }],
-  stove: [{ kit: 'furniture-kit', model: 'kitchenStove', scale: FURNITURE_SCALE }],
-  fridge: [{ kit: 'furniture-kit', model: 'kitchenFridge', scale: FURNITURE_SCALE }],
+  table: [art('table')],
+  bed: [art('bed')],
+  sink: [art('sink')],
+  stove: [art('stove')],
+  fridge: [art('fridge')],
   'cushioned-bench': [{ kit: 'furniture-kit', model: 'benchCushion', scale: FURNITURE_SCALE }],
-  plant: [{ kit: 'furniture-kit', model: 'pottedPlant', scale: FURNITURE_SCALE }],
-  rug: [{ kit: 'furniture-kit', model: 'rugRectangle', scale: FURNITURE_SCALE }],
+  plant: [art('plant')],
+  rug: [art('rug')],
   // No kit has a running machine: a belt on a low base, with a handrail and a console at its front (+z).
   treadmill: [
     { kit: 'city-kit-roads', model: 'tile-low', fit: [0.8, 0.12, 1.8] },
@@ -136,6 +138,9 @@ const TOWN: Record<Exclude<TownPiece, SceneryPiece>, Part[]> = {
 const PIECES: Record<ArtPiece, Part[]> = { ...TOWN, ...SCENERY_PARTS, ...PROP_PARTS };
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ sharp });
+
+/** Whether a kit's models are here to build from: the town's own always are, Kenney's if they were unzipped. */
+const hasKit = (kit: Kit) => kit === 'town-art' || (source !== undefined && existsSync(join(source, kit)));
 
 /** A kit model's file: the GLB, wherever its kit keeps them. */
 function modelPath(kit: Kit, model: string) {
@@ -193,6 +198,9 @@ async function bakePart(part: Part): Promise<Triangles> {
     for (const primitive of mesh.listPrimitives()) {
       const material = primitive.getMaterial();
       const isGlass = part.glass && material?.getName() === 'glass';
+      // The town's own pieces name their surface after their colour: `colour:surface`.
+      const named = material?.getName().split(':')[1];
+      const surface = part.surface ?? (named && named in SURFACE_LOOKS ? (named as Surface) : undefined);
       const colourAt = await colourOf(material, SRGB_FACTORS.has(part.kit));
       const position = primitive.getAttribute('POSITION')!;
       const uvs = primitive.getAttribute('TEXCOORD_0');
@@ -202,7 +210,8 @@ async function bakePart(part: Part): Promise<Triangles> {
         const corners = [0, 1, 2].map((k) => (indices ? indices.getScalar(i + k) : i + k));
         const uv = [0, 1].map((axis) => (uvs ? corners.reduce((sum, corner) => sum + uvs.getElement(corner, [])[axis]!, 0) / 3 : 0)) as [number, number];
         const snapped = nearest(colourAt(uv));
-        const name: TownMaterial = isGlass ? WINDOW_GLASS : (part.paint ?? part.repaint?.[snapped] ?? snapped);
+        const colour = part.paint ?? part.repaint?.[snapped] ?? snapped;
+        const name: TownMaterial = isGlass ? WINDOW_GLASS : surface ? materialName(colour, surface) : colour;
         const list = triangles.get(name) ?? triangles.set(name, []).get(name)!;
         for (const corner of corners) list.push(...transform(matrix, position.getElement(corner, [])));
       }
@@ -249,17 +258,79 @@ function bounds(lists: number[][]): [Vec3, Vec3] {
   return [min, max];
 }
 
-/** Each triangle's own normal at its three corners, so the faces read flat. */
-function flatNormals(positions: number[]) {
-  const normals: number[] = [];
+/**
+ * The normal at each triangle's corners: where faces meet at less than `angle` degrees, their normals are averaged
+ * there (weighted by size), so they shade as one curve; at a sharper angle each keeps its own, and the edge shows.
+ */
+function smoothNormals(positions: number[], angle: number) {
+  const faces: Vec3[] = [];
   for (let i = 0; i < positions.length; i += 9) {
     const [ax, ay, az, bx, by, bz, cx, cy, cz] = positions.slice(i, i + 9) as number[];
     const [ux, uy, uz, vx, vy, vz] = [bx! - ax!, by! - ay!, bz! - az!, cx! - ax!, cy! - ay!, cz! - az!];
-    const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    faces.push([uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]);
+  }
+  const unit = faces.map((n): Vec3 => {
     const length = Math.hypot(...n) || 1;
-    for (let k = 0; k < 3; k++) normals.push(n[0]! / length, n[1]! / length, n[2]! / length);
+    return [n[0] / length, n[1] / length, n[2] / length];
+  });
+  // The triangles at each corner position.
+  const key = (at: number) => [0, 1, 2].map((k) => Math.round(positions[at + k]! * 1e4)).join();
+  const touching = new Map<string, number[]>();
+  for (let corner = 0; corner < positions.length / 3; corner++) {
+    const at = key(corner * 3);
+    (touching.get(at) ?? touching.set(at, []).get(at)!).push(Math.floor(corner / 3));
+  }
+  const within = Math.cos((angle * Math.PI) / 180);
+  const normals: number[] = [];
+  for (let corner = 0; corner < positions.length / 3; corner++) {
+    const face = Math.floor(corner / 3);
+    const [fx, fy, fz] = unit[face]!;
+    const sum = [0, 0, 0];
+    for (const other of new Set(touching.get(key(corner * 3)))) {
+      const [ox, oy, oz] = unit[other]!;
+      if (fx * ox + fy * oy + fz * oz < within) continue;
+      for (let k = 0; k < 3; k++) sum[k]! += faces[other]![k]!;
+    }
+    // A sliver of a triangle, with no direction of its own, takes its neighbours' (or faces up): never no normal at all.
+    if (Math.hypot(...sum) < 1e-12) for (const other of new Set(touching.get(key(corner * 3)))) for (let k = 0; k < 3; k++) sum[k]! += faces[other]![k]!;
+    if (Math.hypot(...sum) < 1e-12) sum[1] = 1;
+    const length = Math.hypot(...sum);
+    normals.push(sum[0]! / length, sum[1]! / length, sum[2]! / length);
   }
   return normals;
+}
+
+/** A piece's triangles as the town art already built has them, to carry over a piece whose kit isn't here. */
+async function builtBefore(): Promise<Map<string, Triangles>> {
+  const pieces = new Map<string, Triangles>();
+  const path = join('public', TOWN_ART_URL);
+  if (!existsSync(path)) return pieces;
+  const built = await io.read(path);
+  for (const node of built.getRoot().getDefaultScene()?.listChildren() ?? []) {
+    const triangles: Triangles = new Map();
+    for (const primitive of node.getMesh()?.listPrimitives() ?? []) {
+      const position = primitive.getAttribute('POSITION')!;
+      const indices = primitive.getIndices();
+      const count = indices ? indices.getCount() : position.getCount();
+      const name = primitive.getMaterial()!.getName() as TownMaterial;
+      const list = triangles.get(name) ?? triangles.set(name, []).get(name)!;
+      for (let i = 0; i < count; i++) list.push(...position.getElement(indices ? indices.getScalar(i) : i, []));
+    }
+    pieces.set(node.getName(), triangles);
+  }
+  return pieces;
+}
+
+/** A piece's kit materials, given the surfaces `town-surfaces.ts` says they are. Materials with a surface already keep it. */
+function withSurfaces(piece: ArtPiece, triangles: Triangles): Triangles {
+  const surfaces = PIECE_SURFACES[piece] ?? {};
+  const named: Triangles = new Map();
+  for (const [name, list] of triangles) {
+    const surface = name in PALETTE ? surfaces[name as PaletteColour] : undefined;
+    const renamed = surface ? materialName(name as PaletteColour, surface) : name;
+    (named.get(renamed) ?? named.set(renamed, []).get(renamed)!).push(...list);
+  }
+  return named;
 }
 
 async function buildTown() {
@@ -270,25 +341,36 @@ async function buildTown() {
   const materials = new Map<TownMaterial, Material>();
   const materialFor = (name: TownMaterial) => {
     if (!materials.has(name)) {
-      const [r, g, b] = hexRgb(PALETTE[name === WINDOW_GLASS ? 'sky' : name]).map(toLinear);
-      materials.set(name, out.createMaterial(name).setBaseColorFactor([r!, g!, b!, 1]).setMetallicFactor(0).setRoughnessFactor(0.9));
+      const [colour, surface = 'matte'] = (name === WINDOW_GLASS ? 'sky' : name).split(':') as [PaletteColour, Surface?];
+      const { roughness, metalness } = SURFACE_LOOKS[surface];
+      const [r, g, b] = hexRgb(PALETTE[colour]).map(toLinear);
+      materials.set(name, out.createMaterial(name).setBaseColorFactor([r!, g!, b!, 1]).setMetallicFactor(metalness).setRoughnessFactor(roughness));
     }
     return materials.get(name)!;
   };
 
+  const before = await builtBefore();
   for (const [piece, parts] of Object.entries(PIECES) as [ArtPiece, Part[]][]) {
-    const triangles: Triangles = new Map();
-    for (const part of parts) {
-      for (const [name, list] of await bakePart(part)) (triangles.get(name) ?? triangles.set(name, []).get(name)!).push(...list);
+    let triangles: Triangles = new Map();
+    const carried = !parts.every((part) => hasKit(part.kit));
+    if (carried) {
+      if (!before.has(piece)) throw new Error(`${piece} needs ${parts.map((part) => part.kit).filter((kit) => !hasKit(kit)).join(', ')}, which isn't here, and there's no town.glb to carry it over from.`);
+      triangles = before.get(piece)!;
+    } else {
+      for (const part of parts) {
+        for (const [name, list] of await bakePart(part)) (triangles.get(name) ?? triangles.set(name, []).get(name)!).push(...list);
+      }
     }
+    triangles = withSurfaces(piece, triangles);
     const mesh = out.createMesh(piece);
     for (const [name, positions] of triangles) {
       const accessor = (array: number[]) => out.createAccessor().setType('VEC3').setArray(new Float32Array(array)).setBuffer(buffer);
-      mesh.addPrimitive(out.createPrimitive().setAttribute('POSITION', accessor(positions)).setAttribute('NORMAL', accessor(flatNormals(positions))).setMaterial(materialFor(name)));
+      const normals = smoothNormals(positions, SMOOTHER[piece] ?? SMOOTH_ANGLE);
+      mesh.addPrimitive(out.createPrimitive().setAttribute('POSITION', accessor(positions)).setAttribute('NORMAL', accessor(normals)).setMaterial(materialFor(name)));
     }
     scene.addChild(out.createNode(piece).setMesh(mesh));
     const [min, max] = bounds([...triangles.values()]);
-    console.log(piece.padEnd(16), [0, 1, 2].map((axis) => (max[axis]! - min[axis]!).toFixed(2)).join(' × '), [...triangles.keys()].join(' '));
+    console.log(piece.padEnd(16), carried ? 'carried' : 'built  ', [0, 1, 2].map((axis) => (max[axis]! - min[axis]!).toFixed(2)).join(' × '), [...triangles.keys()].join(' '));
   }
   await out.transform(weld());
   await mkdir(join('public', TOWN_ART_URL, '..'), { recursive: true });

@@ -2,8 +2,8 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import type { Group } from 'three';
 import { selectLampsOn, selectTramRunning, useGame } from '../store/index.ts';
-import { DOOR_LAMP, upstairsAndRoof, usePieceSizesForBuildings, wallRunPlacements, WALL_PIECE_LENGTH, type PieceSizes } from './Buildings.tsx';
-import { Instances, laidAlong, paletteMaterial, Piece, Solid, usePieceSize, type Footprint, type Placement, type Repaint } from './Kit.tsx';
+import { corners, DOOR_LAMP, upstairsAndRoof, usePieceSizesForBuildings, wallRunPlacements, WALL_PIECE_LENGTH, type PieceSizes } from './Buildings.tsx';
+import { Instances, laidAlong, Piece, Solid, usePieceSize, type Footprint, type Placement, type Repaint } from './Kit.tsx';
 import {
   BACKDROP,
   BOATS,
@@ -29,6 +29,8 @@ import {
   type Prop,
 } from './scenery.ts';
 import { GROUND, STREET, TOWN_BOUNDS, TRAM_STOPS, WALL, type Vec2 } from './town.ts';
+import { townMaterial, WATER } from './materials.ts';
+import type { Surface } from './surfaces.ts';
 import { KIT_FACADE, type TownPiece } from './townArt.ts';
 
 /** Wires over the tracks, carried on the poles' arms. */
@@ -58,9 +60,10 @@ function fillerPlacements(f: Filler, lift: number, sizes: PieceSizes): Placement
     ...wallRunPlacements([cx - w / 2 + t / 2, cz], 0, d - 2 * t, -Math.PI / 2, 'none', walls, lit),
     ...wallRunPlacements([cx + w / 2 - t / 2, cz], 0, d - 2 * t, Math.PI / 2, 'none', walls, lit),
     { piece: 'wall-doorway', position: [cx, 0, front], rotation: turn, repaint: walls },
-    ...[-1, 1].map((s): Placement => ({ piece: 'door', position: [cx + (s * leaf) / 2, 0, front], rotation: turn })),
+    ...[-1, 1].map((s): Placement => ({ piece: 'door', position: [cx + (s * leaf) / 2, 0, front], rotation: turn + (s === 1 ? Math.PI : 0) })),
     ...[-1, 1].map((s): Placement => ({ piece: 'wall-lantern', position: [cx + s * DOOR_LAMP.out, DOOR_LAMP.height, cz + facing * (d / 2 + 0.05)], rotation: turn, lit: true })),
     ...upstairsAndRoof(f, lift, sizes),
+    ...corners(f, lift, sizes),
   ];
   if (shop) {
     for (const s of [-1, 1]) {
@@ -211,7 +214,7 @@ function Catenary() {
         <Solid key={x} position={[x, 2.9, STREET.z]} size={[0.25, 5.8, 0.25]} />
       ))}
       {[TRACKS.westbound, TRACKS.eastbound].map((z) => (
-        <mesh key={z} position={[0, WIRE.height, z]} material={paletteMaterial('charcoal')}>
+        <mesh key={z} position={[0, WIRE.height, z]} material={townMaterial('charcoal', 'metal')}>
           <boxGeometry args={[length, WIRE.thickness, WIRE.thickness]} />
         </mesh>
       ))}
@@ -219,10 +222,10 @@ function Catenary() {
   );
 }
 
-/** Paving: a flat slab just proud of the ground. */
-function Paving({ centre: [x, z], size: [w, d], colour, y = 0.012 }: { centre: Vec2; size: Vec2; colour: 'sand' | 'stone' | 'linen'; y?: number }) {
+/** Paving: a flat slab just proud of the ground, of slabs or setts. */
+function Paving({ centre: [x, z], size: [w, d], colour, surface, y = 0.012 }: { centre: Vec2; size: Vec2; colour: 'sand' | 'stone' | 'linen'; surface: Surface; y?: number }) {
   return (
-    <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow material={paletteMaterial(colour)}>
+    <mesh position={[x, y, z]} rotation-x={-Math.PI / 2} receiveShadow material={townMaterial(colour, surface)}>
       <planeGeometry args={[w, d]} />
     </mesh>
   );
@@ -235,19 +238,19 @@ function Canal() {
   const length = GROUND.x[1] - GROUND.x[0];
   return (
     <>
-      <Paving centre={[0, (p0 + p1) / 2]} size={[length, p1 - p0]} colour="stone" />
-      <mesh position={[0, -CANAL.waterBelow, (z0 + z1) / 2]} rotation-x={-Math.PI / 2} receiveShadow material={paletteMaterial('teal')}>
+      <Paving centre={[0, (p0 + p1) / 2]} size={[length, p1 - p0]} colour="stone" surface="paving" />
+      <mesh position={[0, -CANAL.waterBelow, (z0 + z1) / 2]} rotation-x={-Math.PI / 2} receiveShadow material={WATER}>
         <planeGeometry args={[length, z1 - z0]} />
       </mesh>
       {/* The grass stops at the banks: their walls drop to the water. */}
       {[z0, z1].map((z, i) => (
-        <mesh key={z} position={[0, -CANAL.waterBelow / 2 + 0.06, z + (i === 0 ? -0.2 : 0.2)]} material={paletteMaterial('stone')} receiveShadow castShadow>
+        <mesh key={z} position={[0, -CANAL.waterBelow / 2 + 0.06, z + (i === 0 ? -0.2 : 0.2)]} material={townMaterial('stone', 'stone')} receiveShadow castShadow>
           <boxGeometry args={[length, CANAL.waterBelow + 0.12, 0.4]} />
         </mesh>
       ))}
       {/* And at either end of the ground, a wall across it, so nothing shows through under the land beyond. */}
       {[-1, 1].map((side) => (
-        <mesh key={side} position={[(side * length) / 2, -CANAL.waterBelow / 2, (z0 + z1) / 2]} material={paletteMaterial('stone')}>
+        <mesh key={side} position={[(side * length) / 2, -CANAL.waterBelow / 2, (z0 + z1) / 2]} material={townMaterial('stone', 'stone')}>
           <boxGeometry args={[0.4, CANAL.waterBelow, z1 - z0]} />
         </mesh>
       ))}
@@ -325,8 +328,8 @@ export function Scenery() {
   return (
     <>
       <Fillers />
-      <Paving centre={OLD_TOWN_SQUARE.centre} size={OLD_TOWN_SQUARE.size} colour="sand" />
-      <Paving centre={MARKET.centre} size={MARKET.size} colour="sand" />
+      <Paving centre={OLD_TOWN_SQUARE.centre} size={OLD_TOWN_SQUARE.size} colour="sand" surface="cobbles" />
+      <Paving centre={MARKET.centre} size={MARKET.size} colour="sand" surface="paving" />
       <Props props={STREET_PROPS} />
       <Props props={SQUARE_PROPS} />
       <Props props={MARKET_PROPS} />

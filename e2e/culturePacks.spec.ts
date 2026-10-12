@@ -117,8 +117,9 @@ test('the town’s signs outdoors, not just the café’s, show pinyin and Trans
   // hours, and the stop's name, in view.
   await page.locator('canvas').click();
   await walkUntil(page, 'KeyS', 'Tram stop');
-  // The bookshop's name board, high above the door and clear of the lanterns beside it.
-  await pointAtASign(page, { rows: [0.2, 0.25, 0.15], columns: [0.5, 0.45, 0.55] });
+  // The bookshop's name board, high above the door and clear of the lanterns beside it: higher up the view the further
+  // the walk ran on before the prompt stopped it.
+  await pointAtASign(page, { rows: [0.2, 0.25, 0.15, 0.12, 0.1], columns: [0.5, 0.45, 0.55] });
 
   await expect(signTooltip(page).locator('ruby rt').first()).toBeVisible();
   await signTooltip(page).getByRole('button', { name: 'Translate' }).click();

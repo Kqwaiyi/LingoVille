@@ -26,6 +26,10 @@ export type SkyLook = {
   /** How much of the moon (with its halo) and the stars show, from 0 to 1. */
   moon: number;
   stars: number;
+  /** The clouds: their sunlit and shaded sides, and how much of the sky they cover, from 0 to 1. */
+  cloudLight: Color;
+  cloudShade: Color;
+  clouds: number;
 };
 
 export function createSkyLook(): SkyLook {
@@ -42,6 +46,9 @@ export function createSkyLook(): SkyLook {
     glow: 0,
     moon: 0,
     stars: 0,
+    cloudLight: new Color(),
+    cloudShade: new Color(),
+    clouds: 0,
   };
 }
 
@@ -67,6 +74,11 @@ const SKY_VERTEX = /* glsl */ `
 `;
 
 const SKY_FRAGMENT = /* glsl */ `
+  uniform float discs;
+  uniform float time;
+  uniform vec3 cloudLight;
+  uniform vec3 cloudShade;
+  uniform float clouds;
   uniform vec3 zenith;
   uniform vec3 horizon;
   uniform vec3 haze;
@@ -90,6 +102,28 @@ const SKY_FRAGMENT = /* glsl */ `
     return 1.0 - smoothstep(radius - pixel, radius + pixel, angle);
   }
 
+  float cloudHash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+  float cloudNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(cloudHash(i), cloudHash(i + vec2(1.0, 0.0)), f.x), mix(cloudHash(i + vec2(0.0, 1.0)), cloudHash(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  float cloudFbm(vec2 p) {
+    float sum = 0.0;
+    float amplitude = 0.55;
+    for (int i = 0; i < 5; i++) {
+      sum += amplitude * cloudNoise(p);
+      p = mat2(1.6, 1.2, -1.2, 1.6) * p;
+      amplitude *= 0.5;
+    }
+    return sum;
+  }
+
   void main() {
     vec3 d = normalize(vDirection);
     float up = d.y;
@@ -111,6 +145,19 @@ const SKY_FRAGMENT = /* glsl */ `
     float toSun = max(dot(d, sunDirection), 0.0);
     colour = mix(colour, sunGlow, clamp(glow * (0.5 * pow(toSun, 10.0) + 0.5 * pow(toSun, 120.0)), 0.0, 1.0));
 
+    // Clouds: soft heaps on a layer high over the town, drifting with the wind, thinning towards the horizon. Lit on the
+    // side towards the sun and shaded under, and tinted by sunrise and sunset along with the sky.
+    if (up > 0.0) {
+      vec2 layer = d.xz / (up + 0.12) * 0.55 + vec2(time * 0.006, time * 0.0025);
+      float heap = cloudFbm(layer * 1.4);
+      float cover = smoothstep(0.62 - clouds * 0.3, 0.95 - clouds * 0.2, heap) * smoothstep(0.0, 0.18, up);
+      float thick = cloudFbm(layer * 1.4 + vec2(0.35, 0.2));
+      float lit = clamp(0.55 + (heap - thick) * 3.0 + 0.35 * pow(max(dot(d, sunDirection), 0.0), 4.0), 0.0, 1.0);
+      vec3 cloud = mix(cloudShade, cloudLight, lit);
+      cloud = mix(cloud, twilight, twilightAmount * 0.45 * band);
+      colour = mix(colour, cloud, cover * 0.92);
+    }
+
     // The moon's halo, and its face, with darker seas on it.
     float toMoon = max(dot(d, moonDirection), 0.0);
     colour = mix(colour, moonHalo, moon * 0.35 * pow(toMoon, 300.0));
@@ -121,10 +168,10 @@ const SKY_FRAGMENT = /* glsl */ `
       + smoothstep(0.32, 0.12, length(onFace - vec2(0.3, -0.05)))
       + smoothstep(0.26, 0.08, length(onFace - vec2(-0.05, -0.42)));
     vec3 face = mix(moonLight, moonSeas, clamp(seas, 0.0, 1.0) * 0.8);
-    colour = mix(colour, face, moon * disc(d, moonDirection, ${DISCS.moon.toFixed(4)}));
+    colour = mix(colour, face, discs * moon * disc(d, moonDirection, ${DISCS.moon.toFixed(4)}));
 
     // The sun's disc, in front of all.
-    colour = mix(colour, sunDisc, disc(d, sunDirection, ${DISCS.sun.toFixed(4)}));
+    colour = mix(colour, sunDisc, discs * disc(d, sunDirection, ${DISCS.sun.toFixed(4)}));
 
     gl_FragColor = vec4(mix(haze, colour, aboveHorizon), 1.0);
     #include <colorspace_fragment>
@@ -197,37 +244,60 @@ function starField() {
 }
 
 /**
+ * The sky's material, drawing `look`: with the sun's and moon's discs (`discs`), as the camera sees it, or without, as
+ * the town's surfaces see it in their reflections and the light they take from it (`Lighting`'s environment).
+ */
+export function skyMaterial(look: SkyLook, discs: boolean) {
+  const sky = new ShaderMaterial({
+    vertexShader: SKY_VERTEX,
+    fragmentShader: SKY_FRAGMENT,
+    uniforms: {
+      discs: { value: discs ? 1 : 0 },
+      time: { value: 0 },
+      zenith: { value: look.zenith },
+      horizon: { value: look.horizon },
+      haze: { value: look.haze },
+      twilight: { value: look.twilight },
+      twilightAmount: { value: 0 },
+      sunDirection: { value: look.sunDirection },
+      moonDirection: { value: look.moonDirection },
+      sunDisc: { value: look.sunDisc },
+      sunGlow: { value: look.sunGlow },
+      glow: { value: 0 },
+      moon: { value: 0 },
+      moonLight: { value: new Color(WORLD_COLOURS[MOON.light]) },
+      moonSeas: { value: new Color(WORLD_COLOURS[MOON.seas]) },
+      moonHalo: { value: new Color(WORLD_COLOURS[MOON.halo]) },
+      cloudLight: { value: look.cloudLight },
+      cloudShade: { value: look.cloudShade },
+      clouds: { value: 0 },
+    },
+    side: BackSide,
+    depthTest: false,
+    depthWrite: false,
+    fog: false,
+  });
+  return sky;
+}
+
+/** Brings a sky material's numbers up to `look`, `time` seconds in (which moves the clouds on). */
+export function updateSky(sky: ShaderMaterial, look: SkyLook, time: number) {
+  sky.uniforms.twilightAmount!.value = look.twilightAmount;
+  sky.uniforms.glow!.value = look.glow;
+  sky.uniforms.moon!.value = look.moon;
+  sky.uniforms.clouds!.value = look.clouds;
+  sky.uniforms.time!.value = time;
+}
+
+/**
  * The sky round the camera, past everything else: a gradient from the horizon up, the glow of sunrise and sunset, the
- * sun and the moon, and the stars at night, all as `look` says. Drawn first and behind everything, writing no depth.
+ * clouds, the sun and the moon, and the stars at night, all as `look` says. Drawn first and behind everything, writing
+ * no depth.
  */
 export function Sky({ look }: { look: SkyLook }) {
   const group = useRef<Group>(null);
   const starPoints = useRef<Points>(null);
   const { dome, sky, stars, starMaterial } = useMemo(() => {
-    const sky = new ShaderMaterial({
-      vertexShader: SKY_VERTEX,
-      fragmentShader: SKY_FRAGMENT,
-      uniforms: {
-        zenith: { value: look.zenith },
-        horizon: { value: look.horizon },
-        haze: { value: look.haze },
-        twilight: { value: look.twilight },
-        twilightAmount: { value: 0 },
-        sunDirection: { value: look.sunDirection },
-        moonDirection: { value: look.moonDirection },
-        sunDisc: { value: look.sunDisc },
-        sunGlow: { value: look.sunGlow },
-        glow: { value: 0 },
-        moon: { value: 0 },
-        moonLight: { value: new Color(WORLD_COLOURS[MOON.light]) },
-        moonSeas: { value: new Color(WORLD_COLOURS[MOON.seas]) },
-        moonHalo: { value: new Color(WORLD_COLOURS[MOON.halo]) },
-      },
-      side: BackSide,
-      depthTest: false,
-      depthWrite: false,
-      fog: false,
-    });
     const starMaterial = new ShaderMaterial({
       vertexShader: STAR_VERTEX,
       fragmentShader: STAR_FRAGMENT,
@@ -237,16 +307,14 @@ export function Sky({ look }: { look: SkyLook }) {
       depthWrite: false,
       fog: false,
     });
-    return { dome: new SphereGeometry(1, 48, 24), sky, stars: starField(), starMaterial };
+    return { dome: new SphereGeometry(1, 48, 24), sky: skyMaterial(look, true), stars: starField(), starMaterial };
   }, [look]);
 
   useFrame(({ camera, clock, gl }) => {
     group.current!.position.copy(camera.position);
-    sky.uniforms.twilightAmount!.value = look.twilightAmount;
-    sky.uniforms.glow!.value = look.glow;
-    sky.uniforms.moon!.value = look.moon;
+    updateSky(sky, look, clock.elapsedTime);
     starPoints.current!.visible = look.stars > 0;
-    starMaterial.uniforms.stars!.value = look.stars;
+    starMaterial.uniforms.stars!.value = look.stars * (1 - look.clouds * 0.5);
     starMaterial.uniforms.time!.value = clock.elapsedTime;
     starMaterial.uniforms.pixelRatio!.value = gl.getPixelRatio();
   });

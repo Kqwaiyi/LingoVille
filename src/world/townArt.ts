@@ -2,6 +2,7 @@
 // The build script and `tooling/townArt.test.ts` hold the art to these names.
 import { PROP_IDS, type PropId } from '../content/index.ts';
 import type { PaletteColour } from './palette.ts';
+import type { Surface } from './surfaces.ts';
 
 export const TOWN_ART_URL = '/town/town.glb';
 
@@ -96,6 +97,8 @@ export const TOWN_PIECES = [
   'roof-gable-end',
   'roof-flat',
   'roof-edge',
+  'quoin',
+  'downpipe',
   // The street and the tram stops.
   'rail',
   'street-light',
@@ -135,9 +138,12 @@ export type TownPiece = (typeof TOWN_PIECES)[number];
 export const ART_PIECES = [...TOWN_PIECES, ...PROP_IDS] as const;
 export type ArtPiece = TownPiece | PropId;
 
-/** The glass in a window, lit while its place is open. Every other material is named for its palette colour. */
+/**
+ * The glass in a window, lit while its place is open. Every other material is named for its palette colour and its
+ * surface (`surfaces.ts`): `colour:surface`, or just `colour` for a matte one.
+ */
 export const WINDOW_GLASS = 'window';
-export type TownMaterial = PaletteColour | typeof WINDOW_GLASS;
+export type TownMaterial = PaletteColour | `${PaletteColour}:${Surface}` | typeof WINDOW_GLASS;
 /** The material of each piece's bulb, which glows while it's lit: a street light's, the lamps by the doors, under the tram shelters and in the rooms, and a tram's headlights, from dusk. */
 export const LAMP_BULBS: Partial<Record<ArtPiece, TownMaterial>> = {
   'street-light': 'white',

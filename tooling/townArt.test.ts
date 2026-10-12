@@ -1,16 +1,18 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_ART_URLS } from '../src/world/characterArt.ts';
-import { PALETTE, type PaletteColour } from '../src/world/palette.ts';
+import { PALETTE } from '../src/world/palette.ts';
+import { parseMaterialName, SURFACES, surfaceTextureUrl, TEXTURED_SURFACES } from '../src/world/surfaces.ts';
 import { PROP_IDS } from '../src/content/index.ts';
 import { ART_PIECES, LAMP_BULBS, TOWN_ART_URL, TOWN_PIECES, WINDOW_GLASS } from '../src/world/townArt.ts';
 
 // Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from and every
-// Culture Pack's props, a bulb in each piece that lights up, and nothing but flat colours from the one shared palette.
-// World code draws from the same palette, by name, and the character art's outfit (`npm run build:characters`) is
-// painted in it too.
+// Culture Pack's props, a bulb in each piece that lights up, and no colour but the one shared palette's, each material a
+// palette colour and a surface (`colour:surface`) with no textures of its own: the surfaces' detail textures are the
+// game's, one for each surface that has one. World code draws from the same palette, by name, and the character art's
+// outfit (`npm run build:characters`) is painted in it too.
 
 type Gltf = {
   scenes: { nodes: number[] }[];
@@ -42,7 +44,6 @@ function materialsUnder(gltf: Gltf, index: number): string[] {
   return [...own, ...(node.children ?? []).flatMap((child) => materialsUnder(gltf, child))];
 }
 
-const isPaletteColour = (name: string): name is PaletteColour => name in PALETTE;
 
 /** Everything the game needs that the art lacks, and every colour it has that the palette doesn't, one line each. */
 function townArtProblems(town: Gltf): string[] {
@@ -52,13 +53,14 @@ function townArtProblems(town: Gltf): string[] {
   for (const { name = '', pbrMetallicRoughness: pbr = {} } of town.materials ?? []) {
     if (pbr.baseColorTexture) problems.push(`town.glb's ${name} material has a texture.`);
     if (name === WINDOW_GLASS) continue;
-    if (!isPaletteColour(name)) {
-      problems.push(`town.glb's ${name} material is not a palette colour.`);
+    const material = parseMaterialName(name);
+    if (!material) {
+      problems.push(`town.glb's ${name} material is not a palette colour and surface.`);
       continue;
     }
     const [r, g, b] = pbr.baseColorFactor ?? [1, 1, 1];
-    const off = linear(PALETTE[name]).some((c, i) => Math.abs(c - [r, g, b][i]!) > 0.002);
-    if (off) problems.push(`town.glb's ${name} material is not ${PALETTE[name]}.`);
+    const off = linear(PALETTE[material.colour]).some((c, i) => Math.abs(c - [r, g, b][i]!) > 0.002);
+    if (off) problems.push(`town.glb's ${name} material is not ${PALETTE[material.colour]}.`);
   }
   if (town.images?.length) problems.push('town.glb has images.');
   for (const [piece, bulb] of Object.entries(LAMP_BULBS)) {
@@ -119,6 +121,8 @@ describe('the town art', () => {
     for (const index of stale.scenes[0]!.nodes) if (stale.nodes[index]!.name === 'noren') stale.nodes[index]!.name = 'curtain';
     stale.materials = [
       { name: 'leaf', pbrMetallicRoughness: { baseColorFactor: [0, 0, 1, 1] } },
+      { name: 'brick:brick', pbrMetallicRoughness: { baseColorFactor: [0, 0, 1, 1] } },
+      { name: 'stone:velvet', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1] } },
       { name: 'colormap', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], baseColorTexture: { index: 0 } } },
     ];
     stale.images = [{}];
@@ -127,8 +131,10 @@ describe('the town art', () => {
       'town.glb has no bench.',
       'town.glb has no noren.',
       `town.glb's leaf material is not ${PALETTE.leaf}.`,
+      `town.glb's brick:brick material is not ${PALETTE.brick}.`,
+      "town.glb's stone:velvet material is not a palette colour and surface.",
       "town.glb's colormap material has a texture.",
-      "town.glb's colormap material is not a palette colour.",
+      "town.glb's colormap material is not a palette colour and surface.",
       'town.glb has images.',
       "town.glb's street-light has no white bulb.",
       "town.glb's wall-lantern has no lamplight bulb.",
@@ -137,6 +143,19 @@ describe('the town art', () => {
       "town.glb's ceiling-lamp has no lamplight bulb.",
       "town.glb's tram has no lamplight bulb.",
     ]);
+  });
+});
+
+describe('the surfaces', () => {
+  it('each have a detail texture, if they have one at all', () => {
+    expect(TEXTURED_SURFACES.filter((surface) => !existsSync(`public${surfaceTextureUrl(surface)}`))).toEqual([]);
+  });
+
+  it('name a material by its colour and surface, a matte one by its colour alone', () => {
+    expect(parseMaterialName('lavender:plaster')).toEqual({ colour: 'lavender', surface: 'plaster' });
+    expect(parseMaterialName('lavender')).toEqual({ colour: 'lavender', surface: 'matte' });
+    expect([parseMaterialName('lilac:plaster'), parseMaterialName('lavender:velvet'), parseMaterialName('a:b:c')]).toEqual([null, null, null]);
+    expect(SURFACES).toContain('matte');
   });
 });
 

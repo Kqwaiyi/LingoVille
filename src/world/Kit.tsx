@@ -2,40 +2,18 @@ import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider } from '@react-three/rapier';
 import { useEffect, useMemo, useRef } from 'react';
-import { Box3, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type BufferGeometry, type Mesh, type Object3D } from 'three';
+import { Box3, InstancedMesh, Matrix4, Quaternion, Vector3, type BufferGeometry, type Material, type Mesh, type Object3D } from 'three';
 import { selectLampsOn, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
-import { PALETTE, type PaletteColour } from './palette.ts';
+import { GLASS, LAMP, litGlass, namedMaterial } from './materials.ts';
 import { LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type Repaint, type Size } from './townArt.ts';
 
 export type { Repaint, Size };
 import { spawnAt, type Vec2, type Vec3 } from './town.ts';
 
 // The town's kit pieces, built by `npm run build:town`: every building, street piece and stick of furniture is one of
-// these, flat shaded in palette colours.
+// these, in palette colours and the surfaces they're made of (`materials.ts`).
 useGLTF.preload(TOWN_ART_URL);
-
-
-/** Window glass while its place is open, and while it's closed. Once the lamps are on, an open place's glass is lit. */
-const GLASS = { open: 'sky', closed: 'charcoal' } as const satisfies Record<string, PaletteColour>;
-
-/** How every material in the town is drawn: flat shaded and matte. */
-const FLAT = { roughness: 0.9, flatShading: true } as const;
-
-const materials = new Map<PaletteColour, MeshStandardMaterial>();
-/** One shared material per palette colour, made once: for the town's plain shapes too (kerbs, water, wires). */
-export function paletteMaterial(colour: PaletteColour) {
-  if (!materials.has(colour)) materials.set(colour, new MeshStandardMaterial({ color: PALETTE[colour], ...FLAT }));
-  return materials.get(colour)!;
-}
-
-/** Lit window glass and lit street-light bulbs: lamplight that glows, brighter as night falls. */
-const LAMP = new MeshStandardMaterial({ color: PALETTE.lamplight, emissive: PALETTE.lamplight, ...FLAT });
-
-/** How brightly lit windows and street lights glow, set by the time of day. */
-export function setLampGlow(glow: number) {
-  LAMP.emissiveIntensity = glow;
-}
 
 const isMesh = (object: Object3D): object is Mesh => (object as Mesh).isMesh === true;
 
@@ -98,10 +76,10 @@ export function Piece({ piece, position = [0, 0, 0], rotation = 0, size, repaint
     const swaps: Repaint = JSON.parse(repaintKey);
     copy.traverse((child) => {
       if (!isMesh(child)) return;
-      const name = (child.material as MeshStandardMaterial).name;
-      if (name === WINDOW_GLASS) child.material = !open ? paletteMaterial(GLASS.closed) : lit ? LAMP : paletteMaterial(GLASS.open);
+      const name = (child.material as Material).name;
+      if (name === WINDOW_GLASS) child.material = !open ? GLASS.closed : lit ? litGlass(piece) : GLASS.open;
       else if (lit && name === LAMP_BULBS[piece]) child.material = LAMP;
-      else child.material = paletteMaterial(swaps[name as PaletteColour] ?? (name as PaletteColour));
+      else child.material = namedMaterial(name, swaps);
       child.castShadow = true;
       child.receiveShadow = true;
     });
@@ -177,14 +155,14 @@ function partsOf(art: TownArt, piece: ArtPiece) {
     const root = object.matrixWorld.clone().invert();
     const meshes: { geometry: BufferGeometry; local: Matrix4; name: string }[] = [];
     object.traverse((child) => {
-      if (isMesh(child)) meshes.push({ geometry: child.geometry, local: root.clone().multiply(child.matrixWorld), name: (child.material as MeshStandardMaterial).name });
+      if (isMesh(child)) meshes.push({ geometry: child.geometry, local: root.clone().multiply(child.matrixWorld), name: (child.material as Material).name });
     });
     parts.set(object, meshes);
   }
   return { size, meshes: parts.get(object)! };
 }
 
-type Batch = { mesh: InstancedMesh; matrices: Matrix4[]; lifts: (number | undefined)[]; glass: boolean; bulb: boolean; lit: boolean; colour: PaletteColour };
+type Batch = { mesh: InstancedMesh; matrices: Matrix4[]; lifts: (number | undefined)[]; glass: boolean; bulb: boolean; lit: boolean; material: Material; piece: ArtPiece };
 
 /**
  * Many kit pieces drawn as one instanced mesh per piece and colour: the town's scenery, its houses, trees and street
@@ -197,7 +175,7 @@ export function Instances({ placements, lifts = [], liftMargin = LIFT_MARGIN }: 
   const batches = useMemo(() => {
     // Batched by mesh, not by piece: a piece's parts that aren't repainted (its trim, its frames) are drawn together
     // across every repaint of it, and only glass and bulbs care whether they light up.
-    const byKey = new Map<string, { geometry: BufferGeometry; colour: PaletteColour; glass: boolean; bulb: boolean; lit: boolean; matrices: Matrix4[]; lifts: (number | undefined)[] }>();
+    const byKey = new Map<string, { geometry: BufferGeometry; material: Material; piece: ArtPiece; glass: boolean; bulb: boolean; lit: boolean; matrices: Matrix4[]; lifts: (number | undefined)[] }>();
     const turn = new Quaternion();
     const up = new Vector3(0, 1, 0);
     for (const { piece, position, rotation = 0, size: fit, repaint = {}, lit = false, lift } of placements) {
@@ -207,29 +185,29 @@ export function Instances({ placements, lifts = [], liftMargin = LIFT_MARGIN }: 
       meshes.forEach(({ geometry, local, name }, i) => {
         const glass = name === WINDOW_GLASS;
         const bulb = LAMP_BULBS[piece] === name;
-        const colour = glass ? GLASS.open : (repaint[name as PaletteColour] ?? (name as PaletteColour));
-        const key = `${piece}|${i}|${colour}|${(glass || bulb) && lit}`;
-        const batch = byKey.get(key) ?? byKey.set(key, { geometry, colour, glass, bulb, lit: (glass || bulb) && lit, matrices: [], lifts: [] }).get(key)!;
+        const material = glass ? GLASS.open : namedMaterial(name, repaint);
+        const key = `${piece}|${i}|${material.name}|${(glass || bulb) && lit}`;
+        const batch = byKey.get(key) ?? byKey.set(key, { geometry, material, piece, glass, bulb, lit: (glass || bulb) && lit, matrices: [], lifts: [] }).get(key)!;
         batch.matrices.push(placed.clone().multiply(local));
         batch.lifts.push(lift);
       });
     }
-    return [...byKey.values()].map(({ geometry, colour, glass, bulb, lit, matrices, lifts }): Batch => {
-      const mesh = new InstancedMesh(geometry, paletteMaterial(colour), matrices.length);
+    return [...byKey.values()].map(({ geometry, material, piece, glass, bulb, lit, matrices, lifts }): Batch => {
+      const mesh = new InstancedMesh(geometry, material, matrices.length);
       matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix));
       mesh.computeBoundingSphere();
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      return { mesh, matrices, lifts, glass, bulb, lit, colour };
+      return { mesh, matrices, lifts, glass, bulb, lit, material, piece };
     });
   }, [art, placements]);
   useEffect(() => () => batches.forEach(({ mesh }) => mesh.dispose()), [batches]);
 
   // Window glass is clear by day and dark at night, unless it's lit; bulbs that light up glow once the lamps are on.
   useEffect(() => {
-    for (const { mesh, glass, bulb, lit, colour } of batches) {
-      if (glass) mesh.material = lit && lampsOn ? LAMP : paletteMaterial(lampsOn ? GLASS.closed : GLASS.open);
-      else if (bulb) mesh.material = lit && lampsOn ? LAMP : paletteMaterial(colour);
+    for (const { mesh, glass, bulb, lit, material, piece } of batches) {
+      if (glass) mesh.material = lit && lampsOn ? litGlass(piece) : lampsOn ? GLASS.closed : GLASS.open;
+      else if (bulb) mesh.material = lit && lampsOn ? LAMP : material;
     }
   }, [batches, lampsOn]);
 

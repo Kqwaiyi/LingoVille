@@ -7,13 +7,19 @@ It rebuilds every piece in the scene's `pieces` collection, saves `town.blend`, 
 `art/town/glb/<piece>.glb`, which `scripts/build-town.ts` reads as its `town-art` kit.
 
 Each piece is one object named for the piece, standing on the ground with its front facing -Y (glTF's +z), in metres.
-Every material is a palette colour (`src/world/palette.ts`), named after it: the town build snaps to the palette anyway,
-and repaints some of them per use (an awning's stripes, a bicycle's frame).
+Every material is a palette colour (`src/world/palette.ts`) and a surface (`src/world/surfaces.ts`), named
+`colour:surface` (a bare colour is matte): the town build snaps to the palette anyway and keeps the surface, and the game
+repaints some colours per use (a building's walls and roof, an awning's stripes, a bicycle's frame).
+
+The buildings' parts are in `architecture.py`, the trees in `nature.py` and the rooms' furniture in `furnishings.py`;
+this file holds the rest and builds them all.
 """
 
+import importlib
 import math
 import os
 import re
+import sys
 
 import bmesh
 import bpy
@@ -42,12 +48,16 @@ def linear(hex_colour):
 
 
 def material(name):
-    """The flat, matte material for a palette colour; or `glass`, a window's, sky blue, which the game lights."""
+    """
+    The material named `colour:surface` (or just `colour`, matte): a palette colour, and the surface the game draws it as
+    (`src/world/surfaces.ts`). Or `glass`, a window's, sky blue here, which the game draws as glass and lights at night.
+    """
     found = bpy.data.materials.get(name)
     if found:
         return found
     made = bpy.data.materials.new(name)
-    rgb = (*linear(PALETTE["sky" if name == "glass" else name]), 1.0)
+    colour = name.split(":")[0]
+    rgb = (*linear(PALETTE["sky" if colour == "glass" else colour]), 1.0)
     made.diffuse_color = rgb
     bsdf = made.node_tree.nodes.get("Principled BSDF")
     bsdf.inputs["Base Color"].default_value = rgb
@@ -133,10 +143,14 @@ class Piece:
             faces.append(self.bm.faces.new([self.bm.verts.new(p) for p in reversed(points)]))
         self._paint(faces, colour)
 
-    def prism(self, colour, points, thickness, axis="y"):
-        """A flat shape (points in the plane across `axis`, as (u, v) pairs) given a little thickness along `axis`."""
+    def prism(self, colour, points, thickness, axis="y", offset=0.0):
+        """
+        A flat shape (points in the plane across `axis`, as (u, v) pairs) given thickness along `axis`, centred `offset`
+        along it.
+        """
 
         def place(u, v, w):
+            w += offset
             return {"x": (w, u, v), "y": (u, w, v), "z": (u, v, w)}[axis]
 
         half = thickness / 2
@@ -164,7 +178,11 @@ class Piece:
         return made
 
 
-# The pieces. Each function puts one together.
+# The pieces. Each function puts one together; the buildings' own parts are in `architecture.py`, which the backdrop's
+# houses borrow from.
+sys.path.insert(0, HERE)
+architecture = importlib.reload(importlib.import_module("architecture"))
+
 
 
 def awning(p):
@@ -281,7 +299,7 @@ def street_clock(p):
 
 def hill(p, size=(44.0, 30.0), height=10.0, seed=0.0, colours=("grass", "leaf", "pine"), crown=0.85):
     """A rolling hill, open underneath, for the backdrop: grass low down, leaf green up its sides and a pine crown."""
-    nx, ny = 26, 18
+    nx, ny = 64, 44
     (sx, sy) = size
     grid = []
     for j in range(ny + 1):
@@ -290,7 +308,7 @@ def hill(p, size=(44.0, 30.0), height=10.0, seed=0.0, colours=("grass", "leaf", 
             u, v = i / nx * 2 - 1, j / ny * 2 - 1
             r = min(1.0, math.hypot(u, v))
             falloff = 0.5 + 0.5 * math.cos(math.pi * r)
-            bumps = 1 + 0.18 * noise.noise(Vector((u * 1.6 + seed, v * 1.6 - seed, seed * 0.7)))
+            bumps = 1 + 0.18 * noise.noise(Vector((u * 1.6 + seed, v * 1.6 - seed, seed * 0.7))) + 0.06 * noise.noise(Vector((u * 5.3 - seed, v * 5.3 + seed, seed))) + 0.025 * noise.noise(Vector((u * 13 + seed, v * 13, -seed)))
             z = max(0.0, height * falloff * bumps - 0.02)
             row.append(p.bm.verts.new((u * sx / 2, v * sy / 2, z)))
         grid.append(row)
@@ -405,42 +423,81 @@ def gazebo(p):
     p.box("stone", (1.6, 0.5, 0.15), at=(0, -radius * 0.87 - 0.25, 0.075))
 
 
+def placed(p, matrix, build):
+    """Puts together what `build` adds to the piece, then moves all of it by `matrix`."""
+    p.bm.verts.ensure_lookup_table()
+    before = len(p.bm.verts)
+    build()
+    p.bm.verts.ensure_lookup_table()
+    for vert in p.bm.verts[before:]:
+        vert.co = matrix @ vert.co
+
+
+def facade_window(p, x, side, face, z0, z1, half=0.42):
+    """
+    A window on a backdrop house's wall, its face `face` along y on `side` (-1 the front, +1 the back): glass just proud
+    of the wall in a painted frame with a glazing bar, a stone surround and a sill.
+    """
+    out = lambda d: side * (face + d)  # noqa: E731
+    mid, h = (z0 + z1) / 2, z1 - z0
+    p.box("glass", (2 * half, 0.02, h), at=(x, out(0.01), mid))
+    for dx in (-half, half):
+        p.box(architecture.TRIM, (0.06, 0.04, h), at=(x + dx, out(0.02), mid))
+    for z in (z0, z1, z1 - h * 0.3):
+        p.box(architecture.TRIM, (2 * half, 0.04, 0.05), at=(x, out(0.02), z))
+    p.box(architecture.TRIM, (0.04, 0.035, h * 0.7), at=(x, out(0.02), z0 + h * 0.35))
+    for dx in (-half - 0.06, half + 0.06):
+        p.box(architecture.STONE, (0.1, 0.05, h + 0.1), at=(x + dx, out(0.025), mid))
+    p.box(architecture.STONE, (2 * half + 0.34, 0.06, 0.16), at=(x, out(0.03), z1 + 0.08))
+    p.box(architecture.STONE, (2 * half + 0.3, 0.12, 0.06), at=(x, out(0.06), z0 - 0.03))
+
+
 def house(p, width, depth, storeys, roof_height, door=True):
     """
-    A house for the backdrop, side on to nobody: walls lavender and roof charcoal (the colours the town's kit walls and
-    roofs come in, which each house repaints), cream trim, and window glass the game lights at night.
+    A house for the backdrop, seen only from afar: rendered walls on a stone plinth, a string course between storeys,
+    framed windows front and back with stone surrounds and sills, a panelled front door, and a tiled gable roof with
+    gutters, barge boards and a brick chimney. Walls in lavender and roof in charcoal, as the town's buildings come, which
+    each house repaints; window glass the game lights at night.
     """
     storey = 2.8
     walls = storey * storeys
-    p.box("lavender", (width, depth, walls), at=(0, 0, walls / 2))
-    p.box("cream", (width + 0.12, depth + 0.12, 0.25), at=(0, 0, 0.125))
+    p.box(architecture.FACADE, (width, depth, walls), at=(0, 0, walls / 2))
+    p.box(architecture.STONE, (width + 0.09, depth + 0.09, 0.4), at=(0, 0, 0.2))
     for k in range(1, storeys):
-        p.box("cream", (width + 0.08, depth + 0.08, 0.12), at=(0, 0, k * storey))
-    # The gable roof, its ridge along the front, and its end walls.
-    overhang, half = 0.3, depth / 2 + 0.3
-    slope = math.atan2(roof_height, half)
-    length = math.hypot(half, roof_height)
-    for side in (-1, 1):
-        p.box("charcoal", (width + 2 * overhang, length, 0.14), at=(0, side * half / 2, walls + roof_height / 2), rot=(side * -slope, 0, 0))
-        p.prism("lavender", [(-depth / 2, walls), (depth / 2, walls), (0, walls + roof_height - 0.1)], 0.02, axis="x")
-        p.bm.verts.ensure_lookup_table()
-        for vert in p.bm.verts[-6:]:
-            vert.co.x += side * width / 2
-    p.box("brick", (0.5, 0.5, roof_height + 0.9), at=(width / 2 - 0.9, depth / 4, walls + (roof_height + 0.9) / 2))
+        p.box(architecture.STONE, (width + 0.07, depth + 0.07, 0.14), at=(0, 0, k * storey))
+    # The roof: the town's own tiled gable, sized to this house.
+    overhang = 0.3
+    x0, x1 = -width / 2 - overhang, width / 2 + overhang
+    scale = Matrix.Translation((0, 0, walls)) @ Matrix.Diagonal(((1, (depth + 2 * overhang) / architecture.ROOF_DEPTH, roof_height / architecture.ROOF_HEIGHT, 1)))
+
+    def roof():
+        architecture.attic(p, -width / 2, width / 2)
+        for side in (-1, 1):
+            architecture.roof_courses(p, x0, x1, side)
+        architecture.roof_eaves(p, x0, x1)
+        eave, ridge = (architecture.EAVE, 0.16), (0.0, architecture.ROOF_HEIGHT - 0.14)
+        for end in (x0 + 0.02, x1 - 0.02):
+            for side in (-1, 1):
+                board = [(side * eave[0], 0.0), (side * eave[0], eave[1] - 0.04), (ridge[0], ridge[1] - 0.04), (ridge[0], ridge[1] - 0.2)]
+                p.prism(architecture.TRIM, board, 0.04, axis="x", offset=end)
+
+    placed(p, scale, roof)
+    p.box("brick:brick", (0.5, 0.6, roof_height + 0.9), at=(width / 2 - 0.9, depth / 4, walls + (roof_height + 0.9) / 2))
+    p.box(architecture.STONE, (0.6, 0.7, 0.1), at=(width / 2 - 0.9, depth / 4, walls + roof_height + 0.95))
     # Windows on every storey, front and back, and the front door.
     across = max(1, round(width / 2.2))
     for k in range(storeys):
         for i in range(across):
             x = -width / 2 + (i + 0.5) * width / across
             if door and k == 0 and i == across // 2:
-                p.box("walnut", (0.95, 0.08, 2.0), at=(x, -depth / 2 - 0.02, 1.05))
-                p.box("cream", (1.2, 0.1, 0.15), at=(x, -depth / 2 - 0.03, 2.12))
+                placed(p, Matrix.Translation((x - 0.45, -depth / 2 - 0.03, 0.0)), lambda: architecture.door(p))
+                placed(p, Matrix.Translation((x + 0.45, -depth / 2 - 0.03, 0.0)) @ Matrix.Rotation(math.pi, 4, "Z"), lambda: architecture.door(p))
+                for dx in (-1.02, 1.02):
+                    p.box(architecture.STONE, (0.14, 0.06, 2.2), at=(x + dx, -depth / 2 - 0.03, 1.1))
+                p.box(architecture.STONE, (2.4, 0.08, 0.22), at=(x, -depth / 2 - 0.04, 2.21))
                 continue
             for side in (-1, 1):
-                y = side * (depth / 2 + 0.02)
-                p.box("cream", (0.95, 0.06, 1.25), at=(x, y, k * storey + 1.55))
-                p.box("glass", (0.75, 0.08, 1.05), at=(x, y, k * storey + 1.55))
-                p.box("cream", (1.05, 0.16, 0.08), at=(x, y + side * 0.04, k * storey + 0.95))
+                facade_window(p, x, side, depth / 2, k * storey + 0.95, k * storey + 2.2)
 
 
 def cottage(p):
@@ -525,7 +582,11 @@ def cubbies(p):
                 p.cylinder(colours[(r * cols + k + j) % len(colours)], 0.07, d * 0.8, at=(x - 0.08 + j * 0.16, -0.02, z), rot=(math.pi / 2, 0, 0), segments=8)
 
 
+# The buildings, the trees and the rooms' furniture, each in a module of its own.
+MODULES = [architecture, importlib.reload(importlib.import_module("nature")), importlib.reload(importlib.import_module("furnishings"))]
+
 PIECES = {
+    **{name: made for module in MODULES for name, made in module.PIECES.items()},
     "awning": awning,
     "pennants": pennants,
     "window-box": window_box,
