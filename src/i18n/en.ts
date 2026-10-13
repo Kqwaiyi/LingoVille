@@ -166,6 +166,7 @@ export const en = {
     settings: 'Settings',
     back: 'Back',
     skipTutorial: 'Skip the tutorial',
+    quitToTitle: 'Save and quit to title',
   },
   // The First Morning: a banner at the top centre with the step to do next, an arrow and how far it is.
   firstMorning: {

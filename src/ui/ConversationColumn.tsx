@@ -54,7 +54,7 @@ function NpcLineHelp({ index, text }: { index: number; text: string }) {
   const translation = useGame(selectTranslation(index));
   const nativeLanguage = useGame(selectNativeLanguage);
   const translateLine = useGame((s) => s.translateLine);
-  const hearItSaid = useGame((s) => s.hearItSaid);
+  const replayLine = useGame((s) => s.replayLine);
   return (
     <>
       {translation?.status === 'ready' && (
@@ -69,7 +69,7 @@ function NpcLineHelp({ index, text }: { index: number; text: string }) {
             {translation?.status === 'failed' ? t('chat.translateFailed') : t('chat.translate')}
           </button>
         )}
-        <button type="button" aria-label={t('chat.replayLabel', { text })} onClick={() => hearItSaid(text)}>
+        <button type="button" aria-label={t('chat.replayLabel', { text })} onClick={() => replayLine(index)}>
           {t('chat.replay')}
         </button>
       </div>

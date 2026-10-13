@@ -78,6 +78,8 @@ export function openLiveSession(
   // that turn still in flight is dropped until the server confirms the interruption.
   let npcSpeaking = false;
   let droppingCutOffTurn = false;
+  // What the NPC has said aloud so far this turn, handed to the game with the turn once it is over.
+  let turnAudio: string[] = [];
   // Settles a connect still in progress when the game closes the session.
   let abandonConnect: (() => void) | null = null;
   // Tool responses must name the function they answer.
@@ -110,6 +112,7 @@ export function openLiveSession(
       audio?.stopPlayback();
       npcSpeaking = false;
       droppingCutOffTurn = false;
+      turnAudio = [];
     }
     if (content.inputTranscription?.text) events.onInputTranscript(content.inputTranscription.text);
     if (!droppingCutOffTurn) {
@@ -121,14 +124,17 @@ export function openLiveSession(
         if (!part.inlineData?.data) continue;
         npcSpeaking = true;
         audio?.play(part.inlineData.data);
+        turnAudio.push(part.inlineData.data);
       }
     }
     if (content.turnComplete) {
       npcSpeaking = false;
       droppingCutOffTurn = false;
+      const spoken = turnAudio;
+      turnAudio = [];
       // The turn is over for the game once the Player has heard all of it.
       void audio?.drained().then(() => {
-        if (!closed) events.onTurnComplete();
+        if (!closed) events.onTurnComplete(spoken);
       });
     }
   };
@@ -225,6 +231,7 @@ export function openLiveSession(
       if (!connected) return;
       audio?.stopPlayback();
       if (npcSpeaking) droppingCutOffTurn = true;
+      turnAudio = [];
       listening = true;
       send({ realtimeInput: { activityStart: {} } });
     },
@@ -239,6 +246,7 @@ export function openLiveSession(
     sendText: (line) => {
       if (!connected || closed) return;
       audio?.stopPlayback();
+      turnAudio = [];
       send({ clientContent: { turns: [contentTurn('user', line)], turnComplete: true } });
     },
     sendToolResponse: (id, response) => {

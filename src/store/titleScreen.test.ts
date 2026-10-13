@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { createStore, set, type UseStore } from 'idb-keyval';
 import { describe, expect, it, vi } from 'vitest';
+import type { Recap } from '../ai/index.ts';
 import { DEFAULT_APPEARANCE, type AppearancePreset } from '../content/index.ts';
 import { CHARACTER_NAME, CLOCK, createSave, MIC_CHECK, STARTING_STEPS, type GameState } from '../sim/index.ts';
 import type { OpenMic, OpenVoiceSession, VoiceSessionEvents, VoiceSessionOptions } from '../voice/index.ts';
@@ -18,6 +19,7 @@ import {
   selectMicLevel,
   selectMoneyInShifts,
   selectNativeLanguage,
+  selectPauseMenuOpen,
   selectPersistCallout,
   selectPlaceId,
   selectSavedCount,
@@ -251,6 +253,59 @@ describe('the title screen', () => {
     expect(selectMoneyInShifts(after.getState())).toBe(1.2);
     expect(after.getState().game).toEqual(game);
     expect(selectToast(after.getState())).toBeNull();
+  });
+
+  it('Quit to title on the pause menu saves, shows the title screen with time standing still, and Continue plays on', async () => {
+    const browser = freshBrowser();
+    const store = createGameStore(null, browser);
+    await openTitle(store);
+    setUpNewGame(store);
+    store.getState().enterPlace('cafe');
+    store.getState().advance(CLOCK.maxRealDeltaMs);
+    const game = store.getState().game;
+
+    store.getState().openPauseMenu();
+    store.getState().quitToTitle();
+    store.getState().advance(CLOCK.maxRealDeltaMs);
+
+    expect(selectScreen(store.getState())).toBe('title');
+    expect(selectPauseMenuOpen(store.getState())).toBe(false);
+    expect(store.getState().game).toBe(game);
+    expect(await openTitle(store)).toMatchObject({ continueSlotId: 'slot-1' });
+    store.getState().continueGame();
+    expect(selectScreen(store.getState())).toBe('playing');
+    expect(selectPlaceId(store.getState())).toBe('cafe');
+    expect(store.getState().game).toEqual(game);
+  });
+
+  it('a Recap still on its way when the Player quits goes to its own game’s Journal, and leaves the save played next alone', async () => {
+    let clock = new Date('2026-10-03T09:00:00Z');
+    const browser = freshBrowser({ clock: () => clock });
+    await browser.saves.write('slot-3', dayFour());
+    clock = new Date('2026-10-03T10:00:00Z');
+    const { npc, openVoiceSession } = fakeBarista();
+    let recapArrives: (recap: Recap) => void = () => {};
+    const requestRecap = () => new Promise<Recap>((resolve) => (recapArrives = resolve));
+    const store = createGameStore(null, { ...browser, openVoiceSession, requestRecap });
+    await openTitle(store);
+    setUpNewGame(store);
+    store.getState().enterPlace('cafe');
+    store.getState().setInteractable('barista');
+    store.getState().talk();
+    npc.says('いらっしゃいませ！');
+    npc.events!.onToolCall({ id: 'call', name: 'serve_order', args: { items: [{ item: 'latte', quantity: 1 }] } });
+    npc.says('ありがとうございました。');
+    store.getState().skipRecap();
+
+    store.getState().openPauseMenu();
+    store.getState().quitToTitle();
+    await openTitle(store);
+    store.getState().playSlot('slot-3');
+    recapArrives({ outcome: 'You ordered a latte.', corrections: [], newWords: [], cefrEstimate: 'B2' });
+
+    await vi.waitFor(async () => expect(await browser.journal.list('slot-1')).toHaveLength(1));
+    expect(await browser.journal.list('slot-3')).toEqual([]);
+    expect(store.getState().game).toEqual(dayFour());
   });
 
   it('shows the Continue save’s Character, or the default look with no save to continue', async () => {

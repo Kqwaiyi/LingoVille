@@ -31,15 +31,16 @@ test('H opens Help with hints for this moment and the café phrasebook, and the 
   await expect(npcLine(page, GREETING)).toBeVisible();
 });
 
-test('Translate shows the Native Language line under an NPC line, and 🔊 Replay says it again', async ({ page }) => {
+test('Translate shows the Native Language line under an NPC line, and 🔊 Replay says it again in the barista’s voice', async ({ page }) => {
   await talkToTheBarista(page);
 
   await chat(page).getByRole('button', { name: 'Translate' }).click();
   await expect(chat(page).getByText(TRANSLATION)).toBeVisible();
 
+  // The scripted fake NPC says nothing aloud, so its line is said again by the gateway, in the barista's own voice.
   const said = page.waitForRequest((request) => request.url().endsWith('/api/tts'));
   await chat(page).getByRole('button', { name: `Replay “${GREETING}”` }).click();
-  expect((await said).postDataJSON()).toEqual({ text: GREETING, targetLanguage: 'ja' });
+  expect((await said).postDataJSON()).toEqual({ text: GREETING, targetLanguage: 'ja', voice: { targetLanguage: 'ja', npcId: 'barista' } });
 });
 
 test('a Recap where Help was used has no sticker, and + Phrasebook keeps a word for the Journal and Help', async ({ page }) => {

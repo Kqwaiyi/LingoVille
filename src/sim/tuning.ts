@@ -89,6 +89,12 @@ export const TRAM = {
   minutesPerStop: 8,
 } as const;
 
+/** The place line above the dock: where the Character is, its hours, and whether it's open. */
+export const PLACE_LINE = {
+  /** How long it shows in real time on arriving somewhere, or when the place opens or closes, before it fades away. */
+  shownMs: 4000,
+} as const;
+
 // --- First Morning ----------------------------------------------------------
 
 export const FIRST_MORNING = {

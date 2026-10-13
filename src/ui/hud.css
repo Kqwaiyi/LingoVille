@@ -64,6 +64,20 @@ body,
   font-size: 13px;
   user-select: none;
   white-space: nowrap;
+  transition: opacity 0.2s ease-out;
+}
+
+/* Fades slowly once it has shown for a while, keeping its room, and comes back quickly on arriving somewhere. */
+.place-line[data-faded] {
+  opacity: 0;
+  transition: opacity 0.8s ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .place-line,
+  .place-line[data-faded] {
+    transition: none;
+  }
 }
 
 .unwell-line {

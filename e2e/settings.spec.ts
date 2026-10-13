@@ -62,6 +62,21 @@ test('Settings in the pause menu switch the UI to another Native Language at onc
   await expect(pauseMenu(page, 'Pause')).toBeHidden();
 });
 
+test('Save and quit to title in the pause menu goes back to the title screen, and Continue plays on from there', async ({ page }) => {
+  // `?spawn=cafe` puts the Character just inside the café door.
+  await startNewGame(page, { path: '/?spawn=cafe&at=9', throughScreens: true });
+  await expect(page.getByRole('status', { name: 'Place' })).toContainText('ほしコーヒー');
+
+  await page.keyboard.press('Escape');
+  await pauseMenu(page).getByRole('button', { name: 'Save and quit to title' }).click();
+
+  await expect(pauseMenu(page)).toBeHidden();
+  await expect(dock(page)).toBeHidden();
+  await titleMenu(page).getByRole('button', { name: 'Continue' }).click();
+  await expect(dock(page)).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Place' })).toContainText('ほしコーヒー');
+});
+
 test('Esc in a conversation leaves it, and doesn’t pause', async ({ page }) => {
   await talkToTheBarista(page);
 

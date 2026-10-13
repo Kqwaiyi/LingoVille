@@ -105,16 +105,16 @@ const TOKEN_LIFETIME_MS = 30 * 60_000;
 
 const MOCK_TOKEN = 'mock-ephemeral-token';
 
-// A token request: for a Named NPC, their id; for a Shift Customer or Passer-by, their build and a whole-number seed.
-const TokenRequestSchema = z.object({
-  voice: z.union([
-    z.object({ targetLanguage: z.enum(LANGUAGE_CODES), shiftCustomerVoice: z.number().int().min(0), build: z.enum(BUILDS) }),
-    z.object({ targetLanguage: z.enum(LANGUAGE_CODES), npcId: z.enum(NAMED_NPC_IDS) }),
-  ]),
-});
+// Whose voice: for a Named NPC, their id; for a Shift Customer or Passer-by, their build and a whole-number seed.
+const VoiceRequestSchema = z.union([
+  z.object({ targetLanguage: z.enum(LANGUAGE_CODES), shiftCustomerVoice: z.number().int().min(0), build: z.enum(BUILDS) }),
+  z.object({ targetLanguage: z.enum(LANGUAGE_CODES), npcId: z.enum(NAMED_NPC_IDS) }),
+]);
 
-/** The prebuilt voice a token request asks for: a Named NPC's own, or one from the anonymous NPC's build's pool by their seed. */
-function requestedVoice({ voice }: z.infer<typeof TokenRequestSchema>): VoiceName {
+const TokenRequestSchema = z.object({ voice: VoiceRequestSchema });
+
+/** The prebuilt voice an NPC speaks in: a Named NPC's own, or one from the anonymous NPC's build's pool by their seed. */
+function requestedVoice(voice: z.infer<typeof VoiceRequestSchema>): VoiceName {
   if ('npcId' in voice) return NAMED_NPC_VOICES[voice.npcId];
   const pool = ANONYMOUS_VOICES[voice.build];
   return pool[voice.shiftCustomerVoice % pool.length]!;
@@ -148,7 +148,7 @@ export async function mintLiveToken(apiKey: string, deps: GatewayDeps): Promise<
 async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
   const request = TokenRequestSchema.safeParse(await readJson(req));
   if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
-  const voiceName = requestedVoice(request.data);
+  const voiceName = requestedVoice(request.data.voice);
 
   const session = liveSessionTarget(voiceName);
   if (env.mock) return sendJson(res, 200, { mock: true, token: MOCK_TOKEN, ...session, replyDelayMs: env.mockReplyDelayMs });
@@ -350,20 +350,21 @@ function mockClip() {
   return Buffer.from(samples.buffer).toString('base64');
 }
 
-// Hear-it-said is for a phrase or a sentence, never a speech.
+// Hear-it-said is for a phrase or a sentence, never a speech. An NPC's line is said in their own voice.
 const TtsRequestSchema = z.object({
   text: z.string().trim().min(1).max(500),
   targetLanguage: z.enum(Object.keys(VOICES) as [TargetLanguage, ...TargetLanguage[]]),
+  voice: VoiceRequestSchema.optional(),
 });
 
 // The part of Gemini's TTS answer the gateway uses.
 const TtsAnswerSchema = z.object({ inlineData: z.object({ data: z.string().min(1) }) });
 
-/** POST /api/tts: hear-it-said, a phrase said aloud in the voice for its language, as base64 PCM. */
+/** POST /api/tts: hear-it-said, a phrase said aloud in the voice for its language, or an NPC's line in theirs, as base64 PCM. */
 async function tts(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
   const request = TtsRequestSchema.safeParse(await readJson(req));
   if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
-  const { text, targetLanguage } = request.data;
+  const { text, targetLanguage, voice } = request.data;
   if (env.mock) return sendJson(res, 200, { audio: mockClip(), sampleRate: TTS_SAMPLE_RATE });
   if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
 
@@ -372,7 +373,7 @@ async function tts(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage
       contents: [{ role: 'user', parts: [{ text }] }],
       generationConfig: {
         responseModalities: ['AUDIO'],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES[targetLanguage] } } },
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice ? requestedVoice(voice) : VOICES[targetLanguage] } } },
       },
     });
     const audio = parts.map((part) => TtsAnswerSchema.safeParse(part)).find((part) => part.success);

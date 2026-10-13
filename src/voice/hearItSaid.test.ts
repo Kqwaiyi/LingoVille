@@ -63,6 +63,24 @@ describe('hear-it-said', () => {
     expect(clips.size).toBe(3);
   });
 
+  it('says an NPC’s line in their voice, kept apart from the same text in anyone else’s', async () => {
+    const { say, gateway, clips } = hearItSaid();
+    const barista = { targetLanguage: 'ja', npcId: 'barista' } as const;
+    const customer = { targetLanguage: 'ja', build: 'feminine', shiftCustomerVoice: 3 } as const;
+
+    await say('いらっしゃいませ', 'ja', barista);
+    await say('いらっしゃいませ', 'ja', customer);
+    await say('いらっしゃいませ', 'ja');
+    await say('いらっしゃいませ', 'ja', barista);
+
+    expect(gateway.asked).toEqual([
+      { text: 'いらっしゃいませ', targetLanguage: 'ja', voice: barista },
+      { text: 'いらっしゃいませ', targetLanguage: 'ja', voice: customer },
+      { text: 'いらっしゃいませ', targetLanguage: 'ja' },
+    ]);
+    expect(clips.size).toBe(3);
+  });
+
   it('caches nothing and plays nothing when the gateway cannot say it', async () => {
     const { say, clips, played } = hearItSaid(() => Response.json({ error: 'tts_unavailable' }, { status: 502 }));
 

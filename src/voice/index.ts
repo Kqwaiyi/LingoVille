@@ -2,6 +2,7 @@
 export {
   createHearItSaid,
   hearItSaid,
+  replaySpoken,
   type ClipCache,
   type HearItSaid,
   type HearItSaidClip,
@@ -16,6 +17,7 @@ export {
   VoiceServiceUnavailableError,
   type OpenMic,
   type OpenVoiceSession,
+  type SpokenTurn,
   type TokenUsage,
   type ToolCall,
   type TranscriptLine,

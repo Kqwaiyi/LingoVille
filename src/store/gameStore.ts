@@ -32,6 +32,7 @@ import {
   type Segment,
   type ShiftRecapCustomer,
   type ToolResponse,
+  type VoiceRequest,
 } from '../ai/index.ts';
 import {
   approachInteraction,
@@ -211,9 +212,11 @@ import {
   NO_USAGE,
   openBrowserMic,
   openVoiceSession,
+  replaySpoken,
   VoiceServiceUnavailableError,
   type OpenMic,
   type OpenVoiceSession,
+  type SpokenTurn,
   type TokenUsage,
   type HearItSaid,
   type ToolCall,
@@ -548,6 +551,10 @@ type ConversationState = {
   translated: number[];
   /** Each NPC line's reading aid, by line index, for zh and ja. */
   readings: Partial<Record<number, LineReading>>;
+  /** The voice the NPC speaks in, once their session is open. */
+  npcVoice: VoiceRequest | null;
+  /** Each finished NPC line as the NPC said it aloud, by line index, to replay it. */
+  spoken: Partial<Record<number, SpokenTurn>>;
   /** The Help used so far, in order, placed relative to the turns. It goes to the Recap. */
   helpLog: HelpLogEntry[];
   /** A friend offers to switch to the casual register in this conversation: once it reaches its outcome, they have, and the Recap notes it. */
@@ -574,6 +581,8 @@ export type GameStoreDeps = {
   saves: Saves;
   deviceSettings: DeviceSettingsStore;
   hearItSaid: HearItSaid;
+  /** Plays an NPC's line again just as they said it. */
+  replaySpoken: (spoken: SpokenTurn) => void;
   /** Asks the browser to keep this site's data when space runs low. */
   storage: StoragePersistence;
   /** Hands the Player a file to keep. */
@@ -668,6 +677,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   saves: browserSaves,
   deviceSettings: browserDeviceSettings,
   hearItSaid,
+  replaySpoken,
   storage: browserStorage,
   downloadFile: downloadInBrowser,
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
@@ -941,6 +951,8 @@ export type GameStore = {
   closeRecap: () => void;
   /** 🔊: says a phrase aloud in the Target Language. */
   hearItSaid: (text: string) => void;
+  /** 🔊 Replay under a finished NPC line: plays it again just as the NPC said it, or says it in their voice. */
+  replayLine: (line: number) => void;
   /** H or the Help tab: opens Help, where the conversation waits, or goes back to the chat. */
   toggleHelp: () => void;
   /** Translate under a finished NPC line: shows its Native Language translation. */
@@ -968,6 +980,8 @@ export type GameStore = {
   openPauseMenu: () => void;
   /** Resume: closes the pause menu, and time goes on. */
   closePauseMenu: () => void;
+  /** Quit to title, on the pause menu: saves the game and goes back to the title screen. */
+  quitToTitle: () => void;
   setTyping: (typing: boolean) => void;
   /** The Player is typing a reply in the field: that isn't being quiet. */
   draftTypedLine: () => void;
@@ -1041,6 +1055,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let shiftLog: ShiftLogEntry[] = [];
   // Tells each Shift's end apart, so a late Shift Recap only lands on the end it was written for.
   let shiftsEnded = 0;
+  // Tells each game played apart, so a Recap still on its way when the Player quits to the title moves only its own game.
+  let plays = 0;
   // The size the Player last set on the toggles this Shift: with the Barista skill's remembered size, the next customer starts at it.
   let sizeLastSet: DrinkSize | null = null;
   // An NPC due to come up to the Character while the Player is busy, who waits until the Player is free.
@@ -1095,6 +1111,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
+      plays++;
       realMsSinceSave = 0;
       // A Shift from another game is over without its Recap: its customers' readings go too.
       shiftLog.forEach(({ conversationId }) => lineReadings.delete(conversationId));
@@ -1411,8 +1428,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (get().conversation?.id === conversationId) updateConversation({ recap });
     };
 
-    /** A Recap's evidence moves the hidden Language Proficiency (`apply`), which is saved at once. */
-    const applyEvidence = (apply: (game: GameState) => GameState) => {
+    /**
+     * A Recap's evidence moves the hidden Language Proficiency (`apply`), which is saved at once. Only in the game it
+     * was written in (`play`): once the Player has quit to the title, that game is saved and over.
+     */
+    const applyEvidence = (play: number, apply: (game: GameState) => GameState) => {
+      if (play !== plays || get().screen !== 'playing') return;
       // A later conversation may have begun: a save during it writes the game from before it, which needs the evidence too.
       if (gameBeforeConversation) gameBeforeConversation = apply(gameBeforeConversation);
       set({ game: apply(get().game) });
@@ -1420,7 +1441,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     /** A Recap's evidence moves Proficiency, and what the conversation was about, if anything, is what the NPC remembers talking about last. */
-    const applyRecap = (conversation: NpcConversation, recap: Recap) => {
+    const applyRecap = (play: number, conversation: NpcConversation, recap: Recap) => {
       const evidence: ConversationEvidence = {
         cefrEstimate: recap.cefrEstimate,
         lines: conversation.lines.map(({ speaker, text }) => ({ speaker, text })),
@@ -1429,7 +1450,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       };
       const { npcId } = conversation;
       // A passer-by remembers nothing of the Character.
-      applyEvidence((game) => {
+      applyEvidence(play, (game) => {
         const evidenced = applyRecapEvidence(game, evidence);
         return isNamedNpc(npcId) ? rememberTopic(evidenced, npcId, recap.lastTopic) : evidenced;
       });
@@ -1453,7 +1474,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * while this conversation is still open.
      */
     const writeRecap = (conversation: NpcConversation, outcome: ClosingCard) => {
-      const { game, nativeLanguage } = get();
+      const { game, nativeLanguage, slotId } = get();
+      const play = plays;
       const { culturePackId, targetLanguage } = game.identity;
       const { npcId, interaction, helpLog } = conversation;
       const transcript = transcriptOf(conversation.lines);
@@ -1497,7 +1519,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         .requestRecap(request)
         .then(
           (recap) => {
-            applyRecap(conversation, recap);
+            applyRecap(play, conversation, recap);
             updateRecap(conversation.id, { status: 'ready', entry: journalPage(entry(recap)) });
             return recap;
           },
@@ -1510,7 +1532,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // The Journal keeps the corrected readings, so it waits for the last lines' annotations.
         .then(async (recap) => {
           await Promise.allSettled(lineReadings.get(conversation.id)?.annotating ?? []);
-          return deps.journal.append(get().slotId, entry(recap));
+          return deps.journal.append(slotId, entry(recap));
         })
         .catch((error: unknown) => console.error('[journal] could not save an entry:', error))
         .finally(() => lineReadings.delete(conversation.id));
@@ -1844,7 +1866,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * Proficiency, with the Shift's results as listening evidence, and it goes to the Journal as one entry.
      */
     const writeShiftRecap = (shiftId: number, { jobId, customers, served }: Shift, log: ShiftLogEntry[]) => {
-      const { game, nativeLanguage } = get();
+      const { game, nativeLanguage, slotId } = get();
+      const play = plays;
       const { culturePackId, targetLanguage } = game.identity;
       const listenedAt = game.proficiencyStep;
       const dealtWith: ShiftRecapCustomer[] = log.map(({ order, changedFrom, checkout, atTheTill, table, atTheTable, result, served: handed, conversation }) => ({
@@ -1903,7 +1926,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
               notUnderstoodTurns: conversation?.patience.turnsNotUnderstood ?? 0,
               served: result === 'served',
             }));
-            applyEvidence((state) => applyShiftEvidence(state, { cefrEstimate: recap.cefrEstimate, listenedAt, customers: customersSeen }));
+            applyEvidence(play, (state) => applyShiftEvidence(state, { cefrEstimate: recap.cefrEstimate, listenedAt, customers: customersSeen }));
             landed({ status: 'ready', entry: journalPage(entry(recap)) });
             return recap;
           },
@@ -1916,7 +1939,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // The Journal keeps the corrected readings, so it waits for the last lines' annotations.
         .then(async (recap) => {
           await Promise.allSettled(log.flatMap(({ conversationId }) => lineReadings.get(conversationId)?.annotating ?? []));
-          return deps.journal.append(get().slotId, entry(recap));
+          return deps.journal.append(slotId, entry(recap));
         })
         .catch((error: unknown) => console.error('[journal] could not save an entry:', error))
         .finally(() => log.forEach(({ conversationId }) => lineReadings.delete(conversationId)));
@@ -2033,8 +2056,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             const { lines, index } = addPiece(turn.lines, turn.heardLine, 'player', text);
             set({ conversation: { ...turn, lines, heardLine: index } });
           }),
-          onTurnComplete: live((current) => {
+          onTurnComplete: live((current, spoken?: SpokenTurn) => {
             const finished = current.npcLine;
+            if (finished !== null && spoken?.length) updateConversation({ spoken: { ...current.spoken, [finished]: spoken } });
             // Asked first, so the Journal entry the goodbye starts waits for its reading too.
             if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
             // Once the outcome is decided, the turn that just ended was the goodbye.
@@ -2060,6 +2084,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       );
       voice = session;
       openMicStreaming = true;
+      updateConversation({ npcVoice: npcSession.voice });
       session.connect().then(
         live(() => {
           updateConversation({ reconnecting: false });
@@ -2243,6 +2268,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           annotations: {},
           translated: [],
           readings: {},
+          npcVoice: null,
+          spoken: {},
           helpLog: [],
           offersCasualRegister,
           onTheHouse,
@@ -2770,6 +2797,17 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           .hearItSaid(text, get().game.identity.targetLanguage)
           .catch((error: unknown) => console.warn('[hear-it-said]', error instanceof Error ? error.message : error));
       },
+      replayLine: (line) => {
+        const conversation = get().conversation;
+        const npcLine = conversation?.lines[line];
+        if (!conversation || npcLine?.speaker !== 'npc') return;
+        const spoken = conversation.spoken[line];
+        if (spoken) return deps.replaySpoken(spoken);
+        // A line with nothing of it heard aloud (cut off, or from the scripted fake NPC) is said in the NPC's voice.
+        deps
+          .hearItSaid(npcLine.text, get().game.identity.targetLanguage, conversation.npcVoice ?? undefined)
+          .catch((error: unknown) => console.warn('[hear-it-said]', error instanceof Error ? error.message : error));
+      },
       toggleHelp: () => {
         const conversation = get().conversation;
         if (!conversation || conversation.closed) return;
@@ -2873,6 +2911,25 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!get().pauseMenu) return;
         set({ pauseMenu: false });
         approachIfFree();
+      },
+      quitToTitle: () => {
+        if (!get().pauseMenu) return;
+        // Saved before the screen changes, since only a game being played is saved. The title screen reads the slots
+        // after this write, so Continue plays on from here.
+        save();
+        // An NPC still due to come over belongs to this game, not to whichever is played next.
+        pendingApproach = null;
+        set({
+          screen: 'title',
+          title: { status: 'checking' },
+          pauseMenu: false,
+          interactable: null,
+          sign: null,
+          tramChoosing: false,
+          heldStill: false,
+          typing: false,
+          micLevel: 0,
+        });
       },
       setTyping: (typing) => set({ typing }),
       draftTypedLine: timeSilence,

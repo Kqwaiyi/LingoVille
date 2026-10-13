@@ -6,6 +6,9 @@ export type ToolCall = { id: string; name: string; args: unknown };
 /** One line of the conversation so far, used to seed a session that replaces a dropped one. */
 export type TranscriptLine = { speaker: 'npc' | 'player'; text: string };
 
+/** An NPC's turn as it was said aloud: its 24 kHz 16-bit mono PCM, base64, in the chunks it arrived in. */
+export type SpokenTurn = readonly string[];
+
 /** Tokens one NPC turn cost. The game adds them up per conversation. */
 export type TokenUsage = { promptTokens: number; responseTokens: number; totalTokens: number };
 
@@ -55,8 +58,11 @@ export type VoiceSessionEvents = {
   onOutputTranscript: (text: string) => void;
   /** A piece of what the NPC heard the Player say. Pieces of one turn arrive in order. */
   onInputTranscript: (text: string) => void;
-  /** The NPC finished its turn, and has finished saying it out loud. */
-  onTurnComplete: () => void;
+  /**
+   * The NPC finished its turn, and has finished saying it out loud. `spoken` is the turn as it was said aloud, to hear
+   * it again; the scripted fake NPC says nothing aloud, so it has none.
+   */
+  onTurnComplete: (spoken?: SpokenTurn) => void;
   /** The NPC called a tool, and waits for the answer before it goes on. */
   onToolCall: (call: ToolCall) => void;
   /** How loud the Player is while listening, from 0 to 1. Drops to 0 when they stop. */

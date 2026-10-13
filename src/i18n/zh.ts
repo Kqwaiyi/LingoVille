@@ -163,6 +163,7 @@ export const zh: UiStrings = {
     settings: '设置',
     back: '返回',
     skipTutorial: '跳过教程',
+    quitToTitle: '保存并返回标题画面',
   },
   firstMorning: {
     label: '第一个早晨',

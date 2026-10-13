@@ -25,12 +25,16 @@ export function PauseMenu() {
   return open ? <PauseDialog /> : null;
 }
 
-/** Resume, Settings and, during the First Morning, Skip tutorial, with Settings and the credits opening in its place. Esc steps back, and from the menu resumes. */
+/**
+ * Resume, Settings, during the First Morning Skip tutorial, and Save and quit to title, with Settings and the credits
+ * opening in its place. Esc steps back, and from the menu resumes.
+ */
 function PauseDialog() {
   const { t } = useTranslation();
   const closePauseMenu = useGame((s) => s.closePauseMenu);
   const skippable = useGame(selectSkippableFirstMorning);
   const skipFirstMorning = useGame((s) => s.skipFirstMorning);
+  const quitToTitle = useGame((s) => s.quitToTitle);
   const [view, setView] = useState<PauseView>('menu');
 
   useEffect(() => {
@@ -69,6 +73,11 @@ function PauseDialog() {
                   </button>
                 </li>
               )}
+              <li>
+                <button type="button" onClick={quitToTitle}>
+                  {t('pause.quitToTitle')}
+                </button>
+              </li>
             </ul>
           </>
         )}

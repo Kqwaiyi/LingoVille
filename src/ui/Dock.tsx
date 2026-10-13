@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { formatLocalMoney, formatTime } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { LIFE_SKILL_IDS, LIFE_SKILLS, METER_MAX, SAVE, WELL_BEING, type MoodFace } from '../sim/index.ts';
+import { LIFE_SKILL_IDS, LIFE_SKILLS, METER_MAX, PLACE_LINE, SAVE, WELL_BEING, type MoodFace } from '../sim/index.ts';
 import {
   selectClockMinute,
   selectCulturePackId,
@@ -167,7 +167,11 @@ function SavedNotice() {
   return <div className="dock-saved">{shownFor > 0 ? t('dock.saved') : ''}</div>;
 }
 
-/** Just above the dock: where the Character is, its opening hours, and whether it's open now. Home has no hours to show. */
+/**
+ * Just above the dock on arriving somewhere, and when the place opens or closes: where the Character is, its opening
+ * hours, and whether it's open now. It fades away after a few seconds, still there for a screen reader, and keeps its
+ * room so nothing moves when it goes. Home has no hours to show.
+ */
 function PlaceLine() {
   const { t, i18n } = useTranslation();
   const placeId = useGame(selectPlaceId);
@@ -175,6 +179,14 @@ function PlaceLine() {
   const hours = useGame(selectPlaceHours);
   const open = useGame(selectPlaceOpen);
   const placeName = usePlaceName();
+  // What the line says, and what it last said for long enough to fade.
+  const saying = `${placeId} ${open}`;
+  const [faded, setFaded] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setFaded(saying), PLACE_LINE.shownMs);
+    return () => clearTimeout(timer);
+  }, [saying]);
 
   const parts = [placeName(placeId, packId)];
   if (placeId !== 'home') {
@@ -196,7 +208,7 @@ function PlaceLine() {
   }
 
   return (
-    <div className="place-line" role="status" aria-label={t('placeLine.label')}>
+    <div className="place-line" role="status" aria-label={t('placeLine.label')} data-faded={faded === saying || undefined}>
       <span>{parts.join(' · ')}</span>
       {placeId !== 'home' && (
         <span className="place-status" data-open={open}>

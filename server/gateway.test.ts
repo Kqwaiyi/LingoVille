@@ -1,12 +1,14 @@
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  ANONYMOUS_VOICES,
   DEFAULT_GATEWAY_PORT,
   ENDPOINT_VERSIONS,
   GEMINI_API_BASE,
   GEMINI_LIVE_WS_BASE,
   LIVE_ENDPOINT,
   MODELS,
+  NAMED_NPC_VOICES,
   VOICE_BUILDS,
   VOICES,
   type VoiceName,
@@ -663,6 +665,22 @@ describe('POST /api/tts', () => {
     expect(JSON.stringify(sent.contents)).toContain('ラテをください');
     expect(sent.generationConfig.responseModalities).toEqual(['AUDIO']);
     expect(sent.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe(VOICES.ja);
+  });
+
+  it('says an NPC’s line in their own voice: a Named NPC’s, or one from an anonymous NPC’s build by their seed', async () => {
+    const gemini = fakeGemini(() => geminiAudio('AAAAAA=='));
+    const base = await start({ GEMINI_API_KEY: 'k' }, gemini);
+    const voiceSent = (n: number) => JSON.parse(String(gemini.calls[n]!.init.body)).generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName;
+
+    await post(base, '/api/tts', { text: 'いらっしゃいませ', targetLanguage: 'ja', voice: { targetLanguage: 'ja', npcId: 'barista' } });
+    await post(base, '/api/tts', {
+      text: 'ラテをください',
+      targetLanguage: 'ja',
+      voice: { targetLanguage: 'ja', build: 'masculine', shiftCustomerVoice: ANONYMOUS_VOICES.masculine.length + 1 },
+    });
+
+    expect(voiceSent(0)).toBe(NAMED_NPC_VOICES.barista);
+    expect(voiceSent(1)).toBe(ANONYMOUS_VOICES.masculine[1]);
   });
 
   it('answers with canned audio and no network in mock mode', async () => {

@@ -163,6 +163,7 @@ export const de: UiStrings = {
     settings: 'Einstellungen',
     back: 'Zurück',
     skipTutorial: 'Tutorial überspringen',
+    quitToTitle: 'Speichern und zum Titelbildschirm',
   },
   firstMorning: {
     label: 'Der erste Morgen',

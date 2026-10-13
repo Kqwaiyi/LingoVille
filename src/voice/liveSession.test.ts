@@ -81,6 +81,7 @@ function fakeAudio({ micAllowed = true } = {}) {
 /** Everything the session told the game, in order. */
 function listen() {
   const heard: string[] = [];
+  const said: (readonly string[] | undefined)[] = [];
   const toolCalls: ToolCall[] = [];
   const usage: TokenUsage[] = [];
   const micLevels: number[] = [];
@@ -89,7 +90,10 @@ function listen() {
   const events: VoiceSessionEvents = {
     onOutputTranscript: (text) => heard.push(`npc: ${text}`),
     onInputTranscript: (text) => heard.push(`player: ${text}`),
-    onTurnComplete: () => heard.push('turn complete'),
+    onTurnComplete: (spoken) => {
+      heard.push('turn complete');
+      said.push(spoken);
+    },
     onToolCall: (call) => toolCalls.push(call),
     onMicLevel: (level) => micLevels.push(level),
     onMicUnavailable: () => micUnavailable++,
@@ -98,6 +102,7 @@ function listen() {
   };
   return {
     heard,
+    said,
     toolCalls,
     usage,
     micLevels,
@@ -264,6 +269,38 @@ describe('Live VoiceSession', () => {
     audio.finishesPlaying();
     await flush();
     expect(game.heard.at(-1)).toBe('turn complete');
+  });
+
+  it('hands the game each finished turn as it was said aloud, so the line can be heard again', async () => {
+    const { server, audio, game } = await connected();
+
+    server.says({ serverContent: { outputTranscription: { text: 'Hallo! ' }, modelTurn: { parts: [{ inlineData: { data: 'HAL' } }] } } });
+    server.says({ serverContent: { modelTurn: { parts: [{ inlineData: { data: 'LO' } }] } } });
+    server.says({ serverContent: { turnComplete: true } });
+    audio.finishesPlaying();
+    await flush();
+    server.says({ serverContent: { outputTranscription: { text: 'Was darf’s sein?' }, modelTurn: { parts: [{ inlineData: { data: 'WAS' } }] } } });
+    server.says({ serverContent: { turnComplete: true } });
+    audio.finishesPlaying();
+    await flush();
+
+    expect(game.said).toEqual([['HAL', 'LO'], ['WAS']]);
+  });
+
+  it('keeps none of a cut-off turn in the next turn’s audio', async () => {
+    const { server, audio, game, session } = await connected();
+    server.says({ serverContent: { outputTranscription: { text: 'Hallo! ' }, modelTurn: { parts: [{ inlineData: { data: 'HI' } }] } } });
+
+    session.startTalking();
+    server.says({ serverContent: { modelTurn: { parts: [{ inlineData: { data: 'LATE' } }] } } });
+    server.says({ serverContent: { interrupted: true } });
+    session.stopTalking();
+    server.says({ serverContent: { outputTranscription: { text: 'Kaffee, gern.' }, modelTurn: { parts: [{ inlineData: { data: 'REPLY' } }] } } });
+    server.says({ serverContent: { turnComplete: true } });
+    audio.finishesPlaying();
+    await flush();
+
+    expect(game.said).toEqual([['REPLY']]);
   });
 
   it('streams the mic only while the Player holds push-to-talk, and passes on what the NPC heard', async () => {

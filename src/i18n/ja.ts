@@ -163,6 +163,7 @@ export const ja: UiStrings = {
     settings: '設定',
     back: '戻る',
     skipTutorial: 'チュートリアルをスキップ',
+    quitToTitle: 'セーブしてタイトルへ戻る',
   },
   firstMorning: {
     label: '最初の朝',
