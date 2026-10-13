@@ -1,45 +1,50 @@
-// What the game expects of the shared character art in `public/characters/`, built by `npm run build:characters`.
-// The build script and `tooling/characterArt.test.ts` hold the art to these names.
-import { BODY_IDS, BODY_PRESETS, HAIR_STYLE_IDS, type AppearancePreset, type HairStyleId } from '../content/index.ts';
+// What the game expects of the character art in `public/characters/clawd.glb`: Clawd, the Claude Code mascot, modelled,
+// rigged and animated in Blender by `art/characters/clawd.py`. `tooling/characterArt.test.ts` holds the art to these names.
+import { EYEWEAR_IDS, HAT_IDS, NECKWEAR_IDS, type AppearancePreset } from '../content/index.ts';
 
-export const CHARACTER_ART_URLS = { characters: '/characters/characters.glb', animations: '/characters/animations.glb' } as const;
+export const CHARACTER_ART_URL = '/characters/clawd.glb';
 
-/** The clips in the shared animation library. */
-export const CHARACTER_CLIPS = ['idle', 'walk', 'jog', 'talk', 'sit', 'interact'] as const;
+/** The figure the art holds: Clawd on its rig, the scene's one root. */
+export const FIGURE = 'clawd';
+
+/** The clips in the art. */
+export const CHARACTER_CLIPS = ['idle', 'walk', 'talk'] as const;
 export type CharacterClip = (typeof CHARACTER_CLIPS)[number];
 
-/** The bones the game moves or hangs things on (an expression's head turn, a role's apron), in every build. */
-export const CHARACTER_BONES = ['Head', 'pelvis', 'spine_03'] as const;
-export const HEAD_BONE = 'Head' satisfies CharacterBone;
-export type CharacterBone = (typeof CHARACTER_BONES)[number];
+/** The bone an expression's tilt and nod turn: the body, which is all of Clawd but the arms and legs. */
+export const BODY_BONE = 'body';
+/** The bones the game moves itself. */
+export const CHARACTER_BONES = [BODY_BONE] as const;
 
-/** The hair parts each style shows. A part ending in `-` is cut to fit each face, and takes the face's letter. */
-const HAIR: Record<HairStyleId, string[]> = {
-  short: ['hair-parted'],
-  long: ['hair-long'],
-  buns: ['hair-buns'],
-  buzzed: ['hair-buzzed-'],
-  bearded: ['hair-parted', 'beard'],
-  bald: [],
-};
+/** The eyes, and the shape keys the game eases them between: a blink, and an expression's (relaxed is the eyes as they are). */
+export const EYES = 'eyes';
+export const EYE_SHAPES = ['blink', 'puzzled', 'strained'] as const;
+export type EyeShape = (typeof EYE_SHAPES)[number];
 
-/** Parts that only some looks show. Everything else (the outfit) every look of a build wears. */
-export const OPTIONAL_PART = /^(head|brows|eyes|hair|beard)/;
+/** What staff wear, tinted in their role's colour. */
+export const APRON = 'apron';
+/** A drop of sweat, shown while someone is strained. */
+export const SWEAT = 'sweat';
 
-/** The optional parts a look shows: its face, and its hair cut to fit that face. */
-export function partsOf({ body, hairStyle }: Pick<AppearancePreset, 'body' | 'hairStyle'>) {
-  const { face } = BODY_PRESETS[body];
-  return new Set([`head-${face}`, `brows-${face}`, `eyes-${face}`, ...HAIR[hairStyle].map((part) => (part.endsWith('-') ? part + face : part))]);
+/** The material what's worn is drawn in, tinted with the look's colour; the apron's is tinted with the role's. */
+export const ACCENT_MATERIAL = 'accent';
+export const APRON_MATERIAL = 'apron';
+
+/** Parts only some figures show: what's worn, the apron and the sweat. Everything else (Clawd) every figure shows. */
+export const OPTIONAL_PART = /^(hat|eyewear|neckwear)-|^(apron|sweat)$/;
+
+/** The parts a look wears, each named for its kind and what it is: `hat-beret`, `eyewear-monocle`, `neckwear-scarf`. */
+export function partsOf({ hat, eyewear, neckwear }: Pick<AppearancePreset, 'hat' | 'eyewear' | 'neckwear'>): Set<string> {
+  return new Set([`hat-${hat}`, `eyewear-${eyewear}`, `neckwear-${neckwear}`].filter((part) => !part.endsWith('-none')));
 }
 
-/** Every build, each with every optional part any of its looks can show: what the art must hold. */
-export function partsByBuild() {
-  const parts = new Map<string, Set<string>>();
-  for (const body of BODY_IDS) {
-    const { build } = BODY_PRESETS[body];
-    const set = parts.get(build) ?? new Set<string>();
-    for (const hairStyle of HAIR_STYLE_IDS) for (const part of partsOf({ body, hairStyle })) set.add(part);
-    parts.set(build, set);
-  }
-  return parts;
+/** Every optional part the art must hold: whatever any look can wear, the apron and the sweat. */
+export function optionalParts(): Set<string> {
+  return new Set([
+    ...HAT_IDS.map((hat) => `hat-${hat}`),
+    ...EYEWEAR_IDS.map((eyewear) => `eyewear-${eyewear}`),
+    ...NECKWEAR_IDS.map((neckwear) => `neckwear-${neckwear}`),
+    APRON,
+    SWEAT,
+  ].filter((part) => !part.endsWith('-none')));
 }

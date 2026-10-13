@@ -1,9 +1,8 @@
 /**
  * Downloads one upload of a free (or pay-what-you-want) itch.io page, as the page's own "No thanks, just take me to
- * the downloads" does: Kenney's and Quaternius's CC0 packs, for instance.
+ * the downloads" does: Kenney's CC0 packs, for instance.
  *
  * `npx tsx scripts/fetch-itch.ts <page url> <part of the upload's file name> <out file>`
- * e.g. `npx tsx scripts/fetch-itch.ts https://quaternius.itch.io/universal-base-characters Standard ubc.zip`
  *
  * The flow, as itch.io's own script runs it: the page's CSRF token buys a download page; that page's token, posted to
  * `/file/<upload id>` (without the download page's key, which the site refuses), answers with the file's CDN URL.

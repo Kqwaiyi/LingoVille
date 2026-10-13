@@ -11,6 +11,7 @@ import {
   MEDICINE_IDS,
   menuPrice,
   NAMED_NPCS,
+  NpcLookSchema,
   SHIFT_TEMPLATES,
   type ItemId,
   type NamedNpcId,
@@ -36,7 +37,7 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 18;
+export const SAVE_SCHEMA_VERSION = 19;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
@@ -150,7 +151,7 @@ const GameStateSchema = z.object({
             checkout: checkout.nullable(),
             table: z.array(diner).min(1).readonly().nullable(),
             voiceSeed: z.int().min(0),
-            appearances: z.array(AppearancePresetSchema).min(1).readonly(),
+            appearances: z.array(NpcLookSchema).min(1).readonly(),
           })
           .nullable(),
       })
@@ -181,6 +182,11 @@ export type SlotId = (typeof SLOT_IDS)[number];
 
 /** A stored save in some older shape. Migrations only touch what changed. */
 type StoredSave = { schemaVersion: number; game: Record<string, unknown> } & Record<string, unknown>;
+
+/** The hat a Character's hair became when everyone became Clawd (18 → 19): short hair and a beard went bare-headed. */
+const CLAWD_HATS = { short: 'none', long: 'beret', buns: 'bow', buzzed: 'beanie', bearded: 'none', bald: 'top-hat' } as const;
+/** The colour a Character's hair colour became when everyone became Clawd (18 → 19). */
+const CLAWD_COLOURS = { black: 'charcoal', 'dark-brown': 'denim', brown: 'mustard', auburn: 'red', blonde: 'cream', grey: 'sky' } as const;
 
 /**
  * Ordered migrations: `MIGRATIONS[n]` upgrades a save from version n + 1 to
@@ -333,6 +339,28 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       appearances: Array.from({ length: shift.customer.table?.length ?? 1 }, (_, i) => lookFromSeed(shift.customer!.voiceSeed + i, weights)),
     };
     return { ...save, schemaVersion: 18, game: { ...save.game, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } } };
+  },
+  // 18 → 19: everyone is Clawd, told apart by what they wear. The Character's hair becomes a hat (`CLAWD_HATS`, with a
+  // scarf for a beard) in a colour for the hair's; a Shift Customer at the counter is drawn again from their voice seed,
+  // one look for each at their table, as 17 → 18 drew them.
+  (save) => {
+    const game = save.game as {
+      identity: { culturePackId: LanguageCode; appearance: { hairStyle: keyof typeof CLAWD_HATS; hairColour: keyof typeof CLAWD_COLOURS } };
+      possessions: { shift: { customer: { voiceSeed: number; table: unknown[] | null } | null } | null };
+    };
+    const { hairStyle, hairColour } = game.identity.appearance;
+    const appearance = { hat: CLAWD_HATS[hairStyle], eyewear: 'none', neckwear: hairStyle === 'bearded' ? 'scarf' : 'none', colour: CLAWD_COLOURS[hairColour] };
+    const { shift } = game.possessions;
+    const weights = customerLookWeights(game.identity.culturePackId);
+    const customer = shift?.customer && {
+      ...shift.customer,
+      appearances: Array.from({ length: shift.customer.table?.length ?? 1 }, (_, i) => lookFromSeed(shift.customer!.voiceSeed + i, weights)),
+    };
+    return {
+      ...save,
+      schemaVersion: 19,
+      game: { ...save.game, identity: { ...game.identity, appearance }, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } },
+    };
   },
 ];
 

@@ -136,20 +136,21 @@ describe('nextShiftCustomer: how a Shift Customer looks', () => {
     expect(new Set(looks.map(([look]) => JSON.stringify(look))).size).toBeGreaterThan(5);
   });
 
-  it('draws only parts the pack weighs, with a hair style weighed for the body drawn', () => {
+  it('draws only parts the pack weighs', () => {
     const looks = looksOf({
-      body: { 'body-2': 1, 'body-3': 1 },
-      hairStyle: { 'body-1': { bald: 1 }, 'body-2': { bearded: 1 }, 'body-3': { buns: 1 }, 'body-4': { long: 1 } },
-      hairColour: { auburn: 1 },
-      skinTone: { 'tone-4': 1 },
+      build: { feminine: 1 },
+      hat: { beret: 1, 'top-hat': 1 },
+      eyewear: { monocle: 1 },
+      neckwear: { 'bow-tie': 1 },
+      colour: { plum: 1 },
     }).map(([look]) => look!);
-    expect(new Set(looks.map((look) => `${look.body} ${look.hairStyle}`))).toEqual(new Set(['body-2 bearded', 'body-3 buns']));
-    expect(new Set(looks.map((look) => `${look.hairColour} ${look.skinTone}`))).toEqual(new Set(['auburn tone-4']));
+    expect(new Set(looks.map((look) => look.hat))).toEqual(new Set(['beret', 'top-hat']));
+    expect(new Set(looks.map((look) => `${look.build} ${look.eyewear} ${look.neckwear} ${look.colour}`))).toEqual(new Set(['feminine monocle bow-tie plum']));
   });
 
   it('draws each part as often as the pack weighs it', () => {
-    const looks = looksOf({ ...TEST_LOOKS, skinTone: { 'tone-1': 3, 'tone-6': 1 } }, 2000).map(([look]) => look!);
-    const share = looks.filter((look) => look.skinTone === 'tone-1').length / looks.length;
+    const looks = looksOf({ ...TEST_LOOKS, colour: { red: 3, sky: 1 } }, 2000).map(([look]) => look!);
+    const share = looks.filter((look) => look.colour === 'red').length / looks.length;
     expect(share).toBeGreaterThan(0.7);
     expect(share).toBeLessThan(0.8);
   });

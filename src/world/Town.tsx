@@ -30,8 +30,8 @@ import { Signs } from './Signs.tsx';
 import { isWaitingForTram, NPC_SPOTS, type Vec3, WORKPLACES } from './town.ts';
 
 /**
- * Each role's signifier, the same in every Culture Pack: staff wear an apron in their role's colour. The landlord, the
- * park regulars and passers-by wear their everyday clothes.
+ * Each role's signifier, the same in every Culture Pack: staff wear an apron in their role's colour over what their look
+ * has them wear. The landlord, the park regulars and passers-by wear only their look.
  */
 const APRONS: Partial<Record<RoleId, PaletteColour>> = {
   barista: 'teal',
@@ -51,12 +51,15 @@ const apronOf = (role: RoleId) => {
   return colour && PALETTE[colour];
 };
 
+/** How far above the middle of where someone stands the "speaking…" shows: just over Clawd in a tall hat. */
+const SPEAKING_HEIGHT = 0.75;
+
 /** A small "speaking…" over the NPC while a line of theirs is coming in. The words themselves are in the chat column. */
 function SpeakingIndicator({ speaking }: { speaking: boolean }) {
   const { t } = useTranslation();
   if (!speaking) return null;
   return (
-    <Html position={[0, 1.2, 0]} center zIndexRange={[10, 0]}>
+    <Html position={[0, SPEAKING_HEIGHT, 0]} center zIndexRange={[10, 0]}>
       <span className="npc-speaking" role="status">
         {t('chat.speaking')}
       </span>
@@ -83,7 +86,7 @@ function FacingTheCharacter({ at: [x, , z], children }: { at: Vec3; children: Re
   return <group ref={turning}>{children}</group>;
 }
 
-/** Someone on the shared rig standing at `at` (a capsule's middle, as the spots are given), feet on the floor, facing the Character. */
+/** Someone (Clawd, as everyone is) standing at `at` (a capsule's middle, as the spots are given), feet on the floor, facing the Character. */
 function Figure({ at, children }: { at: Vec3; children: ReactNode }) {
   return (
     <group position={at}>

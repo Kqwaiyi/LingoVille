@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import type { NpcSession, ToolResponse } from '../ai/index.ts';
-import { BODY_PRESETS, CULTURE_PACKS, INTERACTIONS, menuPrice, PASSER_BY_IDS, placeHours, townNpcLook, type TownNpcId } from '../content/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, menuPrice, PASSER_BY_IDS, placeHours, townNpcLook, type TownNpcId } from '../content/index.ts';
 import { createSave, weekdayOf, type GameState, type InventoryItem, type OpeningHours, type PlaceId } from '../sim/index.ts';
 import type { OpenVoiceSession, VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -166,7 +166,7 @@ describe('asking a passer-by which tram goes to a place (#25)', () => {
     const { store, npc } = nextTo({ placeId: 'tram-stop', npcId });
     store.getState().talk('E');
 
-    expect(npc.session!.voice).toMatchObject({ build: BODY_PRESETS[townNpcLook(npcId, DEV_SETUP.culturePackId).body].build });
+    expect(npc.session!.voice).toMatchObject({ build: townNpcLook(npcId, DEV_SETUP.culturePackId).build });
   });
 
   it('marks the stop to get off at, and leaves no memory of the Character', () => {

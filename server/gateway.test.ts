@@ -25,7 +25,7 @@ import {
   type Recap,
   type RecapRequest,
 } from '../src/ai/index.ts';
-import { BODY_PRESETS, BUILDS, CULTURE_PACKS, NAMED_NPC_IDS, type Build, type NamedNpcId } from '../src/content/index.ts';
+import { BUILDS, CULTURE_PACKS, NAMED_NPC_IDS, type Build, type NamedNpcId } from '../src/content/index.ts';
 import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import { createGateway, readGatewayEnv } from './gateway.ts';
 
@@ -322,7 +322,7 @@ describe('POST /api/token', () => {
     for (const pack of Object.values(CULTURE_PACKS)) {
       for (const npcId of NAMED_NPC_IDS) {
         const voice = (await voiceOf(await askForToken(base, { voice: { targetLanguage: pack.id, npcId } }))) as VoiceName;
-        expect({ pack: pack.id, npcId, build: VOICE_BUILDS[voice] }).toEqual({ pack: pack.id, npcId, build: BODY_PRESETS[pack.appearances.npcs[npcId].body].build });
+        expect({ pack: pack.id, npcId, build: VOICE_BUILDS[voice] }).toEqual({ pack: pack.id, npcId, build: pack.appearances.npcs[npcId].build });
       }
     }
   });

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { ECONOMY, LANGUAGE_CODES, PLACE_IDS, type LanguageCode } from '../sim/index.ts';
-import { BODY_PRESETS } from './appearance.ts';
 import { culturePackSchema, type CulturePack } from './culturePacks.ts';
 import { priceProblem } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
@@ -48,13 +47,10 @@ export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, in
       if (favourite && !favourite.includes(GIFT_WORDS[favouriteGift])) {
         problems.push(`gives ${npcId} a favourite gift that isn't ${GIFT_WORDS[favouriteGift]}, the one they love most.`);
       }
-      const body = pack.appearances.npcs[npcId]?.body;
-      const jaBody = packs.ja.appearances.npcs[npcId]?.body;
-      const build = jaBody && BODY_PRESETS[jaBody]?.build;
+      const build = pack.appearances.npcs[npcId]?.build;
+      const jaBuild = packs.ja.appearances.npcs[npcId]?.build;
       if (!pack.appearances.npcs[npcId]) problems.push(`gives ${npcId} no Appearance Preset.`);
-      else if (body && build && BODY_PRESETS[body] && BODY_PRESETS[body].build !== build) {
-        problems.push(`gives ${npcId} a ${BODY_PRESETS[body].build} build, not the ${build} one they have in every pack.`);
-      }
+      else if (build && jaBuild && build !== jaBuild) problems.push(`gives ${npcId} a ${build} build, not the ${jaBuild} one they have in every pack.`);
     }
     for (const placeId of PLACE_IDS) {
       for (const otherId of LANGUAGE_CODES) {

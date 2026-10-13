@@ -10,7 +10,7 @@ describe('lookFromSeed: someone anonymous who is always about', () => {
   });
 
   it('wears only parts the pack weighs', () => {
-    const look = lookFromSeed(7, { ...TEST_LOOKS, hairColour: { grey: 1 }, skinTone: { 'tone-6': 1 } });
-    expect(look).toMatchObject({ hairColour: 'grey', skinTone: 'tone-6' });
+    const look = lookFromSeed(7, { ...TEST_LOOKS, hat: { 'sun-hat': 1 }, colour: { blush: 1 } });
+    expect(look).toMatchObject({ hat: 'sun-hat', colour: 'blush' });
   });
 });

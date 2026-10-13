@@ -1,6 +1,6 @@
 import { GROCERIES_SOLD, TRAM_LINE, type CulturePack, type PropId } from '../content/index.ts';
 import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
-import { buildingOf, frontOf, inPark, inside, PLATFORM, TRAM_STOPS, type Building, type Vec3 } from './town.ts';
+import { buildingOf, COUNTER_HEIGHT, frontOf, inPark, inside, PLATFORM, TRAM_STOPS, type Building, type Vec3 } from './town.ts';
 
 // Where each Culture Pack's props stand. The layout keeps the same spots in every pack, each for one kind of prop;
 // a pack only says which props it sets out at each place (`props` in its content), and each takes the next free spot of
@@ -31,28 +31,28 @@ function spotsIn(placeId: PlaceId, spots: readonly { at: Vec3; rotation?: number
 const SPOTS: Record<PlaceId, PlaceSpots> = {
   // The stove top, and beside the bed against the back wall.
   home: { counter: spotsIn('home', [{ at: [2.4, 1.03, -3.85] }]), floor: spotsIn('home', [{ at: [-2.6, 0, -3.8] }]) },
-  cafe: { counter: spotsIn('cafe', [{ at: [-1.6, 1.1, -2.3] }, { at: [1.6, 1.1, -2.3] }]) },
+  cafe: { counter: spotsIn('cafe', [{ at: [-1.6, COUNTER_HEIGHT, -2.3] }, { at: [1.6, COUNTER_HEIGHT, -2.3] }]) },
   // The till, and inside the door, beside the aisles.
-  supermarket: { counter: spotsIn('supermarket', [{ at: [-4.4, 1.1, 2.6] }]), floor: spotsIn('supermarket', [{ at: [6.2, 0, 4.2] }]) },
-  'convenience-store': { counter: spotsIn('convenience-store', [{ at: [-0.9, 1.1, -2] }, { at: [0.9, 1.1, -2] }]) },
+  supermarket: { counter: spotsIn('supermarket', [{ at: [-4.4, COUNTER_HEIGHT, 2.6] }]), floor: spotsIn('supermarket', [{ at: [6.2, 0, 4.2] }]) },
+  'convenience-store': { counter: spotsIn('convenience-store', [{ at: [-0.9, COUNTER_HEIGHT, -2] }, { at: [0.9, COUNTER_HEIGHT, -2] }]) },
   // A dish on each of the back tables, and on the server's.
   restaurant: { table: spotsIn('restaurant', [{ at: [-3, 0.8, -2.6] }, { at: [1, 0.8, -2.6] }, { at: [-3, 0.8, 1] }]) },
   // Reception's counter and the pharmacy's, facing the door; and the waiting room, beside the bench.
   clinic: {
-    counter: spotsIn('clinic', [{ at: [5.3, 1.1, 2.8] }, { at: [-6.3, 1.1, 2.8] }]),
+    counter: spotsIn('clinic', [{ at: [5.3, COUNTER_HEIGHT, 2.8] }, { at: [-6.3, COUNTER_HEIGHT, 2.8] }]),
     floor: spotsIn('clinic', [{ at: [3.4, 0, -0.6] }]),
   },
   // Open lawn, clear of the trees, the benches, the bandstand and the paths.
   park: { lawn: [{ at: inPark([-3.5, 0.01, -1.5]) }, { at: inPark([2.5, 0.01, 2.2]), rotation: 0.5 }] },
   // The west end of each platform, clear of the shelter's posts and of where the tram sets the Character down.
   'tram-stop': { platform: TRAM_LINE.map((stopId): Spot => ({ at: [TRAM_STOPS[stopId].centre[0] - 4.4, PLATFORM.height, TRAM_STOPS[stopId].centre[1] + 0.3] })) },
-  bookshop: { counter: spotsIn('bookshop', [{ at: [-0.9, 1.1, -2] }, { at: [0.9, 1.1, -2] }]) },
+  bookshop: { counter: spotsIn('bookshop', [{ at: [-0.9, COUNTER_HEIGHT, -2] }, { at: [0.9, COUNTER_HEIGHT, -2] }]) },
   // The front desk, facing the door; and the corner beside the door.
   bathhouse: {
-    counter: spotsIn('bathhouse', [{ at: [-1.1, 1.1, 2.2] }, { at: [1.1, 1.1, 2.2] }]),
+    counter: spotsIn('bathhouse', [{ at: [-1.1, COUNTER_HEIGHT, 2.2] }, { at: [1.1, COUNTER_HEIGHT, 2.2] }]),
     floor: spotsIn('bathhouse', [{ at: [-5.6, 0, 3.8] }]),
   },
-  'town-office': { counter: spotsIn('town-office', [{ at: [-1.8, 1.1, -2] }, { at: [1.8, 1.1, -2] }]) },
+  'town-office': { counter: spotsIn('town-office', [{ at: [-1.8, COUNTER_HEIGHT, -2] }, { at: [1.8, COUNTER_HEIGHT, -2] }]) },
 };
 
 /** Every place's spots, each building's door included. */

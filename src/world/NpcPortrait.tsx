@@ -5,12 +5,15 @@ import type { NpcExpression } from '../sim/index.ts';
 import { CharacterFigure } from './CharacterFigure.tsx';
 import { PALETTE } from './palette.ts';
 
-/** How the portrait frames the face: the camera's height and distance in front of it, where it looks and how wide, in metres and degrees. */
-const FRAMING = { cameraHeight: 1.6, distance: 0.9, lookHeight: 1.6, fov: 22 } as const;
+/**
+ * How the portrait frames the face, Clawd's front with both eyes and the brim of a hat: the camera's height and distance
+ * in front of it, where it looks and how wide, in metres and degrees.
+ */
+const FRAMING = { cameraHeight: 1.0, distance: 3.2, lookHeight: 0.86, fov: 22 } as const;
 
 /**
- * The face of whoever the Player is talking to, close up in a little view of its own: their look on the shared rig,
- * with their Patience on it. It's the only way Patience shows.
+ * The face of whoever the Player is talking to, close up in a little view of its own: Clawd in their look, with their
+ * Patience in its eyes. It's the only way Patience shows.
  */
 export function NpcPortrait({ appearance, expression }: { appearance: AppearancePreset; expression: NpcExpression }) {
   return (

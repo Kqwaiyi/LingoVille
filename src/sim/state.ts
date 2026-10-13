@@ -1,4 +1,4 @@
-import type { AppearancePreset, DietaryNoteId, DrinkModifiers, ItemId, MedicineId, NamedNpcId } from '../content/index.ts';
+import type { AppearancePreset, DietaryNoteId, DrinkModifiers, ItemId, MedicineId, NamedNpcId, NpcLook } from '../content/index.ts';
 import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
 import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
@@ -107,7 +107,7 @@ export type ShiftCustomer = {
   /** Picks their voice: the gateway turns it into one of the anonymous voices for the build of the one who speaks. */
   voiceSeed: number;
   /** How they look, drawn with the pack's weights: the one who speaks, then the rest of their table. */
-  appearances: readonly AppearancePreset[];
+  appearances: readonly NpcLook[];
 };
 
 /** A stretch of work at a Job: a set number of Shift Customers, served one after another. */

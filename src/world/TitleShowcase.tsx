@@ -13,8 +13,8 @@ const SHOWCASE = {
   frameShift: 2.8,
 } as const;
 
-/** While the Player chooses the look: close up, head to toe, so the face and hair show. */
-const PORTRAIT = { distance: 3.4, cameraHeight: 1.7, lookHeight: 1.05, frameShift: 1.15 } as const;
+/** While the Player chooses the look: close up, hat to feet, so what's worn shows. */
+const PORTRAIT = { distance: 3.4, cameraHeight: 1.5, lookHeight: 0.75, frameShift: 1.15 } as const;
 
 /** The camera's slow side-to-side drift: this far either side of straight ahead, in radians, this slowly (radians of the swing's phase per second). */
 const DRIFT = { swing: 0.15, speed: 0.08 } as const;

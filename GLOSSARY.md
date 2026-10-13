@@ -131,10 +131,14 @@ _Avoid_: Skin, theme, locale
 Something bought mainly to lift Mood rather than to meet a Well-being need (e.g. cake, a book, a restaurant meal, a bathhouse visit, flowers). Most are used up when bought; a gift is kept in the inventory, ready to give. A restaurant meal is eaten first and paid for with the bill.
 _Avoid_: Treat, luxury item
 
+**Clawd**:
+The Claude Code mascot, which everyone in town is: the Character, every NPC. A block of orange about twice as wide as it is tall, with two tall black eyes, a stubby arm on each side and four short legs. Clawd looks the same on everyone; what they wear tells them apart.
+_Avoid_: Crab, mascot, character model
+
 **Appearance Preset**:
-One look on the shared character body (build and face, hair, skin tone, clothing), drawn from a single pool that the Character, Named NPCs, Shift Customers and passers-by all use. The player picks the Character's once, at setup. A Named NPC's comes from the persona × pack table; a Shift Customer's or passer-by's is drawn with the pack's weights.
+One look on Clawd: a hat, eyewear and neckwear (any of them none), in one colour, drawn from a single pool that the Character, Named NPCs, Shift Customers and Passers-by all use. Nobody is told apart by body, hair or skin. The player picks the Character's once, at setup. A Named NPC's comes from the persona × pack table; a Shift Customer's or Passer-by's is drawn with the pack's weights. Staff wear an apron in their role's colour as well.
 _Avoid_: Skin, avatar, outfit
 
 **NPC Voice**:
-The voice an NPC speaks in, which always suits the build of their Appearance Preset. Each Named NPC has their own, the same in every Culture Pack. A Shift Customer or Passer-by gets one suited to their build that no Named NPC uses, so they never sound like the staff.
+The voice an NPC speaks in, which always suits their build. Clawd's shape is the same for everyone, so the build is something only the voice shows: it goes with an NPC's look, the same in every Culture Pack for a Named NPC and drawn with the look for a Shift Customer or Passer-by. Each Named NPC has their own voice, the same in every Culture Pack. A Shift Customer or Passer-by gets one suited to their build that no Named NPC uses, so they never sound like the staff.
 _Avoid_: Speaker, TTS voice

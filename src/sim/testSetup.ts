@@ -7,15 +7,16 @@ export const TEST_SETUP: NewGameSetup = {
   targetLanguage: 'ja',
   culturePackId: 'ja',
   startingStep: 'A1',
-  appearance: { body: 'body-1', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-3' },
+  appearance: { hat: 'none', eyewear: 'none', neckwear: 'none', colour: 'denim' },
   skipFirstMorning: false,
   rngSeed: 1,
 };
 
-/** Pack weights for anonymous looks, for tests: every body, a hair style or two for each, and a couple of colours and tones. */
+/** Pack weights for anonymous looks, for tests: both builds, and a few of each thing worn, in a couple of colours. */
 export const TEST_LOOKS: LookWeights = {
-  body: { 'body-1': 1, 'body-2': 1, 'body-3': 1, 'body-4': 1 },
-  hairStyle: { 'body-1': { short: 1, bearded: 1 }, 'body-2': { short: 1, bearded: 1 }, 'body-3': { long: 1, buns: 1 }, 'body-4': { long: 1, buns: 1 } },
-  hairColour: { black: 1, brown: 1 },
-  skinTone: { 'tone-2': 1, 'tone-5': 1 },
+  build: { masculine: 1, feminine: 1 },
+  hat: { none: 1, beanie: 1, cap: 1 },
+  eyewear: { none: 1, 'round-glasses': 1 },
+  neckwear: { none: 1, scarf: 1, tie: 1 },
+  colour: { teal: 1, mustard: 1 },
 };

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CLOCK, LANGUAGE_CODES, lookFromSeed, PLACE_IDS, WEEKDAYS, type LanguageCode, type LookWeights, type OpeningHours, type PlaceId } from '../sim/index.ts';
-import { AppearancePresetSchema, BODY_IDS, BODY_PRESETS, CustomerWeightsSchema, type AppearancePreset, type CustomerWeights } from './appearance.ts';
+import { CustomerWeightsSchema, NpcLookSchema, type CustomerWeights, type NpcLook } from './appearance.ts';
 import {
   ALLERGENS,
   DIETARY_NOTE_IDS,
@@ -193,8 +193,8 @@ export type CulturePack = {
    */
   casualRegister: { formal: string; casual: string; offer: string; inUse: string };
   appearances: {
-    /** Persona × pack → Appearance Preset: each Named NPC's local look, on the build they have in every pack. */
-    npcs: Record<NamedNpcId, AppearancePreset>;
+    /** Persona × pack → look: what each Named NPC wears in this pack, and the build their voice suits, the same in every pack. */
+    npcs: Record<NamedNpcId, NpcLook>;
     /** How often each part of a look turns up among Shift Customers and passers-by. */
     customers: CustomerWeights;
   };
@@ -263,7 +263,7 @@ export function culturePackSchema(packId: LanguageCode) {
     personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
     casualRegister: z.object({ formal: text, casual: text, offer: text, inUse: text }),
     appearances: z.object({
-      npcs: z.record(z.string(), AppearancePresetSchema),
+      npcs: z.record(z.string(), NpcLookSchema),
       customers: CustomerWeightsSchema,
     }),
     props: z.record(z.enum(PLACE_IDS), z.array(z.enum(PROP_IDS)).min(1)),
@@ -442,30 +442,28 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: { body: 'body-3', hairStyle: 'buns', hairColour: 'grey', skinTone: 'tone-2' },
-        barista: { body: 'body-2', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' },
-        cashier: { body: 'body-1', hairStyle: 'buzzed', hairColour: 'black', skinTone: 'tone-3' },
-        'convenience-clerk': { body: 'body-3', hairStyle: 'long', hairColour: 'brown', skinTone: 'tone-1' },
-        server: { body: 'body-1', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
-        receptionist: { body: 'body-3', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-2' },
-        doctor: { body: 'body-4', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-2' },
-        nurse: { body: 'body-4', hairStyle: 'buns', hairColour: 'dark-brown', skinTone: 'tone-3' },
-        pharmacist: { body: 'body-2', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
-        'park-regular-1': { body: 'body-3', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-3' },
-        'park-regular-2': { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-1' },
-        'park-regular-3': { body: 'body-1', hairStyle: 'buzzed', hairColour: 'brown', skinTone: 'tone-2' },
-        shopkeeper: { body: 'body-2', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-3' },
-        attendant: { body: 'body-3', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-3' },
-        'office-clerk': { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
+        landlord: { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'scarf', colour: 'plum' },
+        barista: { build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'none', colour: 'teal' },
+        cashier: { build: 'masculine', hat: 'none', eyewear: 'none', neckwear: 'bow-tie', colour: 'mustard' },
+        'convenience-clerk': { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'none', colour: 'denim' },
+        server: { build: 'masculine', hat: 'none', eyewear: 'none', neckwear: 'tie', colour: 'red' },
+        receptionist: { build: 'feminine', hat: 'bow', eyewear: 'none', neckwear: 'none', colour: 'blush' },
+        doctor: { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'tie', colour: 'sky' },
+        nurse: { build: 'feminine', hat: 'flower', eyewear: 'none', neckwear: 'none', colour: 'blush' },
+        pharmacist: { build: 'masculine', hat: 'none', eyewear: 'square-glasses', neckwear: 'bow-tie', colour: 'teal' },
+        'park-regular-1': { build: 'feminine', hat: 'sun-hat', eyewear: 'none', neckwear: 'scarf', colour: 'mustard' },
+        'park-regular-2': { build: 'feminine', hat: 'beanie', eyewear: 'none', neckwear: 'scarf', colour: 'red' },
+        'park-regular-3': { build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'bandana', colour: 'pine' },
+        shopkeeper: { build: 'masculine', hat: 'none', eyewear: 'monocle', neckwear: 'bow-tie', colour: 'plum' },
+        attendant: { build: 'feminine', hat: 'beanie', eyewear: 'none', neckwear: 'none', colour: 'sky' },
+        'office-clerk': { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'tie', colour: 'charcoal' },
       },
       customers: {
-        body: { 'body-1': 3, 'body-2': 3, 'body-3': 2, 'body-4': 2 },
-        hairStyle: {
-          masculine: { short: 4, buzzed: 2, long: 1, bearded: 1, bald: 1 },
-          feminine: { long: 4, short: 3, buns: 3 },
-        },
-        hairColour: { black: 5, 'dark-brown': 4, brown: 1, grey: 2 },
-        skinTone: { 'tone-1': 3, 'tone-2': 4, 'tone-3': 2 },
+        build: { masculine: 6, feminine: 4 },
+        hat: { none: 6, cap: 3, beanie: 2, 'sun-hat': 2, beret: 1, bow: 1, flower: 1, 'party-hat': 1 },
+        eyewear: { none: 6, 'round-glasses': 2, 'square-glasses': 2 },
+        neckwear: { none: 5, scarf: 2, tie: 2, 'bow-tie': 1, bandana: 1 },
+        colour: { denim: 3, sky: 2, teal: 2, pine: 1, leaf: 2, mustard: 2, red: 2, blush: 2, plum: 1, cream: 2, charcoal: 2 },
       },
     },
     props: {
@@ -649,30 +647,28 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: { body: 'body-4', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-2' },
-        barista: { body: 'body-2', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
-        cashier: { body: 'body-2', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-1' },
-        'convenience-clerk': { body: 'body-4', hairStyle: 'long', hairColour: 'dark-brown', skinTone: 'tone-2' },
-        server: { body: 'body-1', hairStyle: 'buzzed', hairColour: 'black', skinTone: 'tone-3' },
-        receptionist: { body: 'body-4', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-1' },
-        doctor: { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
-        nurse: { body: 'body-4', hairStyle: 'buns', hairColour: 'black', skinTone: 'tone-2' },
-        pharmacist: { body: 'body-2', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-3' },
-        'park-regular-1': { body: 'body-4', hairStyle: 'buzzed', hairColour: 'grey', skinTone: 'tone-3' },
-        'park-regular-2': { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-2' },
-        'park-regular-3': { body: 'body-2', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' },
-        shopkeeper: { body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-3' },
-        attendant: { body: 'body-4', hairStyle: 'buns', hairColour: 'dark-brown', skinTone: 'tone-3' },
-        'office-clerk': { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-2' },
+        landlord: { build: 'feminine', hat: 'flower', eyewear: 'round-glasses', neckwear: 'none', colour: 'red' },
+        barista: { build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'bandana', colour: 'teal' },
+        cashier: { build: 'masculine', hat: 'none', eyewear: 'none', neckwear: 'bow-tie', colour: 'red' },
+        'convenience-clerk': { build: 'feminine', hat: 'beanie', eyewear: 'none', neckwear: 'none', colour: 'denim' },
+        server: { build: 'masculine', hat: 'none', eyewear: 'none', neckwear: 'tie', colour: 'plum' },
+        receptionist: { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'scarf', colour: 'blush' },
+        doctor: { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'none', colour: 'cream' },
+        nurse: { build: 'feminine', hat: 'bow', eyewear: 'none', neckwear: 'none', colour: 'sky' },
+        pharmacist: { build: 'masculine', hat: 'none', eyewear: 'square-glasses', neckwear: 'tie', colour: 'teal' },
+        'park-regular-1': { build: 'feminine', hat: 'sun-hat', eyewear: 'none', neckwear: 'none', colour: 'leaf' },
+        'park-regular-2': { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'scarf', colour: 'plum' },
+        'park-regular-3': { build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'scarf', colour: 'denim' },
+        shopkeeper: { build: 'masculine', hat: 'top-hat', eyewear: 'monocle', neckwear: 'none', colour: 'plum' },
+        attendant: { build: 'feminine', hat: 'none', eyewear: 'none', neckwear: 'bandana', colour: 'sky' },
+        'office-clerk': { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'bow-tie', colour: 'charcoal' },
       },
       customers: {
-        body: { 'body-1': 3, 'body-2': 2, 'body-3': 3, 'body-4': 2 },
-        hairStyle: {
-          masculine: { short: 4, buzzed: 3, long: 1, bearded: 1, bald: 1 },
-          feminine: { long: 4, short: 3, buns: 3 },
-        },
-        hairColour: { black: 6, 'dark-brown': 3, grey: 2 },
-        skinTone: { 'tone-1': 2, 'tone-2': 4, 'tone-3': 3 },
+        build: { masculine: 5, feminine: 5 },
+        hat: { none: 6, cap: 3, 'sun-hat': 2, beanie: 1, bow: 1, flower: 2, 'party-hat': 1 },
+        eyewear: { none: 6, 'round-glasses': 2, 'square-glasses': 2 },
+        neckwear: { none: 5, scarf: 2, tie: 1, 'bow-tie': 1, bandana: 2 },
+        colour: { red: 3, denim: 2, sky: 2, teal: 2, pine: 2, leaf: 1, mustard: 2, blush: 2, plum: 1, cream: 1, charcoal: 2 },
       },
     },
     props: {
@@ -858,30 +854,28 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: { body: 'body-3', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-1' },
-        barista: { body: 'body-1', hairStyle: 'long', hairColour: 'auburn', skinTone: 'tone-1' },
-        cashier: { body: 'body-1', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-4' },
-        'convenience-clerk': { body: 'body-3', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-4' },
-        server: { body: 'body-2', hairStyle: 'short', hairColour: 'blonde', skinTone: 'tone-1' },
-        receptionist: { body: 'body-4', hairStyle: 'buns', hairColour: 'blonde', skinTone: 'tone-2' },
-        doctor: { body: 'body-3', hairStyle: 'buzzed', hairColour: 'black', skinTone: 'tone-6' },
-        nurse: { body: 'body-3', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-1' },
-        pharmacist: { body: 'body-1', hairStyle: 'bearded', hairColour: 'black', skinTone: 'tone-4' },
-        'park-regular-1': { body: 'body-4', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-2' },
-        'park-regular-2': { body: 'body-3', hairStyle: 'long', hairColour: 'brown', skinTone: 'tone-2' },
-        'park-regular-3': { body: 'body-2', hairStyle: 'buzzed', hairColour: 'brown', skinTone: 'tone-1' },
-        shopkeeper: { body: 'body-1', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-2' },
-        attendant: { body: 'body-4', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-1' },
-        'office-clerk': { body: 'body-3', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' },
+        landlord: { build: 'feminine', hat: 'beanie', eyewear: 'round-glasses', neckwear: 'scarf', colour: 'blush' },
+        barista: { build: 'masculine', hat: 'beanie', eyewear: 'none', neckwear: 'none', colour: 'teal' },
+        cashier: { build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'none', colour: 'red' },
+        'convenience-clerk': { build: 'feminine', hat: 'cap', eyewear: 'none', neckwear: 'none', colour: 'denim' },
+        server: { build: 'masculine', hat: 'none', eyewear: 'none', neckwear: 'bow-tie', colour: 'charcoal' },
+        receptionist: { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'scarf', colour: 'sky' },
+        doctor: { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'tie', colour: 'denim' },
+        nurse: { build: 'feminine', hat: 'none', eyewear: 'none', neckwear: 'bandana', colour: 'leaf' },
+        pharmacist: { build: 'masculine', hat: 'none', eyewear: 'round-glasses', neckwear: 'bow-tie', colour: 'teal' },
+        'park-regular-1': { build: 'feminine', hat: 'sun-hat', eyewear: 'round-glasses', neckwear: 'none', colour: 'blush' },
+        'park-regular-2': { build: 'feminine', hat: 'beret', eyewear: 'none', neckwear: 'scarf', colour: 'red' },
+        'park-regular-3': { build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'scarf', colour: 'pine' },
+        shopkeeper: { build: 'masculine', hat: 'none', eyewear: 'monocle', neckwear: 'bow-tie', colour: 'plum' },
+        attendant: { build: 'feminine', hat: 'none', eyewear: 'none', neckwear: 'scarf', colour: 'sky' },
+        'office-clerk': { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'tie', colour: 'charcoal' },
       },
       customers: {
-        body: { 'body-1': 3, 'body-2': 2, 'body-3': 2, 'body-4': 3 },
-        hairStyle: {
-          masculine: { short: 4, buzzed: 2, long: 1, bearded: 2, bald: 1 },
-          feminine: { long: 4, short: 3, buns: 2 },
-        },
-        hairColour: { black: 2, 'dark-brown': 3, brown: 3, auburn: 1, blonde: 2, grey: 2 },
-        skinTone: { 'tone-1': 3, 'tone-2': 3, 'tone-3': 1, 'tone-4': 2, 'tone-5': 1, 'tone-6': 1 },
+        build: { masculine: 5, feminine: 5 },
+        hat: { none: 6, cap: 2, beanie: 2, beret: 1, 'top-hat': 1, 'sun-hat': 1, bow: 1, flower: 1, 'party-hat': 1 },
+        eyewear: { none: 6, 'round-glasses': 2, 'square-glasses': 2, monocle: 1 },
+        neckwear: { none: 4, scarf: 3, tie: 2, 'bow-tie': 1, bandana: 1 },
+        colour: { denim: 2, sky: 2, teal: 2, pine: 2, leaf: 1, mustard: 2, red: 2, blush: 2, plum: 2, cream: 1, charcoal: 2 },
       },
     },
     props: {
@@ -1075,30 +1069,28 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     appearances: {
       npcs: {
-        landlord: { body: 'body-4', hairStyle: 'buns', hairColour: 'grey', skinTone: 'tone-1' },
-        barista: { body: 'body-1', hairStyle: 'long', hairColour: 'blonde', skinTone: 'tone-1' },
-        cashier: { body: 'body-2', hairStyle: 'short', hairColour: 'brown', skinTone: 'tone-2' },
-        'convenience-clerk': { body: 'body-4', hairStyle: 'short', hairColour: 'black', skinTone: 'tone-3' },
-        server: { body: 'body-2', hairStyle: 'long', hairColour: 'auburn', skinTone: 'tone-1' },
-        receptionist: { body: 'body-3', hairStyle: 'short', hairColour: 'blonde', skinTone: 'tone-2' },
-        doctor: { body: 'body-3', hairStyle: 'short', hairColour: 'grey', skinTone: 'tone-1' },
-        nurse: { body: 'body-3', hairStyle: 'buns', hairColour: 'brown', skinTone: 'tone-2' },
-        pharmacist: { body: 'body-1', hairStyle: 'bearded', hairColour: 'brown', skinTone: 'tone-2' },
-        'park-regular-1': { body: 'body-3', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-2' },
-        'park-regular-2': { body: 'body-3', hairStyle: 'long', hairColour: 'dark-brown', skinTone: 'tone-1' },
-        'park-regular-3': { body: 'body-1', hairStyle: 'buzzed', hairColour: 'blonde', skinTone: 'tone-1' },
-        shopkeeper: { body: 'body-1', hairStyle: 'bald', hairColour: 'grey', skinTone: 'tone-2' },
-        attendant: { body: 'body-3', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-2' },
-        'office-clerk': { body: 'body-3', hairStyle: 'short', hairColour: 'brown', skinTone: 'tone-2' },
+        landlord: { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'scarf', colour: 'pine' },
+        barista: { build: 'masculine', hat: 'beret', eyewear: 'none', neckwear: 'none', colour: 'charcoal' },
+        cashier: { build: 'masculine', hat: 'none', eyewear: 'square-glasses', neckwear: 'none', colour: 'mustard' },
+        'convenience-clerk': { build: 'feminine', hat: 'beanie', eyewear: 'none', neckwear: 'scarf', colour: 'red' },
+        server: { build: 'masculine', hat: 'none', eyewear: 'none', neckwear: 'tie', colour: 'plum' },
+        receptionist: { build: 'feminine', hat: 'bow', eyewear: 'round-glasses', neckwear: 'none', colour: 'blush' },
+        doctor: { build: 'feminine', hat: 'none', eyewear: 'round-glasses', neckwear: 'bow-tie', colour: 'denim' },
+        nurse: { build: 'feminine', hat: 'flower', eyewear: 'none', neckwear: 'none', colour: 'sky' },
+        pharmacist: { build: 'masculine', hat: 'none', eyewear: 'square-glasses', neckwear: 'none', colour: 'teal' },
+        'park-regular-1': { build: 'feminine', hat: 'sun-hat', eyewear: 'none', neckwear: 'scarf', colour: 'leaf' },
+        'park-regular-2': { build: 'feminine', hat: 'beanie', eyewear: 'none', neckwear: 'scarf', colour: 'mustard' },
+        'park-regular-3': { build: 'masculine', hat: 'cap', eyewear: 'round-glasses', neckwear: 'none', colour: 'denim' },
+        shopkeeper: { build: 'masculine', hat: 'beret', eyewear: 'monocle', neckwear: 'scarf', colour: 'plum' },
+        attendant: { build: 'feminine', hat: 'none', eyewear: 'none', neckwear: 'bandana', colour: 'red' },
+        'office-clerk': { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'tie', colour: 'pine' },
       },
       customers: {
-        body: { 'body-1': 2, 'body-2': 3, 'body-3': 3, 'body-4': 2 },
-        hairStyle: {
-          masculine: { short: 4, buzzed: 2, long: 1, bearded: 2, bald: 1 },
-          feminine: { long: 4, short: 3, buns: 2 },
-        },
-        hairColour: { black: 1, 'dark-brown': 2, brown: 4, auburn: 1, blonde: 3, grey: 2 },
-        skinTone: { 'tone-1': 3, 'tone-2': 4, 'tone-3': 2, 'tone-4': 1, 'tone-5': 1 },
+        build: { masculine: 5, feminine: 5 },
+        hat: { none: 6, beanie: 3, beret: 2, cap: 2, 'sun-hat': 1, flower: 1, 'party-hat': 1 },
+        eyewear: { none: 5, 'round-glasses': 3, 'square-glasses': 2 },
+        neckwear: { none: 4, scarf: 4, tie: 1, 'bow-tie': 1, bandana: 1 },
+        colour: { denim: 2, sky: 1, teal: 2, pine: 3, leaf: 1, mustard: 2, red: 2, blush: 1, plum: 2, cream: 2, charcoal: 3 },
       },
     },
     props: {
@@ -1171,11 +1163,9 @@ export function cafeAllergensIn(itemId: ItemId, extras: readonly DrinkExtra[], p
   return ALLERGENS.filter((allergen) => (CULTURE_PACKS[packId].cafeAllergens[itemId] ?? []).includes(allergen) || added.includes(allergen));
 }
 
-/** This pack's weights for anonymous looks, as the sim draws them: each body with the hair styles its build wears. */
+/** This pack's weights for anonymous looks, as the sim draws them. */
 export function customerLookWeights(packId: LanguageCode): LookWeights {
-  const { customers } = CULTURE_PACKS[packId].appearances;
-  const hairStyle = Object.fromEntries(BODY_IDS.map((body) => [body, customers.hairStyle[BODY_PRESETS[body].build]]));
-  return { ...customers, hairStyle: hairStyle as LookWeights['hairStyle'] };
+  return CULTURE_PACKS[packId].appearances.customers;
 }
 
 /** Each pack's passers-by, each in a look drawn once from the pack's weights: the same every day. */
@@ -1184,9 +1174,9 @@ const PASSER_BY_LOOKS = Object.fromEntries(
     packId,
     Object.fromEntries(PASSER_BY_IDS.map((npcId, i) => [npcId, lookFromSeed(i, customerLookWeights(packId))])),
   ]),
-) as Record<LanguageCode, Record<PasserById, AppearancePreset>>;
+) as Record<LanguageCode, Record<PasserById, NpcLook>>;
 
 /** How a town NPC looks in this pack: a Named NPC as the persona × pack table has them, a passer-by as drawn for the pack. */
-export function townNpcLook(npcId: TownNpcId, packId: LanguageCode): AppearancePreset {
+export function townNpcLook(npcId: TownNpcId, packId: LanguageCode): NpcLook {
   return isPasserBy(npcId) ? PASSER_BY_LOOKS[packId][npcId] : CULTURE_PACKS[packId].appearances.npcs[npcId];
 }

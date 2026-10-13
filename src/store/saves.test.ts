@@ -58,7 +58,7 @@ function lived(): GameState {
           checkout: null,
           table: null,
           voiceSeed: 4242,
-          appearances: [{ body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-1' }],
+          appearances: [{ build: 'masculine', hat: 'bow', eyewear: 'square-glasses', neckwear: 'none', colour: 'denim' }],
         },
       },
     },
@@ -106,9 +106,24 @@ function beforeTheClinic() {
   return { ...game, character: { ...game.character!, illness } } as unknown as Omit<GameState, 'clinic'>;
 }
 
+/** A look as it was before everyone was Clawd: a body and face, hair and skin. */
+type HumanLook = { body: string; hairStyle: string; hairColour: string; skinTone: string };
+
+/** The game before everyone was Clawd: version 18. The Character and the Shift Customer had hair and skin. */
+function beforeClawd(appearance: HumanLook = { body: 'body-1', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-3' }) {
+  const game = lived();
+  const customer = { ...game.possessions.shift!.customer!, appearances: [{ body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-1' }] };
+  // Stored before looks were what's worn, whatever their types say.
+  return {
+    ...game,
+    identity: { ...game.identity, appearance },
+    possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } },
+  } as unknown as GameState;
+}
+
 /** The game before Shift Customers had looks: version 17. */
 function beforeCustomerLooks() {
-  const game = lived();
+  const game = beforeClawd();
   const customer: Partial<ShiftCustomer> = { ...game.possessions.shift!.customer! };
   delete customer.appearances;
   return { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, customer } } } as GameState;
@@ -372,7 +387,7 @@ describe('saves', () => {
       checkout: null,
       table: null,
       voiceSeed: 4242,
-      appearances: [{ body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-1' }],
+      appearances: [{ build: 'masculine', hat: 'bow', eyewear: 'square-glasses', neckwear: 'none', colour: 'denim' }],
     });
   });
 
@@ -405,7 +420,7 @@ describe('saves', () => {
       checkout: { bag: true, pointsCard: false, fromBehindTheCounter: 'stamps', cashHanded: 5, changeDue: 0.6 },
       table: null,
       voiceSeed: 7,
-      appearances: [{ body: 'body-3', hairStyle: 'buns', hairColour: 'dark-brown', skinTone: 'tone-3' }],
+      appearances: [{ build: 'feminine', hat: 'beret', eyewear: 'none', neckwear: 'scarf', colour: 'plum' }],
     } as const;
     const atTheTill = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'cashier' as const, customer } } };
     await saves.write('slot-1', atTheTill);
@@ -472,17 +487,9 @@ describe('saves', () => {
     await set('slot-1', { schemaVersion: 16, slotId: 'slot-1', createdAt: '', lastPlayedAt: '', game: beforeAppearanceParts('preset-1') }, raw);
     await set('slot-2', { schemaVersion: 16, slotId: 'slot-2', createdAt: '', lastPlayedAt: '', game: beforeAppearanceParts('preset-3') }, raw);
 
-    const game = lived();
-    expect((await saves.load('slot-1'))?.save.game).toEqual({
-      ...game,
-      identity: { ...game.identity, appearance: { body: 'body-1', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-3' } },
-    });
-    expect((await saves.load('slot-2'))?.save.game.identity.appearance).toEqual({
-      body: 'body-3',
-      hairStyle: 'long',
-      hairColour: 'dark-brown',
-      skinTone: 'tone-3',
-    });
+    // Then, as everyone became Clawd, the hair became a hat: none for short hair, a beret for long.
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+    expect((await saves.load('slot-2'))?.save.game.identity.appearance).toEqual({ hat: 'beret', eyewear: 'none', neckwear: 'none', colour: 'denim' });
   });
 
   it('upgrades a save from before Shift Customers had looks with a look for each at the table, drawn from their voice seed', async () => {
@@ -495,9 +502,21 @@ describe('saves', () => {
 
     expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
     expect((await saves.load('slot-2'))?.save.game.possessions.shift?.customer?.appearances).toEqual([
-      { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-3' },
-      { body: 'body-4', hairStyle: 'long', hairColour: 'brown', skinTone: 'tone-1' },
+      { build: 'feminine', hat: 'none', eyewear: 'none', neckwear: 'bandana', colour: 'pine' },
+      { build: 'feminine', hat: 'none', eyewear: 'square-glasses', neckwear: 'none', colour: 'leaf' },
     ]);
+  });
+
+  it('upgrades a save from before everyone was Clawd: the hair becomes a hat in its colour, and Shift Customers are drawn again from their voice seeds', async () => {
+    const { saves, raw } = freshSaves();
+    const stored = (slotId: string, game: GameState) => ({ schemaVersion: 18, slotId, createdAt: '', lastPlayedAt: '', game });
+    await set('slot-1', stored('slot-1', beforeClawd()), raw);
+    await set('slot-2', stored('slot-2', beforeClawd({ body: 'body-4', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-5' })), raw);
+    await set('slot-3', stored('slot-3', beforeClawd({ body: 'body-2', hairStyle: 'bearded', hairColour: 'grey', skinTone: 'tone-6' })), raw);
+
+    expect((await saves.load('slot-1'))?.save.game).toEqual(lived());
+    expect((await saves.load('slot-2'))?.save.game.identity.appearance).toEqual({ hat: 'bow', eyewear: 'none', neckwear: 'none', colour: 'red' });
+    expect((await saves.load('slot-3'))?.save.game.identity.appearance).toEqual({ hat: 'none', eyewear: 'none', neckwear: 'scarf', colour: 'sky' });
   });
 
   it('keeps the clinic as it was: the check-in, the prescription, a treated flu and a payment plan', async () => {
@@ -546,8 +565,8 @@ describe('saves', () => {
       ],
       voiceSeed: 9,
       appearances: [
-        { body: 'body-4', hairStyle: 'long', hairColour: 'black', skinTone: 'tone-3' },
-        { body: 'body-1', hairStyle: 'short', hairColour: 'brown', skinTone: 'tone-6' },
+        { build: 'feminine', hat: 'sun-hat', eyewear: 'none', neckwear: 'scarf', colour: 'mustard' },
+        { build: 'masculine', hat: 'none', eyewear: 'round-glasses', neckwear: 'tie', colour: 'charcoal' },
       ],
     } as const;
     const atTheTable = { ...game, possessions: { ...game.possessions, shift: { ...game.possessions.shift!, jobId: 'server' as const, customer } } };

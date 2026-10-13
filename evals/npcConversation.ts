@@ -1,5 +1,5 @@
 import { buildNpcSession, buildPasserBySession, NOT_UNDERSTOOD_TOOL, type ToolResponse } from '../src/ai/index.ts';
-import { BODY_PRESETS, CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, PASSER_BY_IDS, PASSER_BY_STOPS, townNpcLook, type Interaction } from '../src/content/index.ts';
+import { CULTURE_PACKS, INTERACTIONS, NAMED_NPCS, PASSER_BY_IDS, PASSER_BY_STOPS, townNpcLook, type Interaction } from '../src/content/index.ts';
 import { isOutOfPatience, losePatience, namedNpcOf, namesMatch, newPlayerTurn, startPatience } from '../src/sim/index.ts';
 import { openLiveSession, type LiveAudio, type LiveDeps, type LiveToken } from '../src/voice/liveSession.ts';
 import type { NpcCase, TurnTag } from './cases/schema.ts';
@@ -57,7 +57,7 @@ export function npcSessionFor(c: NpcCase) {
       clock,
       tramStop: PASSER_BY_STOPS[passerBy],
       voiceSeed: PASSER_BY_IDS.indexOf(passerBy),
-      build: BODY_PRESETS[townNpcLook(passerBy, c.targetLanguage).body].build,
+      build: townNpcLook(passerBy, c.targetLanguage).build,
     });
   }
   return buildNpcSession(interaction, CULTURE_PACKS[c.targetLanguage], c.step, NAMED_NPCS[npcId], {

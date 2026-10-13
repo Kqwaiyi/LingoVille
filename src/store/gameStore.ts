@@ -35,7 +35,6 @@ import {
 } from '../ai/index.ts';
 import {
   approachInteraction,
-  BODY_PRESETS,
   CULTURE_PACKS,
   customerLookWeights,
   DEFAULT_APPEARANCE,
@@ -74,6 +73,7 @@ import {
   type Interaction,
   type ItemId,
   type NamedNpcId,
+  type NpcLook,
   type PasserById,
   type PlacePhrase,
   type SignId,
@@ -2173,7 +2173,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           tramStop: PASSER_BY_STOPS[npcId],
           // Each gets an anonymous voice for their build by their place in the list, so it's the same every day, like their look.
           voiceSeed: PASSER_BY_IDS.indexOf(npcId),
-          build: BODY_PRESETS[townNpcLook(npcId, packId).body].build,
+          build: townNpcLook(npcId, packId).build,
         });
       openConversation({ npcId, interaction, shiftCustomer: null, smallTalk: null }, sessionFor);
     };
@@ -3176,7 +3176,7 @@ export const selectDoctorCall = (s: GameStore) => s.doctorCall;
 /** This town NPC's face while the Player talks to them, or null when they aren't. */
 export const selectNpcExpressionOf = (npcId: TownNpcId) => (s: GameStore) => (s.conversation?.npcId === npcId ? selectNpcExpression(s) : null);
 /** How the NPC the Player is talking to looks, for their face: a Shift Customer as drawn, anyone else as the pack dresses them. */
-export const selectNpcLook = (s: GameStore): AppearancePreset | null => {
+export const selectNpcLook = (s: GameStore): NpcLook | null => {
   if (!s.conversation) return null;
   if (s.conversation.npcId) return townNpcLook(s.conversation.npcId, s.game.identity.culturePackId);
   return selectShiftCustomerLooks(s)[0] ?? null;
@@ -3378,7 +3378,7 @@ export const selectCanSuggestChange = (s: GameStore) => {
 /** A Shift Customer is at the counter, and partway through saying a line: for the "speaking…" indicator over them. */
 export const selectShiftCustomerSpeaking = (s: GameStore) =>
   s.conversation?.shiftCustomer != null && !s.conversation.closed && s.conversation.npcLine !== null;
-const NO_ONE: readonly AppearancePreset[] = [];
+const NO_ONE: readonly NpcLook[] = [];
 /** How the Shift Customer at the counter looks: them, then the rest of their table at the restaurant; no one between customers. */
-export const selectShiftCustomerLooks = (s: GameStore): readonly AppearancePreset[] =>
+export const selectShiftCustomerLooks = (s: GameStore): readonly NpcLook[] =>
   (s.conversation?.shiftCustomer && s.game.possessions.shift?.customer?.appearances) || NO_ONE;

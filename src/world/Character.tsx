@@ -27,7 +27,7 @@ import {
   type Arrival,
   type Interactable,
 } from '../store/index.ts';
-import { CharacterFigure, JOG_METRES_PER_SECOND } from './CharacterFigure.tsx';
+import { CharacterFigure, WALK_METRES_PER_SECOND } from './CharacterFigure.tsx';
 import type { Control } from './controls.ts';
 import {
   BATHHOUSE_GYM,
@@ -295,8 +295,8 @@ export function Character() {
           <Suspense fallback={null}>
             <CharacterFigure
               appearance={appearance}
-              clip={moving ? 'jog' : 'idle'}
-              speed={moving ? MOVEMENT.walkSpeedMetresPerSecond / JOG_METRES_PER_SECOND : 1}
+              clip={moving ? 'walk' : 'idle'}
+              speed={moving ? MOVEMENT.walkSpeedMetresPerSecond / WALK_METRES_PER_SECOND : 1}
             />
           </Suspense>
         </group>

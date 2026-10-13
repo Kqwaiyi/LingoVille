@@ -1,8 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { CHARACTER_ART_URLS } from '../src/world/characterArt.ts';
 import { PALETTE } from '../src/world/palette.ts';
 import { parseMaterialName, SURFACES, surfaceTextureUrl, TEXTURED_SURFACES } from '../src/world/surfaces.ts';
 import { PROP_IDS } from '../src/content/index.ts';
@@ -11,8 +9,8 @@ import { ART_PIECES, LAMP_BULBS, TOWN_ART_URL, TOWN_PIECES, WINDOW_GLASS } from 
 // Holds the built town art in `public/town/` to what the game asks of it: every piece the town is built from and every
 // Culture Pack's props, a bulb in each piece that lights up, and no colour but the one shared palette's, each material a
 // palette colour and a surface (`colour:surface`) with no textures of its own: the surfaces' detail textures are the
-// game's, one for each surface that has one. World code draws from the same palette, by name, and the character art's
-// outfit (`npm run build:characters`) is painted in it too.
+// game's, one for each surface that has one. World code draws from the same palette, by name, as does the character art
+// (`tooling/characterArt.test.ts`).
 
 type Gltf = {
   scenes: { nodes: number[] }[];
@@ -75,30 +73,6 @@ function strayColours(files: Record<string, string>): string[] {
   return Object.entries(files).flatMap(([file, source]) =>
     file === 'palette.ts' ? [] : [...source.matchAll(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/gi)].map(([literal]) => `${file}: ${literal}`),
   );
-}
-
-/** The outfit texture's pixels in the character art, as RGB bytes: the image its `outfit` material's colour map names. */
-async function outfitPixels(url: string) {
-  const bytes = readFileSync(`public${url}`);
-  const jsonLength = bytes.readUInt32LE(12);
-  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8'));
-  const binary = bytes.subarray(28 + jsonLength);
-  const material = gltf.materials.find(({ name }: { name: string }) => name === 'outfit');
-  const texture = gltf.textures[material.pbrMetallicRoughness.baseColorTexture.index];
-  const image = gltf.images[texture.extensions?.EXT_texture_webp?.source ?? texture.source];
-  const view = gltf.bufferViews[image.bufferView];
-  return sharp(binary.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength)).removeAlpha().raw().toBuffer();
-}
-
-/** Every colour in RGB pixels that isn't a palette colour, as hex. */
-function offPalette(pixels: Buffer): string[] {
-  const palette = new Set<string>(Object.values(PALETTE));
-  const off = new Set<string>();
-  for (let at = 0; at < pixels.length; at += 3) {
-    const hex = `#${[0, 1, 2].map((k) => pixels[at + k]!.toString(16).padStart(2, '0')).join('')}`;
-    if (!palette.has(hex)) off.add(hex);
-  }
-  return [...off];
 }
 
 const worldSources = () =>
@@ -179,15 +153,5 @@ describe('the world’s colours', () => {
 
   it('catches a colour written out in world code', () => {
     expect(strayColours({ 'Town.tsx': "<meshStandardMaterial color=\"#6b5b4d\" />", 'palette.ts': "ink: '#2f2a24'" })).toEqual(['Town.tsx: #6b5b4d']);
-  });
-});
-
-describe('the character outfits', () => {
-  it('are painted in palette colours', async () => {
-    expect(offPalette(await outfitPixels(CHARACTER_ART_URLS.characters))).toEqual([]);
-  });
-
-  it('catch a pixel off the palette', () => {
-    expect(offPalette(Buffer.from([0xfb, 0xf8, 0xf2, 0x12, 0x34, 0x56]))).toEqual(['#123456']);
   });
 });

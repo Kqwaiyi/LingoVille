@@ -1,4 +1,4 @@
-import { BODY_PRESETS, DIETARY_NOTES, formatLocalAmount, type CulturePack } from '../content/index.ts';
+import { DIETARY_NOTES, formatLocalAmount, type CulturePack } from '../content/index.ts';
 import {
   weekdayOf,
   type Checkout,
@@ -354,7 +354,7 @@ export function buildShiftCustomerSession(
   return {
     systemInstruction,
     tools: [notUnderstoodTool(who)],
-    voice: { targetLanguage: pack.id, shiftCustomerVoice: customer.voiceSeed, build: BODY_PRESETS[speaker(customer).body].build },
+    voice: { targetLanguage: pack.id, shiftCustomerVoice: customer.voiceSeed, build: speaker(customer).build },
     openingScene: openingScene(customer, who),
   };
 }

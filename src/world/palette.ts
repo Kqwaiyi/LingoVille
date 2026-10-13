@@ -57,6 +57,12 @@ export const SKY_PALETTE = {
   moonlight: '#a8bfe8',
 } as const;
 
-/** Every colour the world draws, the town's and the sky's, by name. */
-export const WORLD_COLOURS = { ...PALETTE, ...SKY_PALETTE } as const;
+// Clawd's own colour: the Claude Code mascot's orange, which everyone in town is. Nothing in the town is painted in it,
+// so it's kept out of `PALETTE`, which the art builds snap to.
+export const CLAWD_PALETTE = {
+  clawd: '#d77757',
+} as const;
+
+/** Every colour the world draws, the town's, the sky's and Clawd's, by name. */
+export const WORLD_COLOURS = { ...PALETTE, ...SKY_PALETTE, ...CLAWD_PALETTE } as const;
 export type WorldColour = keyof typeof WORLD_COLOURS;

@@ -260,7 +260,7 @@ describe('the title screen', () => {
     await openTitle(empty);
     expect(selectShowcaseAppearance(empty.getState())).toEqual(DEFAULT_APPEARANCE);
 
-    const mika: AppearancePreset = { body: 'body-3', hairStyle: 'long', hairColour: 'blonde', skinTone: 'tone-2' };
+    const mika: AppearancePreset = { hat: 'beret', eyewear: 'round-glasses', neckwear: 'none', colour: 'mustard' };
     await browser.saves.write('slot-3', dayFour());
     clock = new Date('2026-10-03T10:00:00Z');
     await browser.saves.write('slot-1', { ...dayFour(), identity: { ...dayFour().identity, appearance: mika } });
@@ -431,7 +431,7 @@ describe('New game setup', () => {
     const store = createGameStore(null, { ...browser, newRngSeed: () => 42 });
     await openTitle(store);
 
-    const appearance: AppearancePreset = { body: 'body-3', hairStyle: 'buns', hairColour: 'auburn', skinTone: 'tone-5' };
+    const appearance: AppearancePreset = { hat: 'bow', eyewear: 'none', neckwear: 'scarf', colour: 'red' };
     setUpNewGame(store, { targetLanguage: 'zh', startingStep: 'B2', characterName: '  Mika ', appearance });
     await saved(store, 1);
 
@@ -509,20 +509,20 @@ describe('New game setup', () => {
     const store = await inSetup();
     expect(selectSetup(store.getState())?.appearance).toEqual(DEFAULT_APPEARANCE);
 
-    store.getState().chooseAppearance({ body: 'body-4' });
-    store.getState().chooseAppearance({ hairStyle: 'buns' });
-    store.getState().chooseAppearance({ hairColour: 'grey' });
-    store.getState().chooseAppearance({ skinTone: 'tone-6' });
+    store.getState().chooseAppearance({ hat: 'sun-hat' });
+    store.getState().chooseAppearance({ eyewear: 'monocle' });
+    store.getState().chooseAppearance({ neckwear: 'bow-tie' });
+    store.getState().chooseAppearance({ colour: 'pine' });
 
-    expect(selectSetup(store.getState())?.appearance).toEqual({ body: 'body-4', hairStyle: 'buns', hairColour: 'grey', skinTone: 'tone-6' });
+    expect(selectSetup(store.getState())?.appearance).toEqual({ hat: 'sun-hat', eyewear: 'monocle', neckwear: 'bow-tie', colour: 'pine' });
   });
 
   it('shows the look being chosen behind setup, so the Player sees the real Character', async () => {
     const store = await inSetup();
 
-    store.getState().chooseAppearance({ body: 'body-2', skinTone: 'tone-1' });
+    store.getState().chooseAppearance({ hat: 'party-hat', colour: 'blush' });
 
-    expect(selectShowcaseAppearance(store.getState())).toEqual({ ...DEFAULT_APPEARANCE, body: 'body-2', skinTone: 'tone-1' });
+    expect(selectShowcaseAppearance(store.getState())).toEqual({ ...DEFAULT_APPEARANCE, hat: 'party-hat', colour: 'blush' });
   });
 
   it('Back goes to the screen before, keeping the answers, and from the first screen to the title', async () => {

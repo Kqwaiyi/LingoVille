@@ -1,12 +1,13 @@
-import type { AppearancePreset, BodyId, HairColourId, HairStyleId, SkinToneId, Weights } from '../content/index.ts';
+import type { AccessoryColourId, Build, EyewearId, HatId, NeckwearId, NpcLook, Weights } from '../content/index.ts';
 import { nextRandom, seedRng } from './rng.ts';
 
-/** A pack's weights for anonymous looks: the body, a hair style weighed for each body (as its build wears it), hair colour and skin tone. */
+/** A pack's weights for anonymous looks: the build their voice suits, a hat, eyewear and neckwear, and their colour. */
 export type LookWeights = {
-  body: Weights<BodyId>;
-  hairStyle: Record<BodyId, Weights<HairStyleId>>;
-  hairColour: Weights<HairColourId>;
-  skinTone: Weights<SkinToneId>;
+  build: Weights<Build>;
+  hat: Weights<HatId>;
+  eyewear: Weights<EyewearId>;
+  neckwear: Weights<NeckwearId>;
+  colour: Weights<AccessoryColourId>;
 };
 
 /** One of the weighed parts, drawn from the RNG as often as its weight says. */
@@ -18,21 +19,22 @@ function drawWeighed<K extends string>(rngState: number, weights: Weights<K>): {
   return { value: drawn[0], rngState: roll.rngState };
 }
 
-/** An anonymous look, drawn from the RNG with a pack's weights: a body, then a hair style that body wears, then hair colour and skin tone. */
-function drawLook(rngState: number, weights: LookWeights): { value: AppearancePreset; rngState: number } {
-  const body = drawWeighed(rngState, weights.body);
-  const hairStyle = drawWeighed(body.rngState, weights.hairStyle[body.value]);
-  const hairColour = drawWeighed(hairStyle.rngState, weights.hairColour);
-  const skinTone = drawWeighed(hairColour.rngState, weights.skinTone);
+/** An anonymous look, drawn from the RNG with a pack's weights: a build, then a hat, eyewear, neckwear and their colour. */
+function drawLook(rngState: number, weights: LookWeights): { value: NpcLook; rngState: number } {
+  const build = drawWeighed(rngState, weights.build);
+  const hat = drawWeighed(build.rngState, weights.hat);
+  const eyewear = drawWeighed(hat.rngState, weights.eyewear);
+  const neckwear = drawWeighed(eyewear.rngState, weights.neckwear);
+  const colour = drawWeighed(neckwear.rngState, weights.colour);
   return {
-    value: { body: body.value, hairStyle: hairStyle.value, hairColour: hairColour.value, skinTone: skinTone.value },
-    rngState: skinTone.rngState,
+    value: { build: build.value, hat: hat.value, eyewear: eyewear.value, neckwear: neckwear.value, colour: colour.value },
+    rngState: colour.rngState,
   };
 }
 
 /** `count` anonymous looks, one after another from the RNG. */
-export function drawLooks(rngState: number, weights: LookWeights, count: number): { value: AppearancePreset[]; rngState: number } {
-  const looks: AppearancePreset[] = [];
+export function drawLooks(rngState: number, weights: LookWeights, count: number): { value: NpcLook[]; rngState: number } {
+  const looks: NpcLook[] = [];
   let next = rngState;
   for (let i = 0; i < count; i++) {
     const look = drawLook(next, weights);
@@ -43,6 +45,6 @@ export function drawLooks(rngState: number, weights: LookWeights, count: number)
 }
 
 /** The look of an anonymous someone who is always about (a passer-by): drawn from their own `seed`, not the save's RNG, so it never changes. */
-export function lookFromSeed(seed: number, weights: LookWeights): AppearancePreset {
+export function lookFromSeed(seed: number, weights: LookWeights): NpcLook {
   return drawLook(seedRng(seed), weights).value;
 }

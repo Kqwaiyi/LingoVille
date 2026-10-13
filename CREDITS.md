@@ -19,13 +19,12 @@ These are public domain (CC0 1.0). No credit is required, but they're credited h
 | Nature Kit | Kenney | https://kenney.nl/assets/nature-kit | Flowers, rocks, lilies, grass and fences |
 | Food Kit | Kenney | https://kenney.nl/assets/food-kit | Food, dishes, pots and packaging in the Culture Packs' props |
 | Fantasy Town Kit | Kenney | https://kenney.nl/assets/fantasy-town-kit | The fountain, market stalls and a cart; stools, benches and pointed roofs in the Culture Packs' props |
-| Universal Base Characters | Quaternius | https://quaternius.itch.io/universal-base-characters | Everyone's bodies, heads and hair |
-| Modular Character Outfits – Fantasy | Quaternius | https://quaternius.itch.io/modular-character-outfits-fantasy | Everyone's everyday clothes |
-| Universal Animation Library | Quaternius | https://quaternius.itch.io/universal-animation-library | Everyone's animations |
 
-All of it is recoloured to the town's palette by `npm run build:town` and `npm run build:characters`, and its surfaces (wood, cloth, leaves, stone) are drawn with the town's own detail textures.
+All of it is recoloured to the town's palette by `npm run build:town`, and its surfaces (wood, cloth, leaves, stone) are drawn with the town's own detail textures.
 
 The buildings themselves (walls, windows, doors, floors, tiled roofs, parapets, quoins, downpipes and chimneys), the street lamps, the tram track and stops, the benches, the trees, bushes and hedges, most of the rooms' furniture, and what no kit has (awnings, pennants, window boxes, bicycles, parasols, the town clock, the bandstand, the bath, planters, tram poles, boats, door lanterns, the shelves' books and goods, the bathhouse's cubbies, the backdrop's houses, hills and mountains) are modelled for the game in Blender, in `art/town/`. The surfaces' detail textures (plaster, brick, stone, tiles, boards, cloth, leaves, grass, tarmac, setts, paving, gravel) are drawn by the game's own script (`scripts/build-surfaces.ts`), so there's no texture source to credit.
+
+Everyone in town is Clawd, the Claude Code mascot, which is Anthropic's; it follows the mascot as Claude Code's welcome screen draws it. The figure, its rig and animations, and everything anyone wears (hats, glasses, scarves, ties, aprons) are modelled for the game in Blender, in `art/characters/`.
 
 The music, ambient sound and UI sounds are synthesised by the game as it plays (`src/audio`), so there are no sound files to credit.
 

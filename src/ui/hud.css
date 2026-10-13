@@ -1991,19 +1991,19 @@ ruby {
   color: var(--hud-muted);
 }
 
-/* The parts of a look are short words, so each row holds several. */
-.setup-choices-looks {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.setup-choices-hair {
-  grid-template-columns: repeat(3, 1fr);
+/* The parts of a look are short words, so each row holds as many as fit, each as wide as its word. */
+.setup-choices-hats,
+.setup-choices-eyewear,
+.setup-choices-neckwear {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .setup-appearance-part .setup-choice {
   position: relative;
+  flex: 1 0 auto;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 7px 12px;
 }
 
 .setup-appearance-part .setup-choice input {
@@ -2019,14 +2019,14 @@ ruby {
 .setup-choices-swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 7px;
 }
 
 /* A round sample of the colour, ringed when chosen. */
 .setup-swatch {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border: 2px solid rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   background: var(--swatch);

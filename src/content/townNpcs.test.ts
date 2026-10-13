@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PLACE_IDS, type PlaceId } from '../sim/index.ts';
-import { BODY_PRESETS, CULTURE_PACKS, customerLookWeights, isPasserBy, localNpcPlaceName, localPlaceName, NAMED_NPCS, PASSER_BY_STOPS, STOP_PLACES, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, townNpcLook, type RoleId } from './index.ts';
+import { LANGUAGE_CODES, PLACE_IDS, type PlaceId } from '../sim/index.ts';
+import { CULTURE_PACKS, isPasserBy, localNpcPlaceName, localPlaceName, NAMED_NPC_IDS, NAMED_NPCS, PASSER_BY_STOPS, STOP_PLACES, stopsBetween, TOWN_NPC_IDS, TOWN_NPCS, TRAM_LINE, townNpcLook, type RoleId } from './index.ts';
 
 /** The NPCs column of the spec's places table. */
 const STAFF_BY_PLACE: Record<PlaceId, RoleId[]> = {
@@ -81,8 +81,8 @@ describe('passers-by and the tram line', () => {
   });
 
   it('dresses a Named NPC in their look from the persona × pack table', () => {
-    expect(townNpcLook('barista', 'de')).toEqual({ body: 'body-1', hairStyle: 'long', hairColour: 'blonde', skinTone: 'tone-1' });
-    expect(townNpcLook('barista', 'ja')).toEqual({ body: 'body-2', hairStyle: 'short', hairColour: 'dark-brown', skinTone: 'tone-2' });
+    expect(townNpcLook('barista', 'de')).toEqual({ build: 'masculine', hat: 'beret', eyewear: 'none', neckwear: 'none', colour: 'charcoal' });
+    expect(townNpcLook('barista', 'ja')).toEqual({ build: 'masculine', hat: 'cap', eyewear: 'none', neckwear: 'none', colour: 'teal' });
   });
 
   it('gives each passer-by a look of their own in each pack, from the pack’s weights', () => {
@@ -90,18 +90,24 @@ describe('passers-by and the tram line', () => {
     const looks = TOWN_NPC_IDS.filter(isPasserBy).map((npcId) => townNpcLook(npcId, 'ja'));
     expect(new Set(looks.map((look) => JSON.stringify(look))).size).toBe(looks.length);
     for (const look of looks) {
-      expect(customers.body[look.body]).toBeDefined();
-      expect(customers.hairStyle[BODY_PRESETS[look.body].build][look.hairStyle]).toBeDefined();
-      expect(customers.hairColour[look.hairColour]).toBeDefined();
-      expect(customers.skinTone[look.skinTone]).toBeDefined();
+      expect(customers.build[look.build]).toBeDefined();
+      expect(customers.hat[look.hat]).toBeDefined();
+      expect(customers.eyewear[look.eyewear]).toBeDefined();
+      expect(customers.neckwear[look.neckwear]).toBeDefined();
+      expect(customers.colour[look.colour]).toBeDefined();
     }
     expect(townNpcLook('passer-by-1', 'ja')).toEqual(townNpcLook('passer-by-1', 'ja'));
   });
 
-  it('weighs a pack’s hair styles for each body by its build', () => {
-    const weights = customerLookWeights('en');
-    expect(weights.hairStyle['body-2']).toEqual(CULTURE_PACKS.en.appearances.customers.hairStyle.masculine);
-    expect(weights.hairStyle['body-4']).toEqual(CULTURE_PACKS.en.appearances.customers.hairStyle.feminine);
-    expect(weights.skinTone).toEqual(CULTURE_PACKS.en.appearances.customers.skinTone);
+  it('tells the Named NPCs at one place apart by what they wear', () => {
+    for (const packId of LANGUAGE_CODES) {
+      for (const placeId of PLACE_IDS) {
+        const worn = NAMED_NPC_IDS.filter((npcId) => NAMED_NPCS[npcId].placeId === placeId).map((npcId) => {
+          const { hat, eyewear, neckwear, colour } = townNpcLook(npcId, packId);
+          return [hat, eyewear, neckwear, colour].join();
+        });
+        expect(new Set(worn).size, `${packId} ${placeId}`).toBe(worn.length);
+      }
+    }
   });
 });

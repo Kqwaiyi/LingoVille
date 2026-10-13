@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Hint, HintRequest, NpcSession, Recap, RecapRequest, ToolResponse } from '../ai/index.ts';
-import { BODY_PRESETS, CULTURE_PACKS, DRINK_EXTRAS, SHIFT_TEMPLATES, type DrinkModifiers, type ItemId } from '../content/index.ts';
+import { CULTURE_PACKS, DRINK_EXTRAS, SHIFT_TEMPLATES, type DrinkModifiers, type ItemId } from '../content/index.ts';
 import { createSave, ECONOMY, hire, LIFE_SKILLS, PROFICIENCY_STEP_TABLE, type GameState, type ShiftCustomer, type ShiftOrder } from '../sim/index.ts';
 import { VoiceServiceUnavailableError, type OpenVoiceSession, type VoiceSessionEvents } from '../voice/index.ts';
 import {
@@ -154,7 +154,7 @@ describe('the staff door', () => {
     expect(selectConversation(store.getState())).toMatchObject({ shiftCustomer: { tray: [] } });
     const { session } = customers.current();
     const customer = store.getState().game.possessions.shift!.customer!;
-    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: customer.voiceSeed, build: BODY_PRESETS[customer.appearances[0]!.body].build });
+    expect(session.voice).toEqual({ targetLanguage: 'ja', shiftCustomerVoice: customer.voiceSeed, build: customer.appearances[0]!.build });
     expect(session.openingScene).toMatch(/walk up to the counter/);
     expect(session.systemInstruction).toContain('YOUR ORDER');
   });
@@ -168,9 +168,11 @@ describe('the staff door', () => {
     expect(looks).toHaveLength(1);
     const { customers } = CULTURE_PACKS.ja.appearances;
     const [look] = looks;
-    expect(customers.hairStyle[BODY_PRESETS[look!.body].build][look!.hairStyle]).toBeDefined();
-    expect(customers.hairColour[look!.hairColour]).toBeDefined();
-    expect(customers.skinTone[look!.skinTone]).toBeDefined();
+    expect(customers.build[look!.build]).toBeDefined();
+    expect(customers.hat[look!.hat]).toBeDefined();
+    expect(customers.eyewear[look!.eyewear]).toBeDefined();
+    expect(customers.neckwear[look!.neckwear]).toBeDefined();
+    expect(customers.colour[look!.colour]).toBeDefined();
     expect(selectNpcLook(store.getState())).toEqual(look);
   });
 

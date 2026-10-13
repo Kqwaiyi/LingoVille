@@ -157,6 +157,12 @@ export const TRAM_STOPS: Record<TramStopId, { centre: Vec2 }> = {
 };
 export const PLATFORM = { size: [10, 2.2] as Vec2, height: 0.15 } as const;
 
+/**
+ * How high the shops' counters stand: low enough for Clawd, who everyone in town is, to see over, so the staff behind
+ * one show their faces (and their Patience) to whoever comes up, and so does a Shift Customer to the Character at work.
+ */
+export const COUNTER_HEIGHT = 0.75;
+
 /** Where each person in town stands. Staff stand behind their counter, facing the door. */
 export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
   // In the hallway beside the front door, so the Character passes within talking range on the way out
@@ -270,16 +276,16 @@ const nearGroceries = (z: number) => (x: number, y: number) =>
  */
 export const FURNITURE: readonly Furniture[] = [
   // Café: the counter, with the back counter and its coffee machine behind it, and tables in the window.
-  { position: cafe.at([0, 0.55, -2.3]), size: [4.4, 1.1, 0.8], piece: 'counter', rotation: cafe.turn() },
-  { position: cafe.at([-2.6, 0.55, -3.85]), size: [2.4, 1.1, 0.6], piece: 'counter', rotation: cafe.turn() },
+  { position: cafe.at([0, COUNTER_HEIGHT / 2, -2.3]), size: [4.4, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: cafe.turn() },
+  { position: cafe.at([-2.6, COUNTER_HEIGHT / 2, -3.85]), size: [2.4, COUNTER_HEIGHT, 0.6], piece: 'counter', rotation: cafe.turn() },
   // Convenience store: the counter, shelves down both sides and a drinks fridge at the back.
-  { position: convenienceStore.at([0, 0.55, -2]), size: [3, 1.1, 0.7], piece: 'counter', rotation: convenienceStore.turn() },
+  { position: convenienceStore.at([0, COUNTER_HEIGHT / 2, -2]), size: [3, COUNTER_HEIGHT, 0.7], piece: 'counter', rotation: convenienceStore.turn() },
   { position: convenienceStore.at([-3.3, 0.8, 0.6]), size: [0.6, 1.6, 2.6], piece: 'shelf', rotation: convenienceStore.turn(Math.PI / 2) },
   { position: convenienceStore.at([3.3, 0.8, 0.6]), size: [0.6, 1.6, 2.6], piece: 'shelf', rotation: convenienceStore.turn(-Math.PI / 2) },
   { position: convenienceStore.at([-2.6, 1.05, -3.2]), size: [1.2, 2.1, 0.9], piece: 'fridge-tall', rotation: convenienceStore.turn() },
   { position: convenienceStore.at([2.7, 0.45, -3.3]), size: [1.6, 0.9, 0.6], piece: 'bookcase-low', rotation: convenienceStore.turn() },
   // Supermarket: the checkout, two aisles of shelves, a shelf along the side wall and chiller cabinets along the back.
-  { position: supermarket.at([-4, 0.55, 2.6]), size: [2.4, 1.1, 0.8], piece: 'counter', rotation: supermarket.turn() },
+  { position: supermarket.at([-4, COUNTER_HEIGHT / 2, 2.6]), size: [2.4, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: supermarket.turn() },
   { position: supermarket.at([2, 0.8, -1.4]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
   { position: supermarket.at([2, 0.8, 1.2]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
   { position: supermarket.at([-7.3, 0.8, -2]), size: [0.6, 1.6, 3.6], piece: 'shelf', rotation: supermarket.turn(Math.PI / 2) },
@@ -287,8 +293,8 @@ export const FURNITURE: readonly Furniture[] = [
   // Restaurant: tables, and the server's table on a Shift, west of the door and clear of the way from the door to the staff door.
   { position: restaurant.at([-3, 0.4, 1]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
   // Clinic: reception and pharmacy counters, the pharmacy's shelves, the waiting room bench and the doctor's desk.
-  { position: clinic.at([4.5, 0.55, 2.8]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
-  { position: clinic.at([-5.5, 0.55, 2.8]), size: [3, 1.1, 0.8], piece: 'counter', rotation: clinic.turn() },
+  { position: clinic.at([4.5, COUNTER_HEIGHT / 2, 2.8]), size: [3, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: clinic.turn() },
+  { position: clinic.at([-5.5, COUNTER_HEIGHT / 2, 2.8]), size: [3, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: clinic.turn() },
   { position: clinic.at([-8.3, 0.8, 1.6]), size: [0.6, 1.6, 2.4], piece: 'shelf', rotation: clinic.turn(Math.PI / 2) },
   { position: clinic.at([0, 0.25, -0.5]), size: [3, 0.5, 0.7], piece: 'cushioned-bench', rotation: clinic.turn(), height: 1 },
   { position: clinic.at([5.5, 0.44, -4.65]), size: [1.7, 0.88, 0.8], piece: 'desk', rotation: clinic.turn(Math.PI) },
@@ -296,13 +302,13 @@ export const FURNITURE: readonly Furniture[] = [
   // A rack of leaflets by the way in.
   { position: clinic.at([6.5, 0.45, 4.85]), size: [1.6, 0.9, 0.57], piece: 'bookcase-low', rotation: clinic.turn(Math.PI) },
   // Bookshop: the counter, bookcases down both sides and either side of the counter.
-  { position: bookshop.at([0, 0.55, -2]), size: [2.6, 1.1, 0.7], piece: 'counter', rotation: bookshop.turn() },
+  { position: bookshop.at([0, COUNTER_HEIGHT / 2, -2]), size: [2.6, COUNTER_HEIGHT, 0.7], piece: 'counter', rotation: bookshop.turn() },
   { position: bookshop.at([-3.9, 1, 0.3]), size: [0.6, 2, 3.6], piece: 'bookcase', rotation: bookshop.turn(Math.PI / 2) },
   { position: bookshop.at([3.9, 1, 0.3]), size: [0.6, 2, 3.6], piece: 'bookcase', rotation: bookshop.turn(-Math.PI / 2) },
   { position: bookshop.at([-2.8, 1, -3.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: bookshop.turn() },
   { position: bookshop.at([2.8, 1, -3.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: bookshop.turn() },
   // Bathhouse: the front desk, the two baths, a bench between them, the showers and the lockers.
-  { position: bathhouse.at([0, 0.55, 2.2]), size: [3, 1.1, 0.8], piece: 'counter', rotation: bathhouse.turn() },
+  { position: bathhouse.at([0, COUNTER_HEIGHT / 2, 2.2]), size: [3, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: bathhouse.turn() },
   { position: bathhouse.at([-3.2, 0.5, -2.8]), size: [3.5, 1, 2.85], piece: 'bath', rotation: bathhouse.turn() },
   { position: bathhouse.at([3.2, 0.5, -2.8]), size: [3.5, 1, 2.85], piece: 'bath', rotation: bathhouse.turn() },
   { position: bathhouse.at([0, 0.25, -0.2]), size: [2, 0.5, 0.6], piece: 'bench', rotation: bathhouse.turn(), height: 1 },
@@ -312,7 +318,7 @@ export const FURNITURE: readonly Furniture[] = [
   { position: bathhouse.at([-3.8, 0.45, 4.4]), size: [1.6, 0.9, 0.5], piece: 'cubbies', rotation: bathhouse.turn(Math.PI) },
   { position: bathhouse.at([4.2, 0.45, 4.4]), size: [1.6, 0.9, 0.5], piece: 'cubbies', rotation: bathhouse.turn(Math.PI) },
   // Town office: the counter, the clerks' desks and the filing behind it, and a bench to wait on.
-  { position: townOffice.at([0, 0.55, -2]), size: [5, 1.1, 0.8], piece: 'counter', rotation: townOffice.turn() },
+  { position: townOffice.at([0, COUNTER_HEIGHT / 2, -2]), size: [5, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: townOffice.turn() },
   { position: townOffice.at([-4.5, 0.44, -3.9]), size: [1.7, 0.88, 0.9], piece: 'desk', rotation: townOffice.turn() },
   { position: townOffice.at([4.5, 0.44, -3.9]), size: [1.7, 0.88, 0.9], piece: 'desk', rotation: townOffice.turn() },
   { position: townOffice.at([-2, 1, -4.4]), size: [2, 2, 0.6], piece: 'bookcase', rotation: townOffice.turn() },
@@ -355,8 +361,8 @@ export const DECOR: readonly Decor[] = [
   // Café.
   ...cafeTables.flatMap(({ decor }) => decor),
   { position: cafe.at([-4.8, 0, -3.6]), piece: 'fridge', rotation: cafe.turn() },
-  { position: cafe.at([-2.2, 1.1, -3.85]), piece: 'coffee-machine', rotation: cafe.turn() },
-  { position: cafe.at([-3.2, 1.1, -3.85]), piece: 'coffee-machine', rotation: cafe.turn() },
+  { position: cafe.at([-2.2, COUNTER_HEIGHT, -3.85]), piece: 'coffee-machine', rotation: cafe.turn() },
+  { position: cafe.at([-3.2, COUNTER_HEIGHT, -3.85]), piece: 'coffee-machine', rotation: cafe.turn() },
   { position: cafe.at([-2.6, 1.55, -4.0]), piece: 'wall-cabinet', rotation: cafe.turn() },
   { position: cafe.at([-5.2, 0, 3.7]), piece: 'plant', rotation: cafe.turn() },
   { position: cafe.at([5.2, 0, 3.7]), piece: 'plant', rotation: cafe.turn() },

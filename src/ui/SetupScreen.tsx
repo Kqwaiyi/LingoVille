@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { BODY_IDS, HAIR_COLOUR_IDS, HAIR_COLOURS, HAIR_STYLE_IDS, SKIN_TONE_IDS, SKIN_TONES } from '../content/index.ts';
+import { ACCESSORY_COLOUR_IDS, ACCESSORY_COLOURS, EYEWEAR_IDS, HAT_IDS, NECKWEAR_IDS } from '../content/index.ts';
 import { languageEndonym, Trans, useTranslation } from '../i18n/index.ts';
 import { LANGUAGE_CODES, STARTING_STEPS } from '../sim/index.ts';
 import {
@@ -204,8 +204,9 @@ function AboutYou({ setup }: { setup: Setup }) {
 }
 
 /**
- * Screen 4: the Appearance Preset, part by part: body and face, hair style, hair colour and skin tone. The Character
- * stands in the live scene beside the panel, wearing the look as it's chosen.
+ * Screen 4: the Appearance Preset, part by part: what the Character wears (a hat, glasses, something round the neck) and
+ * its colour. Everyone in town is Clawd; this is what makes the Character theirs. The Character stands in the live
+ * scene beside the panel, wearing the look as it's chosen.
  */
 function Appearance({ setup }: { setup: Setup }) {
   const { t } = useTranslation();
@@ -215,41 +216,36 @@ function Appearance({ setup }: { setup: Setup }) {
   return (
     <>
       <Heading title={t('setup.appearance.heading', { name: setup.characterName.trim() })} body={t('setup.appearance.body')} />
-      <AppearancePart legend={t('setup.appearance.build')} className="setup-choices-looks">
-        {BODY_IDS.map((body, i) => (
-          <Choice key={body} name="body" checked={body === appearance.body} autoFocus={body === appearance.body} onChoose={() => chooseAppearance({ body })}>
-            <small>{t('setup.appearance.look', { number: i + 1 })}</small>
+      <AppearancePart legend={t('setup.appearance.hat')} className="setup-choices-hats">
+        {HAT_IDS.map((hat) => (
+          <Choice key={hat} name="hat" checked={hat === appearance.hat} autoFocus={hat === appearance.hat} onChoose={() => chooseAppearance({ hat })}>
+            <small>{t(`setup.appearance.hats.${hat}`)}</small>
           </Choice>
         ))}
       </AppearancePart>
-      <AppearancePart legend={t('setup.appearance.hairStyle')} className="setup-choices-hair">
-        {HAIR_STYLE_IDS.map((hairStyle) => (
-          <Choice key={hairStyle} name="hair-style" checked={hairStyle === appearance.hairStyle} autoFocus={false} onChoose={() => chooseAppearance({ hairStyle })}>
-            <small>{t(`setup.appearance.hairStyles.${hairStyle}`)}</small>
+      <AppearancePart legend={t('setup.appearance.eyewear')} className="setup-choices-eyewear">
+        {EYEWEAR_IDS.map((eyewear) => (
+          <Choice key={eyewear} name="eyewear" checked={eyewear === appearance.eyewear} autoFocus={false} onChoose={() => chooseAppearance({ eyewear })}>
+            <small>{t(`setup.appearance.eyewears.${eyewear}`)}</small>
           </Choice>
         ))}
       </AppearancePart>
-      <AppearancePart legend={t('setup.appearance.hairColour')} className="setup-choices-swatches">
-        {HAIR_COLOUR_IDS.map((hairColour) => (
-          <Swatch
-            key={hairColour}
-            name="hair-colour"
-            colour={HAIR_COLOURS[hairColour]}
-            label={t(`setup.appearance.hairColours.${hairColour}`)}
-            checked={hairColour === appearance.hairColour}
-            onChoose={() => chooseAppearance({ hairColour })}
-          />
+      <AppearancePart legend={t('setup.appearance.neckwear')} className="setup-choices-neckwear">
+        {NECKWEAR_IDS.map((neckwear) => (
+          <Choice key={neckwear} name="neckwear" checked={neckwear === appearance.neckwear} autoFocus={false} onChoose={() => chooseAppearance({ neckwear })}>
+            <small>{t(`setup.appearance.neckwears.${neckwear}`)}</small>
+          </Choice>
         ))}
       </AppearancePart>
-      <AppearancePart legend={t('setup.appearance.skinTone')} className="setup-choices-swatches">
-        {SKIN_TONE_IDS.map((skinTone, i) => (
+      <AppearancePart legend={t('setup.appearance.colour')} className="setup-choices-swatches">
+        {ACCESSORY_COLOUR_IDS.map((colour) => (
           <Swatch
-            key={skinTone}
-            name="skin-tone"
-            colour={SKIN_TONES[skinTone]}
-            label={t('setup.appearance.tone', { number: i + 1 })}
-            checked={skinTone === appearance.skinTone}
-            onChoose={() => chooseAppearance({ skinTone })}
+            key={colour}
+            name="colour"
+            colour={ACCESSORY_COLOURS[colour]}
+            label={t(`setup.appearance.colours.${colour}`)}
+            checked={colour === appearance.colour}
+            onChoose={() => chooseAppearance({ colour })}
           />
         ))}
       </AppearancePart>
