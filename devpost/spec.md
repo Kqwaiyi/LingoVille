@@ -188,6 +188,9 @@ There's no other service: no hosted database, no accounts, no hosting.
 
 **Learner uncertainty:** none was named in this conversation. The riskiest unknown is technical: whether the live model calls `not_understood` and `serve_order` reliably enough to drive the game. It's checked in slice 1, with a real key, before anything is built on it.
 
+**Changed during the build** (recorded in the checklist's Revisions):
+- **The cashier and server Jobs too.** Once the barista's Shift loop worked, the supermarket till and the restaurant's order pad were one Shift template each, so they joined the barista.
+
 **Still open:**
 - Everyone is Clawd, the Claude Code mascot. Using it in a public repo and demo video may need permission (from `prd.md > Open Questions`). This can wait until `6-ship`.
 - To check early in the build: the doc links above, Gemini's rate limits and current prices.

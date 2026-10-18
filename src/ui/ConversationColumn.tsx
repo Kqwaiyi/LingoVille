@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CULTURE_PACKS, formatLocalMoney, localNpcPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, localNpcPlaceName, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import type { LanguageCode } from '../sim/index.ts';
+import type { JobId, LanguageCode } from '../sim/index.ts';
 import {
   selectCanTakeTurn,
   selectChatLines,
@@ -18,8 +18,10 @@ import {
   selectNativeLanguage,
   selectNpcExpression,
   selectNpcLook,
+  selectPlaceId,
   selectReconnecting,
   selectRecap,
+  selectShift,
   selectTargetLanguage,
   selectTranslation,
   selectTyping,
@@ -33,6 +35,14 @@ import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
+import { MenuGrid, OrderPad, Till } from './ShiftPanel.tsx';
+
+/** The Job action UI for the Shift Customer at the counter: the barista's menu grid, the cashier's till or the server's order pad. */
+function JobPanel({ jobId, conversationId }: { jobId: JobId | undefined; conversationId: number }) {
+  if (jobId === 'cashier') return <Till key={conversationId} />;
+  if (jobId === 'server') return <OrderPad />;
+  return <MenuGrid />;
+}
 
 /** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
 function NpcLineHelp({ index, text }: { index: number; text: string }) {
@@ -119,8 +129,9 @@ function ClosingCardPanel({ card, who }: { card: ClosingCard; who: string }) {
     card.kind === 'failure'
       ? [t('closing.noCharge')]
       : [
-          // Only what happened: nothing served or paid for shows no line for it.
+          // Only what happened: nothing served or paid for (hiring) shows no line for it.
           ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
+          ...(card.hired ? [t('closing.hired', { job: t(`skills.names.${card.hired}`) })] : []),
           ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
         ];
 
@@ -332,6 +343,8 @@ export function ConversationColumn() {
   const typing = useGame(selectTyping);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const toggleHelp = useGame((s) => s.toggleHelp);
+  const placeId = useGame(selectPlaceId);
+  const shift = useGame(selectShift);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
 
@@ -360,10 +373,14 @@ export function ConversationColumn() {
 
   if (!conversation) return null;
   const { npcId } = conversation;
-  const who = t(`roles.${TOWN_NPCS[npcId].role}.subject`);
+  // A Shift Customer is anonymous: just "Customer", and how far into the Shift they come. One already dealt with
+  // counts as done while they say goodbye, so they keep their own number until they leave.
+  const who = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.subject`) : t('shift.customerSubject');
   // A Named NPC goes by their local name, with their role beside it.
-  const name = CULTURE_PACKS[packId].personas[npcId].name;
-  const role = t(`roles.${TOWN_NPCS[npcId].role}.name`);
+  const name = npcId
+    ? CULTURE_PACKS[packId].personas[npcId].name
+    : t('shift.customer', { number: (shift?.done ?? 0) + (conversation.outcome ? 0 : 1), count: shift?.customers ?? 1 });
+  const role = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.name`) : null;
 
   return (
     <aside className="chat-column" aria-label={t('chat.label')}>
@@ -371,10 +388,10 @@ export function ConversationColumn() {
         <div className="chat-who">
           <NpcFace who={who} />
           <span>{name}</span>
-          <span className="chat-role">{role}</span>
+          {role && <span className="chat-role">{role}</span>}
         </div>
         <div className="chat-meta">
-          {localNpcPlaceName(npcId, packId)} · {formatClock(minute)}
+          {npcId ? localNpcPlaceName(npcId, packId) : localPlaceName(placeId, packId)} · {formatClock(minute)}
         </div>
         <div className="chat-tabs">
           <div role="tablist" aria-label={t('chat.tabs')}>
@@ -414,6 +431,7 @@ export function ConversationColumn() {
               )}
             </div>
           )}
+          {conversation.shiftCustomer && <JobPanel jobId={shift?.jobId} conversationId={conversation.id} />}
           {closingCard ? (
             <ClosingCardPanel card={closingCard} who={who} />
           ) : (

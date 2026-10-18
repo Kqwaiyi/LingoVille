@@ -34,6 +34,7 @@ Moments 1 and 2 can be a single café scene (fail, hint, succeed, Recap) to keep
 ## The POC Boundary
 - Speaking to NPCs to complete goals, with Help and the Recap.
 - The barista Job and its Shifts.
+- The cashier and server Jobs, on the barista's Shift loop (added during the build).
 - The gym.
 - Illness, the clinic and the hospital bill.
 - Rent and debt.
@@ -44,5 +45,4 @@ None named.
 
 ## Explicitly Cut
 - Gifts and Familiarity: the demo doesn't need them.
-- The cashier and server Jobs: the demo doesn't need them.
 - Multiplayer, house building, accounts and cloud saves, mobile, and languages beyond the four: out of scope from the start. The game runs locally on the developer's own Gemini key.

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { formatLocalMoney, formatTime } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { PLACE_LINE, SAVE } from '../sim/index.ts';
+import { LIFE_SKILL_IDS, LIFE_SKILLS, PLACE_LINE, SAVE } from '../sim/index.ts';
 import {
   selectClockMinute,
   selectCulturePackId,
   selectDay,
+  selectLifeSkillLevels,
   selectMoneyInShifts,
   selectPlaceHours,
   selectPlaceId,
@@ -27,6 +28,41 @@ function Money() {
       <div className="dock-money" aria-label={t('dock.money')}>
         {formatLocalMoney(shifts, packId)}
       </div>
+    </div>
+  );
+}
+
+/** The skills page, behind a button in the dock: each Life Skill's level as stars out of 5. */
+function Skills() {
+  const { t } = useTranslation();
+  const levels = useGame(selectLifeSkillLevels);
+  const [open, setOpen] = useState(false);
+  const max = LIFE_SKILLS.maxLevel;
+
+  return (
+    <div className="dock-skills">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {t('skills.open')}
+      </button>
+      {open && (
+        <section className="skills" aria-label={t('skills.label')}>
+          <h2>{t('skills.label')}</h2>
+          <ul>
+            {LIFE_SKILL_IDS.map((skill) => (
+              <li key={skill}>
+                <span>{t(`skills.names.${skill}`)}</span>
+                <span className="skills-stars" role="img" aria-label={t('skills.level', { level: levels[skill], max })}>
+                  {'★'.repeat(levels[skill])}
+                  {'☆'.repeat(max - levels[skill])}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="skills-close" onClick={() => setOpen(false)}>
+            {t('skills.close')}
+          </button>
+        </section>
+      )}
     </div>
   );
 }
@@ -119,6 +155,8 @@ export function Dock() {
         </div>
         <div className="dock-sep" aria-hidden />
         <Money />
+        <div className="dock-sep" aria-hidden />
+        <Skills />
       </section>
     </div>
   );

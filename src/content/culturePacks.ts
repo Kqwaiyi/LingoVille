@@ -3,11 +3,13 @@ import { CLOCK, LANGUAGE_CODES, lookFromSeed, PLACE_IDS, WEEKDAYS, type Language
 import { CustomerWeightsSchema, NpcLookSchema, type CustomerWeights, type NpcLook } from './appearance.ts';
 import {
   ALLERGENS,
+  DIETARY_NOTE_IDS,
   DRINK_OPTIONS,
   EXTRA_ALLERGENS,
   GROCERIES_SOLD,
   ITEM_IDS,
   type Allergen,
+  type DietaryNoteId,
   type DrinkExtra,
   type DrinkOptionId,
   type GroceryId,
@@ -41,6 +43,8 @@ export type Currency = {
   perShift: number;
   /** Local price points, from the smallest prices up. */
   priceSteps: PriceStep[];
+  /** The coins and notes in a till, smallest first: what a cashier gives change in. */
+  denominations: number[];
 };
 
 /**
@@ -139,8 +143,10 @@ export type CulturePack = {
   /** Opening hours that differ from the town's defaults (`PLACE_HOURS`, `SERVICE_HOURS`). */
   hours: Partial<Record<HoursId, OpeningHours>>;
   goods: Record<ItemId, Good>;
-  /** How a café drink can be made (size, hot or iced, extras), as customers and the barista say it. */
+  /** How a café drink can be made (size, hot or iced, extras), as the menu grid and Shift Customers say it. */
   drinkOptions: Record<DrinkOptionId, Good>;
+  /** The dietary needs a server notes on the order pad, as the pad and diners say them. */
+  dietaryNotes: Record<DietaryNoteId, Good>;
   /** What a café customer can be allergic to, as customers and the barista say it. */
   allergens: Record<Allergen, Good>;
   /** Which allergens each of this pack's café items has in it (none: an empty list), by what the local item is made with. */
@@ -163,7 +169,7 @@ export type CulturePack = {
   appearances: {
     /** Persona × pack → look: what each Named NPC wears in this pack, and the build their voice suits, the same in every pack. */
     npcs: Record<NamedNpcId, NpcLook>;
-    /** How often each part of a look turns up among passers-by. */
+    /** How often each part of a look turns up among Shift Customers and passers-by. */
     customers: CustomerWeights;
   };
   /** Each place's set dressing: the props the world sets out there, each in a spot of its kind. */
@@ -206,11 +212,16 @@ export function culturePackSchema(packId: LanguageCode) {
       suffix: text.optional(),
       perShift: z.number().positive(),
       priceSteps,
+      denominations: z
+        .array(z.number().positive())
+        .min(1)
+        .refine((money) => money.every((d, i) => i === 0 || d > money[i - 1]!), 'Denominations go up.'),
     }),
     customs: z.array(text),
     hours: z.partialRecord(z.enum(HOURS_IDS), openingHours),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     drinkOptions: z.record(z.enum(DRINK_OPTIONS), z.object({ name: text, glosses })),
+    dietaryNotes: z.record(z.enum(DIETARY_NOTE_IDS), z.object({ name: text, glosses })),
     allergens: z.record(z.enum(ALLERGENS), z.object({ name: text, glosses })),
     cafeAllergens: z.partialRecord(z.enum(ITEM_IDS), z.array(z.enum(ALLERGENS)).readonly()),
     signs: z.record(z.enum(SIGN_WORDS), z.object({ text, glosses })),
@@ -243,6 +254,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       locale: 'en-JP',
       perShift: 6000,
       priceSteps: [{ below: 1000, step: 10 }, { step: 100 }],
+      denominations: [1, 5, 10, 50, 100, 500, 1000, 5000, 10000],
     },
     customs: [
       'Tipping is not done, and staff will politely turn a tip down.',
@@ -257,6 +269,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'キャベツ', glosses: { zh: '卷心菜', en: 'Cabbage', de: 'Weißkohl' } },
       eggs: { name: '卵', glosses: { zh: '鸡蛋', en: 'Eggs', de: 'Eier' } },
       noodles: { name: 'うどん', glosses: { zh: '乌冬面', en: 'Udon noodles', de: 'Udon-Nudeln' } },
+      batteries: { name: '単三電池', glosses: { zh: '五号电池', en: 'AA batteries', de: 'AA-Batterien' } },
+      stamps: { name: '切手', glosses: { zh: '邮票', en: 'Stamps', de: 'Briefmarken' } },
+      'gift-card': { name: 'ギフトカード', glosses: { zh: '礼品卡', en: 'Gift card', de: 'Geschenkkarte' } },
       'pork-dish': { name: 'ポークソテー', glosses: { zh: '香煎猪排', en: 'Pan-fried pork', de: 'Gebratenes Schweinesteak' } },
       'chicken-dish': { name: 'チキン南蛮', glosses: { zh: '南蛮炸鸡', en: 'Fried chicken with tartar sauce', de: 'Frittiertes Hähnchen mit Remoulade' } },
       'fish-dish': { name: '焼き鮭定食', glosses: { zh: '烤三文鱼套餐', en: 'Grilled salmon set meal', de: 'Menü mit gegrilltem Lachs' } },
@@ -276,6 +291,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: '砂糖', glosses: { zh: '加糖', en: 'Sugar', de: 'Zucker' } },
       'extra-shot': { name: 'ショット追加', glosses: { zh: '加一份浓缩', en: 'Extra shot', de: 'Extra Shot' } },
       lemon: { name: 'レモン', glosses: { zh: '加柠檬', en: 'Lemon', de: 'Zitrone' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: 'ベジタリアン', glosses: { zh: '吃素', en: 'Vegetarian', de: 'Vegetarisch' } },
+      'no-pork': { name: '豚肉抜き', glosses: { zh: '不吃猪肉', en: 'No pork', de: 'Ohne Schweinefleisch' } },
+      'no-seafood': { name: '魚介類抜き', glosses: { zh: '不吃海鲜', en: 'No fish or seafood', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
     allergens: {
       milk: { name: '乳', glosses: { zh: '牛奶', en: 'Milk', de: 'Milch' } },
@@ -404,6 +424,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       suffix: '元',
       perShift: 240,
       priceSteps: [{ below: 100, step: 1 }, { step: 5 }],
+      denominations: [0.1, 0.5, 1, 5, 10, 20, 50, 100],
     },
     customs: ['Tipping is not expected.', 'Most people pay by scanning a QR code with WeChat or Alipay.'],
     hours: {},
@@ -415,6 +436,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: '青菜', glosses: { ja: 'チンゲン菜', en: 'Bok choy', de: 'Pak Choi' } },
       eggs: { name: '鸡蛋', glosses: { ja: '卵', en: 'Eggs', de: 'Eier' } },
       noodles: { name: '挂面', glosses: { ja: '乾麺', en: 'Dried noodles', de: 'Getrocknete Nudeln' } },
+      batteries: { name: '五号电池', glosses: { ja: '単三電池', en: 'AA batteries', de: 'AA-Batterien' } },
+      stamps: { name: '邮票', glosses: { ja: '切手', en: 'Stamps', de: 'Briefmarken' } },
+      'gift-card': { name: '购物卡', glosses: { ja: 'ギフトカード', en: 'Gift card', de: 'Geschenkkarte' } },
       'pork-dish': { name: '糖醋里脊', glosses: { ja: '豚ヒレ肉の甘酢炒め', en: 'Sweet and sour pork', de: 'Süßsaures Schweinefilet' } },
       'chicken-dish': { name: '宫保鸡丁', glosses: { ja: '鶏肉とピーナッツの辛味炒め', en: 'Kung pao chicken', de: 'Kung-Pao-Hähnchen' } },
       'fish-dish': { name: '清蒸鱼', glosses: { ja: '魚の姿蒸し', en: 'Steamed fish', de: 'Gedämpfter Fisch' } },
@@ -434,6 +458,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: '加糖', glosses: { ja: '砂糖', en: 'Sugar', de: 'Zucker' } },
       'extra-shot': { name: '加一份浓缩', glosses: { ja: 'ショット追加', en: 'Extra shot', de: 'Extra Shot' } },
       lemon: { name: '加柠檬', glosses: { ja: 'レモン', en: 'Lemon', de: 'Zitrone' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: '吃素', glosses: { ja: 'ベジタリアン', en: 'Vegetarian', de: 'Vegetarisch' } },
+      'no-pork': { name: '不吃猪肉', glosses: { ja: '豚肉抜き', en: 'No pork', de: 'Ohne Schweinefleisch' } },
+      'no-seafood': { name: '不吃海鲜', glosses: { ja: '魚介類抜き', en: 'No fish or seafood', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
     allergens: {
       milk: { name: '牛奶', glosses: { ja: '乳', en: 'Milk', de: 'Milch' } },
@@ -561,6 +590,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       locale: 'en-GB',
       perShift: 60,
       priceSteps: [{ below: 10, step: 0.05 }, { below: 100, step: 0.5 }, { step: 1 }],
+      denominations: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50],
     },
     customs: [
       'Customers order and pay at the counter; there is no table service.',
@@ -575,6 +605,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'Carrots', glosses: { ja: 'にんじん', zh: '胡萝卜', de: 'Karotten' } },
       eggs: { name: 'Eggs', glosses: { ja: '卵', zh: '鸡蛋', de: 'Eier' } },
       noodles: { name: 'Spaghetti', glosses: { ja: 'スパゲッティ', zh: '意大利面', de: 'Spaghetti' } },
+      batteries: { name: 'AA batteries', glosses: { ja: '単三電池', zh: '五号电池', de: 'AA-Batterien' } },
+      stamps: { name: 'Stamps', glosses: { ja: '切手', zh: '邮票', de: 'Briefmarken' } },
+      'gift-card': { name: 'Gift card', glosses: { ja: 'ギフトカード', zh: '礼品卡', de: 'Geschenkkarte' } },
       'pork-dish': { name: 'Sausage and mash', glosses: { ja: 'ソーセージとマッシュポテト', zh: '香肠配土豆泥', de: 'Würstchen mit Kartoffelbrei' } },
       'chicken-dish': { name: 'Chicken pie', glosses: { ja: 'チキンパイ', zh: '鸡肉派', de: 'Hähnchenpastete' } },
       'fish-dish': { name: 'Fish and chips', glosses: { ja: 'フィッシュ・アンド・チップス', zh: '炸鱼薯条', de: 'Fisch mit Pommes' } },
@@ -594,6 +627,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: 'Sugar', glosses: { ja: '砂糖', zh: '加糖', de: 'Zucker' } },
       'extra-shot': { name: 'Extra shot', glosses: { ja: 'ショット追加', zh: '加一份浓缩', de: 'Extra Shot' } },
       lemon: { name: 'Lemon', glosses: { ja: 'レモン', zh: '加柠檬', de: 'Zitrone' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: 'Vegetarian', glosses: { ja: 'ベジタリアン', zh: '吃素', de: 'Vegetarisch' } },
+      'no-pork': { name: 'No pork', glosses: { ja: '豚肉抜き', zh: '不吃猪肉', de: 'Ohne Schweinefleisch' } },
+      'no-seafood': { name: 'No fish or seafood', glosses: { ja: '魚介類抜き', zh: '不吃海鲜', de: 'Ohne Fisch und Meeresfrüchte' } },
     },
     allergens: {
       milk: { name: 'Milk', glosses: { ja: '乳', zh: '牛奶', de: 'Milch' } },
@@ -721,6 +759,7 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       locale: 'de-DE',
       perShift: 60,
       priceSteps: [{ below: 10, step: 0.1 }, { below: 100, step: 0.5 }, { step: 1 }],
+      denominations: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50],
     },
     customs: [
       'At the counter tipping is optional; people often round up.',
@@ -743,6 +782,9 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       vegetables: { name: 'Kartoffeln', glosses: { ja: 'じゃがいも', zh: '土豆', en: 'Potatoes' } },
       eggs: { name: 'Eier', glosses: { ja: '卵', zh: '鸡蛋', en: 'Eggs' } },
       noodles: { name: 'Spätzle', glosses: { ja: 'シュペッツレ（卵の麺）', zh: '德式鸡蛋面', en: 'Spätzle (egg noodles)' } },
+      batteries: { name: 'AA-Batterien', glosses: { ja: '単三電池', zh: '五号电池', en: 'AA batteries' } },
+      stamps: { name: 'Briefmarken', glosses: { ja: '切手', zh: '邮票', en: 'Stamps' } },
+      'gift-card': { name: 'Geschenkkarte', glosses: { ja: 'ギフトカード', zh: '礼品卡', en: 'Gift card' } },
       'pork-dish': { name: 'Schweineschnitzel', glosses: { ja: 'ポークシュニッツェル', zh: '炸猪排', en: 'Pork schnitzel' } },
       'chicken-dish': { name: 'Hähnchengeschnetzeltes', glosses: { ja: '鶏肉のクリーム煮', zh: '奶油鸡肉丝', en: 'Sliced chicken in cream sauce' } },
       'fish-dish': { name: 'Lachsfilet', glosses: { ja: 'サーモンのフィレ', zh: '三文鱼排', en: 'Salmon fillet' } },
@@ -762,6 +804,11 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       sugar: { name: 'Zucker', glosses: { ja: '砂糖', zh: '加糖', en: 'Sugar' } },
       'extra-shot': { name: 'Extra Shot', glosses: { ja: 'ショット追加', zh: '加一份浓缩', en: 'Extra shot' } },
       lemon: { name: 'Zitrone', glosses: { ja: 'レモン', zh: '加柠檬', en: 'Lemon' } },
+    },
+    dietaryNotes: {
+      vegetarian: { name: 'Vegetarisch', glosses: { ja: 'ベジタリアン', zh: '吃素', en: 'Vegetarian' } },
+      'no-pork': { name: 'Ohne Schweinefleisch', glosses: { ja: '豚肉抜き', zh: '不吃猪肉', en: 'No pork' } },
+      'no-seafood': { name: 'Ohne Fisch und Meeresfrüchte', glosses: { ja: '魚介類抜き', zh: '不吃海鲜', en: 'No fish or seafood' } },
     },
     allergens: {
       milk: { name: 'Milch', glosses: { ja: '乳', zh: '牛奶', en: 'Milk' } },

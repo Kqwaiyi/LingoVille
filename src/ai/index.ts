@@ -1,6 +1,21 @@
 // Public interface of the ai module. Other modules import from here.
 export type { FunctionDeclaration } from '../content/index.ts';
 export {
+  buildShiftCustomerSession,
+  readChangedOrder,
+  readChangeScene,
+  readCheckout,
+  readServedScene,
+  readShiftOrder,
+  readTable,
+  shiftCustomerChangeScene,
+  shiftCustomerServedScene,
+  tableServedScene,
+  type CheckoutSaid,
+  type DinerSaid,
+  type ShiftCustomerContext,
+} from './shiftCustomerSession.ts';
+export {
   buildNpcSession,
   GREETING_SCENE,
   NOT_UNDERSTOOD_TOOL,
@@ -21,6 +36,7 @@ export {
   type HelpLogEntry,
   type Recap,
   type RecapConversation,
+  type ShiftRecapCustomer,
   type RecapLine,
   type RecapRequest,
   type RecapRequestBody,

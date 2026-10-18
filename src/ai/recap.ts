@@ -1,7 +1,18 @@
 import { z } from 'zod';
-import { CULTURE_PACKS, toGeminiSchema, type CulturePack } from '../content/index.ts';
+import {
+  CULTURE_PACKS,
+  DIETARY_NOTE_IDS,
+  drinkModifiersSchema,
+  formatLocalAmount,
+  ITEM_IDS,
+  toGeminiSchema,
+  type CulturePack,
+} from '../content/index.ts';
+import { JOB_IDS } from '../sim/index.ts';
 import {
   block,
+  mealSaid,
+  orderSaid,
   InteractionIdSchema,
   interactionById,
   interactionPartner,
@@ -30,6 +41,51 @@ const RecapConversationSchema = z.object({
   helpLog: z.array(HelpLogEntrySchema),
 });
 
+/** A line of a Shift Customer's order, or of what they were handed: a café drink made to order says how it was made. */
+const ShiftOrderLineSchema = z.object({
+  itemId: z.enum(ITEM_IDS),
+  quantity: z.int().min(1),
+  modifiers: drinkModifiersSchema.optional(),
+});
+
+/** What a customer at the supermarket till wanted besides their shopping rung up, in local money. */
+const CheckoutSchema = z.object({
+  bag: z.boolean(),
+  pointsCard: z.boolean(),
+  fromBehindTheCounter: z.enum(ITEM_IDS).nullable(),
+  cashHanded: z.number().positive().nullable(),
+  changeDue: z.number().min(0).nullable(),
+});
+
+/** What the learner did at the till: the bag and points card, and the change counted out, in local money. */
+const TillWorkSchema = z.object({ bag: z.boolean(), pointsCard: z.boolean(), change: z.number().min(0) });
+
+const dietaryNote = z.enum(DIETARY_NOTE_IDS).nullable();
+/** One diner at a restaurant table: what they wanted, and any dietary need. */
+const DinerSchema = z.object({ dish: z.enum(ITEM_IDS), drink: z.enum(ITEM_IDS), note: dietaryNote });
+/** One diner as the learner wrote them on the order pad, which may be missing their dish or drink. */
+const PadDinerSchema = z.object({ dish: z.enum(ITEM_IDS).nullable(), drink: z.enum(ITEM_IDS).nullable(), note: dietaryNote });
+
+/**
+ * One Shift Customer as the Recap reads them: what they ordered, how the game's exact check found the learner served
+ * them (`served` is what was handed over, empty if nothing), and what was said. At the till, `order` is everything to
+ * ring up, `checkout` what else they wanted, and `atTheTill` what the learner did about it. At a restaurant table,
+ * `table` is what each diner wanted and `atTheTable` the order pad the learner wrote.
+ */
+const ShiftRecapCustomerSchema = z.object({
+  order: z.array(ShiftOrderLineSchema).min(1).readonly(),
+  /** What they first asked for, before changing their mind halfway. */
+  changedFrom: z.array(ShiftOrderLineSchema).min(1).readonly().optional(),
+  checkout: CheckoutSchema.optional(),
+  result: z.enum(['served', 'wrongOrder', 'walkedOut']),
+  served: z.array(ShiftOrderLineSchema).readonly(),
+  atTheTill: TillWorkSchema.optional(),
+  table: z.array(DinerSchema).min(1).readonly().optional(),
+  atTheTable: z.array(PadDinerSchema).readonly().optional(),
+  transcript: z.array(RecapLineSchema),
+  helpLog: z.array(HelpLogEntrySchema),
+});
+
 const shared = {
   culturePackId: LanguageSchema,
   step: StepSchema,
@@ -39,16 +95,19 @@ const shared = {
 /** What `/api/recap` takes. The gateway validates requests with it, and builds the prompt from them. */
 export const RecapRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('goal'), ...shared, conversation: RecapConversationSchema }),
+  z.object({ kind: z.literal('shift'), ...shared, jobId: z.enum(JOB_IDS), customers: z.array(ShiftRecapCustomerSchema).min(1) }),
 ]);
 
 export type RecapLine = TranscriptLine;
 export type HelpLogEntry = z.infer<typeof HelpLogEntrySchema>;
 export type RecapConversation = z.infer<typeof RecapConversationSchema>;
+export type ShiftRecapCustomer = z.infer<typeof ShiftRecapCustomerSchema>;
 export type RecapRequest = z.infer<typeof RecapRequestSchema>;
 
 /** How much each kind of Recap may hold. */
 const LIMITS: Record<RecapRequest['kind'], { corrections: number; newWords: number }> = {
   goal: { corrections: 3, newWords: 5 },
+  shift: { corrections: 3, newWords: 6 },
 };
 
 function recapSchema(limits: { corrections: number; newWords: number }) {
@@ -111,10 +170,86 @@ function conversationBlock(heading: string, conversation: RecapConversation, pac
   ]);
 }
 
+/** "a, b and c". */
+const listed = (parts: string[]) => parts.join(', ').replace(/, ([^,]+)$/, ' and $1');
+
+/** What a customer at the till wanted, and whether the learner got it all right, did something else, or never served them. */
+function tillLine(customer: ShiftRecapCustomer, checkout: NonNullable<ShiftRecapCustomer['checkout']>, staff: string, pack: CulturePack) {
+  const { bag, pointsCard, fromBehindTheCounter, cashHanded, changeDue } = checkout;
+  const money = (amount: number) => formatLocalAmount(amount, pack.id);
+  const shopping = customer.order.filter(({ itemId }) => itemId !== fromBehindTheCounter);
+  const wanted = [
+    `They brought ${orderSaid(shopping, pack)} to the till`,
+    ...(fromBehindTheCounter ? [`asked for ${orderSaid([{ itemId: fromBehindTheCounter, quantity: 1 }], pack)} from behind the counter`] : []),
+    bag ? 'wanted a bag' : 'wanted no bag',
+    pointsCard ? 'had a points card' : 'had no points card',
+    cashHanded !== null ? `and paid ${money(cashHanded)} in cash, so ${money(changeDue ?? 0)} change was due` : 'and paid by card',
+  ].join(', ');
+  switch (customer.result) {
+    case 'served':
+      return `${wanted}. The ${staff} got it all right.`;
+    case 'wrongOrder': {
+      const done = customer.atTheTill ?? { bag: false, pointsCard: false, change: 0 };
+      const did = listed([
+        `rang up ${customer.served.length > 0 ? orderSaid(customer.served, pack) : 'nothing'}`,
+        done.bag ? 'gave a bag' : 'gave no bag',
+        done.pointsCard ? 'scanned a points card' : 'scanned no points card',
+        done.change > 0 ? `gave ${money(done.change)} change` : 'gave no change',
+      ]);
+      return `${wanted}. The ${staff} ${did} instead.`;
+    }
+    case 'walkedOut':
+      return `${wanted}. The ${staff} never finished serving them, and they left.`;
+  }
+}
+
+/** What each diner at a restaurant table wanted, and whether the learner wrote it all down right, wrote something else, or never took it. */
+function tableLine(customer: ShiftRecapCustomer, table: NonNullable<ShiftRecapCustomer['table']>, staff: string, pack: CulturePack) {
+  const diners = table.map(
+    (diner, i) => `diner ${i + 1} wanted ${mealSaid(diner, pack)}${diner.note ? `, and is ${pack.dietaryNotes[diner.note].name}` : ''}`,
+  );
+  const wanted = `At their table, ${diners.join('; ')}.`;
+  switch (customer.result) {
+    case 'served':
+      return `${wanted} The ${staff} wrote it all down right.`;
+    case 'wrongOrder': {
+      const pad = customer.atTheTable ?? [];
+      const written = pad.map(
+        (diner, i) => `diner ${i + 1}: ${mealSaid(diner, pack)}${diner.note ? `, noted ${pack.dietaryNotes[diner.note].name}` : ''}`,
+      );
+      return `${wanted} The ${staff} wrote down instead: ${written.length > 0 ? written.join('; ') : 'nothing'}.`;
+    }
+    case 'walkedOut':
+      return `${wanted} The ${staff} never took their order, and they left.`;
+  }
+}
+
+/** What the customer ordered, and whether the learner (the `staff`) served it right, served something else, or never served them. */
+function servedLine(customer: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+  if (customer.checkout) return tillLine(customer, customer.checkout, staff, pack);
+  if (customer.table) return tableLine(customer, customer.table, staff, pack);
+  const { order, changedFrom, result, served } = customer;
+  const changed = changedFrom ? `They first ordered ${orderSaid(changedFrom, pack)}, then changed their mind halfway. ` : '';
+  const ordered = `${changed}They ordered: ${orderSaid(order, pack)}.`;
+  switch (result) {
+    case 'served':
+      return `${ordered} The ${staff} served it right.`;
+    case 'wrongOrder':
+      return `${ordered} The ${staff} served ${served.length > 0 ? orderSaid(served, pack) : 'nothing'} instead.`;
+    case 'walkedOut':
+      return `${ordered} The ${staff} never served them, and they left.`;
+  }
+}
+
+function shiftCustomerBlock(heading: string, customer: ShiftRecapCustomer, staff: string, pack: CulturePack) {
+  return block(heading, [servedLine(customer, staff, pack), ...transcriptLines(customer.transcript), ...helpLines(customer.helpLog)]);
+}
+
 function coachBlock(request: RecapRequest, pack: CulturePack) {
   const native = CULTURE_PACKS[request.nativeLanguage].languageName;
   const what = {
     goal: 'one conversation',
+    shift: `a whole work Shift, where the learner was the ${request.kind === 'shift' ? request.jobId : 'staff member'} serving several customers`,
   }[request.kind];
   return block('WHO YOU ARE', [
     `You are a warm, encouraging language coach. Your learner speaks ${native} and is learning ${pack.languageName} ` +
@@ -152,6 +287,9 @@ function writeBlock(request: RecapRequest, pack: CulturePack) {
     '- cefrEstimate: the CEFR level the learner showed in this conversation.',
     `Write every explanation in ${native}, never in ${target}. Write examples only in ${target}.`,
   ];
+  if (request.kind === 'shift') {
+    lines.push('Write one combined Recap for the whole Shift: the outcome line sums up how the customers went.');
+  }
   return block('WHAT TO WRITE', lines);
 }
 
@@ -159,6 +297,8 @@ function conversationsText(request: RecapRequest, pack: CulturePack) {
   switch (request.kind) {
     case 'goal':
       return conversationBlock('THE CONVERSATION', request.conversation, pack);
+    case 'shift':
+      return request.customers.map((customer, i) => shiftCustomerBlock(`CUSTOMER ${i + 1}`, customer, request.jobId, pack)).join('\n\n');
   }
 }
 

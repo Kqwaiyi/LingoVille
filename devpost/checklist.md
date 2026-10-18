@@ -29,7 +29,7 @@ Build mode: fast
   Learner check: Order something, open Help when you're stuck and say a hint aloud, then read the Recap at the end. Is the correction one you'd want?
   Commit: `Get unstuck with Help, then learn from the Recap`
 
-- [ ] **3. Start a new life in any of four languages**
+- [x] **3. Start a new life in any of four languages**
   Becomes usable: The game opens on a Title Screen over the live town. New game goes through Setup: Native Language, Target Language (any of the four towns), name and level, a look for your Clawd, and the mic check. The game autosaves, so Continue picks up where you left off, and Settings change the UI language, the input and the reading aids.
   Why now: With the conversation loop proven, the game needs a way in and a way back. Setup is also where the language pair and the starting level come from, which every later slice relies on.
   PRD ref: `prd.md > The Core Journey` (steps 1 and 2), `prd.md > Screens and Layout`, `prd.md > Features and Behavior > Four Languages`, `prd.md > States and Boundaries` (no microphone, coming back)
@@ -81,3 +81,5 @@ Reflection: [offered/answered/declined/already covered — personal answer belon
 Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
 
 ## Revisions
+
+- Added the cashier and server Jobs alongside the barista's — once the barista's Shift loop worked, the supermarket till and the restaurant's order pad were one Shift template each, so the learner chose to bring them back from the cut list. `scope.md`, `prd.md` and `spec.md` updated.

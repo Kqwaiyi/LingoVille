@@ -2,13 +2,14 @@ import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import { SegmentSchema } from '../ai/index.ts';
 import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import { JOB_IDS } from '../sim/index.ts';
 
 // The Journal: every Recap the Player has had, kept per slot in its own IndexedDB
 // database, apart from the save. Entries are only ever added. Each holds the
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
-export const JOURNAL_SCHEMA_VERSION = 2;
+export const JOURNAL_SCHEMA_VERSION = 3;
 
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
@@ -22,7 +23,7 @@ const shared = {
   /** When it was written, in real time. */
   writtenAt: z.string(),
   placeName: z.string(),
-  /** The game time the conversation ended. */
+  /** The game time the conversation (or Shift) ended. */
   day: z.int(),
   minuteOfDay: z.number(),
   targetLanguage: z.enum(LANGUAGES),
@@ -42,6 +43,8 @@ const shared = {
       typed: z.boolean().optional(),
       /** An NPC line's reading aid (zh and ja), as corrected by the time the entry was written. */
       reading: z.array(SegmentSchema).optional(),
+      /** In a Shift's entry, which customer (from 1, in the order the Player dealt with them) the line was said with. */
+      customer: z.int().min(1).optional(),
     }),
   ),
   helpLog: z.array(z.object({ afterLine: z.int().min(0), kind: z.enum(['hint', 'phrasebook', 'translate']), text: z.string() })),
@@ -56,6 +59,15 @@ const JournalEntrySchema = z.discriminatedUnion('kind', [
     npcId: z.enum(NPC_IDS),
     interactionId: z.enum(INTERACTION_IDS),
     outcome: z.enum(['success', 'failure']),
+  }),
+  /** A whole Shift's one combined Recap, with every customer's lines in order. */
+  z.object({
+    ...shared,
+    kind: z.literal('shift'),
+    jobId: z.enum(JOB_IDS),
+    /** How many Shift Customers the Shift had, and how many were served right. */
+    customers: z.int().min(1),
+    served: z.int().min(0),
   }),
 ]);
 
@@ -82,6 +94,8 @@ type StoredEntry = { schemaVersion: number } & Record<string, unknown>;
 const MIGRATIONS: readonly ((entry: StoredEntry) => StoredEntry)[] = [
   // 1 → 2: NPC lines may keep their reading aid. Older ones have none.
   (entry) => ({ ...entry, schemaVersion: 2 }),
+  // 2 → 3: a Shift gets its own kind of entry. Older ones are all Goal Interactions'.
+  (entry) => ({ ...entry, schemaVersion: 3 }),
 ];
 
 /** Reads one stored entry as an entry of today's version, through the migrations. Throws, saying why, if it can't. */

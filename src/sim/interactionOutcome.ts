@@ -1,5 +1,6 @@
-import type { Interaction, OrderLine, ServedItem } from '../content/index.ts';
-import type { GameState } from './state.ts';
+import type { Interaction, JobApplication, OrderLine, ServedItem } from '../content/index.ts';
+import { hire, namesMatch } from './jobs.ts';
+import type { GameState, JobId } from './state.ts';
 
 /**
  * How a Goal Interaction ended, as the store saw it. `args` are the NPC's
@@ -8,19 +9,23 @@ import type { GameState } from './state.ts';
 export type InteractionOutcome = { kind: 'success'; args: unknown } | { kind: 'failure' } | { kind: 'abandon' };
 
 /**
- * What happened. `served` is what the Character was handed. `cannot_afford` and
- * `invalid_arguments` change nothing: the NPC is told, and the conversation goes on.
+ * What happened. `served` is what the Character was handed, and `hired` the Job
+ * the Character got. `cannot_afford`, `invalid_arguments` and `wrong_name` (the NPC
+ * misheard the Character's name) change nothing: the NPC is told, and the
+ * conversation goes on.
  */
 export type OutcomeResult =
   | {
       kind: 'success';
       served: ServedItem[];
       paidInShifts: number;
+      hired?: JobId;
     }
   | { kind: 'failure' }
   | { kind: 'abandon' }
   | { kind: 'cannot_afford' }
-  | { kind: 'invalid_arguments'; error: string };
+  | { kind: 'invalid_arguments'; error: string }
+  | { kind: 'wrong_name' };
 
 function orderTotals(lines: OrderLine[]) {
   let costInShifts = 0;
@@ -28,6 +33,12 @@ function orderTotals(lines: OrderLine[]) {
     costInShifts += priceInShifts * quantity;
   }
   return { costInShifts };
+}
+
+/** A hiring completion: the Job, if the name the NPC heard is the Character's. */
+function applyJobApplication(state: GameState, { jobId, name }: JobApplication): { state: GameState; result: OutcomeResult } {
+  if (!namesMatch(name, state.identity.characterName)) return { state, result: { kind: 'wrong_name' } };
+  return { state: hire(state, jobId), result: { kind: 'success', served: [], paidInShifts: 0, hired: jobId } };
 }
 
 /**
@@ -50,6 +61,7 @@ export function applyInteractionOutcome(
     case 'success': {
       const completion = interaction.resolveCompletion(outcome.args, state.identity.culturePackId);
       if (!completion.success) return { state, result: { kind: 'invalid_arguments', error: completion.error } };
+      if (completion.application) return applyJobApplication(state, completion.application);
       const { costInShifts } = orderTotals(completion.lines);
       const { character } = state;
       if (costInShifts > character.moneyInShifts) return { state, result: { kind: 'cannot_afford' } };

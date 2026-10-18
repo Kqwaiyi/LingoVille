@@ -120,13 +120,13 @@ Source: `scope.md > The Unique Kernel`.
 - The Title Screen, Setup and First Morning all come before the first conversation. The learner chose to keep all three.
 - The proof of concept includes the gym, illness and the clinic, the four languages, and rent and debt. The learner chose this in 2-scope.
 - The learner approved the behaviour and checks for those areas as written here.
+- The cashier and server Jobs were added during the build, on the barista's Shift loop: the supermarket till and the restaurant's order pad. The learner chose this in 5-build.
 
 ## What We're Building
 Everything under **Features and Behavior** and **States and Boundaries** above, inside `scope.md > The POC Boundary`.
 
 ## Deferred From the POC
 - **Gifts and Familiarity:** not part of the proof of concept, because the demo doesn't need them.
-- **The cashier and server Jobs:** not part of the proof of concept, because the demo doesn't need them.
 
 ## Possible Later Enhancements
 None named.

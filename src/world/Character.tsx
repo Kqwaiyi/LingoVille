@@ -10,12 +10,13 @@ import {
 } from '@react-three/rapier';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Vector3, type Group } from 'three';
-import { TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
+import { jobAt, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT, PLACE_IDS, type PlaceId } from '../sim/index.ts';
 import {
   selectAppearance,
   selectArrival,
   selectPlaceId,
+  selectShift,
   selectTramArrival,
   selectTramRunning,
   selectWorldKeysOff,
@@ -34,6 +35,7 @@ import {
   tramStopAt,
   tramStopSpawn,
   type Vec3,
+  WORKPLACES,
 } from './town.ts';
 
 /**
@@ -77,12 +79,15 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: the nearest
+ * What the Character standing here could use with E: a workplace's staff door, the nearest
  * person in talking range, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
 function interactableAt(x: number, z: number, tramRunning: boolean): Interactable | null {
   const placeId = placeAt(x, z);
+  const job = placeId && jobAt(placeId);
+  const workplace = job ? WORKPLACES[job] : undefined;
+  if (workplace && distanceTo(x, z, workplace.usedFrom) <= MOVEMENT.interactRangeMetres) return 'staff-door';
   let nearest: Interactable | null = null;
   let nearestDistance: number = MOVEMENT.talkRangeMetres;
   for (const npcId of TOWN_NPC_IDS) {
@@ -148,6 +153,8 @@ export function Character() {
   const keysOff = useGame(selectWorldKeysOff);
   const tramArrival = useGame(selectTramArrival);
   const tramRunning = useGame(selectTramRunning);
+  // At work: from the staff door to the end of the Shift, the Character stands behind the counter.
+  const atWork = useGame((s) => selectShift(s)?.jobId ?? null);
   const appearance = useGame(selectAppearance);
   // Moving or standing, for the figure's clip. Changes only when the Character starts or stops.
   const [moving, setMoving] = useState(false);
@@ -167,6 +174,11 @@ export function Character() {
   useEffect(() => {
     if (tramArrival) moveTo(tramStopSpawn(tramArrival.stopId));
   }, [tramArrival]);
+
+  useEffect(() => {
+    const workplace = atWork && WORKPLACES[atWork];
+    if (workplace) moveTo(workplace.behindTheCounter);
+  }, [atWork]);
 
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.
@@ -192,7 +204,7 @@ export function Character() {
 
     // Walk relative to the camera: forward is away from it, across the ground.
     const held = getKeys();
-    const keys = keysOff ? { forward: false, back: false, left: false, right: false } : held;
+    const keys = keysOff || atWork ? { forward: false, back: false, left: false, right: false } : held;
     const ahead = Number(keys.forward) - Number(keys.back);
     const across = Number(keys.right) - Number(keys.left);
     const move = scratch.move.set(

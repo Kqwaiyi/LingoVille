@@ -1,18 +1,60 @@
 import { createStore, delMany, entries, get, promisifyRequest, set, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
-import { AppearancePresetSchema, CULTURE_PACKS } from '../content/index.ts';
-import { LANGUAGE_CODES, PLACE_IDS, PROFICIENCY_STEPS, type GameState, type LanguageCode } from '../sim/index.ts';
+import {
+  AppearancePresetSchema,
+  CULTURE_PACKS,
+  customerLookWeights,
+  DIETARY_NOTE_IDS,
+  drinkModifiersSchema,
+  ITEM_IDS,
+  NpcLookSchema,
+  SHIFT_TEMPLATES,
+} from '../content/index.ts';
+import {
+  JOB_IDS,
+  LANGUAGE_CODES,
+  LIFE_SKILL_IDS,
+  lookFromSeed,
+  PLACE_IDS,
+  PROFICIENCY_STEPS,
+  type GameState,
+  type LanguageCode,
+} from '../sim/index.ts';
 
 // Saves: one Character's whole life per slot, in IndexedDB. A save is the sim
 // state plus a little metadata. Every load goes through the ordered migrations
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 5;
+export const SAVE_SCHEMA_VERSION = 11;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
 
 const day = z.int().min(1);
+
+/** One line of items: an item, and how many. */
+const orderLine = z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1) });
+
+/** One line of a Shift Customer's order: a café drink made to order says how it's made. */
+const shiftOrder = z
+  .array(
+    orderLine.extend({ modifiers: drinkModifiersSchema.optional() }),
+  )
+  .readonly();
+
+/** What a customer at the supermarket till wants besides their shopping rung up. */
+const checkout = z.object({
+  bag: z.boolean(),
+  pointsCard: z.boolean(),
+  fromBehindTheCounter: z.enum(ITEM_IDS).nullable(),
+  cashHanded: z.number().positive().nullable(),
+  changeDue: z.number().min(0).nullable(),
+});
+
+/** One diner at a restaurant table: their dish, their drink and any dietary need. */
+const diner = z.object({ dish: z.enum(ITEM_IDS), drink: z.enum(ITEM_IDS), note: z.enum(DIETARY_NOTE_IDS).nullable() });
+
+const SHIFT_TEMPLATE_IDS = Object.values(SHIFT_TEMPLATES).flatMap((templates) => templates.map(({ id }) => id)) as [string, ...string[]];
 
 const GameStateSchema = z.object({
   rngState: z.int().min(0),
@@ -30,6 +72,32 @@ const GameStateSchema = z.object({
   progression: z.object({
     proficiencyScore: z.number().min(0),
     evidenceSoFar: z.number().min(0),
+    highestStep: z.enum(PROFICIENCY_STEPS),
+    lifeSkillXp: z.record(z.enum(LIFE_SKILL_IDS), z.number().min(0)),
+    lastShiftDay: day.nullable(),
+  }),
+  possessions: z.object({
+    jobsHired: z.array(z.enum(JOB_IDS)),
+    shift: z
+      .object({
+        jobId: z.enum(JOB_IDS),
+        customers: z.int().min(1),
+        served: z.int().min(0),
+        failed: z.int().min(0),
+        translated: z.int().min(0),
+        customer: z
+          .object({
+            templateId: z.enum(SHIFT_TEMPLATE_IDS),
+            order: shiftOrder,
+            changedFrom: shiftOrder.nullable(),
+            checkout: checkout.nullable(),
+            table: z.array(diner).min(1).readonly().nullable(),
+            voiceSeed: z.int().min(0),
+            appearances: z.array(NpcLookSchema).min(1).readonly(),
+          })
+          .nullable(),
+      })
+      .nullable(),
   }),
   phrasebook: z.array(
     z.object({ text: z.string(), reading: z.string(), gloss: z.string(), glossLanguage: z.enum(LANGUAGE_CODES), dayAdded: day }),
@@ -54,9 +122,9 @@ export type SlotId = (typeof SLOT_IDS)[number];
 /** A stored save in some older shape. Migrations only touch what changed. */
 type StoredSave = { schemaVersion: number; game: Record<string, unknown> } & Record<string, unknown>;
 
-/** The hat a Character's hair became when everyone became Clawd (4 → 5): short hair and a beard went bare-headed. */
+/** The hat a Character's hair became when everyone became Clawd (10 → 11): short hair and a beard went bare-headed. */
 const CLAWD_HATS = { short: 'none', long: 'beret', buns: 'bow', buzzed: 'beanie', bearded: 'none', bald: 'top-hat' } as const;
-/** The colour a Character's hair colour became when everyone became Clawd (4 → 5). */
+/** The colour a Character's hair colour became when everyone became Clawd (10 → 11). */
 const CLAWD_COLOURS = { black: 'charcoal', 'dark-brown': 'denim', brown: 'mustard', auburn: 'red', blonde: 'cream', grey: 'sky' } as const;
 
 /**
@@ -72,26 +140,101 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
     schemaVersion: 3,
     game: { ...save.game, progression: { ...(save.game.progression as object), evidenceSoFar: 0 } },
   }),
-  // 3 → 4: Appearance Presets with parts. Each of the four placeholder looks becomes that body and face preset, with
+  // 3 → 4: Shifts can be worked. No Shift could start before, so none is under way and none was worked.
+  (save) => ({
+    ...save,
+    schemaVersion: 4,
+    game: {
+      ...save.game,
+      progression: { ...(save.game.progression as object), lastShiftDay: null },
+      possessions: { ...(save.game.possessions as object), shift: null },
+    },
+  }),
+  // 4 → 5: Shift Customers come from templates, and some change their mind. Every one so far ordered a single drink.
+  (save) => {
+    const possessions = save.game.possessions as { shift: { customer: object | null } | null };
+    const { shift } = possessions;
+    const customer = shift?.customer && { templateId: 'barista-single-drink', ...shift.customer, changedFrom: null };
+    return {
+      ...save,
+      schemaVersion: 5,
+      game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
+    };
+  },
+  // 5 → 6: translated Shift Customers are docked. No customer under way has been marked translated.
+  (save) => {
+    const possessions = save.game.possessions as { shift: object | null };
+    return {
+      ...save,
+      schemaVersion: 6,
+      game: {
+        ...save.game,
+        possessions: { ...possessions, shift: possessions.shift && { ...possessions.shift, translated: 0 } },
+      },
+    };
+  },
+  // 6 → 7: the cashier's till. Only barista Shifts could be worked, so a customer at the counter has no checkout.
+  (save) => {
+    const possessions = save.game.possessions as { shift: { customer: object | null } | null };
+    const { shift } = possessions;
+    const customer = shift?.customer && { ...shift.customer, checkout: null };
+    return {
+      ...save,
+      schemaVersion: 7,
+      game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
+    };
+  },
+  // 7 → 8: restaurant tables. No server Shift could be worked, so a customer at the counter has no table.
+  (save) => {
+    const possessions = save.game.possessions as { shift: { customer: object | null } | null };
+    const { shift } = possessions;
+    const customer = shift?.customer && { ...shift.customer, table: null };
+    return {
+      ...save,
+      schemaVersion: 8,
+      game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
+    };
+  },
+  // 8 → 9: Appearance Presets with parts. Each of the four placeholder looks becomes that body and face preset, with
   // everyday hair to suit it (short on the first two, long on the others), dark brown hair and a middle skin tone.
   (save) => {
     const { appearancePresetId, ...identity } = save.game.identity as { appearancePresetId: string };
     const number = Number(appearancePresetId.replace('preset-', ''));
     const appearance = { body: `body-${number}`, hairStyle: number <= 2 ? 'short' : 'long', hairColour: 'dark-brown', skinTone: 'tone-3' };
-    return { ...save, schemaVersion: 4, game: { ...save.game, identity: { ...identity, appearance } } };
+    return { ...save, schemaVersion: 9, game: { ...save.game, identity: { ...identity, appearance } } };
   },
-  // 4 → 5: everyone is Clawd, told apart by what they wear. The Character's hair becomes a hat (`CLAWD_HATS`, with a
-  // scarf for a beard) in a colour for the hair's.
+  // 9 → 10: Shift Customers have looks. One at the counter is given a look for each at their table, drawn with the
+  // pack's weights from their voice seed (the save's RNG has moved on since they walked up).
+  (save) => {
+    const game = save.game as { identity: { culturePackId: LanguageCode }; possessions: { shift: { customer: { voiceSeed: number; table: unknown[] | null } | null } | null } };
+    const { shift } = game.possessions;
+    const weights = customerLookWeights(game.identity.culturePackId);
+    const customer = shift?.customer && {
+      ...shift.customer,
+      appearances: Array.from({ length: shift.customer.table?.length ?? 1 }, (_, i) => lookFromSeed(shift.customer!.voiceSeed + i, weights)),
+    };
+    return { ...save, schemaVersion: 10, game: { ...save.game, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } } };
+  },
+  // 10 → 11: everyone is Clawd, told apart by what they wear. The Character's hair becomes a hat (`CLAWD_HATS`, with a
+  // scarf for a beard) in a colour for the hair's; a Shift Customer at the counter is drawn again from their voice seed,
+  // one look for each at their table, as 9 → 10 drew them.
   (save) => {
     const game = save.game as {
       identity: { culturePackId: LanguageCode; appearance: { hairStyle: keyof typeof CLAWD_HATS; hairColour: keyof typeof CLAWD_COLOURS } };
+      possessions: { shift: { customer: { voiceSeed: number; table: unknown[] | null } | null } | null };
     };
     const { hairStyle, hairColour } = game.identity.appearance;
     const appearance = { hat: CLAWD_HATS[hairStyle], eyewear: 'none', neckwear: hairStyle === 'bearded' ? 'scarf' : 'none', colour: CLAWD_COLOURS[hairColour] };
+    const { shift } = game.possessions;
+    const weights = customerLookWeights(game.identity.culturePackId);
+    const customer = shift?.customer && {
+      ...shift.customer,
+      appearances: Array.from({ length: shift.customer.table?.length ?? 1 }, (_, i) => lookFromSeed(shift.customer!.voiceSeed + i, weights)),
+    };
     return {
       ...save,
-      schemaVersion: 5,
-      game: { ...save.game, identity: { ...game.identity, appearance } },
+      schemaVersion: 11,
+      game: { ...save.game, identity: { ...game.identity, appearance }, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } },
     };
   },
 ];

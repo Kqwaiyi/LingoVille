@@ -2,10 +2,14 @@ import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import {
   buildNpcSession,
+  buildShiftCustomerSession,
+  shiftCustomerChangeScene,
   checkReadings,
   hasReadingAids,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
+  shiftCustomerServedScene,
+  tableServedScene,
   wordReading,
   type AnnotateRequest,
   type Annotation,
@@ -17,21 +21,40 @@ import {
   type Recap,
   type RecapRequest,
   type Segment,
+  type ShiftRecapCustomer,
   type ToolResponse,
   type VoiceRequest,
 } from '../ai/index.ts';
 import {
   CULTURE_PACKS,
+  customerLookWeights,
   DEFAULT_APPEARANCE,
+  DEFAULT_DRINK,
   interactionStartedWithE,
+  isDrink,
+  interactionStartedWithF,
+  jobAt,
+  JOB_PLACES,
   localNpcPlaceName,
+  localPlaceName,
   NAMED_NPCS,
   OPEN_AIR_PLACES,
   placeHours,
   placePhrasebook,
+  RESTAURANT_DISHES,
+  SHIFT_MENUS,
+  shiftTemplates,
+  tillFor,
   worldSign,
   type AppearancePreset,
+  type DietaryNoteId,
+  type DrinkExtra,
+  type DrinkModifiers,
+  type DrinkSize,
+  type DrinkTemperature,
+  type EffectKind,
   type Interaction,
+  type ItemId,
   type NamedNpcId,
   type NpcLook,
   type PlacePhrase,
@@ -46,10 +69,14 @@ import {
 import {
   addToPhrasebook,
   applyInteractionOutcome,
+  applyShiftCustomer,
+  cancelShift,
   applyRecapEvidence,
+  applyShiftEvidence,
   CHARACTER_NAME,
   CLOCK,
   createSave,
+  endShift,
   enterPlace,
   gameMinutesFor,
   daylight,
@@ -57,25 +84,57 @@ import {
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
+  jobAids,
+  lifeSkillLevels,
   MIC_CHECK,
   losePatience,
   newPlayerTurn,
+  nextShiftCustomer,
   npcExpression,
   rideTram,
   SAVE,
+  shiftRefusal,
   startPatience,
+  startShift,
   tick,
   tramTripMinutes,
   weekdayOf,
+  type ShiftOrder,
+  addToTray,
+  addPadLine,
+  choosePadLine,
+  clearTray,
+  EMPTY_PAD,
+  kitchenOrder,
+  noteOnPad,
+  removePadLine,
+  writeOnPad,
+  type Diner,
+  type OrderPad,
+  type PadDiner,
+  changeOwed,
+  coinsTotal,
+  EMPTY_TRAY,
+  suggestChange,
+  tillTotal,
+  type Checkout,
+  type TillWork,
+  redoTray,
+  undoTray,
+  type TrayHistory,
   type ConversationEvidence,
   type GameState,
+  type LifeSkillId,
   type LanguageCode,
   type NewGameSetup,
   type NpcExpression,
   type OutcomeResult,
   type Patience,
   type PhrasebookEntry,
+  type JobId,
   type PlaceId,
+  type Shift,
+  type ShiftRefusal,
   type StartingStep,
 } from '../sim/index.ts';
 import {
@@ -128,6 +187,9 @@ export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
 /** Which screen shows: the title, New game setup, or the game itself. */
 export type Screen = 'title' | 'setup' | 'playing';
+
+/** The keys that start a conversation: E and F a Goal Interaction. */
+export type TalkKey = 'E' | 'F';
 
 /** New game setup's screens, in order. A browser that has passed the mic check skips it. */
 export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance', 'micCheck'] as const;
@@ -209,8 +271,8 @@ export type TitleView =
 /** How the Character arrived in the world: a new game, or back from a save. The world picks the spawn point from it. */
 export type Arrival = 'newGame' | 'continued';
 
-/** Something in the world the Character is close enough to use with E: an NPC to talk to, or a tram stop. */
-export type Interactable = TownNpcId | TramStopId;
+/** Something in the world the Character is close enough to use with E: a staff door, an NPC to talk to, or a tram stop. */
+export type Interactable = 'staff-door' | TownNpcId | TramStopId;
 
 /** Where the tram can take the Character from a stop, and how long each trip takes. */
 export type TramDestination = { stopId: TramStopId; minutes: number };
@@ -223,10 +285,19 @@ export type ChatLine = TranscriptLine & { typed?: true };
 
 /** A short notice over the game that clears itself. */
 export type Toast =
-  /** A network abandonment: the NPC had to step away. */
-  | { kind: 'npcSteppedAway'; npcId: TownNpcId }
+  /** A network abandonment: the NPC (null for a Shift Customer, who is replaced) had to step away. */
+  | { kind: 'npcSteppedAway'; npcId: TownNpcId | null }
   | { kind: 'recapSaved' }
   | { kind: 'loadedBackup' };
+
+/**
+ * The Shift is over: how it went and what it paid, shown until the Player closes it, with its one combined Recap
+ * (null if there was nothing to write it from, as when a reload ended the Shift).
+ */
+export type ShiftEnd = { jobId: JobId; customers: number; served: number; payInShifts: number; recap: RecapView | null };
+
+/** The staff door the Character is at: whether E starts a Shift there now (`refusal` null), or why not. */
+export type StaffDoor = { jobId: JobId; refusal: Exclude<ShiftRefusal, 'underway'> | null };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -264,14 +335,67 @@ export type NewWord = Recap['newWords'][number];
 /** How a Goal Interaction ended, and its effects, for the closing card. */
 export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }>;
 
-/** Who the conversation is with: a Named NPC in a Goal Interaction. */
-type Partner = { npcId: NamedNpcId; interaction: Interaction };
+/** How a Shift Customer was dealt with: served what they ordered, served something else, or gone unserved. */
+export type ShiftCustomerOutcome = { kind: ShiftRecapCustomer['result'] };
+
+/**
+ * The Shift Customer at the counter, as the conversation shows them: what the Player has put on the tray to serve
+ * (and can undo and redo), how the modifier toggles say the next drink is made, and whether a customer who changes
+ * their mind has been told the Player has started on their order. At the till, the tray is what's been scanned and
+ * fetched, and the rest is the till: the bag and points card toggles, the cash the Player keyed in as handed over
+ * (null until they do), and the coins and notes counted out as change. At a restaurant table, the order pad.
+ */
+export type ShiftCustomerView = TrayHistory & {
+  making: DrinkModifiers;
+  startedOn: boolean;
+  bag: boolean;
+  pointsCard: boolean;
+  received: number | null;
+  change: readonly number[];
+  pad: OrderPad;
+};
+
+/** A Shift Customer walks up to an empty tray, with the toggles set to make the default drink, an empty till and a fresh order pad. */
+const NEW_SHIFT_CUSTOMER: ShiftCustomerView = {
+  ...EMPTY_TRAY,
+  making: DEFAULT_DRINK,
+  startedOn: false,
+  bag: false,
+  pointsCard: false,
+  received: null,
+  change: [],
+  pad: EMPTY_PAD,
+};
+
+/** A Shift Customer the Player dealt with, kept for the Shift's Recap: their order, how it went, and their conversation once they've gone. */
+type ShiftLogEntry = {
+  conversationId: number;
+  order: ShiftOrder;
+  changedFrom: ShiftOrder | null;
+  /** At the till: what else they wanted, and what the Player did about it. */
+  checkout: Checkout | null;
+  atTheTill: TillWork | null;
+  /** At a restaurant table: what each diner wanted, and what the Player wrote on the order pad. */
+  table: readonly Diner[] | null;
+  atTheTable: readonly PadDiner[] | null;
+  result: ShiftCustomerOutcome['kind'];
+  served: ShiftOrder;
+  conversation: Conversation | null;
+};
+
+/** Who the conversation is with: a Named NPC in a Goal Interaction, or an anonymous Shift Customer. */
+type Partner =
+  | { npcId: NamedNpcId; interaction: Interaction; shiftCustomer: null }
+  | { npcId: null; interaction: null; shiftCustomer: ShiftCustomerView };
 
 /**
  * A conversation under way. It lives only here. A Goal Interaction is never saved in progress,
- * and leaving before its outcome is decided changes nothing.
+ * and leaving before its outcome is decided changes nothing. A Shift Customer left unserved is failed.
  */
 export type Conversation = ConversationState & Partner;
+
+/** A conversation with a Named NPC in a Goal Interaction, which ends with a closing card and a Recap. */
+type NpcConversation = Extract<Conversation, { shiftCustomer: null }>;
 
 type ConversationState = {
   /** Tells this conversation apart from later ones, so a late Recap only lands where it belongs. */
@@ -291,8 +415,8 @@ type ConversationState = {
   usage: TokenUsage;
   /** Hidden. The UI only ever sees it as the NPC's expression. */
   patience: Patience;
-  /** The outcome is applied; the session closes once the NPC finishes saying goodbye. */
-  outcome: ClosingCard | null;
+  /** The outcome is applied; the session closes once the NPC finishes saying goodbye. At a Shift, the next customer then walks up. */
+  outcome: ClosingCard | ShiftCustomerOutcome | null;
   /** The session is over and the closing card shows. */
   closed: boolean;
   /** Started as soon as the session is over, if the outcome was decided. */
@@ -342,6 +466,8 @@ export type GameStoreDeps = {
   newRngSeed: () => number;
   /** Dev only: the hour a new game starts at instead of the usual morning's, or null. */
   devStartHour: () => number | null;
+  /** Dev only: a new game starts on this day, or on day 1 (null). */
+  devStartDay: () => number | null;
   /** Dev only: the Target Language of a new game to start at once, skipping the title screen and setup, or null. Asked once per title screen. */
   devNewGameTarget: () => LanguageCode | null;
   /** Opens the mic for the mic check. */
@@ -424,6 +550,7 @@ const BROWSER_DEPS: GameStoreDeps = {
   downloadFile: downloadInBrowser,
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
   devStartHour: devStartHourFromUrl,
+  devStartDay: devStartDayFromUrl,
   devNewGameTarget: takeDevNewGameFromUrl,
   openMic: openBrowserMic,
 };
@@ -433,6 +560,13 @@ function devStartHourFromUrl(): number | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const hour = Number(new URLSearchParams(window.location.search).get('at') ?? NaN);
   return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
+}
+
+/** Dev only: `?day=3` starts a new game on day 3, to reach a place on a day it's open at once. */
+function devStartDayFromUrl(): number | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const day = Number(new URLSearchParams(window.location.search).get('day') ?? NaN);
+  return Number.isInteger(day) && day >= 1 ? day : null;
 }
 
 /** The answers `?newGame` gives setup. */
@@ -504,6 +638,8 @@ export type GameStore = {
   voiceUnavailable: boolean;
   /** The full-screen Journal, while it is open. */
   journal: JournalView | null;
+  /** What the Shift that just ended paid, until the Player closes it. */
+  shiftEnd: ShiftEnd | null;
   /** The sign the Player is pointing at, and whether the pointer is on its tooltip, which keeps it open. */
   sign: { tooltip: SignTooltip; held: boolean } | null;
   /** The browser refused to keep saves safe from clearing, and the Player hasn't dismissed the callout yet. */
@@ -564,8 +700,43 @@ export type GameStore = {
   holdSignTooltip: (held: boolean) => void;
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
-  /** E near an NPC: opens a conversation, and the NPC speaks first. */
-  talk: () => void;
+  /** E at a staff door during opening hours, once hired there: starts the day's Shift, and the first Shift Customer walks up. */
+  startShift: () => void;
+  /** Taps the menu grid: one more of the item onto the tray for the Shift Customer, a drink made as the toggles say. */
+  tapMenuItem: (itemId: ItemId) => void;
+  /** The modifier toggles: how the next drink tapped is made. */
+  setDrinkSize: (size: DrinkSize) => void;
+  setDrinkTemperature: (temperature: DrinkTemperature) => void;
+  toggleDrinkExtra: (extra: DrinkExtra) => void;
+  clearTray: () => void;
+  /** Takes back the last change to the tray, or puts back the last one taken back. */
+  undoTray: () => void;
+  redoTray: () => void;
+  /** At the till: the bag and points card toggles for the customer at the till. */
+  toggleBag: () => void;
+  togglePointsCard: () => void;
+  /** Keys in the cash the customer handed over, in local money (null clears it), so the till works out the change due. */
+  setCashReceived: (amount: number | null) => void;
+  /** One more of the pack's coins or notes onto the change counted out. */
+  addChangeCoin: (coin: number) => void;
+  clearChange: () => void;
+  /** The Cashier skill's aid: counts out the change due for the cash keyed in, with the fewest coins. */
+  suggestChange: () => void;
+  /** At a restaurant table: another diner's line on the order pad, which line is written on, and taking the one written on off. */
+  addPadDiner: () => void;
+  choosePadDiner: (index: number) => void;
+  removePadDiner: () => void;
+  /** Notes a dietary need on the order pad line being written (null takes it off). */
+  setDietaryNote: (note: DietaryNoteId | null) => void;
+  /**
+   * Hands the Shift Customer what is on the tray (at the till: finishes the sale; at a table: sends the order pad to the
+   * kitchen). It is checked exactly against their order.
+   */
+  serveTray: () => void;
+  /** Closes the pay shown at the end of a Shift. */
+  closeShiftEnd: () => void;
+  /** E near an NPC (or F, for their second conversation if they have one): opens a conversation, and the NPC speaks first. */
+  talk: (key?: TalkKey) => void;
   sendTypedLine: (text: string) => void;
   /** Space or the mic button pressed: interrupts the NPC and listens. */
   startTalking: () => void;
@@ -623,14 +794,25 @@ const isNamedNpc = (interactable: Interactable | null): interactable is NamedNpc
 const isTramStop = (interactable: Interactable | null): interactable is TramStopId =>
   (TRAM_LINE as readonly (Interactable | null)[]).includes(interactable);
 
-/** It's open now in the Character's pack. Closing time stops new conversations from starting here. */
+/** The completions that hand something over, and answer "served": an order. */
+const SERVED_EFFECTS: readonly EffectKind[] = ['serveOrder'];
+
+/** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
 const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
+
+/** The Job whose staff door the Character is at, or null. */
+const staffDoorJob = (interactable: Interactable | null, game: GameState): JobId | null =>
+  interactable === 'staff-door' ? jobAt(game.placeId) : null;
+
+/** Why E at this Job's staff door can't start a Shift now, or null if it can. Closing time stops new Shifts, never one under way. */
+const staffDoorRefusal = (jobId: JobId, game: GameState) =>
+  shiftRefusal(game, jobId, placeHours(JOB_PLACES[jobId], game.identity.culturePackId));
 
 /** A conversation that takes the Player's turns: not yet decided, and not reconnecting. */
 const takesTurns = (conversation: Conversation | null): conversation is Conversation =>
   conversation !== null && !conversation.outcome && !conversation.reconnecting;
 
-/** A Goal Interaction's outcome, which its closing card shows. */
+/** A Goal Interaction's outcome, which its closing card shows, rather than a Shift Customer's. */
 const isClosingCard = (outcome: Conversation['outcome']): outcome is ClosingCard =>
   outcome?.kind === 'success' || outcome?.kind === 'failure';
 
@@ -652,8 +834,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let conversations = 0;
   // The game as it was when the open conversation began: what a save holds until its outcome is decided.
   let gameBeforeConversation: GameState | null = null;
+  // The Shift Customers dealt with so far this Shift, for its one combined Recap. One lost to the network isn't among them.
+  let shiftLog: ShiftLogEntry[] = [];
+  // Tells each Shift's end apart, so a late Shift Recap only lands on the end it was written for.
+  let shiftsEnded = 0;
   // Tells each game played apart, so a Recap still on its way when the Player quits to the title moves only its own game.
   let plays = 0;
+  // The size the Player last set on the toggles this Shift: with the Barista skill's remembered size, the next customer starts at it.
+  let sizeLastSet: DrinkSize | null = null;
   let realMsSinceSave = 0;
   // Found by the title screen: what Continue and Load a save play.
   let slots: Slot[] = [];
@@ -706,6 +894,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
       plays++;
       realMsSinceSave = 0;
+      // A Shift from another game is over without its Recap: its customers' readings go too.
+      shiftLog.forEach(({ conversationId }) => lineReadings.delete(conversationId));
+      shiftLog = [];
       set({
         screen: 'playing',
         title: null,
@@ -728,9 +919,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       );
     };
 
-    /** Plays a loaded save. */
+    /** Plays a loaded save. A Shift saved under way ends at once, paid for the customers already served. */
     const playLoaded = ({ save, fromBackup }: LoadedSave) => {
       play(save.game, save.slotId, 'continued', fromBackup ? { kind: 'loadedBackup' } : null);
+      finishShift();
     };
 
     /** Shows the persist-refused callout, unless the Player has dismissed it before. */
@@ -860,7 +1052,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         rngSeed: deps.newRngSeed(),
       });
       const startHour = deps.devStartHour();
-      const atHour = startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
+      const startDay = deps.devStartDay();
+      const onDay = startDay === null ? game : { ...game, clock: { ...game.clock, day: startDay } };
+      const atHour = startHour === null ? onDay : { ...onDay, clock: { ...onDay.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
       play(atHour, setup.slotId, 'newGame');
       save();
     };
@@ -961,7 +1155,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     /** A Recap's evidence moves Proficiency. */
-    const applyRecap = (play: number, conversation: Conversation, recap: Recap) => {
+    const applyRecap = (play: number, conversation: NpcConversation, recap: Recap) => {
       const evidence: ConversationEvidence = {
         cefrEstimate: recap.cefrEstimate,
         lines: conversation.lines.map(({ speaker, text }) => ({ speaker, text })),
@@ -988,7 +1182,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * Journal whether or not the Player looks at it, and shows in the column only
      * while this conversation is still open.
      */
-    const writeRecap = (conversation: Conversation, outcome: ClosingCard) => {
+    const writeRecap = (conversation: NpcConversation, outcome: ClosingCard) => {
       const { game, nativeLanguage, slotId } = get();
       const play = plays;
       const { culturePackId, targetLanguage } = game.identity;
@@ -1054,6 +1248,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const patience = losePatience(conversation.patience);
       updateConversation({ patience });
       if (!isOutOfPatience(patience)) return false;
+      // A Shift Customer out of Patience gives up unserved.
+      if (conversation.shiftCustomer) {
+        settleShiftCustomer(null);
+        return true;
+      }
       const { state, result } = applyInteractionOutcome(get().game, conversation.interaction, { kind: 'failure' });
       if (result.kind === 'failure') settleOutcome(state, result);
       return true;
@@ -1061,19 +1260,22 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     const answerToolCall = (conversation: Conversation, { name, args }: ToolCall): ToolResponse => {
       if (name === NOT_UNDERSTOOD_TOOL) return { result: notUnderstood(conversation) ? 'out_of_patience' : 'noted' };
-      if (name !== conversation.interaction.completion.name || conversation.outcome) return { result: 'unknown_tool' };
+      // A Shift Customer has no completion: what they're served is checked by the game.
+      if (!conversation.interaction || name !== conversation.interaction.completion.name || conversation.outcome) return { result: 'unknown_tool' };
 
       const { interaction } = conversation;
       const { state, result } = applyInteractionOutcome(get().game, interaction, { kind: 'success', args });
       switch (result.kind) {
         case 'success':
           settleOutcome(state, result);
-          // An order is handed over.
-          return { result: 'served' };
+          // An order is handed over; anything else is simply done.
+          return { result: SERVED_EFFECTS.includes(interaction.effect.kind) ? 'served' : 'done' };
         case 'cannot_afford':
           return { result: 'cannot_afford' };
         case 'invalid_arguments':
           return { result: 'invalid_arguments', error: result.error };
+        case 'wrong_name':
+          return { result: 'wrong_name' };
         default:
           throw new Error(`A completion can't end as ${result.kind}`);
       }
@@ -1104,7 +1306,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     const askForHints = (conversation: Conversation): Conversation => {
       const { game, nativeLanguage } = get();
       const atLine = conversation.lines.length;
-      // Hints are written for a Goal Interaction's goal (free, like all Help).
+      // Hints are written for a Goal Interaction's goal, or at a Shift for the Job's own lines (free, like all Help).
+      const jobId = conversation.shiftCustomer ? game.possessions.shift?.jobId : undefined;
+      const about = conversation.interaction ? { interactionId: conversation.interaction.id } : jobId ? { jobId } : null;
+      if (!about) return { ...conversation, hints: { atLine, view: { status: 'failed' } } };
       const landed = (view: HintsView) => {
         const current = get().conversation;
         if (current?.id !== conversation.id || current.hints?.atLine !== atLine) return;
@@ -1115,7 +1320,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           culturePackId: game.identity.culturePackId,
           step: game.proficiencyStep,
           nativeLanguage,
-          interactionId: conversation.interaction.id,
+          ...about,
           transcript: conversation.lines.map(({ speaker, text, typed }) => (typed ? { speaker, text, typed } : { speaker, text })),
         })
         .then(
@@ -1180,15 +1385,211 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       voice = null;
     };
 
-    /** The session is over. A Goal Interaction shows its closing card and starts its Recap. */
+    /** The session is over. A Goal Interaction shows its closing card and starts its Recap; at a Shift, the customer leaves instead. */
     const showClosingCard = () => {
+      if (get().conversation?.shiftCustomer) return shiftCustomerLeft();
       closeSession();
       updateConversation({ closed: true, npcLine: null, listening: false });
       set({ typing: false, micLevel: 0 });
       const conversation = get().conversation;
-      if (conversation && isClosingCard(conversation.outcome) && !conversation.recap) {
+      if (conversation?.shiftCustomer === null && isClosingCard(conversation.outcome) && !conversation.recap) {
         writeRecap(conversation, conversation.outcome);
       }
+    };
+
+    /**
+     * The Shift Customer at the counter is dealt with: served what is on the tray, or gone unserved (null). The sim
+     * checks it exactly, and it's saved. One the Player had translated a line of is docked a share even if served right.
+     * The customer says goodbye next, then leaves. At the till, `atTheTill` is what was done there; at a table,
+     * `atTheTable` is the order pad. Returns whether it was their order.
+     */
+    const settleShiftCustomer = (served: ShiftOrder | null, { atTheTill, atTheTable }: { atTheTill?: TillWork; atTheTable?: readonly PadDiner[] } = {}) => {
+      const { game, conversation } = get();
+      const customer = game.possessions.shift?.customer;
+      const translated = (conversation?.translated.length ?? 0) > 0;
+      const { state, correct } = applyShiftCustomer(game, served, { translated, atTheTill, atTheTable });
+      const result = correct ? 'served' : served ? 'wrongOrder' : 'walkedOut';
+      if (customer && conversation) {
+        const { order, changedFrom, checkout, table } = customer;
+        shiftLog.push({
+          conversationId: conversation.id,
+          order,
+          changedFrom,
+          checkout,
+          atTheTill: atTheTill ?? null,
+          table,
+          atTheTable: table ? (atTheTable ?? []) : null,
+          result,
+          served: served ?? [],
+          conversation: null,
+        });
+      }
+      set({ game: state });
+      updateConversation({ outcome: { kind: result } });
+      save();
+      return correct;
+    };
+
+    /** Changes the Shift Customer at the counter as the conversation shows them (the tray, the toggles), while they can still be served. */
+    const changeShiftCustomer = (change: (view: ShiftCustomerView) => ShiftCustomerView) => {
+      const conversation = get().conversation;
+      if (!conversation?.shiftCustomer || conversation.outcome) return;
+      set({ conversation: { ...conversation, shiftCustomer: change(conversation.shiftCustomer) } });
+    };
+
+    /**
+     * Once the Player has started on their order (something is on the tray), a Shift Customer who changes their mind
+     * is told, once, as soon as they can hear it: at once, or when a dropped connection is back.
+     */
+    const tellStartedOn = () => {
+      const conversation = get().conversation;
+      const view = conversation?.shiftCustomer;
+      if (!view || view.startedOn || view.tray.length === 0 || !get().game.possessions.shift?.customer?.changedFrom) return;
+      if (!canTakeTurn(conversation) || !voice) return;
+      changeShiftCustomer((before) => ({ ...before, startedOn: true }));
+      voice.sendText(shiftCustomerChangeScene());
+    };
+
+    /**
+     * A Shift Customer's conversation is over: if they were dealt with, it's kept for the Shift's Recap, with its
+     * readings until the Journal entry is written. One lost before they were dealt with is forgotten.
+     */
+    const keepShiftCustomerLines = (conversation: Conversation) => {
+      const logged = shiftLog.find((entry) => entry.conversationId === conversation.id);
+      if (logged) logged.conversation = conversation;
+      else lineReadings.delete(conversation.id);
+    };
+
+    /** The Shift is over: it's paid, the pay shows, and it's saved. Any customer still at the counter goes. Its Recap is written from every customer dealt with. */
+    const finishShift = () => {
+      const { shift } = get().game.possessions;
+      if (!shift) return;
+      closeSession();
+      const conversation = get().conversation;
+      if (conversation?.shiftCustomer) keepShiftCustomerLines(conversation);
+      const log = shiftLog;
+      shiftLog = [];
+      const shiftId = ++shiftsEnded;
+      const { state, payInShifts } = endShift(get().game);
+      const { jobId, customers, served } = shift;
+      const recap: RecapView | null = log.length > 0 ? { status: 'writing' } : null;
+      set({ game: state, conversation: null, typing: false, micLevel: 0, shiftEnd: { jobId, customers, served, payInShifts, recap } });
+      save();
+      if (log.length > 0) writeShiftRecap(shiftId, shift, log);
+    };
+
+    /**
+     * Writes the Shift's one combined Recap over every customer dealt with, the moment it ends. Its evidence moves
+     * Proficiency, with the Shift's results as listening evidence, and it goes to the Journal as one entry.
+     */
+    const writeShiftRecap = (shiftId: number, { jobId, customers, served }: Shift, log: ShiftLogEntry[]) => {
+      const { game, nativeLanguage, slotId } = get();
+      const play = plays;
+      const { culturePackId, targetLanguage } = game.identity;
+      const listenedAt = game.proficiencyStep;
+      const dealtWith: ShiftRecapCustomer[] = log.map(({ order, changedFrom, checkout, atTheTill, table, atTheTable, result, served: handed, conversation }) => ({
+        order,
+        ...(changedFrom && { changedFrom }),
+        ...(checkout && { checkout }),
+        result,
+        served: handed,
+        ...(atTheTill && { atTheTill }),
+        ...(table && { table }),
+        ...(atTheTable && { atTheTable }),
+        transcript: transcriptOf(conversation?.lines ?? []),
+        helpLog: conversation?.helpLog ?? [],
+      }));
+      const request: RecapRequest = { kind: 'shift', jobId, culturePackId, step: listenedAt, nativeLanguage, customers: dealtWith };
+      // Every customer's lines in order, each marked with its customer, and the Help log placed among them.
+      const entry = (recap: Recap | null): NewJournalEntry => {
+        const lines: NewJournalEntry['lines'] = [];
+        const helpLog: HelpLogEntry[] = [];
+        log.forEach(({ conversationId, conversation }, i) => {
+          const { transcript, helpLog: helped } = dealtWith[i]!;
+          const readings = lineReadings.get(conversationId)?.readings ?? conversation?.readings ?? {};
+          helpLog.push(...helped.map((help) => ({ ...help, afterLine: help.afterLine + lines.length })));
+          transcript.forEach((line, n) => {
+            const reading = line.speaker === 'npc' ? readings[n] : undefined;
+            lines.push({ ...line, ...(reading && { reading: reading.segments }), customer: i + 1 });
+          });
+        });
+        return {
+          kind: 'shift',
+          jobId,
+          customers,
+          served,
+          placeName: localPlaceName(JOB_PLACES[jobId], culturePackId),
+          day: game.clock.day,
+          minuteOfDay: game.clock.minuteOfDay,
+          targetLanguage,
+          nativeLanguage,
+          recap: recap && journalRecap(recap, targetLanguage),
+          lines,
+          helpLog,
+        };
+      };
+      const landed = (recap: RecapView) => {
+        const shiftEnd = get().shiftEnd;
+        if (shiftEnd && shiftId === shiftsEnded) set({ shiftEnd: { ...shiftEnd, recap } });
+      };
+
+      deps
+        .requestRecap(request)
+        .then(
+          (recap) => {
+            const customersSeen = log.map(({ result, conversation }) => ({
+              lines: (conversation?.lines ?? []).map(({ speaker, text }) => ({ speaker, text })),
+              helpLog: conversation?.helpLog ?? [],
+              notUnderstoodTurns: conversation?.patience.turnsNotUnderstood ?? 0,
+              served: result === 'served',
+            }));
+            applyEvidence(play, (state) => applyShiftEvidence(state, { cefrEstimate: recap.cefrEstimate, listenedAt, customers: customersSeen }));
+            landed({ status: 'ready', entry: journalPage(entry(recap)) });
+            return recap;
+          },
+          (error: unknown) => {
+            console.warn('[recap] the Shift Recap could not be written:', error instanceof Error ? error.message : error);
+            landed({ status: 'failed' });
+            return null;
+          },
+        )
+        // The Journal keeps the corrected readings, so it waits for the last lines' annotations.
+        .then(async (recap) => {
+          await Promise.allSettled(log.flatMap(({ conversationId }) => lineReadings.get(conversationId)?.annotating ?? []));
+          return deps.journal.append(slotId, entry(recap));
+        })
+        .catch((error: unknown) => console.error('[journal] could not save an entry:', error))
+        .finally(() => log.forEach(({ conversationId }) => lineReadings.delete(conversationId)));
+    };
+
+    /** The next Shift Customer walks up to the counter and speaks first. With every customer seen to, the Shift ends. */
+    const nextShiftCustomerOrEnd = () => {
+      const { game } = get();
+      const { shift } = game.possessions;
+      if (!shift) return;
+      const templates = shiftTemplates(shift.jobId);
+      if (templates.length === 0 || shift.served + shift.failed >= shift.customers) return finishShift();
+      const after = nextShiftCustomer(game, templates, customerLookWeights(game.identity.culturePackId), tillFor(game.identity.culturePackId));
+      set({ game: after });
+      const customer = after.possessions.shift!.customer!;
+      const pack = CULTURE_PACKS[after.identity.culturePackId];
+      const remembered = sizeLastSet && jobAids(after, shift.jobId).includes('rememberedSize') ? sizeLastSet : null;
+      const shiftCustomer = remembered ? { ...NEW_SHIFT_CUSTOMER, making: { ...DEFAULT_DRINK, size: remembered } } : NEW_SHIFT_CUSTOMER;
+      openConversation({ npcId: null, interaction: null, shiftCustomer }, () =>
+        buildShiftCustomerSession(customer, pack, after.proficiencyStep, { clock: after.clock }),
+      );
+    };
+
+    /**
+     * The Shift Customer has gone: their session closes, with no closing card and no Recap, and the next one walks
+     * up. One who goes before they're dealt with (a dropped connection) is replaced, and doesn't count.
+     */
+    const shiftCustomerLeft = () => {
+      closeSession();
+      const conversation = get().conversation;
+      if (conversation) keepShiftCustomerLines(conversation);
+      set({ conversation: null, typing: false, micLevel: 0 });
+      nextShiftCustomerOrEnd();
     };
 
     /** Closes the session and clears the conversation away, with whatever else should show instead. */
@@ -1202,6 +1603,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     const endConversation = () => {
       const conversation = get().conversation;
+      if (conversation?.shiftCustomer) {
+        // Leaving a Shift Customer before serving them fails them.
+        if (!conversation.outcome) settleShiftCustomer(null);
+        return shiftCustomerLeft();
+      }
       // Abandoning before the outcome is decided costs nothing.
       if (conversation?.interaction && !conversation.outcome) {
         set({ game: applyInteractionOutcome(get().game, conversation.interaction, { kind: 'abandon' }).state });
@@ -1282,6 +1688,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       session.connect().then(
         live(() => {
           updateConversation({ reconnecting: false });
+          tellStartedOn();
         }),
         live((current, error: unknown) => connectionFailed(current, sessionFor, error)),
       );
@@ -1297,9 +1704,21 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       closeSession();
       if (conversation.outcome) return showClosingCard();
       if (!conversation.retried && error instanceof VoiceServiceUnavailableError) {
+        // With no voice at all, no more customers can be served. Before any was dealt with, the day's Shift is given
+        // back, since it's no fault of the Player's; after, the Shift ends with pay for those served.
+        if (conversation.shiftCustomer) {
+          const { shift } = get().game.possessions;
+          if (shift && shift.served + shift.failed === 0) set({ game: cancelShift(get().game) });
+          else finishShift();
+        }
         return dropConversation({ voiceUnavailable: true });
       }
       if (conversation.retried) {
+        // A Shift Customer lost to the network is replaced by the next, and doesn't count.
+        if (conversation.shiftCustomer) {
+          set({ toast: { kind: 'npcSteppedAway', npcId: null } });
+          return shiftCustomerLeft();
+        }
         return dropConversation({ toast: { kind: 'npcSteppedAway', npcId: conversation.npcId } });
       }
       set({
@@ -1315,7 +1734,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const npc = NAMED_NPCS[interaction.npcId];
       const sessionFor: SessionFor = () =>
         buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, { clock: game.clock });
-      openConversation({ npcId: npc.id, interaction }, sessionFor);
+      openConversation({ npcId: npc.id, interaction, shiftCustomer: null }, sessionFor);
     };
 
     /** Opens a conversation with `partner`, whose session `sessionFor` builds. They speak first. */
@@ -1382,6 +1801,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       micRetry: null,
       micOffReminder: null,
       journal: null,
+      shiftEnd: null,
       persistCallout: false,
       sign: null,
       openTitle: () => {
@@ -1523,8 +1943,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       setInteractable: (interactable) => {
         if (get().interactable === interactable) return;
         const { conversation } = get();
-        // Walking away is like Leave: no cost before the outcome, the closing card after it.
-        if (conversation && !conversation.closed && interactable !== conversation.npcId) get().leaveConversation();
+        // Walking away is like Leave: no cost before the outcome, the closing card after it. A Shift holds the Character
+        // behind the counter, so what is within reach there never matters to a Shift Customer.
+        if (conversation?.shiftCustomer === null && !conversation.closed && interactable !== conversation.npcId) get().leaveConversation();
         set({ interactable, tramChoosing: false });
       },
       openTram: () => {
@@ -1557,10 +1978,86 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const { sign } = get();
         if (sign?.tooltip.canTranslate) set({ sign: { ...sign, tooltip: signTooltip(sign.tooltip.signId, true) } });
       },
-      talk: () => {
+
+      startShift: () => {
+        const { interactable, conversation, game } = get();
+        const jobId = staffDoorJob(interactable, game);
+        if (conversation || get().journal || !jobId) return;
+        const after = startShift(game, jobId, placeHours(JOB_PLACES[jobId], game.identity.culturePackId));
+        if (after === game) return;
+        set({ game: after, shiftEnd: null });
+        sizeLastSet = null;
+        nextShiftCustomerOrEnd();
+      },
+      tapMenuItem: (itemId) => {
+        const { shift } = get().game.possessions;
+        if (!shift || !SHIFT_MENUS[shift.jobId].includes(itemId)) return;
+        // At a table, a tap writes the dish or the drink on the order pad line being written.
+        if (shift.customer?.table) {
+          const course = (RESTAURANT_DISHES as readonly ItemId[]).includes(itemId) ? 'dish' : 'drink';
+          return changeShiftCustomer((view) => ({ ...view, pad: writeOnPad(view.pad, itemId, course) }));
+        }
+        changeShiftCustomer((view) => ({ ...view, ...addToTray(view, itemId, isDrink(itemId) ? view.making : null) }));
+        tellStartedOn();
+      },
+      setDrinkSize: (size) => {
+        if (!selectCanTapMenu(get())) return;
+        sizeLastSet = size;
+        changeShiftCustomer((view) => ({ ...view, making: { ...view.making, size } }));
+      },
+      setDrinkTemperature: (temperature) => changeShiftCustomer((view) => ({ ...view, making: { ...view.making, temperature } })),
+      toggleDrinkExtra: (extra) =>
+        changeShiftCustomer((view) => {
+          const { extras } = view.making;
+          const toggled = extras.includes(extra) ? extras.filter((e) => e !== extra) : [...extras, extra];
+          return { ...view, making: { ...view.making, extras: toggled } };
+        }),
+      clearTray: () => changeShiftCustomer((view) => ({ ...view, ...clearTray(view), pad: EMPTY_PAD })),
+      undoTray: () => changeShiftCustomer((view) => ({ ...view, ...undoTray(view) })),
+      redoTray: () => changeShiftCustomer((view) => ({ ...view, ...redoTray(view) })),
+      toggleBag: () => changeShiftCustomer((view) => ({ ...view, bag: !view.bag })),
+      togglePointsCard: () => changeShiftCustomer((view) => ({ ...view, pointsCard: !view.pointsCard })),
+      setCashReceived: (amount) =>
+        changeShiftCustomer((view) => ({ ...view, received: amount !== null && Number.isFinite(amount) && amount >= 0 ? amount : null })),
+      addChangeCoin: (coin) => {
+        if (!tillFor(get().game.identity.culturePackId).denominations.includes(coin)) return;
+        changeShiftCustomer((view) => ({ ...view, change: [...view.change, coin] }));
+      },
+      clearChange: () => changeShiftCustomer((view) => ({ ...view, change: [] })),
+      suggestChange: () => {
+        if (!selectCanSuggestChange(get())) return;
+        const { denominations } = tillFor(get().game.identity.culturePackId);
+        changeShiftCustomer((view) => ({ ...view, change: suggestChange(selectTill(get()).changeDue!, denominations) }));
+      },
+      addPadDiner: () => changeShiftCustomer((view) => ({ ...view, pad: addPadLine(view.pad) })),
+      choosePadDiner: (index) => changeShiftCustomer((view) => ({ ...view, pad: choosePadLine(view.pad, index) })),
+      removePadDiner: () => changeShiftCustomer((view) => ({ ...view, pad: removePadLine(view.pad) })),
+      setDietaryNote: (note) => changeShiftCustomer((view) => ({ ...view, pad: noteOnPad(view.pad, note) })),
+      serveTray: () => {
+        const conversation = get().conversation;
+        const view = conversation?.shiftCustomer;
+        if (!view || !canTakeTurn(conversation) || !voice || !hasSomethingToServe(view)) return;
+        const customer = get().game.possessions.shift?.customer;
+        const pack = CULTURE_PACKS[get().game.identity.culturePackId];
+        if (customer?.table) {
+          const { diners } = view.pad;
+          const correct = settleShiftCustomer(kitchenOrder(diners), { atTheTable: diners });
+          return voice.sendText(tableServedScene(diners, correct, pack));
+        }
+        const { tray, bag, pointsCard, change } = view;
+        const atTheTill = customer?.checkout ? { bag, pointsCard, change: coinsTotal(change) } : undefined;
+        const correct = settleShiftCustomer(tray, { atTheTill });
+        voice.sendText(shiftCustomerServedScene(tray, correct, pack, atTheTill));
+      },
+      closeShiftEnd: () => {
+        // Closed before its Recap was there to read: it still goes to the Journal.
+        const recap = get().shiftEnd?.recap;
+        set({ shiftEnd: null, ...(recap?.status === 'writing' && { toast: { kind: 'recapSaved' } as const }) });
+      },
+      talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || get().pauseMenu || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
-        const interaction = selectTalkWithE(get());
+        const interaction = key === 'E' ? selectTalkWithE(get()) : selectTalkWithF(get());
         if (!interaction) return;
         startConversation(interaction);
       },
@@ -1657,7 +2154,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!conversation || npcLine?.speaker !== 'npc' || line === conversation.npcLine) return;
         let next = conversation.translated.includes(line) ? conversation : { ...conversation, translated: [...conversation.translated, line] };
         // The Recap was asked for as the session closed: reading back afterwards isn't Help used in the conversation.
-        const readingBack = conversation.closed;
+        // Nor is it for a Shift Customer already dealt with, whose dock was settled by what was translated before.
+        const readingBack = conversation.closed || (conversation.shiftCustomer !== null && conversation.outcome !== null);
         if (!readingBack) next = logHelp(next, 'translate', [npcLine.text]);
         if (next !== conversation) set({ conversation: next });
         const annotation = conversation.annotations[line];
@@ -1716,8 +2214,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       closeJournal: () => set({ journal: null }),
       openPauseMenu: () => {
-        const { screen, conversation, journal, tramChoosing, voiceUnavailable } = get();
-        if (screen !== 'playing' || conversation || journal || tramChoosing || voiceUnavailable) return;
+        const { screen, conversation, journal, tramChoosing, voiceUnavailable, shiftEnd } = get();
+        if (screen !== 'playing' || conversation || journal || tramChoosing || voiceUnavailable || shiftEnd) return;
         set({ pauseMenu: true });
       },
       closePauseMenu: () => {
@@ -1838,15 +2336,27 @@ export const selectInteractable = (s: GameStore) => {
   if (isTownNpc(s.interactable) && !isAtWork(s.interactable, s.game)) return null;
   return s.interactable;
 };
-/** The conversation `startedWith` starts with the Named NPC the Character is next to, given their Proficiency Step, or null. */
+/** The conversation `startedWith` starts with the Named NPC the Character is next to, given the Jobs they have and their Proficiency Step, or null. */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
   if (!isNamedNpc(npcId)) return null;
-  const { proficiencyStep } = s.game;
-  return startedWith(npcId, { step: proficiencyStep });
+  const { possessions, proficiencyStep } = s.game;
+  return startedWith(npcId, { jobsHired: possessions.jobsHired, step: proficiencyStep });
 };
 /** The conversation E starts with the NPC the Character is next to, or null. */
 export const selectTalkWithE = (s: GameStore) => talkWith(s, interactionStartedWithE);
+/** The second conversation F starts with that NPC (asking for work), or null. */
+export const selectTalkWithF = (s: GameStore) => talkWith(s, interactionStartedWithF);
+const skillLevels = new WeakMap<GameState['progression']['lifeSkillXp'], Record<LifeSkillId, number>>();
+/** Each Life Skill's level, 0–5 stars. The same object until the XP changes. */
+export const selectLifeSkillLevels = (s: GameStore): Record<LifeSkillId, number> => {
+  const { lifeSkillXp } = s.game.progression;
+  const kept = skillLevels.get(lifeSkillXp);
+  if (kept) return kept;
+  const levels = lifeSkillLevels(s.game);
+  skillLevels.set(lifeSkillXp, levels);
+  return levels;
+};
 /** The tram stop the Character is standing at, or null. */
 export const selectTramStop = (s: GameStore) => (isTramStop(s.interactable) ? s.interactable : null);
 /** A tram runs now. Outside the trams' hours, the stop says none is running. */
@@ -1900,10 +2410,11 @@ export const selectRecap = (s: GameStore) => (s.conversation?.showingRecap ? s.c
 export const selectJournal = (s: GameStore) => s.journal;
 /** This town NPC's face while the Player talks to them, or null when they aren't. */
 export const selectNpcExpressionOf = (npcId: TownNpcId) => (s: GameStore) => (s.conversation?.npcId === npcId ? selectNpcExpression(s) : null);
-/** How the NPC the Player is talking to looks, for their face, as the pack dresses them. */
+/** How the NPC the Player is talking to looks, for their face: a Shift Customer as drawn, anyone else as the pack dresses them. */
 export const selectNpcLook = (s: GameStore): NpcLook | null => {
   if (!s.conversation) return null;
-  return townNpcLook(s.conversation.npcId, s.game.identity.culturePackId);
+  if (s.conversation.npcId) return townNpcLook(s.conversation.npcId, s.game.identity.culturePackId);
+  return selectShiftCustomerLooks(s)[0] ?? null;
 };
 /** The NPC's face: Patience shows only like this, never as a number. */
 export const selectNpcExpression = (s: GameStore): NpcExpression | null =>
@@ -1942,3 +2453,146 @@ export const selectPhrasebook = (s: GameStore): readonly PhrasebookEntry[] => s.
 /** A word is already kept in the personal phrasebook, glossed in this Native Language. */
 export const selectInPhrasebook = (text: string, glossLanguage: LanguageCode) => (s: GameStore) =>
   s.game.phrasebook.some((entry) => entry.text === text && entry.glossLanguage === glossLanguage);
+
+// --- Shifts -----------------------------------------------------------------
+
+/** A Shift under way, as the Player sees it: how many Shift Customers come, how many are done with, and how many were served right. */
+export type ShiftView = { jobId: JobId; customers: number; done: number; served: number };
+const shiftViews = new WeakMap<Shift, ShiftView>();
+/** The Shift under way, or null. The same object until the Shift changes. */
+export const selectShift = (s: GameStore): ShiftView | null => {
+  const { shift } = s.game.possessions;
+  if (!shift) return null;
+  let view = shiftViews.get(shift);
+  if (!view) {
+    view = { jobId: shift.jobId, customers: shift.customers, done: shift.served + shift.failed, served: shift.served };
+    shiftViews.set(shift, view);
+  }
+  return view;
+};
+/** What the Shift that just ended paid, until the Player closes it. */
+export const selectShiftEnd = (s: GameStore) => s.shiftEnd;
+/** Each staff door view, made once, so the selector hands back the same object while nothing changes. */
+const STAFF_DOORS = new Map<string, StaffDoor>();
+/** The staff door the Character is at, and whether E starts a Shift there now; null away from one, or during a Shift. */
+export const selectStaffDoor = (s: GameStore): StaffDoor | null => {
+  const jobId = staffDoorJob(s.interactable, s.game);
+  if (!jobId) return null;
+  const refusal = staffDoorRefusal(jobId, s.game);
+  if (refusal === 'underway') return null;
+  const key = `${jobId}:${refusal}`;
+  if (!STAFF_DOORS.has(key)) STAFF_DOORS.set(key, { jobId, refusal });
+  return STAFF_DOORS.get(key)!;
+};
+/** Part of the menu grid: with the Barista skill's grouped grid, drinks and food apart; otherwise the whole menu, ungrouped. */
+export type MenuGroup = { group: 'drinks' | 'food' | null; items: readonly ItemId[] };
+const NO_MENU: readonly MenuGroup[] = [];
+const MENU_GRIDS = new Map<string, readonly MenuGroup[]>();
+/** What the Player can tap on the grid in the Shift under way, grouped once the Job's Life Skill has unlocked it. */
+export const selectShiftMenu = (s: GameStore): readonly MenuGroup[] => {
+  const { shift } = s.game.possessions;
+  const menu = shift && SHIFT_MENUS[shift.jobId];
+  if (!menu) return NO_MENU;
+  const grouped = jobAids(s.game, shift.jobId).includes('groupedGrid');
+  const key = `${shift.jobId}:${grouped}`;
+  if (!MENU_GRIDS.has(key)) {
+    const groups: MenuGroup[] = grouped
+      ? [
+          { group: 'drinks', items: menu.filter(isDrink) },
+          { group: 'food', items: menu.filter((itemId) => !isDrink(itemId)) },
+        ]
+      : [{ group: null, items: menu }];
+    MENU_GRIDS.set(key, groups.filter(({ items }) => items.length > 0));
+  }
+  return MENU_GRIDS.get(key)!;
+};
+const NOTHING_ON_THE_TRAY: ShiftOrder = [];
+/** The Shift Customer at the counter can still be served: the grid takes taps until they've been dealt with. */
+export const selectCanTapMenu = (s: GameStore) => s.conversation?.shiftCustomer != null && !s.conversation.outcome;
+/** What is on the tray for the Shift Customer at the counter. */
+export const selectTray = (s: GameStore): ShiftOrder => s.conversation?.shiftCustomer?.tray ?? NOTHING_ON_THE_TRAY;
+/** How the modifier toggles say the next drink tapped is made. */
+export const selectDrinkModifiers = (s: GameStore): DrinkModifiers => s.conversation?.shiftCustomer?.making ?? DEFAULT_DRINK;
+/** There's a change to the tray to take back, or one taken back to put back, while the customer can still be served. */
+export const selectCanUndoTray = (s: GameStore) => selectCanTapMenu(s) && s.conversation!.shiftCustomer!.undo.length > 0;
+export const selectCanRedoTray = (s: GameStore) => selectCanTapMenu(s) && s.conversation!.shiftCustomer!.redo.length > 0;
+/** There's something to hand over: on the tray, or written on the order pad. */
+function hasSomethingToServe({ tray, pad }: ShiftCustomerView) {
+  return tray.length > 0 || pad.diners.some(({ dish, drink }) => dish !== null || drink !== null);
+}
+/**
+ * Serve can be pressed: something is on the tray (or the order pad), and the customer is listening (not while the
+ * Player talks, Help is open or the connection is coming back).
+ */
+export const selectCanServe = (s: GameStore) => {
+  const { conversation } = s;
+  if (!conversation?.shiftCustomer || conversation.outcome || conversation.reconnecting || conversation.listening) return false;
+  return conversation.tab === 'chat' && hasSomethingToServe(conversation.shiftCustomer);
+};
+/** The order pad for the table being served: a line per diner, and which one is being written. */
+export const selectOrderPad = (s: GameStore): OrderPad => s.conversation?.shiftCustomer?.pad ?? EMPTY_PAD;
+/** The Server skill has unlocked quick-pick dietary notes for the Shift under way. */
+export const selectQuickPickNotes = (s: GameStore) => {
+  const { shift } = s.game.possessions;
+  return shift !== null && jobAids(s.game, shift.jobId).includes('quickPickNotes');
+};
+const NOTHING_ON_THE_COUNTER: ShiftOrder = [];
+const COUNTERS = new WeakMap<ShiftOrder, ShiftOrder>();
+/** The shopping the customer at the till has put on the counter, which the Player can see; not what they want from behind it. */
+export const selectCheckoutCounter = (s: GameStore): ShiftOrder => {
+  const customer = s.conversation?.shiftCustomer ? s.game.possessions.shift?.customer : null;
+  if (!customer?.checkout) return NOTHING_ON_THE_COUNTER;
+  if (!COUNTERS.has(customer.order)) {
+    const behind = customer.checkout.fromBehindTheCounter;
+    COUNTERS.set(customer.order, customer.order.filter(({ itemId }) => itemId !== behind));
+  }
+  return COUNTERS.get(customer.order)!;
+};
+
+/**
+ * The till, as the Player sees it, in local money: what's been rung up comes to `total`; the bag and points card
+ * toggles; the cash keyed in as handed over and the change due from it (null until keyed in); and the coins and
+ * notes counted out as change, which come to `changeGiven`.
+ */
+export type TillView = {
+  total: number;
+  bag: boolean;
+  pointsCard: boolean;
+  received: number | null;
+  changeDue: number | null;
+  change: readonly number[];
+  changeGiven: number;
+};
+const EMPTY_TILL: TillView = { total: 0, bag: false, pointsCard: false, received: null, changeDue: null, change: [], changeGiven: 0 };
+const TILLS = new WeakMap<ShiftCustomerView, TillView>();
+/** The till for the customer at the counter. The same object until it changes. */
+export const selectTill = (s: GameStore): TillView => {
+  const view = s.conversation?.shiftCustomer;
+  if (!view) return EMPTY_TILL;
+  if (!TILLS.has(view)) {
+    const { tray, bag, pointsCard, received, change } = view;
+    const total = tillTotal(tray, tillFor(s.game.identity.culturePackId));
+    const changeDue = received === null ? null : changeOwed(received, total);
+    TILLS.set(view, { total, bag, pointsCard, received, changeDue, change, changeGiven: coinsTotal(change) });
+  }
+  return TILLS.get(view)!;
+};
+/** The Cashier skill has unlocked coin suggestions for the Shift under way. */
+export const selectSuggestsChange = (s: GameStore) => {
+  const { shift } = s.game.possessions;
+  return shift !== null && jobAids(s.game, shift.jobId).includes('suggestedChange');
+};
+/** The Cashier skill can count out the change: it's unlocked, and the cash keyed in covers what's been rung up. */
+export const selectCanSuggestChange = (s: GameStore) => {
+  const { shift } = s.game.possessions;
+  if (!shift || !selectCanTapMenu(s) || !jobAids(s.game, shift.jobId).includes('suggestedChange')) return false;
+  const { changeDue } = selectTill(s);
+  return changeDue !== null && changeDue >= 0;
+};
+/** A Shift Customer is at the counter, and partway through saying a line: for the "speaking…" indicator over them. */
+export const selectShiftCustomerSpeaking = (s: GameStore) =>
+  s.conversation?.shiftCustomer != null && !s.conversation.closed && s.conversation.npcLine !== null;
+const NO_ONE: readonly NpcLook[] = [];
+/** How the Shift Customer at the counter looks: them, then the rest of their table at the restaurant; no one between customers. */
+export const selectShiftCustomerLooks = (s: GameStore): readonly NpcLook[] =>
+  (s.conversation?.shiftCustomer && s.game.possessions.shift?.customer?.appearances) || NO_ONE;

@@ -20,3 +20,9 @@ export function nextRandom(rngState: number): { value: number; rngState: number 
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return { value: ((t ^ (t >>> 14)) >>> 0) / 2 ** 32, rngState: next };
 }
+
+/** A whole number from `min` to `max`, both included, from the save's RNG. */
+export function randomInt(rngState: number, min: number, max: number): { value: number; rngState: number } {
+  const draw = nextRandom(rngState);
+  return { value: min + Math.floor(draw.value * (max - min + 1)), rngState: draw.rngState };
+}

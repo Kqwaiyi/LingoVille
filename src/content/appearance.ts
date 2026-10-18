@@ -1,6 +1,6 @@
 // The Appearance Preset pool: what everyone in town wears. Everyone is Clawd, the Claude Code mascot, in the same
-// orange; what tells them apart is a hat, eyewear and neckwear, in a colour. The Character, Named NPCs and Passers-by
-// all draw on it.
+// orange; what tells them apart is a hat, eyewear and neckwear, in a colour. The Character, Named NPCs, Shift Customers
+// and Passers-by all draw on it.
 import { z } from 'zod';
 
 export const HAT_IDS = ['none', 'beanie', 'cap', 'beret', 'top-hat', 'sun-hat', 'bow', 'flower', 'party-hat'] as const;

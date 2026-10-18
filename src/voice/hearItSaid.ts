@@ -31,7 +31,7 @@ export type HearItSaid = (text: string, targetLanguage: LanguageCode, voice?: Vo
  * NPC, so what it was asked for stands for the voice here.
  */
 async function clipKey(text: string, targetLanguage: LanguageCode, voice: VoiceRequest | undefined) {
-  const who = !voice ? targetLanguage : `${targetLanguage}:${voice.npcId}`;
+  const who = !voice ? targetLanguage : 'npcId' in voice ? `${targetLanguage}:${voice.npcId}` : `${targetLanguage}:${voice.build}:${voice.shiftCustomerVoice}`;
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${who}\n${text}`));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }

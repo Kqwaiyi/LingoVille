@@ -60,6 +60,8 @@ export const SAVE = {
 
 export const MOVEMENT = {
   walkSpeedMetresPerSecond: 4,
+  /** How close the Character must be to use something with E. */
+  interactRangeMetres: 1.6,
   /** How close the Character must be to talk to an NPC. Walking further away ends the conversation. */
   talkRangeMetres: 2.5,
   /** How close the Character must be for pointing at a sign or menu to show its reading aid. */
@@ -90,6 +92,18 @@ export const NEW_GAME = {
 // --- Economy (prices as ratios of one Shift's base pay) ---------------------
 
 export const ECONOMY = {
+  /** Money is held in Shifts, so one Shift's base pay is 1 by definition. Every price is a ratio of it. */
+  shiftBasePayInShifts: 1,
+  shiftCustomers: { min: 5, max: 8 },
+  /** How Shift Customers are mixed: the share from the Player's own band, the one below and the one above. */
+  shiftCustomerMix: { ownBand: 0.6, bandBelow: 0.3, bandAbove: 0.1 },
+  jobLifeSkillPayRaisePerLevel: 0.06,
+  /** A Shift Customer served correctly after the Player translated their lines is docked this share of a failed one's dock. */
+  translatedCustomerDockShare: 0.5,
+  /** A customer at the supermarket till: how many kinds of shopping they bring, the most of each, and how often they want a bag or have a points card. */
+  checkout: { basketLines: { min: 1, max: 3 }, maxQuantity: 2, wantsBag: 0.5, hasPointsCard: 0.5 },
+  /** How many diners sit at a restaurant table that the server takes one order for, dietary request and all. */
+  tableDiners: { min: 2, max: 3 },
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
   /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
@@ -99,7 +113,7 @@ export const ECONOMY = {
 export const PROFICIENCY_STEPS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 export type ProficiencyStep = (typeof PROFICIENCY_STEPS)[number];
 
-/** The band at each Proficiency Step: B = A1–A2, I = B1–B2, A = C1–C2. */
+/** The band of Shift Customers at each Proficiency Step: B = A1–A2, I = B1–B2, A = C1–C2. */
 export const STEP_BANDS: Record<ProficiencyStep, Band> = { A1: 'B', A2: 'B', B1: 'I', B2: 'I', C1: 'A', C2: 'A' };
 
 /** The steps the self-assessment in New game setup can start the Character at. */
@@ -117,14 +131,17 @@ export const MIC_CHECK = {
   heardLevel: 0.15,
 } as const;
 
-/** Patience by Proficiency Step. */
-export const PROFICIENCY_STEP_TABLE: Record<ProficiencyStep, { startingPatience: number }> = {
-  A1: { startingPatience: 4 },
-  A2: { startingPatience: 4 },
-  B1: { startingPatience: 3 },
-  B2: { startingPatience: 3 },
-  C1: { startingPatience: 2 },
-  C2: { startingPatience: 2 },
+/** Patience and Shift stakes by Proficiency Step. */
+export const PROFICIENCY_STEP_TABLE: Record<
+  ProficiencyStep,
+  { startingPatience: number; stakeMultiplier: number; failedCustomerDock: number }
+> = {
+  A1: { startingPatience: 4, stakeMultiplier: 1.0, failedCustomerDock: 0 },
+  A2: { startingPatience: 4, stakeMultiplier: 1.1, failedCustomerDock: 0 },
+  B1: { startingPatience: 3, stakeMultiplier: 1.25, failedCustomerDock: 0.05 },
+  B2: { startingPatience: 3, stakeMultiplier: 1.4, failedCustomerDock: 0.1 },
+  C1: { startingPatience: 2, stakeMultiplier: 1.6, failedCustomerDock: 0.15 },
+  C2: { startingPatience: 2, stakeMultiplier: 1.8, failedCustomerDock: 0.2 },
 };
 
 export const PATIENCE = {
@@ -146,6 +163,11 @@ export const PROFICIENCY = {
   /** How far past a step boundary the score must go before the current step changes, so it doesn't flicker (default). */
   stepBuffer: 0.15,
   /**
+   * A Shift's results as listening evidence (default): a Shift where every order was missed pulls this far below the step
+   * the customers spoke at, in steps, and the listening counts this much beside what the Player said (1: as much).
+   */
+  shiftListening: { missedOrderPull: 1, weight: 1 },
+  /**
    * The middle of each step on the hidden score (default), which runs from 0 to the number of steps.
    * A new save starts here (only A1–B2 can be a starting step), and a Recap's estimate pulls the score here.
    */
@@ -158,4 +180,19 @@ export const HELP_EVIDENCE = {
   copiedTurnWeight: 0.1,
   /** How alike a turn and a hint must be (Dice similarity of letter pairs, 0–1) to count as a close repeat. */
   closeRepeatSimilarity: 0.6,
+} as const;
+
+// --- Life Skills (default: open question 5) ---------------------------------
+
+export const LIFE_SKILLS = {
+  maxLevel: 5,
+  /** Total XP needed to reach each level, index = level. */
+  xpToReachLevel: [0, 40, 100, 180, 280, 400],
+  xpPerShiftCustomer: 3,
+  /**
+   * The level of a Job's Life Skill that unlocks each of its aids. They only ever help with the mechanics, never with
+   * understanding the customer. Barista: the menu grid grouped by kind, and the size toggle remembering the last size made.
+   * Cashier: the coins for the change suggested, once the Player has keyed in the cash they were handed.
+   */
+  jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: { suggestedChange: 1 }, server: { quickPickNotes: 1 } },
 } as const;

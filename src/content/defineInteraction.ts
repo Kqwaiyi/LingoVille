@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { LanguageCode, PlaceId } from '../sim/index.ts';
+import { JOB_IDS, type JobId, type LanguageCode, type PlaceId } from '../sim/index.ts';
 import { cafeAllergensIn, CULTURE_PACKS, type Glosses } from './culturePacks.ts';
 import { menuPrice } from './currency.ts';
 import { ITEM_IDS, type Allergen, type DrinkExtra, type ItemId } from './items.ts';
@@ -26,13 +26,18 @@ export type FactSource = (typeof FACT_SOURCES)[number];
  * made to order, and at the café, an allergen nothing in it may have in it.
  */
 type ServeOrderArgs = { items: { item: ItemId; quantity: number; extras?: readonly DrinkExtra[] }[]; allergen?: Allergen | 'none' };
+/** The arguments a `hire` effect reads: the applicant's name as the NPC heard it, which the sim checks. */
+type HireArgs = { name: string };
 
 /**
  * The effect on success, each only allowed on a completion whose arguments it can read.
- * `serveOrder` serves the confirmed items from the menu and charges for them.
+ * `serveOrder` serves the confirmed items from the menu and charges for them. `hire` gives the Character its Job, once the sim
+ * has checked the name.
  */
-export type EffectKind = 'serveOrder';
-type EffectFor<Args> = Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never;
+export type EffectKind = 'serveOrder' | 'hire';
+type EffectFor<Args> =
+  | (Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never)
+  | (Args extends HireArgs ? { kind: 'hire'; jobId: JobId } : never);
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
   /** kebab-case, stable: saves and the Journal refer to it. */
@@ -58,16 +63,21 @@ export type OrderLine = ServedItem & { priceInShifts: number };
 
 export type ParsedArgs = { success: true; data: Record<string, unknown> } | { success: false; error: string };
 
-/** What a completion comes to in this pack: the lines to pay for. */
+/** A Job asked for, under the name the NPC heard. The sim checks the name against the Character's. */
+export type JobApplication = { jobId: JobId; name: string };
+
+/** What a completion comes to in this pack: the lines to pay for, and for hiring, the application. */
 export type ResolvedCompletion =
   | {
       success: true;
       lines: OrderLine[];
+      application?: JobApplication;
     }
   | { success: false; error: string };
 
 export type Interaction = Omit<InteractionDefinition<z.ZodObject>, 'effect'> & {
-  effect: { kind: EffectKind };
+  /** A `hire` effect gives the Job `jobId`. */
+  effect: { kind: Exclude<EffectKind, 'hire'> } | { kind: 'hire'; jobId: JobId };
   /** The Live tool declaration, generated from `completion.args`. */
   toolDeclaration: FunctionDeclaration;
   /** Validates the NPC's completion arguments against `completion.args`. */
@@ -92,6 +102,7 @@ const definitionSchema = z.object({
   band: z.enum(['B', 'I', 'A']),
   effect: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('serveOrder') }),
+    z.object({ kind: z.literal('hire'), jobId: z.enum(JOB_IDS) }),
   ]),
 });
 
@@ -127,6 +138,8 @@ function resolveEffect(effect: Interaction['effect'], args: Record<string, unkno
       if (problem) return { success: false, error: problem };
       return { success: true, lines: orderLines(items.map(({ item, quantity }) => ({ itemId: item, quantity })), packId) };
     }
+    case 'hire':
+      return { success: true, lines: [], application: { jobId: effect.jobId, name: (args as HireArgs).name } };
   }
 }
 

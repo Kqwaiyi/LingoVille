@@ -23,7 +23,7 @@ import {
 import { PALETTE, type PaletteColour } from './palette.ts';
 
 // Everyone is Clawd, the Claude Code mascot, modelled, rigged and animated in Blender.
-// The Character, Named NPCs and Passers-by all are; what tells them apart is what they wear.
+// The Character, Named NPCs, Shift Customers and Passers-by all are; what tells them apart is what they wear.
 useGLTF.preload(CHARACTER_ART_URL);
 
 /**

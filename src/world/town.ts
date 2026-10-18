@@ -1,5 +1,5 @@
 import { PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type GroceryId, type SignId, type TownNpcId, type TramStopId } from '../content/index.ts';
-import type { PlaceId } from '../sim/index.ts';
+import type { JobId, PlaceId } from '../sim/index.ts';
 import type { PaletteColour } from './palette.ts';
 import type { Repaint, Size, TownPiece } from './townArt.ts';
 
@@ -155,7 +155,7 @@ export const PLATFORM = { size: [10, 2.2] as Vec2, height: 0.15 } as const;
 
 /**
  * How high the shops' counters stand: low enough for Clawd, who everyone in town is, to see over, so the staff behind
- * one show their faces (and their Patience) to whoever comes up.
+ * one show their faces (and their Patience) to whoever comes up, and so does a Shift Customer to the Character at work.
  */
 export const COUNTER_HEIGHT = 0.75;
 
@@ -286,7 +286,7 @@ export const FURNITURE: readonly Furniture[] = [
   { position: supermarket.at([2, 0.8, 1.2]), size: [6, 1.6, 0.7], piece: 'shelf', rotation: supermarket.turn() },
   { position: supermarket.at([-7.3, 0.8, -2]), size: [0.6, 1.6, 3.6], piece: 'shelf', rotation: supermarket.turn(Math.PI / 2) },
   { position: supermarket.at([2.6, 1.05, -4.7]), size: [6, 2.1, 0.9], piece: 'fridge-tall', rotation: supermarket.turn() },
-  // Restaurant: a table west of the door.
+  // Restaurant: tables, and the server's table on a Shift, west of the door and clear of the way from the door to the staff door.
   { position: restaurant.at([-3, 0.4, 1]), size: [1.4, 0.8, 1.4], piece: 'table', rotation: restaurant.turn() },
   // Clinic: reception and pharmacy counters, the pharmacy's shelves, the waiting room bench and the doctor's desk.
   { position: clinic.at([4.5, COUNTER_HEIGHT / 2, 2.8]), size: [3, COUNTER_HEIGHT, 0.8], piece: 'counter', rotation: clinic.turn() },
@@ -437,6 +437,41 @@ export const SOLIDS: readonly SolidBox[] = [
   { position: [BANDSTAND[0], 1.5, BANDSTAND[1]], size: [4.4, 3, 4.4] },
   { position: [POND.centre[0], 0.3, POND.centre[1]], size: [POND.radius * 1.7, 0.6, POND.radius * 1.7] },
 ];
+
+/**
+ * Where each Job is worked: its staff door, set in its place's side wall (and where the Character stands to use it);
+ * where the Character stands through a Shift, behind the counter beside its staff; and where a Shift Customer stands,
+ * across the counter. The café's is level with its counter; the supermarket's, with the customers' side of its till.
+ * At the restaurant the staff door is level with the front door; the Character stands at the table by the side wall,
+ * and the customer is seated across it, with the rest of their table (`otherSeats`) on either side.
+ */
+export const WORKPLACES: Record<
+  JobId,
+  { door: Vec3; doorRotation: number; usedFrom: Vec3; behindTheCounter: Vec3; customerSpot: Vec3; otherSeats?: readonly Vec3[] }
+> = {
+  barista: {
+    door: cafe.at([-5.6, 1.1, -1]),
+    doorRotation: cafe.turn(Math.PI / 2),
+    usedFrom: cafe.at([-5.3, 1, -1]),
+    behindTheCounter: cafe.at([1.5, 1, -3.4]),
+    customerSpot: cafe.at([1.5, 1, -1.2]),
+  },
+  cashier: {
+    door: supermarket.at([-7.6, 1.1, 3.4]),
+    doorRotation: supermarket.turn(Math.PI / 2),
+    usedFrom: supermarket.at([-7.3, 1, 3.4]),
+    behindTheCounter: supermarket.at([-3, 1, 1.6]),
+    customerSpot: supermarket.at([-3, 1, 3.8]),
+  },
+  server: {
+    door: restaurant.at([-5.6, 1.1, 3]),
+    doorRotation: restaurant.turn(Math.PI / 2),
+    usedFrom: restaurant.at([-5.3, 1, 3]),
+    behindTheCounter: restaurant.at([-1.6, 1, 1]),
+    customerSpot: restaurant.at([-4.3, 1, 1]),
+    otherSeats: [restaurant.at([-3, 1, -0.05]), restaurant.at([-3, 1, 2.05])],
+  },
+};
 
 /**
  * A sign: where its middle hangs, its size in metres, and which way it faces (radians about y; 0 faces +z). A building's

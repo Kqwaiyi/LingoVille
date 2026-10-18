@@ -1,4 +1,17 @@
-import { NOT_UNDERSTOOD_TOOL, OUT_OF_PATIENCE_SCENE, type NpcSession, type ToolResponse } from '../ai/index.ts';
+import {
+  NOT_UNDERSTOOD_TOOL,
+  OUT_OF_PATIENCE_SCENE,
+  readChangedOrder,
+  readChangeScene,
+  readCheckout,
+  readServedScene,
+  readShiftOrder,
+  readTable,
+  type CheckoutSaid,
+  type DinerSaid,
+  type NpcSession,
+  type ToolResponse,
+} from '../ai/index.ts';
 import {
   ALLERGENS,
   cafeAllergensIn,
@@ -13,6 +26,7 @@ import {
   localPrice,
   MADE_TO_ORDER_EXTRAS,
   menuPrice,
+  START_WHEN,
   type Allergen,
   type DrinkExtra,
   type DrinkOptionId,
@@ -26,8 +40,9 @@ import type { VoiceSession, VoiceSessionEvents, VoiceSessionOptions } from './vo
 /** Roughly how long the real NPC takes to start answering: the delay when the gateway names none. */
 const DEFAULT_REPLY_DELAY_MS = 600;
 
-// The completion the fake knows how to script: an order over a counter.
+// The completions the fake knows how to script: an order over a counter, and the barista hiring.
 const SERVE_ORDER = INTERACTIONS.orderDrink.completion.name;
+const HIRE_APPLICANT = INTERACTIONS.askBaristaForWork.completion.name;
 
 /**
  * Typed to the fake NPC, this makes its connection drop, so a network failure
@@ -48,6 +63,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['キャベツ', 'きゃべつ', '野菜', 'やさい'],
     eggs: ['卵', 'たまご', '玉子', 'egg'],
     noodles: ['うどん', 'udon'],
+    batteries: ['電池', 'でんち', 'battery'],
+    stamps: ['切手', 'きって'],
+    'gift-card': ['ギフトカード', 'ぎふとかーど'],
     'pork-dish': ['ポークソテー', 'ぽーくそてー', 'ポーク'],
     'chicken-dish': ['チキン南蛮', 'ちきんなんばん', 'チキン'],
     'fish-dish': ['焼き鮭', '鮭', 'さけ', 'しゃけ'],
@@ -65,6 +83,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['青菜', '蔬菜'],
     eggs: ['鸡蛋'],
     noodles: ['挂面', '面条'],
+    batteries: ['电池'],
+    stamps: ['邮票'],
+    'gift-card': ['购物卡', '礼品卡'],
     'pork-dish': ['糖醋里脊', '里脊'],
     'chicken-dish': ['宫保鸡丁', '鸡丁'],
     'fish-dish': ['清蒸鱼', '鱼'],
@@ -82,6 +103,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['carrots', 'carrot', 'vegetables'],
     eggs: ['eggs', 'egg'],
     noodles: ['spaghetti', 'pasta'],
+    batteries: ['batteries', 'battery'],
+    stamps: ['stamps', 'stamp'],
+    'gift-card': ['gift card'],
     'pork-dish': ['sausage and mash', 'bangers'],
     'chicken-dish': ['chicken pie'],
     'fish-dish': ['fish and chips', 'fish'],
@@ -99,6 +123,9 @@ const ITEM_WORDS: Record<LanguageCode, Record<ItemId, string[]>> = {
     vegetables: ['kartoffeln', 'kartoffel'],
     eggs: ['eier', 'ei'],
     noodles: ['spätzle', 'nudeln'],
+    batteries: ['batterien', 'batterie'],
+    stamps: ['briefmarken', 'briefmarke'],
+    'gift-card': ['geschenkkarte', 'gutschein'],
     'pork-dish': ['schnitzel'],
     'chicken-dish': ['geschnetzeltes', 'hähnchen'],
     'fish-dish': ['lachs', 'fisch'],
@@ -198,6 +225,87 @@ const SCRIPT: Record<LanguageCode, OrderScript> = {
   },
 };
 
+/** When an applicant can start, as `hire_applicant` takes it. */
+type StartWhen = (typeof START_WHEN)[number];
+
+/** The fake barista hiring: asks the name, then when they can start, and reads both back. */
+type HiringScript = {
+  /** Words that ask for work. */
+  work: string[];
+  askName: string;
+  askStart: (name: string) => string;
+  readBack: (name: string, start: string) => string;
+  hired: string;
+  nameAgain: string;
+  /** Said around a name ("my name is"), and taken off to leave the name. */
+  introductions: string[];
+  /** How the Player might say each start, and how the barista says it back. */
+  starts: Record<StartWhen, { words: string[]; said: string }>;
+};
+
+const HIRING_SCRIPT: Record<LanguageCode, HiringScript> = {
+  ja: {
+    work: ['仕事', 'しごと', '働き', 'はたらき', 'バイト', 'job', 'work'],
+    askName: 'あ、アルバイトですね！お名前は？',
+    askStart: (name) => `${name}さんですね。いつから働けますか？`,
+    readBack: (name, start) => `${name}さん、${start}からですね。よろしいですか？`,
+    hired: '採用です！働くときは、営業中にスタッフ用のドアから来てくださいね。',
+    nameAgain: 'すみません、お名前をもう一度ゆっくりお願いします。',
+    introductions: ['私の名前は', 'わたしのなまえは', '名前は', 'なまえは', '私は', 'わたしは', 'と申します', 'といいます', 'です', 'さん'],
+    starts: {
+      today: { words: ['今日', 'きょう'], said: '今日' },
+      tomorrow: { words: ['明日', 'あした', 'あす'], said: '明日' },
+      this_week: { words: ['今週', 'こんしゅう'], said: '今週' },
+      next_week: { words: ['来週', 'らいしゅう'], said: '来週' },
+    },
+  },
+  zh: {
+    work: ['工作', '打工', '招人', 'job', 'work'],
+    askName: '哦，你想来工作？你叫什么名字？',
+    askStart: (name) => `${name}，对吧？你什么时候能开始？`,
+    readBack: (name, start) => `${name}，${start}开始。对吗？`,
+    hired: '好，你被录用了！营业时间从员工门进来就可以上班。',
+    nameAgain: '不好意思，请再慢慢说一遍你的名字。',
+    introductions: ['我的名字是', '我的名字叫', '我叫', '我是'],
+    starts: {
+      today: { words: ['今天'], said: '今天' },
+      tomorrow: { words: ['明天'], said: '明天' },
+      this_week: { words: ['这个星期', '这周', '本周'], said: '这个星期' },
+      next_week: { words: ['下个星期', '下周'], said: '下个星期' },
+    },
+  },
+  en: {
+    work: ['job', 'jobs', 'work', 'hiring'],
+    askName: "Oh, you're after a job? Lovely. What's your name?",
+    askStart: (name) => `${name}, is it? When can you start?`,
+    readBack: (name, start) => `So that's ${name}, starting ${start}. Right?`,
+    hired: "You're hired! Just come in through the staff door whenever we're open.",
+    nameAgain: 'Sorry, I think I got your name wrong. Could you say it again, slowly?',
+    introductions: ['my name is', "my name's", "i'm", 'i am', "it's", 'it is', 'call me'],
+    starts: {
+      today: { words: ['today'], said: 'today' },
+      tomorrow: { words: ['tomorrow'], said: 'tomorrow' },
+      this_week: { words: ['this week'], said: 'this week' },
+      next_week: { words: ['next week'], said: 'next week' },
+    },
+  },
+  de: {
+    work: ['arbeit', 'job', 'stelle', 'arbeiten'],
+    askName: 'Ach, Sie suchen Arbeit? Wie heißen Sie?',
+    askStart: (name) => `${name}, richtig? Ab wann können Sie anfangen?`,
+    readBack: (name, start) => `Also ${name}, ab ${start}. Stimmt das?`,
+    hired: 'Sie sind eingestellt! Kommen Sie einfach durch die Personaltür, wenn wir geöffnet haben.',
+    nameAgain: 'Entschuldigung, wie war Ihr Name noch mal? Bitte langsam.',
+    introductions: ['mein name ist', 'ich heiße', 'ich bin'],
+    starts: {
+      today: { words: ['heute'], said: 'heute' },
+      tomorrow: { words: ['morgen'], said: 'morgen' },
+      this_week: { words: ['diese woche'], said: 'dieser Woche' },
+      next_week: { words: ['nächste woche'], said: 'nächster Woche' },
+    },
+  },
+};
+
 const LATIN = /^[\p{Script=Latin}\s']+$/u;
 
 /** Whole words for Latin-script words ("no" isn't in "know"); anywhere in the line otherwise. */
@@ -254,6 +362,273 @@ function orderNpc(script: OrderScript, menu: ItemId[], packId: LanguageCode, act
         });
       }
       if (mentions(line, [...yes, ...no, ...known])) return act.say(script.clarify[clarifications++ % script.clarify.length]!);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** The name in a line: its first sentence, without the words said around a name. */
+function nameIn(line: string, introductions: readonly string[]): string {
+  let name = line.split(/[。．.!！?？,，、]/u)[0]!;
+  for (const words of introductions) name = name.replace(new RegExp(words.replace(/'/g, "['’]"), 'giu'), ' ');
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+/** The barista hiring: on a request for work, asks the name, then when they can start, reads both back and hires on a yes. */
+function hiringNpc(script: HiringScript, common: OrderScript, act: Act): Npc {
+  let asked = false;
+  let name: string | null = null;
+  let start: StartWhen | null = null;
+  const { yes, no, known } = common.words;
+  const nextQuestion = () =>
+    name === null ? script.askName : start === null ? script.askStart(name) : script.readBack(name, script.starts[start].said);
+  return {
+    ...common,
+    hear: (line) => {
+      if (!asked) {
+        if (!mentions(line, script.work)) return mentions(line, [...yes, ...no, ...known]) ? act.say(common.clarify[0]!) : act.notUnderstood();
+        asked = true;
+        return act.say(script.askName);
+      }
+      if (name === null) {
+        name = nameIn(line, script.introductions) || null;
+        return name === null ? act.notUnderstood() : act.say(nextQuestion());
+      }
+      if (start === null) {
+        start = START_WHEN.find((when) => mentions(line, script.starts[when].words)) ?? null;
+        return start || mentions(line, [...yes, ...no, ...known]) ? act.say(nextQuestion()) : act.notUnderstood();
+      }
+      if (mentions(line, no)) {
+        [name, start] = [null, null];
+        return act.say(script.askName);
+      }
+      if (!mentions(line, yes)) return act.say(nextQuestion());
+      act.call(HIRE_APPLICANT, { name, start }, (response) => {
+        if (response.result === 'done') return act.say(script.hired);
+        // Misheard: the start stands, and the name is asked again.
+        name = null;
+        act.say(script.nameAgain);
+      });
+    },
+  };
+}
+
+/** The fake Shift Customer: orders their drink, says it again when asked, and reacts to what they are handed. */
+type CustomerScript = {
+  order: (items: string) => string;
+  /** Says the order again, for a line it understood. */
+  again: (items: string) => string;
+  /** Changes their mind: they want this instead. */
+  change: (items: string) => string;
+  thanks: string;
+  wrongOrder: string;
+  /** Words that ask the customer to repeat or clarify. */
+  repeat: string[];
+};
+
+const CUSTOMER_SCRIPT: Record<LanguageCode, CustomerScript> = {
+  ja: {
+    order: (items) => `こんにちは。${items}をひとつください。`,
+    again: (items) => `${items}をひとつお願いします。`,
+    change: (items) => `あ、すみません！やっぱり${items}にしてください。`,
+    thanks: 'ありがとうございます！',
+    wrongOrder: 'あの、これは注文したものと違います…。じゃあ、いいです。',
+    repeat: ['もう一度', 'もういちど', 'なん', '何', 'えっ', 'え？'],
+  },
+  zh: {
+    order: (items) => `你好，我要一杯${items}。`,
+    again: (items) => `一杯${items}，谢谢。`,
+    change: (items) => `啊，不好意思！我改成${items}吧。`,
+    thanks: '谢谢！',
+    wrongOrder: '这不是我点的……算了，再见。',
+    repeat: ['再说一遍', '什么', '请再说'],
+  },
+  en: {
+    order: (items) => `Hi! Could I get a ${items}, please?`,
+    again: (items) => `A ${items}, please.`,
+    change: (items) => `Oh, sorry! Actually, could I have a ${items} instead?`,
+    thanks: 'Lovely, thanks!',
+    wrongOrder: "Sorry, that's not what I ordered… never mind. Bye.",
+    repeat: ['sorry', 'again', 'pardon', 'what'],
+  },
+  de: {
+    order: (items) => `Hallo! Einen ${items}, bitte.`,
+    again: (items) => `Einen ${items}, bitte.`,
+    change: (items) => `Ach, Entschuldigung! Doch lieber einen ${items}.`,
+    thanks: 'Danke schön!',
+    wrongOrder: 'Das habe ich nicht bestellt… na ja, tschüss.',
+    repeat: ['nochmal', 'noch mal', 'wie bitte', 'was'],
+  },
+};
+
+/** The fake Shift Customer at the till: says everything the cashier needs to hear at once, and again when asked. */
+type TillCustomerScript = {
+  /** What goes between sentences: nothing in ja and zh. */
+  between: string;
+  hello: string;
+  bag: { yes: string; no: string };
+  pointsCard: { yes: string; no: string };
+  behind: (item: string) => string;
+  cash: (amount: string) => string;
+  byCard: string;
+  thanks: string;
+  wrong: string;
+};
+
+const TILL_CUSTOMER_SCRIPT: Record<LanguageCode, TillCustomerScript> = {
+  ja: {
+    between: '',
+    hello: 'こんにちは。',
+    bag: { yes: '袋をお願いします。', no: '袋はいりません。' },
+    pointsCard: { yes: 'ポイントカードあります。', no: 'ポイントカードはないです。' },
+    behind: (item) => `あと、${item}をひとつください。`,
+    cash: (amount) => `${amount}でお願いします。`,
+    byCard: 'カードで払います。',
+    thanks: 'どうも、ありがとうございます！',
+    wrong: 'あの、ちょっと違うみたいです…。まあ、いいです。',
+  },
+  zh: {
+    between: '',
+    hello: '你好！',
+    bag: { yes: '要一个袋子。', no: '不要袋子。' },
+    pointsCard: { yes: '我有积分卡。', no: '我没有积分卡。' },
+    behind: (item) => `还要一份${item}。`,
+    cash: (amount) => `给你${amount}。`,
+    byCard: '我刷卡。',
+    thanks: '谢谢！',
+    wrong: '好像不太对……算了，再见。',
+  },
+  en: {
+    between: ' ',
+    hello: 'Hi there!',
+    bag: { yes: "I'd like a bag, please.", no: 'No bag, thanks.' },
+    pointsCard: { yes: "Here's my points card.", no: "I haven't got a points card." },
+    behind: (item) => `And could I have ${item} from behind the counter?`,
+    cash: (amount) => `Here's ${amount}.`,
+    byCard: "I'll pay by card.",
+    thanks: 'Lovely, thanks!',
+    wrong: "Hmm, that's not quite right… never mind. Bye.",
+  },
+  de: {
+    between: ' ',
+    hello: 'Hallo!',
+    bag: { yes: 'Eine Tüte, bitte.', no: 'Keine Tüte, danke.' },
+    pointsCard: { yes: 'Hier ist meine Punktekarte.', no: 'Ich habe keine Punktekarte.' },
+    behind: (item) => `Und dazu ${item} von hinten, bitte.`,
+    cash: (amount) => `Hier sind ${amount}.`,
+    byCard: 'Ich zahle mit Karte.',
+    thanks: 'Danke schön!',
+    wrong: 'Das stimmt nicht ganz… na ja, tschüss.',
+  },
+};
+
+/** A Shift Customer at the till: says whether they want a bag, have a points card, anything from behind the counter and how they pay. */
+function tillCustomerNpc(script: TillCustomerScript, common: OrderScript, repeat: string[], wants: CheckoutSaid, act: Act): Npc {
+  const all = [
+    script.hello,
+    wants.bag ? script.bag.yes : script.bag.no,
+    wants.pointsCard ? script.pointsCard.yes : script.pointsCard.no,
+    ...(wants.fromBehindTheCounter ? [script.behind(wants.fromBehindTheCounter)] : []),
+    wants.cashHanded ? script.cash(wants.cashHanded) : script.byCard,
+  ].join(script.between);
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: all,
+    resume: all,
+    hear: (line) => {
+      const servedRight = readServedScene(line);
+      if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrong);
+      if (mentions(line, [...repeat, ...yes, ...no, ...known])) return act.say(all);
+      act.notUnderstood();
+    },
+  };
+}
+
+/** The fake Shift Customer at a restaurant table: orders for everyone at once, saying who has what, and again when asked. */
+type TableCustomerScript = {
+  /** What goes between sentences: nothing in ja and zh. */
+  between: string;
+  hello: string;
+  /** What one diner wants (`i` 0 is the customer speaking), with their dietary need if they have one. */
+  diner: (i: number, dish: string, drink: string, note: string | null) => string;
+  thanks: string;
+  wrong: string;
+};
+
+const TABLE_CUSTOMER_SCRIPT: Record<LanguageCode, TableCustomerScript> = {
+  ja: {
+    between: '',
+    hello: 'すみません、注文お願いします。',
+    diner: (i, dish, drink, note) => `${['私', '友達', 'もう一人の友達'][i] ?? '友達'}は${dish}と${drink}を${note ? `、${note}で` : ''}お願いします。`,
+    thanks: 'はい、それでお願いします。ありがとうございます！',
+    wrong: 'あの、ちょっと違うみたいです…。まあ、いいです。',
+  },
+  zh: {
+    between: '',
+    hello: '服务员，点菜。',
+    diner: (i, dish, drink, note) => `${['我', '我朋友', '另一个朋友'][i] ?? '我朋友'}要${dish}和${drink}${note ? `，${note}` : ''}。`,
+    thanks: '好，就这些，谢谢！',
+    wrong: '好像不太对……算了。',
+  },
+  en: {
+    between: ' ',
+    hello: "Hi, we're ready to order.",
+    diner: (i, dish, drink, note) =>
+      `${['I', 'My friend', 'My other friend'][i] ?? 'My friend'}'ll have the ${dish} and a ${drink}${note ? ` (${note}, please)` : ''}.`,
+    thanks: 'Perfect, thanks!',
+    wrong: "Hmm, that's not quite right… never mind.",
+  },
+  de: {
+    between: ' ',
+    hello: 'Hallo, wir möchten bestellen.',
+    diner: (i, dish, drink, note) =>
+      `${['Ich nehme', 'Meine Freundin nimmt', 'Meine andere Freundin nimmt'][i] ?? 'Meine Freundin nimmt'} ${dish} und ${drink}${note ? ` (${note}, bitte)` : ''}.`,
+    thanks: 'Super, danke!',
+    wrong: 'Das stimmt nicht ganz… na ja.',
+  },
+};
+
+/** A Shift Customer at a restaurant table: orders every diner's dish and drink at once, with the dietary need. */
+function tableCustomerNpc(script: TableCustomerScript, common: OrderScript, repeat: string[], diners: DinerSaid[], act: Act): Npc {
+  const all = [script.hello, ...diners.map(({ dish, drink, note }, i) => script.diner(i, dish, drink, note))].join(script.between);
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: all,
+    resume: all,
+    hear: (line) => {
+      const servedRight = readServedScene(line);
+      if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrong);
+      if (mentions(line, [...repeat, ...yes, ...no, ...known])) return act.say(all);
+      act.notUnderstood();
+    },
+  };
+}
+
+/**
+ * A Shift Customer, ordering what the instruction holds by the items' local names ("1 × ラテ" is said as "ラテ"). One
+ * who changes their mind wants what the instruction says instead once the barista has started on it.
+ */
+function customerNpc(script: CustomerScript, common: OrderScript, systemInstruction: string, act: Act): Npc {
+  const said = (order: string | null) => (order ?? '').replace(/\d+ × /g, '');
+  let items = said(readShiftOrder(systemInstruction));
+  const changedTo = readChangedOrder(systemInstruction);
+  const { yes, no, known } = common.words;
+  return {
+    ...common,
+    greeting: script.order(items),
+    get resume() {
+      return script.again(items);
+    },
+    hear: (line) => {
+      const servedRight = readServedScene(line);
+      if (servedRight !== null) return act.say(servedRight ? script.thanks : script.wrongOrder);
+      if (readChangeScene(line) && changedTo) {
+        items = said(changedTo);
+        return act.say(script.change(items));
+      }
+      if (mentions(line, [...script.repeat, ...yes, ...no, ...known])) return act.say(script.again(items));
       act.notUnderstood();
     },
   };
@@ -489,6 +864,15 @@ function cafeNpc(script: CafeScript, common: OrderScript, menu: ItemId[], packId
 /** Which fake NPC plays this session, read from the completion it offers. */
 function castNpc(session: NpcSession, act: Act): Npc {
   const packId = session.voice.targetLanguage;
+  const offers = (name: string) => session.tools.some((tool) => tool.name === name);
+  if ('shiftCustomerVoice' in session.voice) {
+    const atTheTill = readCheckout(session.systemInstruction);
+    if (atTheTill) return tillCustomerNpc(TILL_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTill, act);
+    const atTheTable = readTable(session.systemInstruction);
+    if (atTheTable) return tableCustomerNpc(TABLE_CUSTOMER_SCRIPT[packId], SCRIPT[packId], CUSTOMER_SCRIPT[packId].repeat, atTheTable, act);
+    return customerNpc(CUSTOMER_SCRIPT[packId], SCRIPT[packId], session.systemInstruction, act);
+  }
+  if (offers(HIRE_APPLICANT)) return hiringNpc(HIRING_SCRIPT[packId], SCRIPT[packId], act);
   // The barista's order with options, and avoiding an allergen, say how each line is made.
   const orderLine = session.tools.find((tool) => tool.name === SERVE_ORDER)?.parameters;
   if (orderLine?.properties?.items?.items?.properties?.size) {
@@ -501,7 +885,12 @@ function castNpc(session: NpcSession, act: Act): Npc {
  * The mock-mode NPC: a scripted fake that speaks first and answers every typed
  * line in the Target Language, after a short delay. Which one it plays comes from
  * the session: the barista reads an order back and
- * calls serve_order only once the Player confirms. It calls
+ * calls serve_order only once the Player confirms; the barista asked for work takes a name and a start, reads them
+ * back and hires on a yes, asking the name again if the sim says it's wrong; a Shift Customer orders
+ * the drink in its instruction, says it again when asked, and thanks the barista or says it's the wrong
+ * one when a scene says what it was handed; one at the till says all the cashier needs to hear at once
+ * (bag, points card, anything from behind the counter, the cash it hands over); one at a restaurant table orders
+ * for everyone at once, saying who has what and the dietary need. The server hiring is the barista's. Each calls
  * not_understood for a line with no word it knows. It has no audio, so
  * push-to-talk does nothing. Replacing a dropped session, it picks up again
  * but has forgotten any read-back. Every event waits `replyDelayMs`, from the gateway's

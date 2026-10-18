@@ -19,7 +19,7 @@ export {
   type NpcLook,
   type Weights,
 } from './appearance.ts';
-export { interactionStartedWithE } from './approaches.ts';
+export { interactionStartedWithE, interactionStartedWithF } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {
   CULTURE_PACKS,
@@ -41,7 +41,7 @@ export {
   type Shop,
   type SignWord,
 } from './culturePacks.ts';
-export { chargeInShifts, formatLocalAmount, formatLocalMoney, localPrice, menuPrice, priceProblem } from './currency.ts';
+export { chargeInShifts, formatLocalAmount, formatLocalMoney, localPrice, menuPrice, priceProblem, tillFor } from './currency.ts';
 export {
   defineInteraction,
   FACT_SOURCES,
@@ -50,22 +50,43 @@ export {
   type FactSource,
   type Interaction,
   type InteractionDefinition,
+  type JobApplication,
   type OrderLine,
   type ParsedArgs,
   type ResolvedCompletion,
   type ServedItem,
 } from './defineInteraction.ts';
 export { interactionFacts } from './facts.ts';
-export { INTERACTIONS } from './interactions.ts';
+export { INTERACTIONS, START_WHEN } from './interactions.ts';
+export {
+  DEFAULT_DRINK,
+  isCheckout,
+  isDrink,
+  isTable,
+  jobAt,
+  JOB_PLACES,
+  SHIFT_MENUS,
+  SHIFT_TEMPLATES,
+  shiftTemplates,
+  type CheckoutTemplate,
+  type DrinkTemplate,
+  type ShiftTemplate,
+  type TableTemplate,
+} from './shifts.ts';
 export {
   ALLERGENS,
+  BEHIND_THE_COUNTER,
   CAFE_COUNTER,
   CAFE_MENU,
   CAFE_TREATS,
+  DIETARY_NOTE_IDS,
+  DIETARY_NOTES,
+  dishFits,
   DRINK_EXTRAS,
   DRINK_OPTIONS,
   DRINK_SIZES,
   DRINK_TEMPERATURES,
+  drinkModifiersSchema,
   GROCERIES_SOLD,
   isMadeToOrder,
   ITEM_IDS,
@@ -75,7 +96,9 @@ export {
   RESTAURANT_DRINKS,
   RESTAURANT_MENU,
   type Allergen,
+  type DietaryNoteId,
   type DrinkExtra,
+  type DrinkModifiers,
   type DrinkOptionId,
   type DrinkSize,
   type DrinkTemperature,

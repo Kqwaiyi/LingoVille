@@ -206,6 +206,73 @@ body,
   color: var(--hud-muted);
 }
 
+/* --- Skills --------------------------------------------------------------- */
+
+.skills h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.skills ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skills li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.skills li + li {
+  margin-top: 4px;
+}
+
+.dock-skills button {
+  padding: 2px 10px;
+  border: 1px solid var(--hud-track);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dock-skills {
+  position: relative;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Opens upwards from its button in the dock, solid and over the prompt and place line. */
+.skills {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% + 18px);
+  width: min(300px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(20, 24, 36);
+  white-space: normal;
+}
+
+.skills-stars {
+  color: #f2c14e;
+  font-size: 16px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.dock-skills .skills-close {
+  margin-top: 10px;
+  width: 100%;
+  border-color: transparent;
+  color: var(--hud-muted);
+}
+
 /* --- Signs ---------------------------------------------------------------- */
 
 /* Pointing at a sign or menu: its words with their reading aid, and Translate. */
@@ -600,6 +667,246 @@ ruby {
 .closing-card-actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* --- Shifts ---------------------------------------------------------------- */
+
+/* The barista's menu grid, between the chat and the input bar while a Shift Customer is at the counter. */
+.menu-grid {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--rule);
+  background: #fff;
+}
+
+.menu-grid-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.menu-grid-options > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.menu-grid-options button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.menu-grid-options button[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.menu-grid-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.menu-grid-group {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.8em;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.menu-grid button {
+  padding: 8px 10px;
+  border: 1px solid #d8cfbf;
+  border-radius: 10px;
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.menu-grid-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.menu-grid-tray p {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+
+.menu-grid-tray .primary {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--ink);
+}
+
+.menu-grid button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The cashier's till: the same parts as the menu grid, plus the cash keyed in and the coin tray, packed tighter to leave the chat room. */
+.till {
+  padding-top: 6px;
+  padding-bottom: 8px;
+}
+
+.till button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.till .menu-grid-items {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.till .menu-grid-items + .menu-grid-items {
+  margin-top: 4px;
+}
+
+.till .menu-grid-tray {
+  margin-top: 6px;
+}
+
+.till .menu-grid-options {
+  margin: 0;
+  gap: 4px;
+}
+
+.till-coins {
+  margin-top: 6px !important;
+}
+
+.till-total {
+  flex: 0 0 auto !important;
+  font-weight: 600;
+}
+
+.till-cash {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.till-cash label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.till-cash input {
+  width: 7em;
+  padding: 4px 6px;
+  border: 1px solid #d8cfbf;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.till-spacer {
+  flex: 1;
+}
+
+/* The server's order pad: compact, like the till, so a table of three still fits the column. */
+.order-pad {
+  padding-top: 6px;
+  padding-bottom: 8px;
+}
+
+.order-pad button {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.order-pad .menu-grid-items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.order-pad .menu-grid-items button[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.order-pad .menu-grid-options {
+  margin: 0;
+  gap: 4px;
+}
+
+.order-pad .menu-grid-tray {
+  margin-top: 6px;
+}
+
+.order-pad-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.order-pad-note select {
+  padding: 4px 6px;
+  border: 1px solid #d8cfbf;
+  border-radius: 6px;
+  font: inherit;
+}
+
+/* What the Shift paid, over the town until it's closed. */
+.shift-end {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 18px 22px;
+  border-radius: 14px;
+  background: #fffaf2;
+  color: #1d2433;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.shift-end h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.shift-end > p {
+  margin: 0 0 10px;
+}
+
+/* The Shift's combined Recap, under the pay: it scrolls if it's long. */
+.shift-end-recap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -8px 12px;
+}
+
+.shift-end-pay {
+  font-weight: 600;
+}
+
+.shift-end > button {
+  align-self: flex-start;
+  padding: 9px 18px;
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  background: var(--ok);
+  font: inherit;
+  cursor: pointer;
 }
 
 /* --- Voice ----------------------------------------------------------------- */

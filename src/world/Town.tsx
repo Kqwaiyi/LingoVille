@@ -7,8 +7,12 @@ import { TOWN_NPC_IDS, TOWN_NPCS, townNpcLook, type RoleId, type TownNpcId } fro
 import { useTranslation } from '../i18n/index.ts';
 import {
   selectCulturePackId,
+  selectNpcExpression,
   selectNpcExpressionOf,
   selectNpcSpeaking,
+  selectShift,
+  selectShiftCustomerLooks,
+  selectShiftCustomerSpeaking,
   selectTramRunning,
   useGame,
 } from '../store/index.ts';
@@ -16,12 +20,13 @@ import { characterPosition } from './Character.tsx';
 import { CharacterFigure } from './CharacterFigure.tsx';
 import { Buildings } from './Buildings.tsx';
 import { Groceries } from './Groceries.tsx';
+import { Piece } from './Kit.tsx';
 import { Outdoors } from './Outdoors.tsx';
 import { PALETTE, type PaletteColour } from './palette.ts';
 import { Props } from './Props.tsx';
 import { Scenery } from './Scenery.tsx';
 import { Signs } from './Signs.tsx';
-import { isWaitingForTram, NPC_SPOTS, type Vec3 } from './town.ts';
+import { isWaitingForTram, NPC_SPOTS, type Vec3, WORKPLACES } from './town.ts';
 
 /**
  * Each role's signifier, the same in every Culture Pack: staff wear an apron in their role's colour over what their look
@@ -116,6 +121,46 @@ function Npc({ npcId }: { npcId: TownNpcId }) {
   );
 }
 
+/**
+ * The Shift Customer at the café counter or the supermarket till, from walking up until they leave, in the look drawn
+ * for them. At the restaurant, the rest of their table stands with them; the one speaking for the table shows the
+ * speaking indicator, and their Patience.
+ */
+function ShiftCustomer() {
+  const looks = useGame(selectShiftCustomerLooks);
+  const speaking = useGame(selectShiftCustomerSpeaking);
+  const expression = useGame(selectNpcExpression);
+  const jobId = useGame((s) => selectShift(s)?.jobId);
+  const workplace = jobId && WORKPLACES[jobId];
+  if (!workplace) return null;
+  const seats = [workplace.customerSpot, ...(workplace.otherSeats ?? [])];
+  return (
+    <>
+      {looks.map((look, i) => (
+        <group key={i}>
+          <Figure at={seats[i]!}>
+            <CharacterFigure
+              appearance={look}
+              clip={i === 0 && speaking ? 'talk' : 'idle'}
+              expression={i === 0 ? (expression ?? 'relaxed') : 'relaxed'}
+            />
+          </Figure>
+          {i === 0 && (
+            <group position={seats[i]}>
+              <SpeakingIndicator speaking={speaking} />
+            </group>
+          )}
+        </group>
+      ))}
+    </>
+  );
+}
+
+/** The staff doors at the café, the supermarket and the restaurant: each a door set flat against the inside of a side wall. */
+function StaffDoors() {
+  return Object.values(WORKPLACES).map(({ door: [x, , z], doorRotation }) => <Piece key={`${x},${z}`} piece="door" position={[x, 0, z]} rotation={doorRotation} />);
+}
+
 export function Town() {
   const tramRunning = useGame(selectTramRunning);
   return (
@@ -123,6 +168,8 @@ export function Town() {
       <Outdoors />
       <Scenery />
       <Buildings />
+      <StaffDoors />
+      <ShiftCustomer />
       {TOWN_NPC_IDS.filter((npcId) => tramRunning || !isWaitingForTram(npcId)).map((npcId) => (
         <Npc key={npcId} npcId={npcId} />
       ))}

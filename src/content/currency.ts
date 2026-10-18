@@ -1,6 +1,6 @@
-import { ECONOMY, type LanguageCode } from '../sim/index.ts';
+import { ECONOMY, type LanguageCode, type Till } from '../sim/index.ts';
 import { CULTURE_PACKS, type Currency } from './culturePacks.ts';
-import { ITEMS, type ItemId } from './items.ts';
+import { ITEM_IDS, ITEMS, type ItemId } from './items.ts';
 
 // Prices are authored as ratios of one Shift's base pay. Each pack converts
 // them by its anchor and rounds them to local price points, so ¥380, 15元,
@@ -47,4 +47,14 @@ export function formatLocalAmount(amount: number, packId: LanguageCode): string 
   const { code, locale, suffix } = CULTURE_PACKS[packId].currency;
   if (suffix) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(amount)}${suffix}`;
   return new Intl.NumberFormat(locale, { style: 'currency', currency: code, trailingZeroDisplay: 'stripIfInteger' }).format(amount);
+}
+
+const TILLS = new Map<LanguageCode, Till>();
+/** The pack's money at the supermarket till: every item at its local price, and the coins and notes in the drawer. */
+export function tillFor(packId: LanguageCode): Till {
+  if (!TILLS.has(packId)) {
+    const prices = Object.fromEntries(ITEM_IDS.map((itemId) => [itemId, localPrice(ITEMS[itemId].priceInShifts, packId)])) as Till['prices'];
+    TILLS.set(packId, { prices, denominations: CULTURE_PACKS[packId].currency.denominations });
+  }
+  return TILLS.get(packId)!;
 }

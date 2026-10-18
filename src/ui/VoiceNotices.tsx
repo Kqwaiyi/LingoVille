@@ -23,7 +23,7 @@ export function Toast() {
       {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'loadedBackup' && t('toast.loadedBackup')}
       {toast.kind === 'npcSteppedAway' &&
-        t('toast.npcSteppedAway', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
+        t('toast.npcSteppedAway', { who: toast.npcId ? t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) : t('shift.customerSubject') })}
     </div>
   );
 }

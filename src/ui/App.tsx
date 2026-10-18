@@ -11,6 +11,7 @@ import { PauseMenu } from './PauseMenu.tsx';
 import { PersistCallout } from './PersistCallout.tsx';
 import { SetupScreen } from './SetupScreen.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
+import { ShiftEndCard } from './ShiftPanel.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
 import { TramPanel } from './TramPanel.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
@@ -58,6 +59,7 @@ function Hud() {
       <SignTooltip />
       <Dock />
       <ConversationColumn />
+      <ShiftEndCard />
       <Toast />
       <Journal />
       <VoiceUnavailableScreen />

@@ -32,6 +32,18 @@ function drawLook(rngState: number, weights: LookWeights): { value: NpcLook; rng
   };
 }
 
+/** `count` anonymous looks, one after another from the RNG. */
+export function drawLooks(rngState: number, weights: LookWeights, count: number): { value: NpcLook[]; rngState: number } {
+  const looks: NpcLook[] = [];
+  let next = rngState;
+  for (let i = 0; i < count; i++) {
+    const look = drawLook(next, weights);
+    looks.push(look.value);
+    next = look.rngState;
+  }
+  return { value: looks, rngState: next };
+}
+
 /** The look of an anonymous someone who is always about (a passer-by): drawn from their own `seed`, not the save's RNG, so it never changes. */
 export function lookFromSeed(seed: number, weights: LookWeights): NpcLook {
   return drawLook(seedRng(seed), weights).value;

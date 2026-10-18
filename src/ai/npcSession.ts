@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  type Build,
   interactionFacts,
   toToolDeclaration,
   type CulturePack,
@@ -11,10 +12,13 @@ import {
 import { weekdayOf, type GameState, type LanguageCode, type PlaceId, type ProficiencyStep } from '../sim/index.ts';
 
 /**
- * Which voice the NPC speaks with: a Named NPC's own.
+ * Which voice the NPC speaks with: a Named NPC's own, or, for a Shift Customer, one that suits the build
+ * of their look, drawn by their seed.
  * The gateway resolves it to a prebuilt voice, because voices live only in the gateway config.
  */
-export type VoiceRequest = { targetLanguage: LanguageCode; npcId: NamedNpcId };
+export type VoiceRequest =
+  | { targetLanguage: LanguageCode; npcId: NamedNpcId }
+  | { targetLanguage: LanguageCode; shiftCustomerVoice: number; build: Build };
 
 export type NpcSession = {
   systemInstruction: string;
@@ -33,8 +37,10 @@ export const NOT_UNDERSTOOD_TOOL = 'not_understood';
 // What the game answers each tool call with. The system instruction tells the NPC what each answer means.
 export type CompletionResponse =
   | { result: 'served' }
+  | { result: 'done' }
   | { result: 'cannot_afford' }
-  | { result: 'invalid_arguments'; error: string };
+  | { result: 'invalid_arguments'; error: string }
+  | { result: 'wrong_name' };
 export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
 export type ToolResponse = CompletionResponse | NotUnderstoodResponse | { result: 'unknown_tool' };
 
@@ -159,7 +165,14 @@ function personaBlock(npc: NamedNpc, pack: CulturePack) {
   ]);
 }
 
-function youAndThisPersonBlock(who: string) {
+function youAndThisPersonBlock(interaction: Interaction, who: string) {
+  // Hiring asks for the name itself.
+  if (interaction.effect.kind === 'hire') {
+    return block('YOU AND THIS PERSON', [
+      `This ${who} is a stranger: you have never met. You don't know their name yet; asking for it is part of hiring them.`,
+      'Speak to them politely, as you would to anyone asking for a job.',
+    ]);
+  }
   return block('YOU AND THIS PERSON', [
     `This ${who} is a stranger: you have never met. You don't know their name and don't ask for it.`,
     `Speak to them politely, as you would to any ${who}.`,
@@ -193,6 +206,15 @@ function factsBlock(interaction: Interaction, pack: CulturePack) {
 
 function goalBlock(interaction: Interaction, who: string) {
   const { name } = interaction.completion;
+  if (interaction.effect.kind === 'hire') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know their name and when they can start, read both back and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with their name as they said it and when they can start. Never call it before.`,
+      `- If ${name} answers "wrong_name", you misheard their name: apologise, and ask them to say it again slowly, or to spell it. The conversation goes on.`,
+      `- If ${name} answers "done", tell them they have the job and can start a shift at the staff door whenever you are open, and say goodbye.`,
+    ]);
+  }
   if (interaction.facts.includes('drinkOptions')) {
     const allergen = interaction.facts.includes('allergens') ? ', and the allergen they told you, or "none"' : '';
     return block('YOUR GOAL', [
@@ -238,7 +260,7 @@ export function buildNpcSession(
   const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    youAndThisPersonBlock(who),
+    youAndThisPersonBlock(interaction, who),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
     factsBlock(interaction, culturePack),
