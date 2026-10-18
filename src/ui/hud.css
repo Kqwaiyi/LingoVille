@@ -1,0 +1,500 @@
+:root {
+  --hud-bg: rgba(20, 24, 36, 0.88);
+  --hud-ink: #fff;
+  --hud-muted: #b9c0d0;
+  --hud-track: #39415a;
+  --ok: #6fcf8e;
+  --low: #e8785f;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.game {
+  position: fixed;
+  inset: 0;
+}
+
+.dev-status {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  margin: 0;
+  font-size: 12px;
+  color: #445;
+}
+
+.dock-area {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dock {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 18px 18px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 18px;
+  user-select: none;
+}
+
+.place-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 999px;
+  font-size: 13px;
+  user-select: none;
+  white-space: nowrap;
+  transition: opacity 0.2s ease-out;
+}
+
+/* Fades slowly once it has shown for a while, keeping its room, and comes back quickly on arriving somewhere. */
+.place-line[data-faded] {
+  opacity: 0;
+  transition: opacity 0.8s ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .place-line,
+  .place-line[data-faded] {
+    transition: none;
+  }
+}
+
+.place-status {
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.place-status[data-open='false'] {
+  color: var(--hud-muted);
+}
+
+.dock-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dock-time {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-day {
+  font-size: 12px;
+  color: var(--hud-muted);
+  white-space: nowrap;
+}
+
+.dock-money {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.prompt {
+  position: absolute;
+  left: 50%;
+  /* Clear of the dock and the place line above it. */
+  bottom: 160px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.prompt kbd {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--hud-muted);
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+/* --- Tram ------------------------------------------------------------------ */
+
+/* At a tram stop: the other stops on the line, each with its trip time. */
+.tram-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 160px;
+  transform: translateX(-50%);
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+}
+
+.tram-panel h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.tram-from {
+  margin: 2px 0 10px;
+  color: var(--hud-muted);
+  font-size: 13px;
+}
+
+.tram-panel ul {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.tram-panel button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--hud-track);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tram-panel li + li {
+  margin-top: 6px;
+}
+
+.tram-panel button:hover,
+.tram-panel button:focus-visible {
+  background: var(--hud-track);
+}
+
+.tram-trip {
+  color: var(--hud-muted);
+}
+
+.tram-panel .tram-cancel {
+  justify-content: center;
+  border-color: transparent;
+  color: var(--hud-muted);
+}
+
+/* --- Conversation ---------------------------------------------------------- */
+
+.game {
+  --chat-width: min(420px, 40vw);
+  --paper: #fffaf2;
+  --ink: #1d2433;
+  --rule: #e6dfd2;
+  --player: #2d6cdf;
+}
+
+/* The dock shrinks and centres on the scene left of the column. */
+.game[data-talking] .dock-area {
+  left: calc((100% - var(--chat-width)) / 2);
+  transform: translateX(-50%) scale(0.85);
+  transform-origin: bottom center;
+}
+
+.chat-column {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--chat-width);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.2);
+}
+
+.chat-header {
+  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.chat-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.npc-face {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e7eef4;
+}
+
+.chat-role {
+  font-size: 12px;
+  font-weight: 400;
+  color: #7b8496;
+}
+
+.chat-meta {
+  font-size: 12px;
+  color: #7b8496;
+}
+
+.chat-tabs {
+  display: flex;
+  align-items: flex-end;
+  margin-top: 8px;
+}
+
+.chat-tabs button {
+  border: 0;
+  background: none;
+  padding: 8px 12px;
+  font: inherit;
+  color: #7b8496;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.chat-tabs .chat-leave {
+  margin-left: auto;
+}
+
+.chat-leave kbd {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bubble {
+  max-width: 82%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.bubble-npc {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-bottom-left-radius: 4px;
+}
+
+.bubble-player {
+  align-self: flex-end;
+  background: var(--player);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.bubble-player small {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.chat-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 15px;
+}
+
+.closing-card {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--rule);
+  background: #fff;
+}
+
+.closing-card h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.closing-card[data-outcome='failure'] h2 {
+  color: #8a5a44;
+}
+
+.closing-card p {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+/* --- Voice ----------------------------------------------------------------- */
+
+/* Push-to-talk. Red with a live dot while listening; the dot swells with the mic level. */
+.mic {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #d8cfbf;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.mic[data-listening] {
+  border-color: #d93a3a;
+  background: #e5484d;
+  box-shadow: 0 0 0 4px rgba(229, 72, 77, 0.25);
+}
+
+.mic-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #e5484d;
+  opacity: 0;
+  transform: scale(calc(1 + var(--level, 0) * 0.6));
+  transition: transform 80ms linear;
+}
+
+.mic[data-listening] .mic-dot {
+  opacity: 1;
+  animation: mic-live 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-live {
+  50% {
+    border-color: #ffd2d2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mic[data-listening] .mic-dot {
+    animation: none;
+  }
+}
+
+/* In the Typed Fallback, the mic button's place says the mic is off. */
+.mic-off {
+  flex: none;
+  max-width: 150px;
+  padding: 4px 10px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: #f4efe6;
+  color: #6b6458;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.chat-notice {
+  align-self: center;
+  margin: 0;
+  font-size: 13px;
+  color: #7b8496;
+}
+
+.toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 15px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.screen-backdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 12, 20, 0.55);
+}
+
+.voice-unavailable {
+  max-width: 440px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: #fffaf2;
+  color: #1d2433;
+}
+
+.voice-unavailable h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.voice-unavailable p {
+  margin: 0 0 16px;
+  line-height: 1.45;
+}
+
+.voice-unavailable .primary {
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ok);
+  color: #1d2433;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Anchored to the NPC in the scene while a line of theirs is coming in. */
+.npc-speaking {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}

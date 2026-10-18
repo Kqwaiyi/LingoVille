@@ -1,0 +1,134 @@
+import { Html } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
+import { CapsuleCollider, RigidBody } from '@react-three/rapier';
+import { Suspense, useRef, type ReactNode } from 'react';
+import type { Group } from 'three';
+import { TOWN_NPC_IDS, TOWN_NPCS, townNpcLook, type RoleId, type TownNpcId } from '../content/index.ts';
+import { useTranslation } from '../i18n/index.ts';
+import {
+  selectCulturePackId,
+  selectNpcExpressionOf,
+  selectNpcSpeaking,
+  selectTramRunning,
+  useGame,
+} from '../store/index.ts';
+import { characterPosition } from './Character.tsx';
+import { CharacterFigure } from './CharacterFigure.tsx';
+import { Buildings } from './Buildings.tsx';
+import { Groceries } from './Groceries.tsx';
+import { Outdoors } from './Outdoors.tsx';
+import { PALETTE, type PaletteColour } from './palette.ts';
+import { Props } from './Props.tsx';
+import { Scenery } from './Scenery.tsx';
+import { Signs } from './Signs.tsx';
+import { isWaitingForTram, NPC_SPOTS, type Vec3 } from './town.ts';
+
+/**
+ * Each role's signifier, the same in every Culture Pack: staff wear an apron in their role's colour over what their look
+ * has them wear. The landlord, the park regulars and passers-by wear only their look.
+ */
+const APRONS: Partial<Record<RoleId, PaletteColour>> = {
+  barista: 'teal',
+  cashier: 'mustard',
+  clerk: 'denim',
+  server: 'brick',
+  receptionist: 'slate',
+  doctor: 'white',
+  nurse: 'leaf',
+  pharmacist: 'sky',
+  shopkeeper: 'plum',
+  attendant: 'denim',
+};
+
+const apronOf = (role: RoleId) => {
+  const colour = APRONS[role];
+  return colour && PALETTE[colour];
+};
+
+/** How far above the middle of where someone stands the "speaking…" shows: just over Clawd in a tall hat. */
+const SPEAKING_HEIGHT = 0.75;
+
+/** A small "speaking…" over the NPC while a line of theirs is coming in. The words themselves are in the chat column. */
+function SpeakingIndicator({ speaking }: { speaking: boolean }) {
+  const { t } = useTranslation();
+  if (!speaking) return null;
+  return (
+    <Html position={[0, SPEAKING_HEIGHT, 0]} center zIndexRange={[10, 0]}>
+      <span className="npc-speaking" role="status">
+        {t('chat.speaking')}
+      </span>
+    </Html>
+  );
+}
+
+/** How near the Character must come before someone turns to face them, in metres. */
+const TURN_RANGE = 6;
+/** How quickly someone turns to face the Character (per second). */
+const TURN_SPEED = 4;
+
+/** Turns what it holds, on the spot, to face the Character once they come near. */
+function FacingTheCharacter({ at: [x, , z], children }: { at: Vec3; children: ReactNode }) {
+  const turning = useRef<Group>(null);
+  useFrame((_, delta) => {
+    const group = turning.current;
+    const [dx, dz] = [characterPosition.x - x, characterPosition.z - z];
+    if (!group || dx * dx + dz * dz > TURN_RANGE * TURN_RANGE) return;
+    // The shorter way round.
+    const turn = Math.atan2(dx, dz) - group.rotation.y;
+    group.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, TURN_SPEED * delta);
+  });
+  return <group ref={turning}>{children}</group>;
+}
+
+/** Someone (Clawd, as everyone is) standing at `at` (a capsule's middle, as the spots are given), feet on the floor, facing the Character. */
+function Figure({ at, children }: { at: Vec3; children: ReactNode }) {
+  return (
+    <group position={at}>
+      <FacingTheCharacter at={at}>
+        <group position-y={-at[1]}>
+          <Suspense fallback={null}>{children}</Suspense>
+        </group>
+      </FacingTheCharacter>
+    </group>
+  );
+}
+
+/** A town NPC in their look for this Culture Pack, whose face shows their Patience while the Player talks to them. Solid to the Character. */
+function Npc({ npcId }: { npcId: TownNpcId }) {
+  const speaking = useGame(selectNpcSpeaking) === npcId;
+  const packId = useGame(selectCulturePackId);
+  const expression = useGame(selectNpcExpressionOf(npcId));
+  return (
+    <>
+      <Figure at={NPC_SPOTS[npcId]}>
+        <CharacterFigure
+          appearance={townNpcLook(npcId, packId)}
+          clip={speaking ? 'talk' : 'idle'}
+          expression={expression ?? 'relaxed'}
+          apron={apronOf(TOWN_NPCS[npcId].role)}
+        />
+      </Figure>
+      <group position={NPC_SPOTS[npcId]}>
+        <CapsuleCollider args={[0.5, 0.35]} />
+        <SpeakingIndicator speaking={speaking} />
+      </group>
+    </>
+  );
+}
+
+export function Town() {
+  const tramRunning = useGame(selectTramRunning);
+  return (
+    <RigidBody type="fixed" colliders={false}>
+      <Outdoors />
+      <Scenery />
+      <Buildings />
+      {TOWN_NPC_IDS.filter((npcId) => tramRunning || !isWaitingForTram(npcId)).map((npcId) => (
+        <Npc key={npcId} npcId={npcId} />
+      ))}
+      <Signs />
+      <Props />
+      <Groceries />
+    </RigidBody>
+  );
+}
