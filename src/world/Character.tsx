@@ -10,15 +10,18 @@ import {
 } from '@react-three/rapier';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Vector3, type Group } from 'three';
-import { jobAt, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
+import { GROCERIES_SOLD, jobAt, TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT, PLACE_IDS, type PlaceId } from '../sim/index.ts';
 import {
   selectAppearance,
   selectArrival,
+  selectHeldStill,
   selectPlaceId,
   selectShift,
   selectTramArrival,
   selectTramRunning,
+  selectWardArrival,
+  selectDoctorCall,
   selectWorldKeysOff,
   useGame,
   type Arrival,
@@ -27,10 +30,17 @@ import {
 import { CharacterFigure, WALK_METRES_PER_SECOND } from './CharacterFigure.tsx';
 import type { Control } from './controls.ts';
 import {
+  BATHHOUSE_GYM,
+  BEFORE_THE_DOCTOR,
+  HOME_BED,
+  HOME_STOVE,
+  HOME_TAP,
   IN_BED,
+  IN_WARD_BED,
   isWaitingForTram,
   NPC_SPOTS,
   placeAt,
+  SHELF_SPOTS,
   spawnAt,
   tramStopAt,
   tramStopSpawn,
@@ -39,7 +49,7 @@ import {
 } from './town.ts';
 
 /**
- * Where the Character appears. A new game starts at home
+ * Where the Character appears. A new game starts the First Morning at home
  * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the
  * saved place's entrance, or in bed if that's home.
  */
@@ -79,12 +89,16 @@ function distanceTo(x: number, z: number, [tx, , tz]: Vec3) {
 }
 
 /**
- * What the Character standing here could use with E: a workplace's staff door, the nearest
- * person in talking range, or else the tram stop whose platform this is.
+ * What the Character standing here could use with E: the tap, the stove or the bed, the gym, a workplace's staff door, the nearest
+ * person in talking range, the nearest supermarket shelf, or else the tram stop whose platform this is.
  * Only from inside the same place, so no one is reachable through a wall.
  */
 function interactableAt(x: number, z: number, tramRunning: boolean): Interactable | null {
   const placeId = placeAt(x, z);
+  if (placeId === 'home' && distanceTo(x, z, HOME_TAP) <= MOVEMENT.interactRangeMetres) return 'tap';
+  if (placeId === 'home' && distanceTo(x, z, HOME_STOVE) <= MOVEMENT.interactRangeMetres) return 'stove';
+  if (placeId === 'home' && distanceTo(x, z, HOME_BED) <= MOVEMENT.interactRangeMetres) return 'bed';
+  if (placeId === 'bathhouse' && distanceTo(x, z, BATHHOUSE_GYM) <= MOVEMENT.interactRangeMetres) return 'gym';
   const job = placeId && jobAt(placeId);
   const workplace = job ? WORKPLACES[job] : undefined;
   if (workplace && distanceTo(x, z, workplace.usedFrom) <= MOVEMENT.interactRangeMetres) return 'staff-door';
@@ -94,6 +108,14 @@ function interactableAt(x: number, z: number, tramRunning: boolean): Interactabl
     if (TOWN_NPCS[npcId].placeId !== placeId || (!tramRunning && isWaitingForTram(npcId))) continue;
     const distance = distanceTo(x, z, NPC_SPOTS[npcId]);
     if (distance <= nearestDistance) [nearest, nearestDistance] = [npcId, distance];
+  }
+  if (nearest) return nearest;
+  if (placeId === 'supermarket') {
+    let nearestShelf: number = MOVEMENT.interactRangeMetres;
+    for (const itemId of GROCERIES_SOLD) {
+      const distance = distanceTo(x, z, SHELF_SPOTS[itemId]);
+      if (distance <= nearestShelf) [nearest, nearestShelf] = [itemId, distance];
+    }
   }
   return nearest ?? tramStopAt(x, z);
 }
@@ -151,7 +173,12 @@ export function Character() {
   const setInteractable = useGame((s) => s.setInteractable);
   // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
   const keysOff = useGame(selectWorldKeysOff);
+  // An NPC who came up to the Character stopped them: keys held then count only once let go.
+  const heldStill = useGame(selectHeldStill);
+  const letGoOfWalkKeys = useGame((s) => s.letGoOfWalkKeys);
   const tramArrival = useGame(selectTramArrival);
+  const wardArrival = useGame(selectWardArrival);
+  const doctorCall = useGame(selectDoctorCall);
   const tramRunning = useGame(selectTramRunning);
   // At work: from the staff door to the end of the Shift, the Character stands behind the counter.
   const atWork = useGame((s) => selectShift(s)?.jobId ?? null);
@@ -180,6 +207,16 @@ export function Character() {
     if (workplace) moveTo(workplace.behindTheCounter);
   }, [atWork]);
 
+  // Fainted: the Character is in the ward bed, beside the nurse, behind the Fainting screen.
+  useEffect(() => {
+    if (wardArrival) moveTo(IN_WARD_BED);
+  }, [wardArrival]);
+
+  // Called in from the waiting room: the Character stands in front of the doctor.
+  useEffect(() => {
+    if (doctorCall) moveTo(BEFORE_THE_DOCTOR);
+  }, [doctorCall]);
+
   // Created in an effect, not a memo: StrictMode's cleanup frees the controller,
   // and the second effect run must then make a fresh one.
   const controller = useRef<CharacterController>(null);
@@ -204,7 +241,9 @@ export function Character() {
 
     // Walk relative to the camera: forward is away from it, across the ground.
     const held = getKeys();
-    const keys = keysOff || atWork ? { forward: false, back: false, left: false, right: false } : held;
+    const walkKeyHeld = held.forward || held.back || held.left || held.right;
+    if (heldStill && !walkKeyHeld) letGoOfWalkKeys();
+    const keys = keysOff || heldStill || atWork ? { forward: false, back: false, left: false, right: false } : held;
     const ahead = Number(keys.forward) - Number(keys.back);
     const across = Number(keys.right) - Number(keys.left);
     const move = scratch.move.set(

@@ -145,7 +145,10 @@ export const STREET_LIGHTS: readonly Vec2[] = [
   ...[-85, -70, -54, -33, -22, -12, 12, 24, 46, 60, 75].map((x): Vec2 => [x, SOUTH_FRONT - STREET.pavement + 0.5]),
 ];
 
-/** Each tram stop: an island platform between the tracks, with a pole at its centre. */
+/**
+ * Each tram stop: an island platform between the tracks, with a pole at its centre. Passers-by name the stop nearest
+ * each building (`STOP_PLACES`), so moving a stop or a building means checking that list still holds.
+ */
 export const TRAM_STOPS: Record<TramStopId, { centre: Vec2 }> = {
   'west-stop': { centre: [-45, STREET.z] },
   'central-stop': { centre: [-2, STREET.z] },
@@ -161,8 +164,8 @@ export const COUNTER_HEIGHT = 0.75;
 
 /** Where each person in town stands. Staff stand behind their counter, facing the door. */
 export const NPC_SPOTS: Record<TownNpcId, Vec3> = {
-  // In the hallway beside the front door, so the Character passes within talking range on the way out,
-  // but not from where a new game starts.
+  // In the hallway beside the front door, so the Character passes within talking range on the way out
+  // (and the landlord can catch them), but not from where a new game starts.
   landlord: home.at([-1.6, 1, 3.4]),
   barista: cafe.at([0, 1, -3.4]),
   cashier: supermarket.at([-4, 1, 1.6]),
@@ -221,7 +224,7 @@ export const HOME_STOVE: Vec3 = home.at([2.4, 0.5, -3.85]);
 /** The gym at the bathhouse: a running machine by the side wall beside the door, out of talking range of the attendant. */
 export const BATHHOUSE_GYM: Vec3 = bathhouse.at([5.5, 0.5, 2.2]);
 
-/** The ward's bed, at the back of the clinic, within talking range of the nurse. */
+/** The Fainting ward's bed, at the back of the clinic, within talking range of the nurse. */
 export const WARD_BED: Vec3 = clinic.at([-5.5, 0.25, -3.9]);
 
 type Furniture = { position: Vec3; size: Vec3; piece: TownPiece; rotation?: number; height?: number; repaint?: Repaint };
@@ -549,8 +552,8 @@ function insideTheDoor({ centre: [x, z], size: [, depth], facing }: Building): V
 }
 
 /**
- * Where the Character starts at each place. At home it stands facing the tap;
- * in other buildings just inside the door; at the tram
+ * Where the Character starts at each place. At home it stands facing the tap
+ * (the First Morning); in other buildings just inside the door; at the tram
  * stop on the first platform of the line. The save keeps only the place, not
  * which stop, so Continue at a tram stop always starts at the first one.
  */
@@ -567,6 +570,12 @@ export function spawnAt(placeId: PlaceId): Vec3 {
 
 /** Back from a save at home, the Character wakes up in bed. It drops onto the mattress. */
 export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
+
+/** After Fainting, the Character wakes up in the ward bed. */
+export const IN_WARD_BED: Vec3 = [WARD_BED[0], 1.5, WARD_BED[2]];
+
+/** In front of the doctor: where the Character goes when the doctor calls their name from the waiting room. */
+export const BEFORE_THE_DOCTOR: Vec3 = clinic.at([5.5, 1.5, -3.8 + 1.8]);
 
 const within = (x: number, z: number, [cx, cz]: Vec2, [w, d]: Vec2) => Math.abs(x - cx) < w / 2 && Math.abs(z - cz) < d / 2;
 

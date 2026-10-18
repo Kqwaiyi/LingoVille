@@ -19,9 +19,10 @@ export {
   type NpcLook,
   type Weights,
 } from './appearance.ts';
-export { interactionStartedWithE, interactionStartedWithF } from './approaches.ts';
+export { approachInteraction, interactionStartedWithE, interactionStartedWithF, interactionStartedWithR } from './approaches.ts';
 export { culturePackProblems } from './crossReferences.ts';
 export {
+  AMBIENT_SOUND_IDS,
   CULTURE_PACKS,
   culturePackSchema,
   cafeAllergensIn,
@@ -32,6 +33,7 @@ export {
   localShop,
   PROP_IDS,
   SIGN_WORDS,
+  type AmbientSoundId,
   type Currency,
   type CulturePack,
   type Glosses,
@@ -45,19 +47,38 @@ export { chargeInShifts, formatLocalAmount, formatLocalMoney, localPrice, menuPr
 export {
   defineInteraction,
   FACT_SOURCES,
+  PASSER_BY,
+  SHIPPING_SPEEDS,
   type Band,
+  type Diagnosis,
   type EffectKind,
   type FactSource,
   type Interaction,
   type InteractionDefinition,
+  type InteractionNpcId,
   type JobApplication,
   type OrderLine,
   type ParsedArgs,
+  type RentChange,
   type ResolvedCompletion,
+  type Refund,
   type ServedItem,
+  type Shipment,
+  type ShippingSpeed,
+  type Treatment,
 } from './defineInteraction.ts';
-export { interactionFacts } from './facts.ts';
-export { INTERACTIONS, START_WHEN } from './interactions.ts';
+export {
+  basketFacts,
+  interactionFacts,
+  readBasketTotal,
+  readBillTotal,
+  readHospitalOwed,
+  readNewWeeklyRent,
+  readPrescription,
+  readRentOwed,
+  type FactsContext,
+} from './facts.ts';
+export { HIRING_PLACES, INTERACTIONS, START_WHEN } from './interactions.ts';
 export {
   DEFAULT_DRINK,
   isCheckout,
@@ -78,23 +99,31 @@ export {
   BEHIND_THE_COUNTER,
   CAFE_COUNTER,
   CAFE_MENU,
-  CAFE_TREATS,
+  CAFE_COMFORTS,
+  COMFORT_PURCHASES,
+  CONVENIENCE_MENU,
+  BILL_METHODS,
   DIETARY_NOTE_IDS,
   DIETARY_NOTES,
+  dishContents,
   dishFits,
   DRINK_EXTRAS,
   DRINK_OPTIONS,
   DRINK_SIZES,
   DRINK_TEMPERATURES,
   drinkModifiersSchema,
+  GIFTS_SOLD,
   GROCERIES_SOLD,
+  isDish,
   isMadeToOrder,
   ITEM_IDS,
   ITEMS,
   MADE_TO_ORDER_EXTRAS,
+  READING_SOLD,
   RESTAURANT_DISHES,
   RESTAURANT_DRINKS,
   RESTAURANT_MENU,
+  SEATING,
   type Allergen,
   type DietaryNoteId,
   type DrinkExtra,
@@ -105,7 +134,9 @@ export {
   type GroceryId,
   type Item,
   type ItemId,
+  type Restores,
 } from './items.ts';
+export { illnessCuredBy, ILLNESSES, illnessSchema, MEDICINE_IDS, SYMPTOM_IDS, type Illness, type MedicineId, type SymptomId } from './illnesses.ts';
 export { NAMED_NPC_IDS, NAMED_NPCS, namedNpcSchema, type NamedNpc, type NamedNpcId } from './npcs.ts';
 export { PLACE_PHRASEBOOKS, placePhrasebook, placePhrasebookSchema, type PlacePhrase } from './phrasebooks.ts';
 export { placeHours } from './openingHours.ts';
@@ -116,6 +147,7 @@ export {
   PASSER_BY_IDS,
   PASSER_BY_STOPS,
   ROLE_IDS,
+  STOP_PLACES,
   stopsBetween,
   TOWN_NPC_IDS,
   TOWN_NPCS,

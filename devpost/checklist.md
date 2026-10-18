@@ -39,7 +39,7 @@ Build mode: fast
   Learner check: Start a new game learning a different language, play for a minute, reload and Continue. Is everything where you left it?
   Commit: `Start a new life in any of four languages`
 
-- [ ] **4. Get a Job and work a Shift**
+- [x] **4. Get a Job and work a Shift**
   Becomes usable: Ask the barista for work in the Target Language and get hired. At the staff door, work a Shift of 5 to 8 customers who order out loud with hidden orders, fill each from the drinks menu, and get paid by how many were right, with one Recap for the Shift.
   Why now: The Shift is the third moment in the scope's "What Working Looks Like", and it's how the Character earns money, which slice 5 gives them things to spend on.
   PRD ref: `prd.md > The Core Journey` (step 8), `prd.md > Features and Behavior > Barista Job and Shifts`
@@ -83,3 +83,4 @@ Activity mode: [live app and editor, explicit static fallback, focused alternati
 ## Revisions
 
 - Added the cashier and server Jobs alongside the barista's — once the barista's Shift loop worked, the supermarket till and the restaurant's order pad were one Shift template each, so the learner chose to bring them back from the cut list. `scope.md`, `prd.md` and `spec.md` updated.
+- Added the supermarket and cooking, the convenience store, the bookshop, the restaurant as a guest, the bathhouse's baths, the town office, directions at the tram stops, and Small Talk with gifts and Familiarity — each was one more interaction on the same conversation loop, and they give the money from Shifts somewhere to go. The learner chose to bring gifts and Familiarity back from the cut list. `scope.md`, `prd.md` and `spec.md` updated.

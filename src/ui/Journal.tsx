@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { playUiSound } from '../audio/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import {
   selectConversation,
@@ -114,7 +115,10 @@ export function Journal() {
                   <EntryButton
                     page={entry}
                     selected={entry === selected}
-                    onSelect={() => setSelectedId(entry.id)}
+                    onSelect={() => {
+                      if (entry !== selected) playUiSound('pageTurn');
+                      setSelectedId(entry.id);
+                    }}
                   />
                 </li>
               ))}

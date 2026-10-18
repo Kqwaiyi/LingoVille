@@ -39,10 +39,10 @@ Moments 1 and 2 can be a single café scene (fail, hint, succeed, Recap) to keep
 - Illness, the clinic and the hospital bill.
 - Rent and debt.
 - All four languages: Japanese, Chinese, English and German.
+- Small Talk with gifts and Familiarity, and the town's other shops and services (added during the build).
 
 ## Later
 None named.
 
 ## Explicitly Cut
-- Gifts and Familiarity: the demo doesn't need them.
 - Multiplayer, house building, accounts and cloud saves, mobile, and languages beyond the four: out of scope from the start. The game runs locally on the developer's own Gemini key.

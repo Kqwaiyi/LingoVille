@@ -1,12 +1,17 @@
 // Every game number lives here. Rules read their numbers from this module, so
 // retuning the game is a change to this file alone.
 //
-// Sections marked "default" are the spec's open question 5 (tuning numbers):
-// starting guesses, to be adjusted in playtesting.
+// Sections marked "default" are the spec's open questions 4 (Mood) and 5 (other
+// tuning numbers): starting guesses, to be adjusted in playtesting.
 
 import type { Band } from '../content/index.ts';
 
 export const MINUTES_PER_HOUR = 60;
+
+// --- Meters -----------------------------------------------------------------
+
+/** Health, Hunger, Thirst and Mood all run from 0 to METER_MAX. */
+export const METER_MAX = 100;
 
 // --- Clock ------------------------------------------------------------------
 
@@ -16,6 +21,15 @@ export const CLOCK = {
   gameMinutesPerRealSecond: 1,
   timeScale: { normal: 1, conversation: 0.25, paused: 0 },
   maxRealDeltaMs: 250,
+  /** Sleeping always wakes at this time. */
+  wakeAt: 7 * MINUTES_PER_HOUR,
+  bedUsableFrom: 20 * MINUTES_PER_HOUR,
+  /**
+   * Mood drains fast from this time until `wakeAt`, the hour the bed would have
+   * woken the Character. Staying up all night doesn't drain on into the day.
+   */
+  lateNightFrom: 2 * MINUTES_PER_HOUR,
+  faintWakeAt: 8 * MINUTES_PER_HOUR,
 } as const;
 
 // --- Day and night ----------------------------------------------------------
@@ -80,18 +94,68 @@ export const PLACE_LINE = {
   shownMs: 4000,
 } as const;
 
-// --- New game ---------------------------------------------------------------
+// --- First Morning ----------------------------------------------------------
 
-export const NEW_GAME = {
+export const FIRST_MORNING = {
   day: 1,
-  minuteOfDay: 7 * MINUTES_PER_HOUR,
+  minuteOfDay: CLOCK.wakeAt,
   /** ¥10,000, 400元, €100 or £100: the same in every pack's anchor. */
   moneyInShifts: 5 / 3,
+  health: METER_MAX,
+  hunger: 0.6 * METER_MAX,
+  thirst: 0.4 * METER_MAX,
+  /** Rent is first due at the end of this day. */
+  rentDueDay: 7,
+  /** In the café order, the Help tab pulses once the Player has been quiet this many real seconds since the barista spoke. */
+  helpPulseAfterSilentSeconds: 10,
+} as const;
+
+// --- Well-being -------------------------------------------------------------
+
+export const WELL_BEING = {
+  hungerFullToEmptyGameMinutes: 24 * MINUTES_PER_HOUR,
+  thirstFullToEmptyGameMinutes: 12 * MINUTES_PER_HOUR,
+  /** Health drain while Hunger or Thirst is at 0, at Fitness 0. */
+  healthFullToEmptyWhileDeprivedGameMinutes: 12 * MINUTES_PER_HOUR,
+  /** A Well-being gauge at or below this shows the warning colour. */
+  lowWarningAt: 0.25 * METER_MAX,
+  /** Thirst one café drink gives back. */
+  cafeDrinkThirst: 0.4 * METER_MAX,
+  /** Hunger one café pastry gives back. */
+  cafeFoodHunger: 0.25 * METER_MAX,
+  /** Hunger a convenience store counter snack gives back. */
+  counterSnackHunger: 0.2 * METER_MAX,
+  /** Hunger a convenience store bento gives back: a proper meal. */
+  bentoHunger: 0.5 * METER_MAX,
+  /** Hunger a restaurant main dish gives back: a big meal. */
+  restaurantDishHunger: 0.7 * METER_MAX,
+  /** Thirst a drink with a restaurant meal gives back. */
+  restaurantDrinkThirst: 0.4 * METER_MAX,
+  /** Where the ward's care leaves Well-being when the Character comes round after Fainting (default). */
+  afterFainting: { health: 0.5 * METER_MAX, hunger: 0.5 * METER_MAX, thirst: 0.5 * METER_MAX },
 } as const;
 
 // --- Economy (prices as ratios of one Shift's base pay) ---------------------
 
 export const ECONOMY = {
+  rentPeriodDays: 7,
+  /** Weekly rent at full price, before the Newcomer Discount. */
+  weeklyRentInShifts: 2.0,
+  /** The most days of extra time the landlord will give at once. */
+  maxRentExtensionDays: 7,
+  faintingBillInShifts: 1.5,
+  /** What the doctor charges for a visit, settled at reception: taken from the Character's money, or owed as hospital debt. Well below Fainting with the medicine. */
+  consultationFeeInShifts: 0.4,
+  /** What each medicine costs at the clinic's pharmacy. */
+  medicineInShifts: 0.15,
+  /** The most weeks reception will spread a hospital bill over. */
+  maxPaymentPlanWeeks: 4,
+  gymMembershipInShifts: 0.5,
+  gymMembershipDays: 30,
+  /** What the post office charges to send a parcel home, by how fast it goes. */
+  postageInShifts: { sea: 0.2, air: 0.35, express: 0.6 },
+  /** What a Comfort Purchase may cost: bought to feel good, not to get by. */
+  comfortPurchaseInShifts: { min: 0.1, max: 0.3 },
   /** Money is held in Shifts, so one Shift's base pay is 1 by definition. Every price is a ratio of it. */
   shiftBasePayInShifts: 1,
   shiftCustomers: { min: 5, max: 8 },
@@ -104,6 +168,8 @@ export const ECONOMY = {
   checkout: { basketLines: { min: 1, max: 3 }, maxQuantity: 2, wantsBag: 0.5, hasPointsCard: 0.5 },
   /** How many diners sit at a restaurant table that the server takes one order for, dietary request and all. */
   tableDiners: { min: 2, max: 3 },
+  /** The most people the Character can ask the restaurant to seat at once. */
+  maxRestaurantParty: 6,
   /** The most of one item a single order can ask for. */
   maxQuantityPerOrderLine: 5,
   /** How far a pack's rounding to local price points may move a price from its ratio before the content check fails it. */
@@ -131,17 +197,17 @@ export const MIC_CHECK = {
   heardLevel: 0.15,
 } as const;
 
-/** Patience and Shift stakes by Proficiency Step. */
+/** Patience, Newcomer Discount and Shift stakes by Proficiency Step. */
 export const PROFICIENCY_STEP_TABLE: Record<
   ProficiencyStep,
-  { startingPatience: number; stakeMultiplier: number; failedCustomerDock: number }
+  { startingPatience: number; newcomerDiscount: number; stakeMultiplier: number; failedCustomerDock: number }
 > = {
-  A1: { startingPatience: 4, stakeMultiplier: 1.0, failedCustomerDock: 0 },
-  A2: { startingPatience: 4, stakeMultiplier: 1.1, failedCustomerDock: 0 },
-  B1: { startingPatience: 3, stakeMultiplier: 1.25, failedCustomerDock: 0.05 },
-  B2: { startingPatience: 3, stakeMultiplier: 1.4, failedCustomerDock: 0.1 },
-  C1: { startingPatience: 2, stakeMultiplier: 1.6, failedCustomerDock: 0.15 },
-  C2: { startingPatience: 2, stakeMultiplier: 1.8, failedCustomerDock: 0.2 },
+  A1: { startingPatience: 4, newcomerDiscount: 0.5, stakeMultiplier: 1.0, failedCustomerDock: 0 },
+  A2: { startingPatience: 4, newcomerDiscount: 0.4, stakeMultiplier: 1.1, failedCustomerDock: 0 },
+  B1: { startingPatience: 3, newcomerDiscount: 0.25, stakeMultiplier: 1.25, failedCustomerDock: 0.05 },
+  B2: { startingPatience: 3, newcomerDiscount: 0.1, stakeMultiplier: 1.4, failedCustomerDock: 0.1 },
+  C1: { startingPatience: 2, newcomerDiscount: 0, stakeMultiplier: 1.6, failedCustomerDock: 0.15 },
+  C2: { startingPatience: 2, newcomerDiscount: 0, stakeMultiplier: 1.8, failedCustomerDock: 0.2 },
 };
 
 export const PATIENCE = {
@@ -156,7 +222,7 @@ export const PROFICIENCY = {
   updateRate: 0.15,
   fastStartUpdateRate: 0.3,
   fastStartInteractions: 10,
-  /** A conversation with this many player turns or fewer ("a latte, please") counts only this much (default). */
+  /** A conversation with this many player turns or fewer ("yes, the usual") counts only this much (default). */
   shortConversation: { maxPlayerTurns: 2, weight: 0.15 },
   /** How far below the Recap's estimate each turn the NPC couldn't make sense of pulls the score (default), in steps. */
   notUnderstoodPull: 0.4,
@@ -182,12 +248,63 @@ export const HELP_EVIDENCE = {
   closeRepeatSimilarity: 0.6,
 } as const;
 
+// --- Mood (default: open question 4) ----------------------------------------
+
+export const MOOD = {
+  neutral: 0.5 * METER_MAX,
+  changes: {
+    goalInteractionSuccess: 4,
+    /** Always a smaller dip than the success boost, so trying is worth it. */
+    goalInteractionFailure: -2,
+    /** Per understood Small Talk exchange, by Familiarity tier: more the better the NPC knows the Character. */
+    smallTalkExchange: { stranger: 2, acquaintance: 3, friend: 4 },
+    sleep: 5,
+    /**
+     * A Comfort Purchase, by kind, on top of the conversation's success. Once per kind per purchase, however many are bought.
+     * The bathhouse is the big one.
+     */
+    comfortPurchase: { cafe: 3, reading: 5, gift: 3, meal: 5, bathhouse: 8 },
+    gymSession: 4,
+    /** Sending a parcel home, on top of the conversation's success. */
+    parcelSent: 3,
+    goodHomeMeal: 2,
+    unmetNeedPerGameHour: -1,
+    lateNightPerGameHour: -6,
+    /** While the Character is ill, whatever the Illness. */
+    illnessPerGameHour: -0.5,
+    fainting: -20,
+  },
+  /** Working this many or more days in one week (the last `overworkWeekDays` days, today included) counts as overwork. */
+  overworkDaysPerWeek: 5,
+  overworkWeekDays: 7,
+  overworkPenaltyPerShift: -6,
+  /** At the end of each day rent debt is owed, unless the landlord gave more time. */
+  debtPenaltyPerDay: -3,
+  /** The Mood modifier on Shift pay and Life Skill XP, linear from Mood 0 to METER_MAX. */
+  modifier: { atZero: 0.8, atMax: 1.2 },
+  /** The lowest Mood each face on the dock's Mood gauge shows from. */
+  faceFrom: { miserable: 0, low: 0.2 * METER_MAX, okay: 0.4 * METER_MAX, good: 0.6 * METER_MAX, great: 0.8 * METER_MAX },
+} as const;
+
+/** The kinds of Comfort Purchase, each with its own Mood lift. */
+export type ComfortKind = keyof typeof MOOD.changes.comfortPurchase;
+
 // --- Life Skills (default: open question 5) ---------------------------------
 
 export const LIFE_SKILLS = {
   maxLevel: 5,
   /** Total XP needed to reach each level, index = level. */
   xpToReachLevel: [0, 40, 100, 180, 280, 400],
+  xpPerHomeMeal: 6,
+  homeMealsCountingPerDay: 3,
+  /** Hunger one home-cooked meal gives back, linear in Cooking level: under a bento at 0, over one at max. */
+  homeMealHunger: { atZero: 0.35 * METER_MAX, atMax: 0.6 * METER_MAX },
+  /** How much of the gone-off food poisoning chance max Cooking takes away, scaled linearly by level. */
+  cookingFoodPoisoningReductionAtMax: 0.8,
+  xpPerGymSession: 15,
+  gymSessionsPerDay: 1,
+  /** How long a workout at the gym takes. */
+  gymSessionGameMinutes: MINUTES_PER_HOUR,
   xpPerShiftCustomer: 3,
   /**
    * The level of a Job's Life Skill that unlocks each of its aids. They only ever help with the mechanics, never with
@@ -195,4 +312,74 @@ export const LIFE_SKILLS = {
    * Cashier: the coins for the change suggested, once the Player has keyed in the cash they were handed.
    */
   jobAidsFromLevel: { barista: { groupedGrid: 1, rememberedSize: 2 }, cashier: { suggestedChange: 1 }, server: { quickPickNotes: 1 } },
+  /** Illness chance reduction at max Fitness, scaled linearly by level. */
+  fitnessIllnessReductionAtMax: 0.4,
+  /** Health drain while deprived is multiplied by this at max Fitness. */
+  fitnessDeprivedDrainAtMax: 0.6,
+} as const;
+
+// --- Familiarity (default: open question 5) ---------------------------------
+
+export const FAMILIARITY = {
+  /** Points needed for each tier; Familiarity never decays. */
+  tierThresholds: { stranger: 0, acquaintance: 15, friend: 45 },
+  smallTalkExchange: 2,
+  goalInteractionSuccess: 1,
+  gift: 5,
+  favouriteGift: 10,
+  /** Shared per-NPC, per-day cap on Familiarity gain and Small Talk Mood. */
+  dailyCapPerNpc: 6,
+  giftCooldownDays: 7,
+  usualOrderAfterIdenticalOrders: 3,
+  friendPatienceBonus: 1,
+  /** The chance a friend adds a little something "on the house" to an order: flavour only, never a discount. */
+  onTheHouseChance: 0.2,
+  /** At most once in this many days from each NPC. */
+  onTheHouseCooldownDays: 7,
+} as const;
+
+// --- Small Talk -------------------------------------------------------------
+
+export const SMALL_TALK = {
+  /** The NPC wraps up after this many player turns, drawn from the save's RNG when the chat starts. */
+  exchanges: { min: 6, max: 8 },
+} as const;
+
+// --- Illness and food (default: open question 5) ----------------------------
+
+export const ILLNESS = {
+  /** About once every 1–2 game weeks at full Well-being and Fitness 0. */
+  baseDailyChance: 0.08,
+  /** Multiplier on the chance when average Well-being is at 0. */
+  lowWellBeingMultiplierAtZero: 2,
+  healthFullToEmptyGameMinutes: 48 * MINUTES_PER_HOUR,
+  /** Food poisoning chance from cooking one gone-off grocery at Cooking 0. Fresh groceries carry none. */
+  expiredFoodPoisoningChance: 0.25,
+  /** Food poisoning chance from each piece of cheap counter food eaten (a convenience store snack or bento). */
+  cheapFoodPoisoningChance: 0.03,
+} as const;
+
+export const CLINIC = {
+  /** How long the Character waits after checking in at reception before the doctor calls their name (default). */
+  waitForDoctorGameMinutes: 15,
+} as const;
+
+export const GROCERIES = {
+  /** Groceries stay fresh until the end of this many days after the day they were bought. */
+  expiryDays: 3,
+  /** Gone-off groceries stay in the inventory this many days (they can still be cooked, at a risk), then get thrown out. */
+  goneOffDaysKept: 2,
+} as const;
+
+// --- Audio mix --------------------------------------------------------------
+
+/**
+ * How loud music and ambient sound play, as a share of their volume settings, while something needs hearing over
+ * them. The NPC's voice and hear-it-said always play at their own full volume.
+ */
+export const AUDIO_MIX = {
+  /** In a conversation, so NPC speech stays clear. */
+  conversation: { music: 0.2, ambient: 0.4 },
+  /** While the mic is open, so the game doesn't leak into what the NPC hears. */
+  micOpen: { music: 0, ambient: 0.1 },
 } as const;

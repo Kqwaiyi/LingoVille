@@ -19,7 +19,7 @@ function nameParts(name: string): string[] {
 /**
  * Whether the name an NPC heard is the Character's name from setup: the whole
  * name, or one part of it ("Sam" for "Sam Lee"). Hiring checks the applicant's
- * name with it.
+ * name with it, and so will `learn_name`.
  */
 export function namesMatch(heard: string, characterName: string): boolean {
   const heardName = nameParts(heard).join('');

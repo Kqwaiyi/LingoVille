@@ -91,6 +91,13 @@ export const PASSER_BY_IDS = Object.keys(PASSER_BY_STOPS) as PasserById[];
 /** Someone at a tram stop: not a Named NPC, with no name, persona or memory of the Character. */
 export const isPasserBy = (npcId: TownNpcId): npcId is PasserById => npcId in PASSER_BY_STOPS;
 
+/** The places nearest each stop, west to east: where to get off for each. The world lays the town out to match. */
+export const STOP_PLACES: Record<TramStopId, readonly PlaceId[]> = {
+  'west-stop': ['town-office', 'bookshop', 'clinic'],
+  'central-stop': ['home', 'convenience-store', 'park', 'cafe'],
+  'east-stop': ['supermarket', 'bathhouse', 'restaurant'],
+};
+
 /** How many stops along the line one stop is from another. */
 export function stopsBetween(from: TramStopId, to: TramStopId): number {
   return Math.abs(TRAM_LINE.indexOf(to) - TRAM_LINE.indexOf(from));

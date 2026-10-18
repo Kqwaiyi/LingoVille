@@ -91,7 +91,7 @@ export const VOICES: Record<TargetLanguage, VoiceName> = {
   de: 'Charon',
 };
 
-// Shift Customers are anonymous, so each gets a voice from their build's pool by their seed.
+// Shift Customers and Passers-by are anonymous, so each gets a voice from their build's pool by their seed.
 // None is a Named NPC's voice, so a stranger never sounds like someone the Player knows.
 type VoiceFor<B extends Build> = { [V in VoiceName]: (typeof VOICE_BUILDS)[V] extends B ? V : never }[VoiceName];
 export const ANONYMOUS_VOICES: { [B in Build]: readonly VoiceFor<B>[] } = {

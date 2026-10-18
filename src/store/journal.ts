@@ -1,7 +1,7 @@
 import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import { SegmentSchema } from '../ai/index.ts';
-import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
+import { INTERACTIONS, NAMED_NPCS, PASSER_BY_IDS, type NamedNpcId, type PasserById } from '../content/index.ts';
 import { JOB_IDS } from '../sim/index.ts';
 
 // The Journal: every Recap the Player has had, kept per slot in its own IndexedDB
@@ -9,11 +9,13 @@ import { JOB_IDS } from '../sim/index.ts';
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
-export const JOURNAL_SCHEMA_VERSION = 3;
+export const JOURNAL_SCHEMA_VERSION = 5;
 
 const LANGUAGES = ['ja', 'zh', 'en', 'de'] as const;
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
+/** A Goal Interaction can be with a passer-by too. */
+const GOAL_NPC_IDS = [...NPC_IDS, ...PASSER_BY_IDS] as [NamedNpcId | PasserById, ...(NamedNpcId | PasserById)[]];
 const INTERACTION_IDS = Object.values(INTERACTIONS).map((interaction) => interaction.id) as [string, ...string[]];
 
 // What every entry has, whatever it is a Recap of.
@@ -56,9 +58,19 @@ const JournalEntrySchema = z.discriminatedUnion('kind', [
   z.object({
     ...shared,
     kind: z.literal('goal'),
-    npcId: z.enum(NPC_IDS),
+    npcId: z.enum(GOAL_NPC_IDS),
+    /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
+    npcName: z.string().nullable(),
     interactionId: z.enum(INTERACTION_IDS),
     outcome: z.enum(['success', 'failure']),
+  }),
+  /** Small Talk's lighter Recap. It can't fail, so it has no outcome. */
+  z.object({
+    ...shared,
+    kind: z.literal('smallTalk'),
+    npcId: z.enum(NPC_IDS),
+    /** The NPC's name as the Character knew it then, or null if they didn't know it yet. */
+    npcName: z.string().nullable(),
   }),
   /** A whole Shift's one combined Recap, with every customer's lines in order. */
   z.object({
@@ -92,10 +104,14 @@ type StoredEntry = { schemaVersion: number } & Record<string, unknown>;
  * rewritten, so the Journal stays as it was written.
  */
 const MIGRATIONS: readonly ((entry: StoredEntry) => StoredEntry)[] = [
-  // 1 → 2: NPC lines may keep their reading aid. Older ones have none.
-  (entry) => ({ ...entry, schemaVersion: 2 }),
-  // 2 → 3: a Shift gets its own kind of entry. Older ones are all Goal Interactions'.
+  // 1 → 2: entries keep the NPC's name. Older ones never knew it.
+  (entry) => ({ ...entry, schemaVersion: 2, npcName: null }),
+  // 2 → 3: NPC lines may keep their reading aid. Older ones have none.
   (entry) => ({ ...entry, schemaVersion: 3 }),
+  // 3 → 4: a Shift gets its own kind of entry. Older ones are all Goal Interactions'.
+  (entry) => ({ ...entry, schemaVersion: 4 }),
+  // 4 → 5: Small Talk gets its own kind of entry. Older ones are all Goal Interactions' or Shifts'.
+  (entry) => ({ ...entry, schemaVersion: 5 }),
 ];
 
 /** Reads one stored entry as an entry of today's version, through the migrations. Throws, saying why, if it can't. */

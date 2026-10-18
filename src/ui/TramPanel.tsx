@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from '../i18n/index.ts';
-import { selectTramChoosing, selectTramDestinations, selectTramStop, useGame } from '../store/index.ts';
+import { selectRouteMarker, selectTramChoosing, selectTramDestinations, selectTramStop, useGame } from '../store/index.ts';
 
-/** At a tram stop, after E: the other stops on the line, each with its trip time. Trams are free. */
+/** At a tram stop, after E: the other stops on the line, each with its trip time, and the one a passer-by said to get off at marked. Trams are free. */
 export function TramPanel() {
   const { t } = useTranslation();
   const choosing = useGame(selectTramChoosing);
   const stopId = useGame(selectTramStop);
+  const routeMarker = useGame(selectRouteMarker);
   const rideTram = useGame((s) => s.rideTram);
   const closeTram = useGame((s) => s.closeTram);
   const nearestStop = useRef<HTMLButtonElement>(null);
@@ -32,6 +33,7 @@ export function TramPanel() {
           <li key={to}>
             <button ref={i === 0 ? nearestStop : undefined} onClick={() => rideTram(to)}>
               <span>{t(`tramStops.${to}`)}</span>
+              {to === routeMarker && <span className="tram-marker">{t('tram.routeMarker')}</span>}
               <span className="tram-trip">{t('tram.trip', { minutes })}</span>
             </button>
           </li>

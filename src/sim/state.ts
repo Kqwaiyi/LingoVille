@@ -1,6 +1,7 @@
-import type { AppearancePreset, DietaryNoteId, DrinkModifiers, ItemId, NpcLook } from '../content/index.ts';
+import type { AppearancePreset, DietaryNoteId, DrinkModifiers, ItemId, MedicineId, NamedNpcId, NpcLook } from '../content/index.ts';
+import { weeklyRent } from './rentPrice.ts';
 import { seedRng } from './rng.ts';
-import { NEW_GAME, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
+import { FIRST_MORNING, MOOD, PROFICIENCY, type ProficiencyStep, type StartingStep } from './tuning.ts';
 
 /** A Target Language, and the id of the Culture Pack set where it's spoken. */
 export const LANGUAGE_CODES = ['ja', 'zh', 'en', 'de'] as const;
@@ -22,15 +23,40 @@ export const PLACE_IDS = [
 ] as const;
 export type PlaceId = (typeof PLACE_IDS)[number];
 
-export const LIFE_SKILL_IDS = ['barista', 'cashier', 'server'] as const;
+export const LIFE_SKILL_IDS = ['cooking', 'fitness', 'barista', 'cashier', 'server'] as const;
 export type LifeSkillId = (typeof LIFE_SKILL_IDS)[number];
 
 /** The Life Skills that are also Jobs the Character can be hired for. */
 export const JOB_IDS = ['barista', 'cashier', 'server'] as const satisfies readonly LifeSkillId[];
 export type JobId = (typeof JOB_IDS)[number];
 
+export const ILLNESS_IDS = ['cold', 'flu', 'food-poisoning', 'hay-fever'] as const;
+export type IllnessId = (typeof ILLNESS_IDS)[number];
+
+/** Something the Character owns. Groceries go off on `expiresOnDay`; goods that keep have null. */
+export type InventoryItem = { itemId: ItemId; quantity: number; expiresOnDay: number | null };
+
 /** A word or phrase the Player kept from a Recap, with its gloss in the Native Language it was saved in. */
 export type PhrasebookEntry = { text: string; reading: string; gloss: string; glossLanguage: LanguageCode; dayAdded: number };
+
+/** What one Named NPC remembers of the Character. With no record, they are a stranger. */
+export type NpcMemory = {
+  familiarity: number;
+  /** Familiarity and Small Talk Mood gained from this NPC on `day`, against the daily cap. */
+  todaysGain: { day: number; amount: number };
+  timesMet: number;
+  knowsName: boolean;
+  /** The interaction and completion arguments ordered the same way enough times in a row. */
+  usualOrder: { interactionId: string; args: unknown } | null;
+  /** The latest order from this NPC, and how many times in a row it has been ordered just so, toward `usualOrder`. */
+  lastOrder: { interactionId: string; args: unknown; inARow: number } | null;
+  lastTopic: string | null;
+  favouriteKnown: boolean;
+  lastGiftDay: number | null;
+  /** The day the NPC last gave the Character a little something "on the house": once a week at most. */
+  lastOnTheHouseDay: number | null;
+  registerOffered: boolean;
+};
 
 /** A line of a Shift Customer's order, or of what the Player hands them. A café drink made to order says how it's made. */
 export type ShiftOrderLine = { itemId: ItemId; quantity: number; modifiers?: DrinkModifiers };
@@ -99,6 +125,16 @@ export type Shift = {
   customer: ShiftCustomer | null;
 };
 
+/**
+ * At the restaurant: whether the Character has a table (given up on leaving), and what they've eaten and not paid for,
+ * each at the menu price it was ordered at. A bill still unpaid on leaving becomes restaurant debt.
+ */
+export type RestaurantTable = { seated: boolean; bill: { itemId: ItemId; quantity: number; priceInShifts: number }[] };
+
+export const DEBT_KINDS = ['rent', 'hospital', 'restaurant'] as const;
+export type Debt = { kind: (typeof DEBT_KINDS)[number]; amountInShifts: number };
+export type PaymentPlan = { debtKind: Debt['kind']; instalmentInShifts: number; nextDueDay: number };
+
 /** The answers from New game setup that a save is built from. */
 export type NewGameSetup = {
   characterName: string;
@@ -107,6 +143,8 @@ export type NewGameSetup = {
   /** From the self-assessment. */
   startingStep: StartingStep;
   appearance: AppearancePreset;
+  /** The Player chose "Skip tutorial" on the last setup screen. */
+  skipFirstMorning: boolean;
   rngSeed: number;
 };
 
@@ -122,9 +160,46 @@ export type GameState = {
   /** The Character's current place. Positions live in the world, not here. */
   placeId: PlaceId;
   character: {
+    health: number;
+    hunger: number;
+    thirst: number;
+    mood: number;
     /** Money is held in Shifts of base pay; the Culture Pack converts it to local currency. */
     moneyInShifts: number;
+    /**
+     * The Illness the Character has, if any. `treated`: the fever reducer has stopped flu's Health drain, and the flu
+     * clears after the next sleep. Every other Illness is cured outright by its medicine.
+     */
+    illness: { illnessId: IllnessId; onsetDay: number; treated: boolean } | null;
+    /**
+     * The chance that what the Character has eaten gives them food poisoning, built up by cooking
+     * gone-off groceries. Recorded here for Illness, which rolls it and starts it again from 0.
+     */
+    foodPoisoningChance: number;
   };
+  rent: {
+    /** This week's rent falls due at the end of this day. */
+    dueDay: number;
+    /** What is still to pay of this week's rent. Whatever is unpaid at the end of `dueDay` becomes rent debt. */
+    owedInShifts: number;
+    /** An extension from the landlord: rent debt costs no Mood at the end of any day up to this one. */
+    extendedThroughDay: number | null;
+    /** The day the landlord last caught the Character in the hallway about rent: once a day at most. */
+    remindedOnDay: number | null;
+  };
+  debts: Debt[];
+  /** At most one per debt kind. Each takes its weekly instalment on rent day. */
+  paymentPlans: PaymentPlan[];
+  clinic: {
+    /** When the Character checked in at reception, to wait for the doctor to call their name. Leaving the clinic gives up the place. */
+    checkedInAt: { day: number; minuteOfDay: number } | null;
+    /** What the doctor prescribed, for the pharmacist to dispense. Used up when it is dispensed. */
+    prescription: MedicineId | null;
+  };
+  /** The day the Character last woke in the ward after Fainting, or null if they never have fainted. Each Fainting wakes on a new day. */
+  wokeInWardOnDay: number | null;
+  /** The day a park regular last waved the Character over: once a day at most. */
+  parkWavedOnDay: number | null;
   /** The current step, read from the hidden score with a buffer at boundaries. */
   proficiencyStep: ProficiencyStep;
   progression: {
@@ -134,22 +209,38 @@ export type GameState = {
      * The score moves faster until there's `PROFICIENCY.fastStartInteractions` worth.
      */
     evidenceSoFar: number;
-    /** Ratchets: drives Shift stakes. */
+    /** Ratchets: drives the Newcomer Discount and Shift stakes. */
     highestStep: ProficiencyStep;
+    /**
+     * The Newcomer Discount step the landlord has told the Character about. Rent follows `highestStep`
+     * from each new week; this catches up with it when the landlord announces the step-down.
+     */
+    newcomerDiscountStep: ProficiencyStep;
     lifeSkillXp: Record<LifeSkillId, number>;
     /** The day the Character last started a Shift: there's at most one a day. */
     lastShiftDay: number | null;
+    /** The days a Shift was worked in the last week, oldest first, for overwork. */
+    shiftDays: number[];
+    /** Daily counters, reset when `day` is no longer today. */
+    today: { day: number; homeMeals: number; gymSessions: number };
   };
   possessions: {
+    inventory: InventoryItem[];
+    gymMembershipUntilDay: number | null;
+    addressRegistered: boolean;
     jobsHired: JobId[];
     /** A Shift under way. */
     shift: Shift | null;
   };
+  restaurant: RestaurantTable;
   /** The personal phrasebook. */
   phrasebook: PhrasebookEntry[];
+  onboarding: { firstMorningStepsDone: number; firstMorningSkipped: boolean };
+  /** One NPC Memory record per Named NPC the Character has met. */
+  people: Partial<Record<NamedNpcId, NpcMemory>>;
 };
 
-/** Builds the state for a new game. */
+/** Builds the First Morning state for a new game. */
 export function createSave(setup: NewGameSetup): GameState {
   return {
     rngState: seedRng(setup.rngSeed),
@@ -159,18 +250,43 @@ export function createSave(setup: NewGameSetup): GameState {
       culturePackId: setup.culturePackId,
       appearance: setup.appearance,
     },
-    clock: { day: NEW_GAME.day, minuteOfDay: NEW_GAME.minuteOfDay },
+    clock: { day: FIRST_MORNING.day, minuteOfDay: FIRST_MORNING.minuteOfDay },
     placeId: 'home',
-    character: { moneyInShifts: NEW_GAME.moneyInShifts },
+    character: {
+      health: FIRST_MORNING.health,
+      hunger: FIRST_MORNING.hunger,
+      thirst: FIRST_MORNING.thirst,
+      mood: MOOD.neutral,
+      moneyInShifts: FIRST_MORNING.moneyInShifts,
+      illness: null,
+      foodPoisoningChance: 0,
+    },
+    rent: {
+      dueDay: FIRST_MORNING.rentDueDay,
+      owedInShifts: weeklyRent(setup.startingStep),
+      extendedThroughDay: null,
+      remindedOnDay: null,
+    },
+    debts: [],
+    paymentPlans: [],
+    clinic: { checkedInAt: null, prescription: null },
+    wokeInWardOnDay: null,
+    parkWavedOnDay: null,
     proficiencyStep: setup.startingStep,
     progression: {
       proficiencyScore: PROFICIENCY.stepCentre[setup.startingStep],
       evidenceSoFar: 0,
       highestStep: setup.startingStep,
+      newcomerDiscountStep: setup.startingStep,
       lifeSkillXp: Object.fromEntries(LIFE_SKILL_IDS.map((skill) => [skill, 0])) as Record<LifeSkillId, number>,
       lastShiftDay: null,
+      shiftDays: [],
+      today: { day: FIRST_MORNING.day, homeMeals: 0, gymSessions: 0 },
     },
-    possessions: { jobsHired: [], shift: null },
+    possessions: { inventory: [], gymMembershipUntilDay: null, addressRegistered: false, jobsHired: [], shift: null },
+    restaurant: { seated: false, bill: [] },
     phrasebook: [],
+    onboarding: { firstMorningStepsDone: 0, firstMorningSkipped: setup.skipFirstMorning },
+    people: {},
   };
 }

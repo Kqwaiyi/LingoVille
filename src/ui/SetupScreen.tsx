@@ -65,6 +65,8 @@ export function SetupScreen() {
         {setup.step === 'aboutYou' && <AboutYou setup={setup} />}
         {setup.step === 'appearance' && <Appearance setup={setup} />}
         {setup.step === 'micCheck' && <MicCheck setup={setup} />}
+        {/* On the mic check, or on the appearance for a browser that has passed it. */}
+        {last && <SkipTutorial setup={setup} />}
         <div className="setup-actions">
           <button type="button" onClick={setupBack}>
             {t('setup.back')}
@@ -300,5 +302,17 @@ function MicCheck({ setup }: { setup: Setup }) {
         {setup.mic && t(`setup.micCheck.status.${setup.mic}`)}
       </p>
     </>
+  );
+}
+
+/** "Skip tutorial", on the last setup screen: the game starts without the First Morning. */
+function SkipTutorial({ setup }: { setup: Setup }) {
+  const { t } = useTranslation();
+  const chooseSkipFirstMorning = useGame((s) => s.chooseSkipFirstMorning);
+  return (
+    <label className="setup-skip-tutorial">
+      <input type="checkbox" checked={setup.skipFirstMorning} onChange={(e) => chooseSkipFirstMorning(e.target.checked)} />
+      {t('setup.skipTutorial')}
+    </label>
   );
 }

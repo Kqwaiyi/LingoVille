@@ -105,7 +105,7 @@ const TOKEN_LIFETIME_MS = 30 * 60_000;
 
 const MOCK_TOKEN = 'mock-ephemeral-token';
 
-// Whose voice: for a Named NPC, their id; for a Shift Customer, their build and a whole-number seed.
+// Whose voice: for a Named NPC, their id; for a Shift Customer or Passer-by, their build and a whole-number seed.
 const VoiceRequestSchema = z.union([
   z.object({ targetLanguage: z.enum(LANGUAGE_CODES), shiftCustomerVoice: z.number().int().min(0), build: z.enum(BUILDS) }),
   z.object({ targetLanguage: z.enum(LANGUAGE_CODES), npcId: z.enum(NAMED_NPC_IDS) }),
@@ -191,6 +191,7 @@ const MOCK_RECAP: Recap = {
     { base: 'よろしいですか', reading: 'よろしいですか', gloss: 'is that all right? (polite)' },
   ],
   cefrEstimate: 'A1',
+  lastTopic: 'a hot latte',
 };
 
 /**

@@ -85,7 +85,7 @@ export function isCheckout(template: ShiftTemplate): template is CheckoutTemplat
   return 'basket' in template;
 }
 
-/** The café's drinks: everything on its menu that's a drink. */
+/** The café's drinks: everything on its menu that quenches Thirst. */
 const CAFE_DRINKS = CAFE_MENU.filter(isDrink);
 
 /** The café drinks made to order, in any size, hot or iced, and the extras each one takes. */
@@ -135,9 +135,9 @@ export function shiftTemplates(jobId: JobId): readonly ShiftTemplate[] {
   return SHIFT_TEMPLATES[jobId];
 }
 
-/** It's a drink, so the barista makes it to order: a size, hot or iced, and extras. */
+/** It quenches Thirst, so the barista makes it to order: a size, hot or iced, and extras. */
 export function isDrink(itemId: ItemId): boolean {
-  return ITEMS[itemId].drink === true;
+  return (ITEMS[itemId].restores.thirst ?? 0) > 0;
 }
 
 /** How the modifier toggles make a drink until the Player changes them: medium, hot, with nothing added. */

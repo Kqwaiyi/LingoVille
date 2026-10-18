@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { TOWN_NPCS } from '../content/index.ts';
+import { formatTime, TOWN_NPCS } from '../content/index.ts';
 import { Trans, useTranslation } from '../i18n/index.ts';
+import { CLOCK } from '../sim/index.ts';
 import { selectToast, selectVoiceUnavailable, useGame } from '../store/index.ts';
 
 const TOAST_MS = 5_000;
@@ -22,6 +23,9 @@ export function Toast() {
     <div className="toast" role="status">
       {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'loadedBackup' && t('toast.loadedBackup')}
+      {toast.kind === 'nothingToCook' && t('toast.nothingToCook')}
+      {toast.kind === 'gymRefused' && t(`toast.gymRefused.${toast.refusal}`)}
+      {toast.kind === 'tooEarlyForBed' && t('toast.tooEarlyForBed', { time: formatTime(CLOCK.bedUsableFrom) })}
       {toast.kind === 'npcSteppedAway' &&
         t('toast.npcSteppedAway', { who: toast.npcId ? t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) : t('shift.customerSubject') })}
     </div>

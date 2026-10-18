@@ -6,19 +6,30 @@ import {
   customerLookWeights,
   DIETARY_NOTE_IDS,
   drinkModifiersSchema,
+  INTERACTIONS,
   ITEM_IDS,
+  MEDICINE_IDS,
+  menuPrice,
+  NAMED_NPCS,
   NpcLookSchema,
   SHIFT_TEMPLATES,
+  type ItemId,
+  type NamedNpcId,
 } from '../content/index.ts';
 import {
+  DEBT_KINDS,
+  ECONOMY,
+  ILLNESS_IDS,
   JOB_IDS,
   LANGUAGE_CODES,
   LIFE_SKILL_IDS,
   lookFromSeed,
   PLACE_IDS,
   PROFICIENCY_STEPS,
+  weeklyRent,
   type GameState,
   type LanguageCode,
+  type ProficiencyStep,
 } from '../sim/index.ts';
 
 // Saves: one Character's whole life per slot, in IndexedDB. A save is the sim
@@ -26,13 +37,30 @@ import {
 // and then Zod, so a save is either the game as it was or a loud failure.
 // Content is referenced by id, and an id the game no longer knows fails loudly.
 
-export const SAVE_SCHEMA_VERSION = 11;
+export const SAVE_SCHEMA_VERSION = 19;
 
 const PACK_IDS = Object.keys(CULTURE_PACKS) as [LanguageCode, ...LanguageCode[]];
+const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
+const INTERACTION_IDS = Object.values(INTERACTIONS).map((interaction) => interaction.id) as [string, ...string[]];
 
+const meter = z.number().min(0);
 const day = z.int().min(1);
 
-/** One line of items: an item, and how many. */
+const NpcMemorySchema = z.object({
+  familiarity: z.number().min(0),
+  todaysGain: z.object({ day, amount: z.number().min(0) }),
+  timesMet: z.int().min(0),
+  knowsName: z.boolean(),
+  usualOrder: z.object({ interactionId: z.enum(INTERACTION_IDS), args: z.unknown() }).nullable(),
+  lastOrder: z.object({ interactionId: z.enum(INTERACTION_IDS), args: z.unknown(), inARow: z.int().min(1) }).nullable(),
+  lastTopic: z.string().nullable(),
+  favouriteKnown: z.boolean(),
+  lastGiftDay: day.nullable(),
+  lastOnTheHouseDay: day.nullable(),
+  registerOffered: z.boolean(),
+});
+
+/** One line of items in the inventory. */
 const orderLine = z.object({ itemId: z.enum(ITEM_IDS), quantity: z.int().min(1) });
 
 /** One line of a Shift Customer's order: a café drink made to order says how it's made. */
@@ -67,16 +95,46 @@ const GameStateSchema = z.object({
   }),
   clock: z.object({ day, minuteOfDay: z.number().min(0) }),
   placeId: z.enum(PLACE_IDS),
-  character: z.object({ moneyInShifts: z.number() }),
+  character: z.object({
+    health: meter,
+    hunger: meter,
+    thirst: meter,
+    mood: meter,
+    moneyInShifts: z.number(),
+    illness: z.object({ illnessId: z.enum(ILLNESS_IDS), onsetDay: day, treated: z.boolean() }).nullable(),
+    foodPoisoningChance: z.number().min(0).max(1),
+  }),
+  rent: z.object({
+    dueDay: day,
+    owedInShifts: z.number().min(0),
+    extendedThroughDay: day.nullable(),
+    remindedOnDay: day.nullable(),
+  }),
+  debts: z.array(z.object({ kind: z.enum(DEBT_KINDS), amountInShifts: z.number().min(0) })),
+  paymentPlans: z.array(
+    z.object({ debtKind: z.enum(DEBT_KINDS), instalmentInShifts: z.number().min(0), nextDueDay: day }),
+  ),
+  clinic: z.object({
+    checkedInAt: z.object({ day, minuteOfDay: z.number().min(0) }).nullable(),
+    prescription: z.enum(MEDICINE_IDS).nullable(),
+  }),
+  wokeInWardOnDay: day.nullable(),
+  parkWavedOnDay: day.nullable(),
   proficiencyStep: z.enum(PROFICIENCY_STEPS),
   progression: z.object({
     proficiencyScore: z.number().min(0),
     evidenceSoFar: z.number().min(0),
     highestStep: z.enum(PROFICIENCY_STEPS),
+    newcomerDiscountStep: z.enum(PROFICIENCY_STEPS),
     lifeSkillXp: z.record(z.enum(LIFE_SKILL_IDS), z.number().min(0)),
     lastShiftDay: day.nullable(),
+    shiftDays: z.array(day),
+    today: z.object({ day, homeMeals: z.int().min(0), gymSessions: z.int().min(0) }),
   }),
   possessions: z.object({
+    inventory: z.array(orderLine.extend({ expiresOnDay: day.nullable() })),
+    gymMembershipUntilDay: day.nullable(),
+    addressRegistered: z.boolean(),
     jobsHired: z.array(z.enum(JOB_IDS)),
     shift: z
       .object({
@@ -99,9 +157,12 @@ const GameStateSchema = z.object({
       })
       .nullable(),
   }),
+  restaurant: z.object({ seated: z.boolean(), bill: z.array(orderLine.extend({ priceInShifts: z.number().min(0) })) }),
   phrasebook: z.array(
     z.object({ text: z.string(), reading: z.string(), gloss: z.string(), glossLanguage: z.enum(LANGUAGE_CODES), dayAdded: day }),
   ),
+  onboarding: z.object({ firstMorningStepsDone: z.int().min(0), firstMorningSkipped: z.boolean() }),
+  people: z.partialRecord(z.enum(NPC_IDS), NpcMemorySchema),
 }) satisfies z.ZodType<GameState>;
 
 const SaveSchema = z.object({
@@ -122,9 +183,9 @@ export type SlotId = (typeof SLOT_IDS)[number];
 /** A stored save in some older shape. Migrations only touch what changed. */
 type StoredSave = { schemaVersion: number; game: Record<string, unknown> } & Record<string, unknown>;
 
-/** The hat a Character's hair became when everyone became Clawd (10 → 11): short hair and a beard went bare-headed. */
+/** The hat a Character's hair became when everyone became Clawd (18 → 19): short hair and a beard went bare-headed. */
 const CLAWD_HATS = { short: 'none', long: 'beret', buns: 'bow', buzzed: 'beanie', bearded: 'none', bald: 'top-hat' } as const;
-/** The colour a Character's hair colour became when everyone became Clawd (10 → 11). */
+/** The colour a Character's hair colour became when everyone became Clawd (18 → 19). */
 const CLAWD_COLOURS = { black: 'charcoal', 'dark-brown': 'denim', brown: 'mustard', auburn: 'red', blonde: 'cream', grey: 'sky' } as const;
 
 /**
@@ -134,76 +195,140 @@ const CLAWD_COLOURS = { black: 'charcoal', 'dark-brown': 'denim', brown: 'mustar
 const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
   // 1 → 2: saves gain the personal phrasebook, empty.
   (save) => ({ ...save, schemaVersion: 2, game: { ...save.game, phrasebook: [] } }),
-  // 2 → 3: Recap evidence moves Language Proficiency. No conversation has moved it yet.
+  // 2 → 3: the First Morning can be skipped from setup. No save so far skipped it.
   (save) => ({
     ...save,
     schemaVersion: 3,
-    game: { ...save.game, progression: { ...(save.game.progression as object), evidenceSoFar: 0 } },
+    game: { ...save.game, onboarding: { ...(save.game.onboarding as object), firstMorningSkipped: false } },
   }),
-  // 3 → 4: Shifts can be worked. No Shift could start before, so none is under way and none was worked.
+  // 3 → 4: Recap evidence moves Language Proficiency. No conversation has moved it yet.
   (save) => ({
     ...save,
     schemaVersion: 4,
+    game: { ...save.game, progression: { ...(save.game.progression as object), evidenceSoFar: 0 } },
+  }),
+  // 4 → 5: Health running out faints the Character. No one has fainted yet.
+  (save) => ({ ...save, schemaVersion: 5, game: { ...save.game, wokeInWardOnDay: null } }),
+  // 5 → 6: cooking gone-off food records a food poisoning chance. Nothing has been cooked yet.
+  (save) => ({
+    ...save,
+    schemaVersion: 6,
+    game: { ...save.game, character: { ...(save.game.character as object), foodPoisoningChance: 0 } },
+  }),
+  // 6 → 7: rent falls due. Nothing ever set what was owed, so this week's rent is owed in full, at the
+  // Newcomer Discount for the highest step reached. A save already past its first due day moves on to the
+  // next one: the weeks that never fell due are forgiven rather than turned into debt.
+  (save) => {
+    const { clock, rent, progression } = save.game as {
+      clock: { day: number };
+      rent: { dueDay: number };
+      progression: { highestStep: ProficiencyStep };
+    };
+    let { dueDay } = rent;
+    while (dueDay < clock.day) dueDay += ECONOMY.rentPeriodDays;
+    const owedInShifts = weeklyRent(progression.highestStep);
+    return {
+      ...save,
+      schemaVersion: 7,
+      game: { ...save.game, rent: { dueDay, owedInShifts, extendedThroughDay: null, remindedOnDay: null } },
+    };
+  },
+  // 7 → 8: Shifts can be worked. No Shift could start before, so none is under way and none was worked.
+  (save) => ({
+    ...save,
+    schemaVersion: 8,
     game: {
       ...save.game,
       progression: { ...(save.game.progression as object), lastShiftDay: null },
       possessions: { ...(save.game.possessions as object), shift: null },
     },
   }),
-  // 4 → 5: Shift Customers come from templates, and some change their mind. Every one so far ordered a single drink.
+  // 8 → 9: Shift Customers come from templates, and some change their mind. Every one so far ordered a single drink.
   (save) => {
     const possessions = save.game.possessions as { shift: { customer: object | null } | null };
     const { shift } = possessions;
     const customer = shift?.customer && { templateId: 'barista-single-drink', ...shift.customer, changedFrom: null };
     return {
       ...save,
-      schemaVersion: 5,
+      schemaVersion: 9,
       game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
     };
   },
-  // 5 → 6: translated Shift Customers are docked. No customer under way has been marked translated.
+  // 9 → 10: translated Shift Customers are docked, and working too many days a week costs Mood. No customer under way
+  // has been marked translated, and the only Shift day known is the last one.
   (save) => {
+    const progression = save.game.progression as { lastShiftDay: number | null };
     const possessions = save.game.possessions as { shift: object | null };
     return {
       ...save,
-      schemaVersion: 6,
+      schemaVersion: 10,
       game: {
         ...save.game,
+        progression: { ...progression, shiftDays: progression.lastShiftDay === null ? [] : [progression.lastShiftDay] },
         possessions: { ...possessions, shift: possessions.shift && { ...possessions.shift, translated: 0 } },
       },
     };
   },
-  // 6 → 7: the cashier's till. Only barista Shifts could be worked, so a customer at the counter has no checkout.
+  // 10 → 11: the cashier's till. Only barista Shifts could be worked, so a customer at the counter has no checkout.
   (save) => {
     const possessions = save.game.possessions as { shift: { customer: object | null } | null };
     const { shift } = possessions;
     const customer = shift?.customer && { ...shift.customer, checkout: null };
     return {
       ...save,
-      schemaVersion: 7,
+      schemaVersion: 11,
       game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
     };
   },
-  // 7 → 8: restaurant tables. No server Shift could be worked, so a customer at the counter has no table.
+  // 11 → 12: restaurant tables. No server Shift could be worked, so a customer at the counter has no table.
   (save) => {
     const possessions = save.game.possessions as { shift: { customer: object | null } | null };
     const { shift } = possessions;
     const customer = shift?.customer && { ...shift.customer, table: null };
     return {
       ...save,
-      schemaVersion: 8,
+      schemaVersion: 12,
       game: { ...save.game, possessions: { ...possessions, shift: shift && { ...shift, customer } } },
     };
   },
-  // 8 → 9: Appearance Presets with parts. Each of the four placeholder looks becomes that body and face preset, with
+  // 12 → 13: a table and a bill at the restaurant. No one could be seated before, so no one is, and nothing is owed.
+  (save) => ({ ...save, schemaVersion: 13, game: { ...save.game, restaurant: { seated: false, bill: [] } } }),
+  // 13 → 14: each line of the bill keeps its price, so a bill walked out on can become debt. An open bill is priced from the menu.
+  (save) => {
+    const game = save.game as { identity: { culturePackId: LanguageCode }; restaurant: { seated: boolean; bill: { itemId: ItemId; quantity: number }[] } };
+    const { restaurant, identity } = game;
+    // An item the game no longer has is left unpriced, for Zod to name.
+    const bill = restaurant.bill.map((line) =>
+      ITEM_IDS.includes(line.itemId) ? { ...line, priceInShifts: menuPrice(line.itemId, identity.culturePackId) } : line,
+    );
+    return { ...save, schemaVersion: 14, game: { ...save.game, restaurant: { ...restaurant, bill } } };
+  },
+  // 14 → 15: regulars. No order run toward a usual was counted, no one gave anything on the house, and no park regular waved today.
+  (save) => {
+    const people = Object.fromEntries(
+      Object.entries(save.game.people as Record<string, object>).map(([npcId, memory]) => [npcId, { ...memory, lastOrder: null, lastOnTheHouseDay: null }]),
+    );
+    return { ...save, schemaVersion: 15, game: { ...save.game, people, parkWavedOnDay: null } };
+  },
+  // 15 → 16: the clinic. No one could check in or be prescribed anything before, and no medicine had treated an Illness.
+  (save) => {
+    const character = save.game.character as { illness: object | null };
+    const illness = character.illness && { ...character.illness, treated: false };
+    return {
+      ...save,
+      schemaVersion: 16,
+      game: { ...save.game, character: { ...character, illness }, clinic: { checkedInAt: null, prescription: null } },
+    };
+  },
+  // 16 → 17: Appearance Presets with parts. Each of the four placeholder looks becomes that body and face preset, with
   // everyday hair to suit it (short on the first two, long on the others), dark brown hair and a middle skin tone.
   (save) => {
     const { appearancePresetId, ...identity } = save.game.identity as { appearancePresetId: string };
     const number = Number(appearancePresetId.replace('preset-', ''));
     const appearance = { body: `body-${number}`, hairStyle: number <= 2 ? 'short' : 'long', hairColour: 'dark-brown', skinTone: 'tone-3' };
-    return { ...save, schemaVersion: 9, game: { ...save.game, identity: { ...identity, appearance } } };
+    return { ...save, schemaVersion: 17, game: { ...save.game, identity: { ...identity, appearance } } };
   },
-  // 9 → 10: Shift Customers have looks. One at the counter is given a look for each at their table, drawn with the
+  // 17 → 18: Shift Customers have looks. One at the counter is given a look for each at their table, drawn with the
   // pack's weights from their voice seed (the save's RNG has moved on since they walked up).
   (save) => {
     const game = save.game as { identity: { culturePackId: LanguageCode }; possessions: { shift: { customer: { voiceSeed: number; table: unknown[] | null } | null } | null } };
@@ -213,11 +338,11 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
       ...shift.customer,
       appearances: Array.from({ length: shift.customer.table?.length ?? 1 }, (_, i) => lookFromSeed(shift.customer!.voiceSeed + i, weights)),
     };
-    return { ...save, schemaVersion: 10, game: { ...save.game, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } } };
+    return { ...save, schemaVersion: 18, game: { ...save.game, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } } };
   },
-  // 10 → 11: everyone is Clawd, told apart by what they wear. The Character's hair becomes a hat (`CLAWD_HATS`, with a
+  // 18 → 19: everyone is Clawd, told apart by what they wear. The Character's hair becomes a hat (`CLAWD_HATS`, with a
   // scarf for a beard) in a colour for the hair's; a Shift Customer at the counter is drawn again from their voice seed,
-  // one look for each at their table, as 9 → 10 drew them.
+  // one look for each at their table, as 17 → 18 drew them.
   (save) => {
     const game = save.game as {
       identity: { culturePackId: LanguageCode; appearance: { hairStyle: keyof typeof CLAWD_HATS; hairColour: keyof typeof CLAWD_COLOURS } };
@@ -233,7 +358,7 @@ const MIGRATIONS: readonly ((save: StoredSave) => StoredSave)[] = [
     };
     return {
       ...save,
-      schemaVersion: 11,
+      schemaVersion: 19,
       game: { ...save.game, identity: { ...game.identity, appearance }, possessions: { ...game.possessions, shift: shift && { ...shift, customer } } },
     };
   },

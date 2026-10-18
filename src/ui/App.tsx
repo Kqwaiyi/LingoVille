@@ -1,9 +1,14 @@
 import { useEffect } from 'react';
+import { useSoundtrack } from '../audio/index.ts';
 import { useShowNativeLanguage } from '../i18n/index.ts';
 import { selectConversation, selectNativeLanguage, selectScreen, useGame } from '../store/index.ts';
 import { Scene } from '../world/index.ts';
+import { BasketPanel } from './BasketPanel.tsx';
 import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
+import { FaintingScreen } from './FaintingScreen.tsx';
+import { FirstMorningBanner } from './FirstMorningBanner.tsx';
+import { FirstMorningCard } from './FirstMorningCard.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
 import { Journal } from './Journal.tsx';
@@ -13,6 +18,7 @@ import { SetupScreen } from './SetupScreen.tsx';
 import { SignTooltip } from './SignTooltip.tsx';
 import { ShiftEndCard } from './ShiftPanel.tsx';
 import { TitleScreen } from './TitleScreen.tsx';
+import { TooltipCard } from './TooltipCard.tsx';
 import { TramPanel } from './TramPanel.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
@@ -36,6 +42,7 @@ function usePauseAndSaveWhenHidden() {
 /** The live town is always there: behind the title screen and setup first, then under the HUD. */
 export function App() {
   usePauseAndSaveWhenHidden();
+  useSoundtrack();
   useShowNativeLanguage(useGame(selectNativeLanguage));
   const screen = useGame(selectScreen);
   const talking = useGame(selectConversation) !== null;
@@ -56,13 +63,19 @@ function Hud() {
       <GatewayStatus />
       <InteractionPrompt />
       <TramPanel />
+      <BasketPanel />
       <SignTooltip />
       <Dock />
+      <TooltipCard />
       <ConversationColumn />
       <ShiftEndCard />
+      {/* Before the toast, which moves down out of its way. */}
+      <FirstMorningBanner />
+      <FirstMorningCard />
       <Toast />
       <Journal />
       <VoiceUnavailableScreen />
+      <FaintingScreen />
       <PersistCallout />
       <PauseMenu />
     </>

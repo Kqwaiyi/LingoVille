@@ -1,4 +1,4 @@
-import type { GameState, PlaceId } from './state.ts';
+import type { GameState } from './state.ts';
 import { CLOCK } from './tuning.ts';
 
 const MS_PER_SECOND = 1000;
@@ -41,16 +41,4 @@ export function advanceClock(clock: GameState['clock'], dtGameMinutes: number): 
   const total = clock.minuteOfDay + dtGameMinutes;
   const daysPassed = Math.floor(total / CLOCK.minutesPerDay);
   return { day: clock.day + daysPassed, minuteOfDay: total - daysPassed * CLOCK.minutesPerDay };
-}
-
-/** Advances the game by `dtGameMinutes`: the clock moves on, and each day ends at midnight. */
-export function tick(state: GameState, dtGameMinutes: number): GameState {
-  if (dtGameMinutes <= 0) return state;
-  return { ...state, clock: advanceClock(state.clock, dtGameMinutes) };
-}
-
-/** The Character walks into a place, given its hours in this pack. A closed place can't be entered. */
-export function enterPlace(state: GameState, placeId: PlaceId, hours: OpeningHours): GameState {
-  if (state.placeId === placeId || !isOpen(hours, state.clock)) return state;
-  return { ...state, placeId };
 }

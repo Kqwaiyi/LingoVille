@@ -20,11 +20,30 @@ import { hours, HOURS_IDS, type HoursId } from './places.ts';
 import { isPasserBy, PASSER_BY_IDS, PASSER_BY_STOPS, TOWN_NPCS, TRAM_LINE, type PasserById, type TownNpcId, type TramStopId } from './townNpcs.ts';
 
 // Each Culture Pack dresses the same town as Japan, China, the UK or Germany:
-// local names, prices, money, customs, signs and props. Everything the
+// local names, prices, money, customs, signs, sounds and props. Everything the
 // Player can read carries a gloss in each of the three other Native Languages.
 
 /** A Native Language → the meaning in it. A pack glosses its words in the three languages other than its own. */
 export type Glosses = Partial<Record<LanguageCode, string>>;
+
+/**
+ * The ambient one-shots a pack can play now and then around the town: the local touches over the shared beds. None is
+ * intelligible speech: a street vendor's call is a wordless far-off cry.
+ */
+export const AMBIENT_SOUND_IDS = [
+  'bicycle-bell',
+  'bus-brakes',
+  'church-bells',
+  'crow-caw',
+  'evening-chime',
+  'level-crossing',
+  'pigeon-coo',
+  'scooter-horn',
+  'shop-door-chime',
+  'street-vendor-call',
+  'tram-bell',
+] as const;
+export type AmbientSoundId = (typeof AMBIENT_SOUND_IDS)[number];
 
 /** An item as this pack sells it: its local name and glosses. Its price is the catalogue's (`ITEMS`), converted. */
 export type Good = { name: string; glosses: Glosses };
@@ -142,6 +161,8 @@ export type CulturePack = {
   customs: string[];
   /** Opening hours that differ from the town's defaults (`PLACE_HOURS`, `SERVICE_HOURS`). */
   hours: Partial<Record<HoursId, OpeningHours>>;
+  /** Ambient one-shots, played now and then out in the town. */
+  ambient: AmbientSoundId[];
   goods: Record<ItemId, Good>;
   /** How a café drink can be made (size, hot or iced, extras), as the menu grid and Shift Customers say it. */
   drinkOptions: Record<DrinkOptionId, Good>;
@@ -156,16 +177,21 @@ export type CulturePack = {
   supermarket: Shop;
   convenienceStore: Shop;
   restaurant: Shop;
-  /** The clinic and hospital, by its local name. */
+  /** The clinic and hospital, by its local name: where the Fainting ward is. */
   hospital: { name: string; nameGlosses: Glosses };
   /** The apartment block the Character lives in, by its local name: where the landlord is. */
   apartments: { name: string; nameGlosses: Glosses };
   /** The tram stops by their local names, as the stop signs and passers-by say them. */
   tramStops: Record<TramStopId, { name: string; nameGlosses: Glosses }>;
-  /** The other places Named NPCs are found, by their local names. */
-  townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses }>;
-  /** Persona localisations: each Named NPC's local name. */
-  personas: Record<NamedNpcId, { name: string }>;
+  /** The other places Named NPCs are found, by their local names, and any facts their staff know (in English). */
+  townPlaces: Record<TownPlaceId, { name: string; nameGlosses: Glosses; facts?: string[] }>;
+  /** Persona localisations: each Named NPC's local name, and their favourite gift (the persona's `favouriteGift`) as a local would put it (in English, as the prompt reads it). */
+  personas: Record<NamedNpcId, { name: string; favouriteGift: string }>;
+  /**
+   * The casual register a friend offers to switch to, once: `formal` and `casual` as the Target Language names them
+   * (for the Recap), `offer` what the NPC offers and `inUse` how they speak once they have (in English, as the prompt reads them).
+   */
+  casualRegister: { formal: string; casual: string; offer: string; inUse: string };
   appearances: {
     /** Persona × pack → look: what each Named NPC wears in this pack, and the build their voice suits, the same in every pack. */
     npcs: Record<NamedNpcId, NpcLook>;
@@ -219,6 +245,7 @@ export function culturePackSchema(packId: LanguageCode) {
     }),
     customs: z.array(text),
     hours: z.partialRecord(z.enum(HOURS_IDS), openingHours),
+    ambient: z.array(z.enum(AMBIENT_SOUND_IDS)).min(1),
     goods: z.partialRecord(z.enum(ITEM_IDS), z.object({ name: text, glosses })),
     drinkOptions: z.record(z.enum(DRINK_OPTIONS), z.object({ name: text, glosses })),
     dietaryNotes: z.record(z.enum(DIETARY_NOTE_IDS), z.object({ name: text, glosses })),
@@ -232,8 +259,9 @@ export function culturePackSchema(packId: LanguageCode) {
     hospital: z.object({ name: text, nameGlosses: glosses }),
     apartments: z.object({ name: text, nameGlosses: glosses }),
     tramStops: z.record(z.enum(TRAM_LINE), z.object({ name: text, nameGlosses: glosses })),
-    townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses })),
-    personas: z.record(z.string(), z.object({ name: text })),
+    townPlaces: z.record(z.enum(TOWN_PLACE_IDS), z.object({ name: text, nameGlosses: glosses, facts: z.array(text).optional() })),
+    personas: z.record(z.string(), z.object({ name: text, favouriteGift: text })),
+    casualRegister: z.object({ formal: text, casual: text, offer: text, inUse: text }),
     appearances: z.object({
       npcs: z.record(z.string(), NpcLookSchema),
       customers: CustomerWeightsSchema,
@@ -261,11 +289,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'Customers put their money on the small tray by the till rather than in the hand.',
     ],
     hours: { cafe: hours(7, 20) },
+    ambient: ['crow-caw', 'level-crossing', 'shop-door-chime', 'evening-chime'],
     goods: {
       latte: { name: 'ホットラテ', glosses: { zh: '热拿铁', en: 'Hot latte', de: 'Heißer Latte' } },
       coffee: { name: 'ブレンドコーヒー', glosses: { zh: '招牌混合咖啡', en: 'House blend coffee', de: 'Kaffee der Hausmischung' } },
       tea: { name: '紅茶', glosses: { zh: '红茶', en: 'Black tea', de: 'Schwarzer Tee' } },
       pastry: { name: 'メロンパン', glosses: { zh: '菠萝包', en: 'Melon bread', de: 'Melonenbrötchen' } },
+      snack: { name: 'からあげ', glosses: { zh: '日式炸鸡块', en: 'Japanese fried chicken', de: 'Japanisches Brathähnchen' } },
+      bento: { name: 'のり弁当', glosses: { zh: '海苔便当', en: 'Seaweed bento box', de: 'Nori-Bento' } },
       vegetables: { name: 'キャベツ', glosses: { zh: '卷心菜', en: 'Cabbage', de: 'Weißkohl' } },
       eggs: { name: '卵', glosses: { zh: '鸡蛋', en: 'Eggs', de: 'Eier' } },
       noodles: { name: 'うどん', glosses: { zh: '乌冬面', en: 'Udon noodles', de: 'Udon-Nudeln' } },
@@ -280,6 +311,19 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       cola: { name: 'コーラ', glosses: { zh: '可乐', en: 'Cola', de: 'Cola' } },
       cake: { name: 'いちごのショートケーキ', glosses: { zh: '草莓奶油蛋糕', en: 'Strawberry shortcake', de: 'Erdbeer-Sahnetorte' } },
       'special-drink': { name: 'クリームソーダ', glosses: { zh: '冰淇淋苏打', en: 'Cream soda float', de: 'Limonade mit Eiskugel' } },
+      'mystery-novel': { name: 'ミステリー小説', glosses: { zh: '推理小说', en: 'Mystery novel', de: 'Kriminalroman' } },
+      cookbook: { name: '家庭料理の本', glosses: { zh: '家常菜谱', en: 'Home cooking cookbook', de: 'Kochbuch für Hausmannskost' } },
+      'travel-book': { name: '散歩ガイド', glosses: { zh: '散步指南', en: 'Walking guide', de: 'Wanderführer' } },
+      magazine: { name: '雑誌', glosses: { zh: '杂志', en: 'Magazine', de: 'Zeitschrift' } },
+      flowers: { name: '花束', glosses: { zh: '花束', en: 'Bouquet of flowers', de: 'Blumenstrauß' } },
+      chocolates: { name: 'チョコレートの詰め合わせ', glosses: { zh: '巧克力礼盒', en: 'Box of chocolates', de: 'Pralinenschachtel' } },
+      'scented-candle': { name: 'アロマキャンドル', glosses: { zh: '香薰蜡烛', en: 'Scented candle', de: 'Duftkerze' } },
+      'bath-entry': { name: '入浴券', glosses: { zh: '洗浴票', en: 'Bath entry ticket', de: 'Eintrittskarte fürs Bad' } },
+      'gym-membership': { name: 'ジムの会員', glosses: { zh: '健身房会员', en: 'Gym membership', de: 'Mitgliedschaft im Fitnessstudio' } },
+      'cold-medicine': { name: '風邪薬', glosses: { zh: '感冒药', en: 'Cold medicine', de: 'Erkältungsmittel' } },
+      'fever-reducer': { name: '解熱剤', glosses: { zh: '退烧药', en: 'Fever reducer', de: 'Fiebersenkendes Mittel' } },
+      'stomach-medicine': { name: '胃腸薬', glosses: { zh: '肠胃药', en: 'Stomach medicine', de: 'Magen-Darm-Mittel' } },
+      antihistamine: { name: '花粉症の薬', glosses: { zh: '过敏药', en: 'Hay fever tablets', de: 'Heuschnupfentabletten' } },
     },
     drinkOptions: {
       small: { name: 'Sサイズ', glosses: { zh: '小杯', en: 'Small', de: 'Klein' } },
@@ -353,25 +397,48 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: '桜ヶ丘公園', nameGlosses: { zh: '樱丘公园', en: 'Sakuragaoka Park', de: 'Sakuragaoka-Park' } },
       bookshop: { name: 'ひだまり書店', nameGlosses: { zh: '向阳书店', en: 'Hidamari Books', de: 'Buchhandlung Hidamari' } },
-      bathhouse: { name: '松の湯', nameGlosses: { zh: '松之汤', en: 'Matsu-no-yu Bathhouse', de: 'Badehaus Matsu-no-yu' } },
-      'town-office': { name: '南町役場', nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' } },
+      bathhouse: {
+        name: '松の湯',
+        nameGlosses: { zh: '松之汤', en: 'Matsu-no-yu Bathhouse', de: 'Badehaus Matsu-no-yu' },
+        facts: [
+          'Shoes go in the wooden shoe lockers at the entrance.',
+          'Wash and rinse at the taps before getting into the bath, and keep towels out of the bathwater.',
+          'The gym is a corner just inside the entrance with a running machine. Members wipe it down after use.',
+          'After the bath, many people buy a bottle of cold milk from the fridge by the desk.',
+        ],
+      },
+      'town-office': {
+        name: '南町役場',
+        nameGlosses: { zh: '南町政府', en: 'Minami Town Office', de: 'Gemeindeamt Minami' },
+        facts: [
+          'Anyone who moves to town registers their new address here (a moving-in notification, 転入届) within 14 days.',
+          'The post office counter is in the same hall, at the far end.',
+          'Customers take a numbered ticket from the machine by the door and wait to be called.',
+        ],
+      },
+    },
+    casualRegister: {
+      formal: '敬語',
+      casual: 'タメ口',
+      offer: 'suggest that the two of you drop the polite です/ます forms (keigo) and talk in タメ口, the plain casual forms friends use',
+      inUse: 'You talk to each other in タメ口 now: use the plain casual forms friends use, not です/ます.',
     },
     personas: {
-      landlord: { name: '山本' },
-      barista: { name: '佐藤' },
-      cashier: { name: '鈴木' },
-      'convenience-clerk': { name: '田中' },
-      server: { name: '中村' },
-      receptionist: { name: '小林' },
-      doctor: { name: '伊藤' },
-      nurse: { name: '高橋' },
-      pharmacist: { name: '渡辺' },
-      'park-regular-1': { name: '加藤' },
-      'park-regular-2': { name: '吉田' },
-      'park-regular-3': { name: '山田' },
-      shopkeeper: { name: '松本' },
-      attendant: { name: '井上' },
-      'office-clerk': { name: '木村' },
+      landlord: { name: '山本', favouriteGift: 'flowers for the hallway, seasonal ones like cosmos or chrysanthemums' },
+      barista: { name: '佐藤', favouriteGift: 'chocolates, especially ones flavoured with matcha' },
+      cashier: { name: '鈴木', favouriteGift: 'a scented candle with a calm hinoki cypress scent' },
+      'convenience-clerk': { name: '田中', favouriteGift: 'chocolates, the more unusual the limited-edition flavour the better' },
+      server: { name: '中村', favouriteGift: 'flowers, a small bunch to brighten the restaurant counter' },
+      receptionist: { name: '小林', favouriteGift: 'flowers for the reception desk, something cheerful' },
+      doctor: { name: '伊藤', favouriteGift: 'a scented candle to unwind with after a long day at the clinic' },
+      nurse: { name: '高橋', favouriteGift: 'a scented candle, ideally with a yuzu scent' },
+      pharmacist: { name: '渡辺', favouriteGift: 'chocolates, in a neat little box from a good shop' },
+      'park-regular-1': { name: '加藤', favouriteGift: 'flowers that remind them of the garden they used to keep' },
+      'park-regular-2': { name: '吉田', favouriteGift: 'chocolates to share at home (not with the dog!)' },
+      'park-regular-3': { name: '山田', favouriteGift: 'flowers, to sketch before they wilt' },
+      shopkeeper: { name: '松本', favouriteGift: 'a scented candle to read by in the evenings' },
+      attendant: { name: '井上', favouriteGift: 'a scented candle that smells like a forest bath' },
+      'office-clerk': { name: '木村', favouriteGift: 'chocolates to keep in the desk drawer for long afternoons' },
     },
     appearances: {
       npcs: {
@@ -428,11 +495,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     },
     customs: ['Tipping is not expected.', 'Most people pay by scanning a QR code with WeChat or Alipay.'],
     hours: {},
+    ambient: ['bicycle-bell', 'scooter-horn', 'street-vendor-call', 'shop-door-chime'],
     goods: {
       latte: { name: '热拿铁', glosses: { ja: 'ホットラテ', en: 'Hot latte', de: 'Heißer Latte' } },
       coffee: { name: '美式咖啡', glosses: { ja: 'アメリカーノ', en: 'Americano', de: 'Americano' } },
       tea: { name: '红茶', glosses: { ja: '紅茶', en: 'Black tea', de: 'Schwarzer Tee' } },
       pastry: { name: '蛋挞', glosses: { ja: 'エッグタルト', en: 'Egg tart', de: 'Puddingtörtchen' } },
+      snack: { name: '茶叶蛋', glosses: { ja: '茶葉卵', en: 'Tea egg', de: 'Tee-Ei' } },
+      bento: { name: '盒饭', glosses: { ja: 'お弁当', en: 'Boxed rice meal', de: 'Reis-Box' } },
       vegetables: { name: '青菜', glosses: { ja: 'チンゲン菜', en: 'Bok choy', de: 'Pak Choi' } },
       eggs: { name: '鸡蛋', glosses: { ja: '卵', en: 'Eggs', de: 'Eier' } },
       noodles: { name: '挂面', glosses: { ja: '乾麺', en: 'Dried noodles', de: 'Getrocknete Nudeln' } },
@@ -447,6 +517,19 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       cola: { name: '可乐', glosses: { ja: 'コーラ', en: 'Cola', de: 'Cola' } },
       cake: { name: '提拉米苏', glosses: { ja: 'ティラミス', en: 'Tiramisu', de: 'Tiramisu' } },
       'special-drink': { name: '芒果冰沙', glosses: { ja: 'マンゴースムージー', en: 'Mango smoothie', de: 'Mango-Smoothie' } },
+      'mystery-novel': { name: '推理小说', glosses: { ja: 'ミステリー小説', en: 'Mystery novel', de: 'Kriminalroman' } },
+      cookbook: { name: '家常菜谱', glosses: { ja: '家庭料理のレシピ本', en: 'Home cooking cookbook', de: 'Kochbuch für Hausmannskost' } },
+      'travel-book': { name: '旅游指南', glosses: { ja: '旅行ガイド', en: 'Travel guide', de: 'Reiseführer' } },
+      magazine: { name: '杂志', glosses: { ja: '雑誌', en: 'Magazine', de: 'Zeitschrift' } },
+      flowers: { name: '鲜花', glosses: { ja: '生花', en: 'Fresh flowers', de: 'Frische Blumen' } },
+      chocolates: { name: '巧克力礼盒', glosses: { ja: 'チョコレートのギフトボックス', en: 'Gift box of chocolates', de: 'Pralinen-Geschenkbox' } },
+      'scented-candle': { name: '香薰蜡烛', glosses: { ja: 'アロマキャンドル', en: 'Scented candle', de: 'Duftkerze' } },
+      'bath-entry': { name: '洗浴票', glosses: { ja: '入浴券', en: 'Bath entry ticket', de: 'Eintrittskarte fürs Bad' } },
+      'gym-membership': { name: '健身卡', glosses: { ja: 'ジムの会員証', en: 'Gym pass', de: 'Karte fürs Fitnessstudio' } },
+      'cold-medicine': { name: '感冒药', glosses: { ja: '風邪薬', en: 'Cold medicine', de: 'Erkältungsmittel' } },
+      'fever-reducer': { name: '退烧药', glosses: { ja: '解熱剤', en: 'Fever reducer', de: 'Fiebersenkendes Mittel' } },
+      'stomach-medicine': { name: '肠胃药', glosses: { ja: '胃腸薬', en: 'Stomach medicine', de: 'Magen-Darm-Mittel' } },
+      antihistamine: { name: '抗过敏药', glosses: { ja: 'アレルギーの薬', en: 'Antihistamine', de: 'Antihistaminikum' } },
     },
     drinkOptions: {
       small: { name: '小杯', glosses: { ja: 'Sサイズ', en: 'Small', de: 'Klein' } },
@@ -520,25 +603,47 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: '人民公园', nameGlosses: { ja: '人民公園', en: 'People’s Park', de: 'Volkspark' } },
       bookshop: { name: '书香书店', nameGlosses: { ja: '書香書店', en: 'Book Fragrance Bookshop', de: 'Buchhandlung Bücherduft' } },
-      bathhouse: { name: '清泉浴池', nameGlosses: { ja: '清泉浴場', en: 'Clear Spring Bathhouse', de: 'Badehaus Klarquelle' } },
-      'town-office': { name: '街道办事处', nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' } },
+      bathhouse: {
+        name: '清泉浴池',
+        nameGlosses: { ja: '清泉浴場', en: 'Clear Spring Bathhouse', de: 'Badehaus Klarquelle' },
+        facts: [
+          'The desk hands out flip-flops and a wristband with a locker key.',
+          'Shower before going into the pools.',
+          'The gym is a corner just inside the entrance with a running machine. Members show their pass at the desk.',
+          'Many people rest in the lounge after bathing, with a pot of tea.',
+        ],
+      },
+      'town-office': {
+        name: '街道办事处',
+        nameGlosses: { ja: '街道事務所', en: 'Neighbourhood Office', de: 'Bezirksamt' },
+        facts: [
+          'Newcomers register their address here (residence registration, 住宿登记) soon after they move in.',
+          'There is a China Post counter (中国邮政) in the same hall.',
+        ],
+      },
+    },
+    casualRegister: {
+      formal: '您',
+      casual: '你',
+      offer: 'tell them there is no need for the polite 您 or for titles between you: they can just say 你 and use your given name, as friends do',
+      inUse: 'You talk to each other as friends now: say 你, never 您, and no titles.',
     },
     personas: {
-      landlord: { name: '刘阿姨' },
-      barista: { name: '小李' },
-      cashier: { name: '张敏' },
-      'convenience-clerk': { name: '小陈' },
-      server: { name: '小赵' },
-      receptionist: { name: '杨洁' },
-      doctor: { name: '黄医生' },
-      nurse: { name: '王芳' },
-      pharmacist: { name: '周明' },
-      'park-regular-1': { name: '吴大爷' },
-      'park-regular-2': { name: '徐丽' },
-      'park-regular-3': { name: '小孙' },
-      shopkeeper: { name: '马老师' },
-      attendant: { name: '胡姐' },
-      'office-clerk': { name: '郭先生' },
+      landlord: { name: '刘阿姨', favouriteGift: 'flowers for the stairwell, something bright like peonies' },
+      barista: { name: '小李', favouriteGift: 'chocolates, especially dark ones that go with coffee' },
+      cashier: { name: '张敏', favouriteGift: 'a scented candle with a jasmine scent' },
+      'convenience-clerk': { name: '小陈', favouriteGift: 'chocolates, the fancier the gift box the better' },
+      server: { name: '小赵', favouriteGift: 'flowers, a small bunch for the restaurant counter' },
+      receptionist: { name: '杨洁', favouriteGift: 'flowers for the front desk, something cheerful' },
+      doctor: { name: '黄医生', favouriteGift: 'a scented candle to relax with after a long day at the clinic' },
+      nurse: { name: '王芳', favouriteGift: 'a scented candle with an osmanthus scent' },
+      pharmacist: { name: '周明', favouriteGift: 'chocolates, a tidy box of them' },
+      'park-regular-1': { name: '吴大爷', favouriteGift: 'flowers, especially chrysanthemums like the ones on the old balcony' },
+      'park-regular-2': { name: '徐丽', favouriteGift: 'chocolates to share at home (not with the dog!)' },
+      'park-regular-3': { name: '小孙', favouriteGift: 'flowers, to sketch before they wilt' },
+      shopkeeper: { name: '马老师', favouriteGift: 'a scented candle to read by in the evenings' },
+      attendant: { name: '胡姐', favouriteGift: 'a scented candle that smells like a warm bath' },
+      'office-clerk': { name: '郭先生', favouriteGift: 'chocolates to keep in the desk drawer for long afternoons' },
     },
     appearances: {
       npcs: {
@@ -597,11 +702,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'Tipping at the counter is optional, and there is a tip jar by the till.',
     ],
     hours: { cafe: hours(7, 18) },
+    ambient: ['pigeon-coo', 'bus-brakes', 'church-bells', 'shop-door-chime'],
     goods: {
       latte: { name: 'Latte', glosses: { ja: 'ラテ', zh: '拿铁', de: 'Latte' } },
       coffee: { name: 'Filter coffee', glosses: { ja: 'ドリップコーヒー', zh: '滴滤咖啡', de: 'Filterkaffee' } },
       tea: { name: 'Cup of tea', glosses: { ja: '紅茶', zh: '一杯红茶', de: 'Tasse Tee' } },
       pastry: { name: 'Scone', glosses: { ja: 'スコーン', zh: '司康饼', de: 'Scone' } },
+      snack: { name: 'Sausage roll', glosses: { ja: 'ソーセージロール', zh: '香肠卷', de: 'Würstchen im Blätterteig' } },
+      bento: { name: 'Microwave lasagne', glosses: { ja: 'レンジで温めるラザニア', zh: '微波炉千层面', de: 'Mikrowellen-Lasagne' } },
       vegetables: { name: 'Carrots', glosses: { ja: 'にんじん', zh: '胡萝卜', de: 'Karotten' } },
       eggs: { name: 'Eggs', glosses: { ja: '卵', zh: '鸡蛋', de: 'Eier' } },
       noodles: { name: 'Spaghetti', glosses: { ja: 'スパゲッティ', zh: '意大利面', de: 'Spaghetti' } },
@@ -616,6 +724,19 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       cola: { name: 'Cola', glosses: { ja: 'コーラ', zh: '可乐', de: 'Cola' } },
       cake: { name: 'Victoria sponge', glosses: { ja: 'ヴィクトリアケーキ', zh: '维多利亚海绵蛋糕', de: 'Victoria-Biskuitkuchen' } },
       'special-drink': { name: 'Hot chocolate', glosses: { ja: 'ホットチョコレート', zh: '热巧克力', de: 'Heiße Schokolade' } },
+      'mystery-novel': { name: 'Crime novel', glosses: { ja: '推理小説', zh: '侦探小说', de: 'Kriminalroman' } },
+      cookbook: { name: 'Cookbook', glosses: { ja: '料理の本', zh: '菜谱', de: 'Kochbuch' } },
+      'travel-book': { name: 'Walking guide', glosses: { ja: '散歩ガイド', zh: '徒步指南', de: 'Wanderführer' } },
+      magazine: { name: 'Magazine', glosses: { ja: '雑誌', zh: '杂志', de: 'Zeitschrift' } },
+      flowers: { name: 'Bunch of flowers', glosses: { ja: '花束', zh: '一束花', de: 'Blumenstrauß' } },
+      chocolates: { name: 'Box of chocolates', glosses: { ja: 'チョコレートの箱', zh: '一盒巧克力', de: 'Pralinenschachtel' } },
+      'scented-candle': { name: 'Scented candle', glosses: { ja: 'アロマキャンドル', zh: '香薰蜡烛', de: 'Duftkerze' } },
+      'bath-entry': { name: 'Swim and steam entry', glosses: { ja: 'プールとスチームルームの入場券', zh: '游泳和蒸汽房门票', de: 'Eintritt Schwimmbad und Dampfbad' } },
+      'gym-membership': { name: 'Gym membership', glosses: { ja: 'ジムの会員', zh: '健身房会员', de: 'Mitgliedschaft im Fitnessstudio' } },
+      'cold-medicine': { name: 'Cold relief capsules', glosses: { ja: '風邪薬', zh: '感冒胶囊', de: 'Erkältungskapseln' } },
+      'fever-reducer': { name: 'Paracetamol', glosses: { ja: '解熱鎮痛剤', zh: '扑热息痛', de: 'Paracetamol' } },
+      'stomach-medicine': { name: 'Stomach settler', glosses: { ja: '胃腸薬', zh: '肠胃药', de: 'Magenberuhigungsmittel' } },
+      antihistamine: { name: 'Hay fever tablets', glosses: { ja: '花粉症の薬', zh: '花粉过敏药片', de: 'Heuschnupfentabletten' } },
     },
     drinkOptions: {
       small: { name: 'Small', glosses: { ja: 'スモール', zh: '小杯', de: 'Klein' } },
@@ -689,25 +810,47 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: 'Victoria Park', nameGlosses: { ja: 'ヴィクトリア公園', zh: '维多利亚公园', de: 'Victoria Park' } },
       bookshop: { name: 'The Book Nook', nameGlosses: { ja: 'ブック・ヌック', zh: '书角书店', de: 'Bücherecke' } },
-      bathhouse: { name: 'Riverside Baths', nameGlosses: { ja: 'リバーサイド浴場', zh: '河畔浴场', de: 'Flussbad' } },
-      'town-office': { name: 'Town Hall', nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' } },
+      bathhouse: {
+        name: 'Riverside Baths',
+        nameGlosses: { ja: 'リバーサイド浴場', zh: '河畔浴场', de: 'Flussbad' },
+        facts: [
+          'The baths are Victorian: a pool and a steam room. Swimwear is worn everywhere.',
+          'Please shower before using the pool or the steam room.',
+          'Lockers take a £1 coin, which comes back when you open them again.',
+          'The gym is a corner just inside the entrance with a running machine. Members sign in at the desk first.',
+        ],
+      },
+      'town-office': {
+        name: 'Town Hall',
+        nameGlosses: { ja: 'タウンホール', zh: '市政厅', de: 'Rathaus' },
+        facts: [
+          'New residents register their address with the council here, which also puts them on the electoral register.',
+          'The Post Office counter is just inside the main doors.',
+        ],
+      },
+    },
+    casualRegister: {
+      formal: 'Mr / Ms',
+      casual: 'first names',
+      offer: 'tell them to drop the "sir", "madam" and surnames and call you by your first name, as friends do',
+      inUse: 'You are on first-name terms now: talk to them casually, as friends do, with nothing formal.',
     },
     personas: {
-      landlord: { name: 'Mrs Hughes' },
-      barista: { name: 'Jess' },
-      cashier: { name: 'Priya' },
-      'convenience-clerk': { name: 'Dev' },
-      server: { name: 'Tom' },
-      receptionist: { name: 'Karen' },
-      doctor: { name: 'Dr Okafor' },
-      nurse: { name: 'Bridget' },
-      pharmacist: { name: 'Mr Shah' },
-      'park-regular-1': { name: 'Arthur' },
-      'park-regular-2': { name: 'Ellie' },
-      'park-regular-3': { name: 'Callum' },
-      shopkeeper: { name: 'Mr Price' },
-      attendant: { name: 'Maureen' },
-      'office-clerk': { name: 'Gareth' },
+      landlord: { name: 'Mrs Hughes', favouriteGift: 'flowers for the hallway, sweet peas if you can find them' },
+      barista: { name: 'Jess', favouriteGift: 'chocolates, the posh dark kind that goes with coffee' },
+      cashier: { name: 'Priya', favouriteGift: 'a scented candle, something like lavender for the bath' },
+      'convenience-clerk': { name: 'Dev', favouriteGift: 'chocolates, the bigger the box the better' },
+      server: { name: 'Tom', favouriteGift: 'flowers, a small bunch for the restaurant counter' },
+      receptionist: { name: 'Karen', favouriteGift: 'flowers for the reception desk, something cheerful like daffodils' },
+      doctor: { name: 'Dr Okafor', favouriteGift: 'a scented candle to unwind with after evening surgery' },
+      nurse: { name: 'Bridget', favouriteGift: 'a scented candle, something fresh like lemon' },
+      pharmacist: { name: 'Mr Shah', favouriteGift: 'chocolates, a neat box of them' },
+      'park-regular-1': { name: 'Arthur', favouriteGift: 'flowers that remind them of their allotment' },
+      'park-regular-2': { name: 'Ellie', favouriteGift: 'chocolates to share at home (not with the dog!)' },
+      'park-regular-3': { name: 'Callum', favouriteGift: 'flowers, to sketch before they wilt' },
+      shopkeeper: { name: 'Mr Price', favouriteGift: 'a scented candle to read by on winter evenings' },
+      attendant: { name: 'Maureen', favouriteGift: 'a scented candle that smells of eucalyptus, like the steam room' },
+      'office-clerk': { name: 'Gareth', favouriteGift: 'chocolates to keep in the desk drawer for long afternoons' },
     },
     appearances: {
       npcs: {
@@ -765,8 +908,8 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       'At the counter tipping is optional; people often round up.',
       'Cash is still common, and some cafés only take card above a few euros.',
     ],
-    // Almost everything shuts on Sunday. The bathhouse, the convenience store and
-    // the trams don't; the clinic and town office already do.
+    // Almost everything shuts on Sunday. The bathhouse, the Fainting ward, the
+    // convenience store and the trams don't; the clinic and town office already do.
     hours: {
       cafe: hours(8, 18, ['sunday']),
       supermarket: hours(9, 21, ['sunday']),
@@ -774,11 +917,14 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       bookshop: hours(10, 20, ['sunday']),
       landlord: hours(8, 20, ['sunday']),
     },
+    ambient: ['tram-bell', 'church-bells', 'bicycle-bell', 'shop-door-chime'],
     goods: {
       latte: { name: 'Latte macchiato', glosses: { ja: 'ラテ・マキアート', zh: '拿铁玛奇朵', en: 'Latte macchiato' } },
       coffee: { name: 'Filterkaffee', glosses: { ja: 'ドリップコーヒー', zh: '滴滤咖啡', en: 'Filter coffee' } },
       tea: { name: 'Schwarztee', glosses: { ja: '紅茶', zh: '红茶', en: 'Black tea' } },
       pastry: { name: 'Butterbrezel', glosses: { ja: 'バタープレッツェル', zh: '黄油扭结饼', en: 'Butter pretzel' } },
+      snack: { name: 'Bockwurst', glosses: { ja: 'ボックヴルスト（ソーセージ）', zh: '德式香肠', en: 'Bockwurst sausage' } },
+      bento: { name: 'Fertiggericht', glosses: { ja: '温めて食べる調理済みの料理', zh: '速食餐', en: 'Ready meal' } },
       vegetables: { name: 'Kartoffeln', glosses: { ja: 'じゃがいも', zh: '土豆', en: 'Potatoes' } },
       eggs: { name: 'Eier', glosses: { ja: '卵', zh: '鸡蛋', en: 'Eggs' } },
       noodles: { name: 'Spätzle', glosses: { ja: 'シュペッツレ（卵の麺）', zh: '德式鸡蛋面', en: 'Spätzle (egg noodles)' } },
@@ -793,6 +939,19 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
       cola: { name: 'Cola', glosses: { ja: 'コーラ', zh: '可乐', en: 'Cola' } },
       cake: { name: 'Käsekuchen', glosses: { ja: 'チーズケーキ', zh: '芝士蛋糕', en: 'Cheesecake' } },
       'special-drink': { name: 'Heiße Schokolade', glosses: { ja: 'ホットチョコレート', zh: '热巧克力', en: 'Hot chocolate' } },
+      'mystery-novel': { name: 'Krimi', glosses: { ja: '推理小説', zh: '侦探小说', en: 'Crime novel' } },
+      cookbook: { name: 'Kochbuch', glosses: { ja: '料理の本', zh: '菜谱', en: 'Cookbook' } },
+      'travel-book': { name: 'Wanderführer', glosses: { ja: 'ハイキングガイド', zh: '徒步指南', en: 'Walking guide' } },
+      magazine: { name: 'Zeitschrift', glosses: { ja: '雑誌', zh: '杂志', en: 'Magazine' } },
+      flowers: { name: 'Blumenstrauß', glosses: { ja: '花束', zh: '花束', en: 'Bunch of flowers' } },
+      chocolates: { name: 'Pralinen', glosses: { ja: 'プラリネ（チョコレート菓子）', zh: '果仁夹心巧克力', en: 'Chocolates' } },
+      'scented-candle': { name: 'Duftkerze', glosses: { ja: 'アロマキャンドル', zh: '香薰蜡烛', en: 'Scented candle' } },
+      'bath-entry': { name: 'Eintritt Bad und Sauna', glosses: { ja: 'プールとサウナの入場券', zh: '浴场和桑拿门票', en: 'Entry to the pool and sauna' } },
+      'gym-membership': { name: 'Fitness-Mitgliedschaft', glosses: { ja: 'ジムの会員', zh: '健身房会员', en: 'Gym membership' } },
+      'cold-medicine': { name: 'Erkältungsmittel', glosses: { ja: '風邪薬', zh: '感冒药', en: 'Cold medicine' } },
+      'fever-reducer': { name: 'Fiebersaft', glosses: { ja: '解熱シロップ', zh: '退烧糖浆', en: 'Fever syrup' } },
+      'stomach-medicine': { name: 'Magentropfen', glosses: { ja: '胃薬の滴剤', zh: '胃药滴剂', en: 'Stomach drops' } },
+      antihistamine: { name: 'Heuschnupfentabletten', glosses: { ja: '花粉症の薬', zh: '花粉过敏药片', en: 'Hay fever tablets' } },
     },
     drinkOptions: {
       small: { name: 'Klein', glosses: { ja: 'スモール', zh: '小杯', en: 'Small' } },
@@ -866,25 +1025,47 @@ export const CULTURE_PACKS: Record<LanguageCode, CulturePack> = {
     townPlaces: {
       park: { name: 'Stadtpark', nameGlosses: { ja: '市立公園', zh: '城市公园', en: 'City Park' } },
       bookshop: { name: 'Buchhandlung Seitenweise', nameGlosses: { ja: 'ザイテンヴァイゼ書店', zh: '页页书店', en: 'Seitenweise Bookshop' } },
-      bathhouse: { name: 'Stadtbad', nameGlosses: { ja: '市営浴場', zh: '市立浴场', en: 'Town Baths' } },
-      'town-office': { name: 'Bürgeramt', nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' } },
+      bathhouse: {
+        name: 'Stadtbad',
+        nameGlosses: { ja: '市営浴場', zh: '市立浴场', en: 'Town Baths' },
+        facts: [
+          'Outdoor shoes stay in the changing area.',
+          'Shower before going into the pool or the sauna.',
+          'The sauna is mixed and swimwear-free: always sit on your own towel.',
+          'The gym is a corner just inside the entrance with a running machine. Members sign in at the desk first.',
+        ],
+      },
+      'town-office': {
+        name: 'Bürgeramt',
+        nameGlosses: { ja: '市民課', zh: '市民服务中心', en: 'Citizens’ Office' },
+        facts: [
+          'Anyone who moves here must register their address within two weeks (the Anmeldung) and is given a registration certificate (Meldebescheinigung).',
+          'There is a post office counter (Postfiliale) in the same building.',
+        ],
+      },
+    },
+    casualRegister: {
+      formal: 'Sie',
+      casual: 'du',
+      offer: 'offer them the du ("Wollen wir uns duzen?"): to say du to each other instead of Sie, as friends do',
+      inUse: 'You say du to each other now: never Sie.',
     },
     personas: {
-      landlord: { name: 'Frau Becker' },
-      barista: { name: 'Lena' },
-      cashier: { name: 'Jonas' },
-      'convenience-clerk': { name: 'Murat' },
-      server: { name: 'Sabine' },
-      receptionist: { name: 'Frau Wagner' },
-      doctor: { name: 'Dr. Schulz' },
-      nurse: { name: 'Petra' },
-      pharmacist: { name: 'Herr Hoffmann' },
-      'park-regular-1': { name: 'Herr Krüger' },
-      'park-regular-2': { name: 'Anja' },
-      'park-regular-3': { name: 'Felix' },
-      shopkeeper: { name: 'Herr Lange' },
-      attendant: { name: 'Frau Schmitt' },
-      'office-clerk': { name: 'Herr Neumann' },
+      landlord: { name: 'Frau Becker', favouriteGift: 'flowers for the stairwell, ideally tulips' },
+      barista: { name: 'Lena', favouriteGift: 'chocolates, the dark ones that go with an espresso' },
+      cashier: { name: 'Jonas', favouriteGift: 'a scented candle with a cosy vanilla scent' },
+      'convenience-clerk': { name: 'Murat', favouriteGift: 'chocolates, the more marzipan the better' },
+      server: { name: 'Sabine', favouriteGift: 'flowers, a small bunch for the restaurant counter' },
+      receptionist: { name: 'Frau Wagner', favouriteGift: 'flowers for the reception desk, something cheerful like sunflowers' },
+      doctor: { name: 'Dr. Schulz', favouriteGift: 'a scented candle to wind down with after a long day at the practice' },
+      nurse: { name: 'Petra', favouriteGift: 'a scented candle with a fresh citrus scent' },
+      pharmacist: { name: 'Herr Hoffmann', favouriteGift: 'chocolates, a tidy box of them' },
+      'park-regular-1': { name: 'Herr Krüger', favouriteGift: 'flowers that remind them of their allotment garden' },
+      'park-regular-2': { name: 'Anja', favouriteGift: 'chocolates to share at home (not with the dog!)' },
+      'park-regular-3': { name: 'Felix', favouriteGift: 'flowers, to sketch before they wilt' },
+      shopkeeper: { name: 'Herr Lange', favouriteGift: 'a scented candle to read by on long winter evenings' },
+      attendant: { name: 'Frau Schmitt', favouriteGift: 'a scented candle that smells of pine, like the sauna' },
+      'office-clerk': { name: 'Herr Neumann', favouriteGift: 'chocolates to keep in the desk drawer for long afternoons' },
     },
     appearances: {
       npcs: {
@@ -944,8 +1125,9 @@ export const TOWN_PLACE_IDS = ['park', 'bookshop', 'bathhouse', 'town-office'] a
 export type TownPlaceId = (typeof TOWN_PLACE_IDS)[number];
 const isTownPlace = (placeId: PlaceId): placeId is TownPlaceId => (TOWN_PLACE_IDS as readonly PlaceId[]).includes(placeId);
 
-/** What the staff at a place know about it in this pack (in English): a shop's facts, if it is one. */
+/** What the staff at a place know about it in this pack (in English): a shop's facts, or another place's, if it has any. */
 export function localPlaceFacts(placeId: PlaceId, packId: LanguageCode): string[] {
+  if (isTownPlace(placeId)) return CULTURE_PACKS[packId].townPlaces[placeId].facts ?? [];
   return localShop(placeId, packId)?.facts ?? [];
 }
 

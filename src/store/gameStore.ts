@@ -1,16 +1,24 @@
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import {
+  basketChangedScene,
   buildNpcSession,
+  buildPasserBySession,
   buildShiftCustomerSession,
+  buildSmallTalkSession,
+  giftScene,
   shiftCustomerChangeScene,
   checkReadings,
   hasReadingAids,
+  LEARN_NAME_TOOL,
+  LearnNameArgsSchema,
   NOT_UNDERSTOOD_TOOL,
   OUT_OF_PATIENCE_SCENE,
+  REVEAL_FAVOURITE_TOOL,
   shiftCustomerServedScene,
   tableServedScene,
   wordReading,
+  WRAP_UP_SCENE,
   type AnnotateRequest,
   type Annotation,
   type HelpLogEntry,
@@ -20,25 +28,34 @@ import {
   type NpcSession,
   type Recap,
   type RecapRequest,
+  type Relationship,
   type Segment,
   type ShiftRecapCustomer,
   type ToolResponse,
   type VoiceRequest,
 } from '../ai/index.ts';
 import {
+  approachInteraction,
   CULTURE_PACKS,
   customerLookWeights,
   DEFAULT_APPEARANCE,
   DEFAULT_DRINK,
+  GROCERIES_SOLD,
   interactionStartedWithE,
   isDrink,
   interactionStartedWithF,
+  interactionStartedWithR,
+  INTERACTIONS,
+  isPasserBy,
+  ITEMS,
   jobAt,
   JOB_PLACES,
   localNpcPlaceName,
   localPlaceName,
   NAMED_NPCS,
   OPEN_AIR_PLACES,
+  PASSER_BY_IDS,
+  PASSER_BY_STOPS,
   placeHours,
   placePhrasebook,
   RESTAURANT_DISHES,
@@ -53,10 +70,12 @@ import {
   type DrinkSize,
   type DrinkTemperature,
   type EffectKind,
+  type GroceryId,
   type Interaction,
   type ItemId,
   type NamedNpcId,
   type NpcLook,
+  type PasserById,
   type PlacePhrase,
   type SignId,
   stopsBetween,
@@ -65,40 +84,86 @@ import {
   TRAM_LINE,
   type TownNpcId,
   type TramStopId,
+  ILLNESSES,
+  type SymptomId,
 } from '../content/index.ts';
 import {
+  addToBasket,
   addToPhrasebook,
   applyInteractionOutcome,
   applyShiftCustomer,
   cancelShift,
+  approachDue,
+  approachMade,
+  approachStillDue,
+  casualRegisterDue,
+  casualRegisterOffered,
   applyRecapEvidence,
   applyShiftEvidence,
+  bedUsable,
   CHARACTER_NAME,
   CLOCK,
+  cook,
   createSave,
+  drinkWater,
+  ECONOMY,
+  endSmallTalk,
+  familiarityTier,
+  faintedBetween,
+  FIRST_MORNING,
+  firstMorningStep,
+  isFirstMorningCafeOrder,
   endShift,
   enterPlace,
+  skipFirstMorning,
+  hallwayApproach,
+  hallwayApproachMade,
+  parkWaveDue,
+  parkWaveMade,
   gameMinutesFor,
+  giveGift,
+  gymMembership,
+  hospitalDebt,
+  hospitalStatement,
+  gymRefusal,
+  gymSession,
+  isGoneOff,
   daylight,
   isOpen,
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
   jobAids,
+  learnName,
   lifeSkillLevels,
+  memoryOf,
   MIC_CHECK,
+  namedNpcOf,
   losePatience,
+  moodFace,
   newPlayerTurn,
   nextShiftCustomer,
   npcExpression,
+  putBackFromBasket,
+  rememberTopic,
+  onTheHouseGiven,
+  rollOnTheHouse,
+  rentStatement,
+  revealFavourite,
+  restaurantDebt,
   rideTram,
   SAVE,
   shiftRefusal,
+  sleep,
+  smallTalkExchange,
   startPatience,
   startShift,
+  startSmallTalk,
   tick,
   tramTripMinutes,
   weekdayOf,
+  type ApproachId,
+  type Basket,
   type ShiftOrder,
   addToTray,
   addPadLine,
@@ -124,6 +189,7 @@ import {
   type TrayHistory,
   type ConversationEvidence,
   type GameState,
+  type InventoryItem,
   type LifeSkillId,
   type LanguageCode,
   type NewGameSetup,
@@ -134,8 +200,11 @@ import {
   type JobId,
   type PlaceId,
   type Shift,
+  type GymRefusal,
   type ShiftRefusal,
   type StartingStep,
+  ILLNESS_IDS,
+  type IllnessId,
 } from '../sim/index.ts';
 import {
   addUsage,
@@ -169,18 +238,22 @@ import {
 } from './saveFiles.ts';
 import { browserSaves, SLOT_IDS, type LoadedSave, type Saves, type Slot, type SlotId } from './saves.ts';
 
-/** Builds the NPC's session for a conversation. */
-type SessionFor = () => NpcSession;
+/** Builds the NPC's session for a conversation, given the shopping on the counter at the time. */
+type SessionFor = (onCounter: Basket) => NpcSession;
 
-/** A fixed setup: the new game that stands in behind the title screen. */
+/** A fixed setup: the First Morning that stands in behind the title screen. */
 export const DEV_SETUP: NewGameSetup = {
   characterName: 'Sam',
   targetLanguage: 'ja',
   culturePackId: 'ja',
   startingStep: 'A1',
   appearance: DEFAULT_APPEARANCE,
+  skipFirstMorning: false,
   rngSeed: 20261003,
 };
+
+/** Dev only: Health for a game started about to faint: a few real seconds' worth with Hunger and Thirst empty. */
+const DEV_FAINT_SOON_HEALTH = 0.5;
 
 /** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
@@ -188,8 +261,8 @@ export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 /** Which screen shows: the title, New game setup, or the game itself. */
 export type Screen = 'title' | 'setup' | 'playing';
 
-/** The keys that start a conversation: E and F a Goal Interaction. */
-export type TalkKey = 'E' | 'F';
+/** The keys that start a conversation: E, F and R a Goal Interaction (R bringing something back to the shop), and T Small Talk with staff. */
+export type TalkKey = 'E' | 'F' | 'T' | 'R';
 
 /** New game setup's screens, in order. A browser that has passed the mic check skips it. */
 export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance', 'micCheck'] as const;
@@ -199,6 +272,9 @@ export type SetupStep = (typeof SETUP_STEPS)[number];
 export type InputMode = DeviceSettings['inputMode'];
 /** Push-to-talk (hold Space), or open mic, where the voice session detects when the Player speaks. A device setting. */
 export type TalkMode = DeviceSettings['talkMode'];
+/** How loud each kind of sound is, from 0 to 1. Device settings. */
+export type Volumes = DeviceSettings['volumes'];
+export type VolumeBus = keyof Volumes;
 /** Retry microphone: waiting for the browser to open the mic, or it still couldn't. */
 export type MicRetry = 'trying' | 'failed';
 /** In the Typed Fallback, where the mic button would be: the day's reminder that Settings can turn the mic on, or just "off". */
@@ -221,6 +297,8 @@ export type Setup = {
   appearance: AppearancePreset;
   /** The mic check, while its screen shows. */
   mic: MicCheckStatus | null;
+  /** "Skip tutorial": the game starts without the First Morning. */
+  skipFirstMorning: boolean;
 };
 
 /** A slot on the title screen: empty, a save to play, or a save that can't be loaded at all. */
@@ -268,11 +346,14 @@ export type TitleView =
   /** The saves couldn't be looked at at all. */
   | { status: 'failed'; message: string };
 
-/** How the Character arrived in the world: a new game, or back from a save. The world picks the spawn point from it. */
+/** How the Character arrived in the world: the First Morning, or back from a save. The world picks the spawn point from it. */
 export type Arrival = 'newGame' | 'continued';
 
-/** Something in the world the Character is close enough to use with E: a staff door, an NPC to talk to, or a tram stop. */
-export type Interactable = 'staff-door' | TownNpcId | TramStopId;
+/** Something in the world the Character is close enough to use with E: the tap, the gym, an NPC to talk to, or a tram stop. */
+export type Interactable = 'tap' | 'stove' | 'bed' | 'gym' | 'staff-door' | TownNpcId | TramStopId | GroceryId;
+
+/** One thing in the inventory, and whether it has gone off yet. */
+export type InventoryLine = InventoryItem & { goneOff: boolean };
 
 /** Where the tram can take the Character from a stop, and how long each trip takes. */
 export type TramDestination = { stopId: TramStopId; minutes: number };
@@ -288,7 +369,13 @@ export type Toast =
   /** A network abandonment: the NPC (null for a Shift Customer, who is replaced) had to step away. */
   | { kind: 'npcSteppedAway'; npcId: TownNpcId | null }
   | { kind: 'recapSaved' }
-  | { kind: 'loadedBackup' };
+  | { kind: 'loadedBackup' }
+  /** The bed is used before 20:00. */
+  | { kind: 'tooEarlyForBed' }
+  /** The stove is used with no groceries in the inventory. */
+  | { kind: 'nothingToCook' }
+  /** The gym can't be used now: no membership, one that has run out, today's session done, or the bathhouse shut. */
+  | { kind: 'gymRefused'; refusal: GymRefusal };
 
 /**
  * The Shift is over: how it went and what it paid, shown until the Player closes it, with its one combined Recap
@@ -298,6 +385,15 @@ export type ShiftEnd = { jobId: JobId; customers: number; served: number; payInS
 
 /** The staff door the Character is at: whether E starts a Shift there now (`refusal` null), or why not. */
 export type StaffDoor = { jobId: JobId; refusal: Exclude<ShiftRefusal, 'underway'> | null };
+
+/** The Fainting screen: the Character has fainted and is out until the Player wakes them in the ward. Shows what the bill was and whether it was paid. */
+export type Fainting = { billInShifts: number; paid: boolean };
+
+/** The Character has fainted and is taken to the ward. Each Fainting is a new object, so the world moves the Character into the ward bed once per Fainting. */
+export type WardArrival = { wokeInWardOnDay: number };
+
+/** The doctor has called the Character in from the waiting room, at this game time: the world walks them to the doctor. */
+export type DoctorCall = { day: number; minuteOfDay: number };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -333,7 +429,16 @@ export type SignTooltip = {
 export type NewWord = Recap['newWords'][number];
 
 /** How a Goal Interaction ended, and its effects, for the closing card. */
-export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }>;
+export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }> | SmallTalkEnd;
+
+/** Small Talk is over: it can't fail, so all there is to show is the Mood it lifted. */
+export type SmallTalkEnd = { kind: 'smallTalk'; moodChange: number };
+
+/**
+ * Small Talk under way: how many player turns it lasts before the NPC wraps up, how many there have been, how many
+ * lines had been counted when the NPC last finished a turn, and the Mood the understood ones have lifted so far.
+ */
+export type SmallTalk = { exchanges: number; turns: number; countedLines: number; moodChange: number };
 
 /** How a Shift Customer was dealt with: served what they ordered, served something else, or gone unserved. */
 export type ShiftCustomerOutcome = { kind: ShiftRecapCustomer['result'] };
@@ -383,10 +488,14 @@ type ShiftLogEntry = {
   conversation: Conversation | null;
 };
 
-/** Who the conversation is with: a Named NPC in a Goal Interaction, or an anonymous Shift Customer. */
+/**
+ * Who the conversation is with: a Named NPC in a Goal Interaction or in Small Talk, a passer-by at a tram stop (who is
+ * no one the Character gets to know) in a Goal Interaction, or an anonymous Shift Customer.
+ */
 type Partner =
-  | { npcId: NamedNpcId; interaction: Interaction; shiftCustomer: null }
-  | { npcId: null; interaction: null; shiftCustomer: ShiftCustomerView };
+  | { npcId: NamedNpcId | PasserById; interaction: Interaction; shiftCustomer: null; smallTalk: null }
+  | { npcId: NamedNpcId; interaction: null; shiftCustomer: null; smallTalk: SmallTalk }
+  | { npcId: null; interaction: null; shiftCustomer: ShiftCustomerView; smallTalk: null };
 
 /**
  * A conversation under way. It lives only here. A Goal Interaction is never saved in progress,
@@ -394,7 +503,7 @@ type Partner =
  */
 export type Conversation = ConversationState & Partner;
 
-/** A conversation with a Named NPC in a Goal Interaction, which ends with a closing card and a Recap. */
+/** A conversation with a Named NPC or a passer-by, a Goal Interaction or Small Talk, which ends with a closing card and a Recap. */
 type NpcConversation = Extract<Conversation, { shiftCustomer: null }>;
 
 type ConversationState = {
@@ -415,6 +524,8 @@ type ConversationState = {
   usage: TokenUsage;
   /** Hidden. The UI only ever sees it as the NPC's expression. */
   patience: Patience;
+  /** What the Character brought to the counter: at the till, the shopping to pay for. */
+  basket: Basket;
   /** The outcome is applied; the session closes once the NPC finishes saying goodbye. At a Shift, the next customer then walks up. */
   outcome: ClosingCard | ShiftCustomerOutcome | null;
   /** The session is over and the closing card shows. */
@@ -425,6 +536,13 @@ type ConversationState = {
   showingRecap: boolean;
   /** Which tab of the column shows. While Help shows, the conversation waits: no time passes and Patience is frozen. */
   tab: 'chat' | 'help';
+  /** The First Morning's café order, which can't fail, and where Help is pointed to. */
+  firstMorningOrder: boolean;
+  /**
+   * In the First Morning's café order, the Help tab pulses after a while of the Player being quiet, or at the first
+   * turn not understood, until the Player opens Help: from then on it's found, and never pulses again.
+   */
+  helpPulse: 'waiting' | 'pulsing' | 'found';
   /** The hints for the moment Help was last opened at: `atLine` is how many lines the conversation had then. */
   hints: { atLine: number; view: HintsView } | null;
   /** Each finished NPC line's annotation, by line index, asked for as the line finished. */
@@ -439,7 +557,14 @@ type ConversationState = {
   spoken: Partial<Record<number, SpokenTurn>>;
   /** The Help used so far, in order, placed relative to the turns. It goes to the Recap. */
   helpLog: HelpLogEntry[];
+  /** A friend offers to switch to the casual register in this conversation: once it reaches its outcome, they have, and the Recap notes it. */
+  offersCasualRegister: boolean;
+  /** A friend adds a little something on the house to this order: once it's served, that's the week's. */
+  onTheHouse: boolean;
 };
+
+/** What a conversation brings with it: the shopping on the counter, and a friend's casual-register offer or little something on the house. */
+type Extras = Partial<Pick<ConversationState, 'basket' | 'offersCasualRegister' | 'onTheHouse'>>;
 
 export type GameStoreDeps = {
   /** How a conversation reaches its NPC. In mock mode the gateway hands it the scripted fake NPC. */
@@ -464,10 +589,14 @@ export type GameStoreDeps = {
   downloadFile: (file: SaveFile) => void;
   /** The RNG seed for a new game. */
   newRngSeed: () => number;
-  /** Dev only: the hour a new game starts at instead of the usual morning's, or null. */
+  /** Dev only: the hour a new game starts at instead of the First Morning's, or null. */
   devStartHour: () => number | null;
-  /** Dev only: a new game starts on this day, or on day 1 (null). */
+  /** Dev only: a new game starts on this day (rent is still first due on day 7), or on day 1 (null). */
   devStartDay: () => number | null;
+  /** Dev only: a new game starts about to faint, with money for the bill or (`broke`) none, or as usual (null). */
+  devFaintSoon: () => 'paying' | 'broke' | null;
+  /** Dev only: a new game starts already ill with this Illness, or well (null). */
+  devIllness: () => IllnessId | null;
   /** Dev only: the Target Language of a new game to start at once, skipping the title screen and setup, or null. Asked once per title screen. */
   devNewGameTarget: () => LanguageCode | null;
   /** Opens the mic for the mic check. */
@@ -476,6 +605,9 @@ export type GameStoreDeps = {
 
 /** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
 export type StoragePersistence = { persisted: () => Promise<boolean>; persist: () => Promise<boolean> };
+
+/** The systems a one-time tooltip explains the first time each comes up. */
+export type TooltipId = 'shift' | 'fainting' | 'journal' | 'openMic' | 'typedFallback';
 
 /** The device settings tooltip id that remembers the persist-refused callout was dismissed. */
 const PERSIST_REFUSED = 'persist-refused';
@@ -551,22 +683,39 @@ const BROWSER_DEPS: GameStoreDeps = {
   newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
   devStartHour: devStartHourFromUrl,
   devStartDay: devStartDayFromUrl,
+  devFaintSoon: devFaintSoonFromUrl,
+  devIllness: devIllnessFromUrl,
   devNewGameTarget: takeDevNewGameFromUrl,
   openMic: openBrowserMic,
 };
 
-/** Dev only: `?at=9` starts a new game at 09:00, so a place that isn't open first thing can be reached at once. */
+/** Dev only: `?at=9` starts a new game at 09:00, so a place that opens after the First Morning can be reached at once. */
 function devStartHourFromUrl(): number | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const hour = Number(new URLSearchParams(window.location.search).get('at') ?? NaN);
   return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
 }
 
-/** Dev only: `?day=3` starts a new game on day 3, to reach a place on a day it's open at once. */
+/** Dev only: `?day=7` starts a new game on day 7, to reach the day rent falls due at once. */
 function devStartDayFromUrl(): number | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const day = Number(new URLSearchParams(window.location.search).get('day') ?? NaN);
   return Number.isInteger(day) && day >= 1 ? day : null;
+}
+
+/** Dev only: `?faint` starts a new game seconds from Fainting, to reach the ward at once; `?faint=broke` with no money. */
+function devFaintSoonFromUrl(): 'paying' | 'broke' | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const faint = new URLSearchParams(window.location.search).get('faint');
+  if (faint === null) return null;
+  return faint === 'broke' ? 'broke' : 'paying';
+}
+
+/** Dev only: `?ill=flu` starts a new game already ill, to see what the Player is shown. */
+function devIllnessFromUrl(): IllnessId | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const ill = new URLSearchParams(window.location.search).get('ill');
+  return (ILLNESS_IDS as readonly (string | null)[]).includes(ill) ? (ill as IllnessId) : null;
 }
 
 /** The answers `?newGame` gives setup. */
@@ -578,7 +727,7 @@ const DEV_NEW_GAME = {
 } as const satisfies { nativeLanguage: LanguageCode } & Pick<Setup, 'targetLanguage' | 'startingStep' | 'characterName'>;
 
 /**
- * Dev only: `?newGame` starts a new game straight away, learning Japanese or (`?newGame=de`) the
+ * Dev only: `?newGame` starts a new game straight into the First Morning, learning Japanese or (`?newGame=de`) the
  * language named, to try the town without the title screen and setup. It comes off the URL once read, so
  * a reload shows the title screen.
  */
@@ -616,19 +765,36 @@ export type GameStore = {
   /** This browser has heard the Player in a mic check, so New game skips it. A device setting. */
   micCheckPassed: boolean;
   talkMode: TalkMode;
+  volumes: Volumes;
+  /** One-time tooltips show. A device setting. */
+  tooltips: boolean;
+  /** The one-time tooltips that have come up and not been dismissed, in turn: the first one shows. */
+  tooltipsDue: TooltipId[];
   micRetry: MicRetry | null;
   /** The day the mic-off chip last said to enable the mic in Settings, and the conversation it said it in. */
   micOffReminder: { day: number; conversationId: number } | null;
   tabHidden: boolean;
   /** The pause menu is open: time stands still, and the Character with it. */
   pauseMenu: boolean;
+  /** Where the First Morning's next step is from the Character, as the world last measured it. Never saved. */
+  firstMorningGuide: FirstMorningGuide | null;
   /** The Character is out on the street, in no place: the place id stays the last one they were in. Never saved. */
   onStreet: boolean;
+  /** The First Morning was just done (not skipped), so its closing card is due. Never saved. */
+  firstMorningCard: boolean;
   interactable: Interactable | null;
   /** The Player is choosing where to take the tram. */
   tramChoosing: boolean;
+  /** An NPC has come up to the Character and stopped them: walking keys held then don't count until they are let go. */
+  heldStill: boolean;
   tramArrival: TramArrival | null;
   conversation: Conversation | null;
+  /** What the Character has taken off the supermarket's shelves and not paid for yet. Never saved. */
+  basket: Basket;
+  /** The grocery the cashier last pointed to, marked on its shelf until the Character takes one or leaves. */
+  shelfMarker: GroceryId | null;
+  /** The tram stop a passer-by last said to get off at, marked until the Character gets there. Never saved. */
+  routeMarker: TramStopId | null;
   /** The typed field has focus, so keys type into it instead of moving or acting. */
   typing: boolean;
   /** How loud the Player is while push-to-talk is held, or on the mic check, from 0 to 1. */
@@ -638,6 +804,10 @@ export type GameStore = {
   voiceUnavailable: boolean;
   /** The full-screen Journal, while it is open. */
   journal: JournalView | null;
+  /** The Fainting screen, while it shows. Time stands still behind it. */
+  fainting: Fainting | null;
+  wardArrival: WardArrival | null;
+  doctorCall: DoctorCall | null;
   /** What the Shift that just ended paid, until the Player closes it. */
   shiftEnd: ShiftEnd | null;
   /** The sign the Player is pointing at, and whether the pointer is on its tooltip, which keeps it open. */
@@ -662,7 +832,9 @@ export type GameStore = {
   nameCharacter: (characterName: string) => void;
   /** Changes one or more parts of the look, keeping the rest. */
   chooseAppearance: (change: Partial<AppearancePreset>) => void;
-  /** On to the next setup screen once this one is answered; after the last, the new game in its slot. */
+  /** "Skip tutorial", on the last setup screen: whether the game starts without the First Morning. */
+  chooseSkipFirstMorning: (skip: boolean) => void;
+  /** On to the next setup screen once this one is answered; after the last, the First Morning in its slot. */
   setupNext: () => void;
   /** Back to the setup screen before, keeping the answers; from the first, to the title screen. */
   setupBack: () => void;
@@ -690,6 +862,8 @@ export type GameStore = {
   /** E at a tram stop while the trams run: choose a stop to ride to. */
   openTram: () => void;
   closeTram: () => void;
+  /** No walking key is held any more, so the Character can walk again after an NPC stopped them. */
+  letGoOfWalkKeys: () => void;
   /** Rides the tram from this stop to `stopId`: free, but time passes. */
   rideTram: (stopId: TramStopId) => void;
   /** The pointer is on a sign within range: shows its tooltip. */
@@ -700,6 +874,25 @@ export type GameStore = {
   holdSignTooltip: (held: boolean) => void;
   /** Translate on the sign's tooltip: shows each line's gloss in the Native Language. */
   translateSign: () => void;
+  drinkWater: () => void;
+  /** The world measures, as the Character walks, where the First Morning's next step is. */
+  setFirstMorningGuide: (guide: FirstMorningGuide) => void;
+  /** Skip tutorial, in the pause menu: the First Morning's prompts stop, and the game resumes. */
+  skipFirstMorning: () => void;
+  /** Closes the First Morning's closing card, for good. */
+  dismissFirstMorningCard: () => void;
+  /** E at the stove: cooks a grocery into a meal, or says there's nothing to cook. */
+  cook: () => void;
+  /** E at the gym: the day's workout for a member, or why there can't be one. */
+  workOut: () => void;
+  /** E at a supermarket shelf: one of its grocery into the basket. */
+  takeFromShelf: () => void;
+  /** Puts one of an item in the basket back on its shelf. */
+  putBack: (itemId: ItemId) => void;
+  /** Closes the Fainting screen: the Character wakes in the ward bed, and the nurse comes over. */
+  wakeInWard: () => void;
+  /** Goes to bed at home: from 20:00, it wakes the next morning and saves; earlier, it says it's too early. */
+  sleep: () => void;
   /** E at a staff door during opening hours, once hired there: starts the day's Shift, and the first Shift Customer walks up. */
   startShift: () => void;
   /** Taps the menu grid: one more of the item onto the tray for the Shift Customer, a drink made as the toggles say. */
@@ -736,8 +929,11 @@ export type GameStore = {
   /** Closes the pay shown at the end of a Shift. */
   closeShiftEnd: () => void;
   /** E near an NPC (or F, for their second conversation if they have one): opens a conversation, and the NPC speaks first. */
+  /** Starts a conversation with the NPC in reach: E and F their Goal Interactions, and Small Talk on the key `selectSmallTalkKey` gives. */
   talk: (key?: TalkKey) => void;
   sendTypedLine: (text: string) => void;
+  /** Gives a Named NPC a gift from the inventory, mid-conversation: the NPC is handed it, and thanks the Character. */
+  giveGift: (itemId: ItemId) => void;
   /** Space or the mic button pressed: interrupts the NPC and listens. */
   startTalking: () => void;
   /** Space or the mic button released: the Player's turn is over. */
@@ -763,8 +959,14 @@ export type GameStore = {
   translateLine: (line: number) => void;
   /** Shows or hides reading aids, or romaji, and keeps the choice on this device. */
   setReadingAids: (change: Partial<ReadingAidsSettings>) => void;
+  /** Sets one volume, from 0 (silent) to 1 (full), and keeps it on this device. */
+  setVolume: (bus: VolumeBus, level: number) => void;
   /** Push-to-talk or open mic, kept on this device. */
   setTalkMode: (talkMode: TalkMode) => void;
+  /** Turns one-time tooltips on or off, on this device. Turned off, the one showing goes. */
+  setTooltips: (on: boolean) => void;
+  /** Got it: closes the tooltip showing, and the next one due shows. */
+  dismissTooltip: () => void;
   /** Types replies instead of speaking them: the Typed Fallback, kept on this device. */
   chooseTypedFallback: () => void;
   /** Retry microphone: asks for the mic again, and switches back to Speaking once it opens. */
@@ -781,6 +983,8 @@ export type GameStore = {
   /** Quit to title, on the pause menu: saves the game and goes back to the title screen. */
   quitToTitle: () => void;
   setTyping: (typing: boolean) => void;
+  /** The Player is typing a reply in the field: that isn't being quiet. */
+  draftTypedLine: () => void;
   dismissToast: () => void;
   dismissVoiceUnavailable: () => void;
 };
@@ -788,14 +992,18 @@ export type GameStore = {
 const isTownNpc = (interactable: Interactable | null): interactable is TownNpcId =>
   interactable !== null && interactable in TOWN_NPCS;
 
-/** Someone with a name: anyone in town but the passers-by. */
+
+/** Someone with a name and a memory of the Character: anyone in town but the passers-by. */
 const isNamedNpc = (interactable: Interactable | null): interactable is NamedNpcId => isTownNpc(interactable) && interactable in NAMED_NPCS;
 
 const isTramStop = (interactable: Interactable | null): interactable is TramStopId =>
   (TRAM_LINE as readonly (Interactable | null)[]).includes(interactable);
 
-/** The completions that hand something over, and answer "served": an order. */
-const SERVED_EFFECTS: readonly EffectKind[] = ['serveOrder'];
+const isShelf = (interactable: Interactable | null): interactable is GroceryId =>
+  (GROCERIES_SOLD as readonly (Interactable | null)[]).includes(interactable);
+
+/** The completions that hand something over, and answer "served": an order, a restaurant meal, or shopping. */
+const SERVED_EFFECTS: readonly EffectKind[] = ['serveOrder', 'orderMeal', 'purchase', 'dispense'];
 
 /** It's open now in the Character's pack. Closing time stops new conversations and Shifts from starting here. */
 const isPlaceOpen = (placeId: PlaceId, game: GameState) => isOpen(placeHours(placeId, game.identity.culturePackId), game.clock);
@@ -814,11 +1022,20 @@ const takesTurns = (conversation: Conversation | null): conversation is Conversa
 
 /** A Goal Interaction's outcome, which its closing card shows, rather than a Shift Customer's. */
 const isClosingCard = (outcome: Conversation['outcome']): outcome is ClosingCard =>
-  outcome?.kind === 'success' || outcome?.kind === 'failure';
+  outcome?.kind === 'success' || outcome?.kind === 'failure' || outcome?.kind === 'smallTalk';
+
+/** What a Named NPC remembers of the Character, for their session. */
+const relationshipWith = (game: GameState, npcId: NamedNpcId): Relationship => ({
+  memory: memoryOf(game, npcId),
+  characterName: game.identity.characterName,
+});
 
 /** Staff can be talked to only while their place is open. Closing time stops new conversations, never one under way. */
 const isAtWork = (npcId: TownNpcId, game: GameState) =>
   isOpen(placeHours(TOWN_NPCS[npcId].hoursId, game.identity.culturePackId), game.clock);
+
+/** The Named NPCs who are regulars at the park, any of whom may wave the Character over. */
+const PARK_REGULARS = Object.values(NAMED_NPCS).flatMap((npc) => (npc.placeId === 'park' ? [npc.id] : []));
 
 /** The trams run now: the tram stop's hours are theirs. */
 const tramsRunning = (game: GameState) => isPlaceOpen('tram-stop', game);
@@ -842,6 +1059,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
   let plays = 0;
   // The size the Player last set on the toggles this Shift: with the Barista skill's remembered size, the next customer starts at it.
   let sizeLastSet: DrinkSize | null = null;
+  // An NPC due to come up to the Character while the Player is busy, who waits until the Player is free.
+  let pendingApproach: ApproachId | null = null;
   let realMsSinceSave = 0;
   // Found by the title screen: what Continue and Load a save play.
   let slots: Slot[] = [];
@@ -904,7 +1123,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         slotId,
         arrival,
         toast,
+        basket: [],
+        shelfMarker: null,
+        routeMarker: null,
         pauseMenu: false,
+        firstMorningGuide: null,
+        firstMorningCard: false,
         onStreet: false,
         micOffReminder: null,
       });
@@ -961,9 +1185,43 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       settingsWrites = settingsWrites.then(() => written);
     };
 
-    /** This browser has shown the persist-refused callout, so no save shows it again. */
+    /** This browser has shown a tooltip (or the persist-refused callout), so no save shows it again. */
     const markSeen = (id: string) =>
       updateDeviceSettings((settings) => (settings.tooltipsSeen.includes(id) ? null : { ...settings, tooltipsSeen: [...settings.tooltipsSeen, id] }));
+
+    // Each one-time tooltip is offered once per store, then shows only if this browser hasn't shown it before, in
+    // any save. It counts as seen once the Player can see it: one still waiting behind a screen can come up again.
+    const tooltipsOffered = new Set<TooltipId>();
+    api.subscribe((state, before) => {
+      const shown = selectTooltip(state);
+      if (shown && shown !== selectTooltip(before)) markSeen(shown);
+    });
+
+    // The First Morning is done, however its last step was: its closing card is due. Not for a game just loaded or started.
+    api.subscribe((state, before) => {
+      if (state.game === before.game || before.screen !== 'playing' || state.screen !== 'playing') return;
+      const done = firstMorningStep(before.game) !== null && firstMorningStep(state.game) === null;
+      if (done && !state.game.onboarding.firstMorningSkipped) set({ firstMorningCard: true });
+    });
+    /** A system has come up: its tooltip shows, or waits for the one showing, unless it has shown before or tooltips are off. */
+    const offerTooltip = (id: TooltipId) => {
+      if (!get().tooltips || tooltipsOffered.has(id)) return;
+      tooltipsOffered.add(id);
+      settingsWrites
+        .then(() => deps.deviceSettings.load())
+        .then(
+          ({ tooltipsSeen }) => {
+            if (tooltipsSeen.includes(id)) return;
+            // Turned off meanwhile: it can come up again once they are back on.
+            if (!get().tooltips) return void tooltipsOffered.delete(id);
+            set({ tooltipsDue: [...get().tooltipsDue, id] });
+          },
+          (error: unknown) => {
+            tooltipsOffered.delete(id);
+            console.warn('[settings] could not be read:', error);
+          },
+        );
+    };
 
     const answerSetup = (answers: Partial<Setup>) => {
       const setup = get().setup;
@@ -1035,10 +1293,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       set({ micLevel: 0 });
     };
 
-    /** Setup is over: the new game starts in its slot, saved at once. */
+    /** Setup is over: the First Morning starts in its slot, saved at once. */
     const startNewGame = (setup: Setup) => {
       stopMicCheck();
-      const { targetLanguage, startingStep, characterName, appearance } = setup;
+      const { targetLanguage, startingStep, characterName, appearance, skipFirstMorning } = setup;
       set({ setup: null });
       // The pre-selected language counts as chosen too, so it no longer follows the browser's.
       const nativeLanguage = get().nativeLanguage;
@@ -1049,13 +1307,33 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         culturePackId: targetLanguage!,
         startingStep: startingStep!,
         appearance,
+        skipFirstMorning,
         rngSeed: deps.newRngSeed(),
       });
       const startHour = deps.devStartHour();
       const startDay = deps.devStartDay();
+      const faintSoon = deps.devFaintSoon();
       const onDay = startDay === null ? game : { ...game, clock: { ...game.clock, day: startDay } };
       const atHour = startHour === null ? onDay : { ...onDay, clock: { ...onDay.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
-      play(atHour, setup.slotId, 'newGame');
+      const illnessId = deps.devIllness();
+      const ill =
+        illnessId === null ? atHour : { ...atHour, character: { ...atHour.character, illness: { illnessId, onsetDay: atHour.clock.day, treated: false } } };
+      play(
+        faintSoon === null
+          ? ill
+          : {
+              ...ill,
+              character: {
+                ...ill.character,
+                health: DEV_FAINT_SOON_HEALTH,
+                hunger: 0,
+                thirst: 0,
+                ...(faintSoon === 'broke' && { moneyInShifts: 0 }),
+              },
+            },
+        setup.slotId,
+        'newGame',
+      );
       save();
     };
 
@@ -1077,6 +1355,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             characterName: DEV_NEW_GAME.characterName,
             appearance: DEFAULT_APPEARANCE,
             mic: null,
+            skipFirstMorning: false,
           });
         },
       );
@@ -1131,8 +1410,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       if (conversation) set({ conversation: { ...conversation, ...change } });
     };
 
-    /** The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. */
+    /**
+     * The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. A friend who
+     * offered the casual register in it has now offered it, and an order served with something on the house has had it.
+     */
     const settleOutcome = (game: GameState, outcome: ClosingCard) => {
+      const conversation = get().conversation;
+      const npcId = conversation?.npcId ?? null;
+      if (isNamedNpc(npcId) && conversation?.offersCasualRegister) game = casualRegisterOffered(game, npcId);
+      if (isNamedNpc(npcId) && conversation?.onTheHouse && outcome.kind === 'success') game = onTheHouseGiven(game, npcId);
       set({ game });
       updateConversation({ outcome });
       save();
@@ -1154,7 +1440,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       save();
     };
 
-    /** A Recap's evidence moves Proficiency. */
+    /** A Recap's evidence moves Proficiency, and what the conversation was about, if anything, is what the NPC remembers talking about last. */
     const applyRecap = (play: number, conversation: NpcConversation, recap: Recap) => {
       const evidence: ConversationEvidence = {
         cefrEstimate: recap.cefrEstimate,
@@ -1162,7 +1448,12 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         helpLog: conversation.helpLog,
         notUnderstoodTurns: conversation.patience.turnsNotUnderstood,
       };
-      applyEvidence(play, (game) => applyRecapEvidence(game, evidence));
+      const { npcId } = conversation;
+      // A passer-by remembers nothing of the Character.
+      applyEvidence(play, (game) => {
+        const evidenced = applyRecapEvidence(game, evidence);
+        return isNamedNpc(npcId) ? rememberTopic(evidenced, npcId, recap.lastTopic) : evidenced;
+      });
     };
 
     /** A Recap as the Journal keeps it: each new word with its reading if that passes the checks, or with the library's. */
@@ -1189,17 +1480,24 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const { npcId, interaction, helpLog } = conversation;
       const transcript = transcriptOf(conversation.lines);
       const step = game.proficiencyStep;
-      // A Goal Interaction's Recap reads it against its goal.
-      const request: RecapRequest = {
-        kind: 'goal',
-        culturePackId,
-        step,
-        nativeLanguage,
-        conversation: { interactionId: interaction.id, outcome: outcome.kind, transcript, helpLog },
-      };
+      // A Goal Interaction's Recap reads it against its goal; Small Talk gets a lighter one.
+      const goal = interaction && outcome.kind !== 'smallTalk' ? { interaction, outcome: outcome.kind } : null;
+      const registerOffered = conversation.offersCasualRegister && { registerOffered: true as const };
+      const request: RecapRequest = goal
+        ? {
+            kind: 'goal',
+            culturePackId,
+            step,
+            nativeLanguage,
+            conversation: { interactionId: goal.interaction.id, outcome: goal.outcome, transcript, helpLog },
+            ...registerOffered,
+          }
+        : // Small Talk is only ever with a Named NPC.
+          { kind: 'smallTalk', culturePackId, step, nativeLanguage, npcId: npcId as NamedNpcId, transcript, helpLog, ...registerOffered };
       const entry = (recap: Recap | null): NewJournalEntry => {
         const page = {
           npcId,
+          npcName: isNamedNpc(npcId) && game.people[npcId]?.knowsName ? CULTURE_PACKS[culturePackId].personas[npcId].name : null,
           placeName: localNpcPlaceName(npcId, culturePackId),
           day: game.clock.day,
           minuteOfDay: game.clock.minuteOfDay,
@@ -1212,7 +1510,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           }),
           helpLog,
         };
-        return { ...page, kind: 'goal', interactionId: interaction.id, outcome: outcome.kind };
+        return goal
+          ? { ...page, kind: 'goal', interactionId: goal.interaction.id, outcome: goal.outcome }
+          : { ...page, kind: 'smallTalk', npcId: npcId as NamedNpcId };
       };
       updateConversation({ recap: { status: 'writing' } });
       deps
@@ -1238,15 +1538,48 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         .finally(() => lineReadings.delete(conversation.id));
     };
 
+    /** In the First Morning's café order, the Help tab starts pulsing, unless Help was opened already or the outcome is decided. */
+    const pointToHelp = () => {
+      const conversation = get().conversation;
+      if (conversation?.firstMorningOrder && conversation.helpPulse === 'waiting' && !conversation.outcome) updateConversation({ helpPulse: 'pulsing' });
+    };
+
+    // In the First Morning's café order, the conversation waiting for the Player's turn since the NPC last spoke, and the
+    // Player's quiet in it, which points to Help if it goes on. Typing a reply isn't quiet, and a hidden tab doesn't count.
+    let waitingFor: number | null = null;
+    let silence: ReturnType<typeof setTimeout> | undefined;
+    /** Times the Player's quiet from now, while the conversation waits for their turn and the tab shows. */
+    const timeSilence = () => {
+      clearTimeout(silence);
+      if (waitingFor === null || waitingFor !== get().conversation?.id || get().tabHidden) return;
+      silence = setTimeout(pointToHelp, FIRST_MORNING.helpPulseAfterSilentSeconds * 1000);
+    };
+    const stopWaitingForPlayer = () => {
+      clearTimeout(silence);
+      waitingFor = null;
+    };
+    const waitForPlayer = (conversation: Conversation) => {
+      stopWaitingForPlayer();
+      if (!conversation.firstMorningOrder || conversation.helpPulse !== 'waiting') return;
+      waitingFor = conversation.id;
+      timeSilence();
+    };
+
     /**
      * The NPC couldn't make sense of the Player's latest turn. Running out fails
      * the interaction. Returns whether the NPC is now out of Patience.
      */
     const notUnderstood = (conversation: Conversation) => {
+      // Small Talk can't fail: the turn just doesn't count as understood, Help open or not.
+      if (conversation.smallTalk) {
+        if (!conversation.outcome) updateConversation({ patience: losePatience(conversation.patience) });
+        return false;
+      }
       // Patience is frozen while Help is open.
       if (conversation.outcome || conversation.tab === 'help') return isOutOfPatience(conversation.patience);
       const patience = losePatience(conversation.patience);
       updateConversation({ patience });
+      pointToHelp();
       if (!isOutOfPatience(patience)) return false;
       // A Shift Customer out of Patience gives up unserved.
       if (conversation.shiftCustomer) {
@@ -1260,15 +1593,25 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     const answerToolCall = (conversation: Conversation, { name, args }: ToolCall): ToolResponse => {
       if (name === NOT_UNDERSTOOD_TOOL) return { result: notUnderstood(conversation) ? 'out_of_patience' : 'noted' };
+      if (name === LEARN_NAME_TOOL && isNamedNpc(conversation.npcId)) return learnTheName(conversation.npcId, args);
+      if (name === REVEAL_FAVOURITE_TOOL && isNamedNpc(conversation.npcId)) {
+        set({ game: revealFavourite(get().game, conversation.npcId) });
+        return { result: 'remembered' };
+      }
       // A Shift Customer has no completion: what they're served is checked by the game.
       if (!conversation.interaction || name !== conversation.interaction.completion.name || conversation.outcome) return { result: 'unknown_tool' };
 
-      const { interaction } = conversation;
-      const { state, result } = applyInteractionOutcome(get().game, interaction, { kind: 'success', args });
+      const { basket, interaction } = conversation;
+      const { state, result } = applyInteractionOutcome(get().game, interaction, { kind: 'success', args, basket });
       switch (result.kind) {
         case 'success':
+          // Paid-for shopping leaves the basket for the inventory; an item pointed to is marked on its shelf.
+          if (interaction.effect.kind === 'purchase') set({ basket: [] });
+          if (result.pointedTo) set({ shelfMarker: result.pointedTo.itemId as GroceryId });
+          // The stop a passer-by said to get off at is marked on the way there.
+          if (result.directedTo) set({ routeMarker: result.directedTo });
           settleOutcome(state, result);
-          // An order is handed over; anything else is simply done.
+          // An order, a meal or shopping is handed over; anything else is simply done.
           return { result: SERVED_EFFECTS.includes(interaction.effect.kind) ? 'served' : 'done' };
         case 'cannot_afford':
           return { result: 'cannot_afford' };
@@ -1279,6 +1622,44 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         default:
           throw new Error(`A completion can't end as ${result.kind}`);
       }
+    };
+
+    /** A Named NPC heard the Character's name (`learn_name`). The sim checks it, and only the right one is remembered. */
+    const learnTheName = (npcId: NamedNpcId, args: unknown): ToolResponse => {
+      const parsed = LearnNameArgsSchema.safeParse(args);
+      const { state, learned } = learnName(get().game, npcId, parsed.success ? parsed.data.name : '');
+      set({ game: state });
+      return { result: learned ? 'learned' : 'wrong_name' };
+    };
+
+    /**
+     * The NPC has finished a turn of Small Talk. If the Player took a turn since the last one, it counts, and lifts Mood
+     * and Familiarity if the NPC understood it. Once the chat has gone on long enough, or the NPC is busy, they wrap up.
+     */
+    const smallTalkTurnDone = () => {
+      const conversation = get().conversation;
+      if (!conversation?.smallTalk || conversation.outcome) return;
+      const { smallTalk, npcId, lines, patience } = conversation;
+      const tookTurn = lines.slice(smallTalk.countedLines).some((line) => line.speaker === 'player');
+      const counted: SmallTalk = { ...smallTalk, countedLines: lines.length };
+      if (tookTurn) {
+        counted.turns++;
+        if (!patience.spentThisTurn) {
+          const exchange = smallTalkExchange(get().game, npcId);
+          set({ game: exchange.state });
+          counted.moodChange += exchange.moodChange;
+        }
+      }
+      set({ conversation: { ...conversation, smallTalk: counted } });
+      if (counted.turns >= counted.exchanges || !isAtWork(npcId, get().game)) wrapUpSmallTalk();
+    };
+
+    /** The NPC wraps up Small Talk: they say goodbye next, and then the closing card shows. Ending it counts as meeting them. */
+    const wrapUpSmallTalk = () => {
+      const conversation = get().conversation;
+      if (!conversation?.smallTalk || conversation.outcome || !voice) return;
+      voice.sendText(WRAP_UP_SCENE);
+      settleOutcome(endSmallTalk(get().game, conversation.npcId), { kind: 'smallTalk', moodChange: conversation.smallTalk.moodChange });
     };
 
     /** Adds Help to the log, placed after the lines so far. Help already logged at this moment isn't logged twice. */
@@ -1381,6 +1762,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     const closeSession = () => {
+      stopWaitingForPlayer();
       voice?.close();
       voice = null;
     };
@@ -1476,6 +1858,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       set({ game: state, conversation: null, typing: false, micLevel: 0, shiftEnd: { jobId, customers, served, payInShifts, recap } });
       save();
       if (log.length > 0) writeShiftRecap(shiftId, shift, log);
+      approachIfFree();
     };
 
     /**
@@ -1575,7 +1958,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const pack = CULTURE_PACKS[after.identity.culturePackId];
       const remembered = sizeLastSet && jobAids(after, shift.jobId).includes('rememberedSize') ? sizeLastSet : null;
       const shiftCustomer = remembered ? { ...NEW_SHIFT_CUSTOMER, making: { ...DEFAULT_DRINK, size: remembered } } : NEW_SHIFT_CUSTOMER;
-      openConversation({ npcId: null, interaction: null, shiftCustomer }, () =>
+      openConversation({ npcId: null, interaction: null, shiftCustomer, smallTalk: null }, () =>
         buildShiftCustomerSession(customer, pack, after.proficiencyStep, { clock: after.clock }),
       );
     };
@@ -1599,6 +1982,14 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       const conversation = get().conversation;
       if (conversation && !conversation.outcome) lineReadings.delete(conversation.id);
       set({ conversation: null, typing: false, micLevel: 0, ...instead });
+      approachIfFree();
+    };
+
+    /** Ends the conversation. If it had a Recap, that's in the Journal now, which the Player may not know of yet. */
+    const endAndOfferJournal = () => {
+      const recap = get().conversation?.recap;
+      endConversation();
+      if (recap) offerTooltip('journal');
     };
 
     const endConversation = () => {
@@ -1608,7 +1999,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (!conversation.outcome) settleShiftCustomer(null);
         return shiftCustomerLeft();
       }
-      // Abandoning before the outcome is decided costs nothing.
+      // Abandoning before the outcome is decided costs nothing. Small Talk left early keeps the Mood it lifted.
+      if (conversation?.smallTalk && !conversation.outcome) {
+        set({ game: endSmallTalk(get().game, conversation.npcId) });
+        // Nothing else saves what the chat lifted until the next autosave.
+        dropConversation();
+        return save();
+      }
       if (conversation?.interaction && !conversation.outcome) {
         set({ game: applyInteractionOutcome(get().game, conversation.interaction, { kind: 'abandon' }).state });
       }
@@ -1626,11 +2023,11 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
     };
 
     /**
-     * Opens a session for the conversation.
+     * Opens a session for the conversation, built for the shopping on the counter now.
      * Every event from a session that has since been closed or replaced is ignored.
      */
     const openSession = (sessionFor: SessionFor, resumeFrom?: ChatLine[]) => {
-      const npcSession = sessionFor();
+      const npcSession = sessionFor(get().conversation!.basket);
       const live =
         <A extends unknown[]>(handle: (conversation: Conversation, ...args: A) => void) =>
         (...args: A) => {
@@ -1655,6 +2052,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
               openMicOn() && current.heardLine === null
                 ? { ...current, tab: 'chat' as const, npcLine: null, patience: newPlayerTurn(current.patience) }
                 : current;
+            stopWaitingForPlayer();
             const { lines, index } = addPiece(turn.lines, turn.heardLine, 'player', text);
             set({ conversation: { ...turn, lines, heardLine: index } });
           }),
@@ -1667,6 +2065,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             if (current.outcome) return showClosingCard();
             // With open mic, whatever the Player says after the NPC's turn is a new line.
             updateConversation(openMicOn() ? { npcLine: null, heardLine: null } : { npcLine: null });
+            waitForPlayer(get().conversation!);
+            smallTalkTurnDone();
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
           onMicLevel: live((current, level: number) => {
@@ -1719,6 +2119,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           set({ toast: { kind: 'npcSteppedAway', npcId: null } });
           return shiftCustomerLeft();
         }
+        // Small Talk lost to the network still counts as meeting the NPC, and keeps the Mood it lifted.
+        if (conversation.smallTalk) set({ game: endSmallTalk(get().game, conversation.npcId) });
         return dropConversation({ toast: { kind: 'npcSteppedAway', npcId: conversation.npcId } });
       }
       set({
@@ -1728,21 +2130,114 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       openSession(sessionFor, conversation.lines);
     };
 
-    /** Opens a conversation with a Named NPC, who speaks first, greeting the Character. */
-    const startConversation = (interaction: Interaction) => {
-      const { game } = get();
-      const npc = NAMED_NPCS[interaction.npcId];
-      const sessionFor: SessionFor = () =>
-        buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, { clock: game.clock });
-      openConversation({ npcId: npc.id, interaction, shiftCustomer: null }, sessionFor);
+    /**
+     * Health ran out during this tick: the Fainting screen shows, with the Character
+     * already in the ward the next morning. Waking there starts the day, so it's saved as this morning's backup.
+     */
+    const fainted = (before: GameState, after: GameState) => {
+      // A Shift under way ends where the Character collapsed, paid for the customers served so far.
+      finishShift();
+      // A conversation under way ends there too: abandoned, or closed if its outcome was decided.
+      const conversation = get().conversation;
+      if (conversation?.outcome && !conversation.closed) showClosingCard();
+      if (get().conversation) endConversation();
+      const billInShifts = ECONOMY.faintingBillInShifts;
+      set({
+        fainting: { billInShifts, paid: after.character.moneyInShifts < before.character.moneyInShifts },
+        wardArrival: { wokeInWardOnDay: after.wokeInWardOnDay! },
+        // Fainting moves the Character to the ward without going through a door, so the shopping goes back here.
+        basket: [],
+        shelfMarker: null,
+      });
+      save({ startsDay: true });
+      noticeApproach(before, after);
     };
 
-    /** Opens a conversation with `partner`, whose session `sessionFor` builds. They speak first. */
-    const openConversation = (partner: Partner, sessionFor: SessionFor) => {
+    /**
+     * Opens a conversation with a Named NPC, who speaks first: greeting the Character, or saying why they have come over.
+     * A friend taking an order may add a little something on the house, drawn now. A friend the Player went up to may
+     * offer the casual register; one who came over with something to say (the landlord about rent) doesn't.
+     */
+    const startConversation = (interaction: Interaction, approach: ApproachId | null) => {
+      const npcId = namedNpcOf(interaction);
+      if (!npcId) throw new Error(`${interaction.id} is with a passer-by, not a Named NPC`);
+      const { state: game, onTheHouse } = rollOnTheHouse(get().game, interaction);
+      set({ game });
+      const npc = NAMED_NPCS[npcId];
+      const offersCasualRegister = !approach && casualRegisterDue(memoryOf(game, npc.id));
+      const sessionFor: SessionFor = (onCounter) =>
+        buildNpcSession(interaction, CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, npc, {
+          clock: game.clock,
+          ...(approach && { approach }),
+          ...(onCounter.length > 0 && { basket: onCounter }),
+          ...(npc.id === 'landlord' && { rent: rentStatement(game) }),
+          ...(interaction.effect.kind === 'settleBill' && { bill: game.restaurant.bill, restaurantDebt: restaurantDebt(game) }),
+          ...(interaction.effect.kind === 'dispense' && { prescription: game.clinic.prescription }),
+          ...(interaction.effect.kind === 'setPaymentPlan' && { hospital: hospitalStatement(game) }),
+          relationship: relationshipWith(game, npc.id),
+          ...(onTheHouse && { onTheHouse }),
+          ...(offersCasualRegister && { offersCasualRegister }),
+        });
+      // An NPC who comes up to the Character stops them where they are.
+      if (approach) set({ heldStill: true });
+      // At the till, the cashier rings up the basket as it is now.
+      openConversation({ npcId: npc.id, interaction, shiftCustomer: null, smallTalk: null }, sessionFor, {
+        basket: interaction.effect.kind === 'purchase' ? get().basket : [],
+        offersCasualRegister,
+        onTheHouse,
+      });
+    };
+
+    /** Opens a Goal Interaction with a passer-by at the stop they wait at, who greets the Character first in a voice that suits their look. */
+    const startWithPasserBy = (npcId: PasserById, interaction: Interaction) => {
+      const { game } = get();
+      const packId = game.identity.culturePackId;
+      const sessionFor: SessionFor = () =>
+        buildPasserBySession(interaction, CULTURE_PACKS[packId], game.proficiencyStep, {
+          clock: game.clock,
+          tramStop: PASSER_BY_STOPS[npcId],
+          // Each gets an anonymous voice for their build by their place in the list, so it's the same every day, like their look.
+          voiceSeed: PASSER_BY_IDS.indexOf(npcId),
+          build: townNpcLook(npcId, packId).build,
+        });
+      openConversation({ npcId, interaction, shiftCustomer: null, smallTalk: null }, sessionFor);
+    };
+
+    /**
+     * Opens Small Talk with a Named NPC, who greets the Character first, or (`wavedOver`) has waved them over and speaks
+     * to them first. How long it goes on is drawn now.
+     */
+    const startSmallTalkWith = (npcId: NamedNpcId, wavedOver = false) => {
+      const started = startSmallTalk(get().game);
+      const game = started.state;
+      set({ game });
+      const offersCasualRegister = casualRegisterDue(memoryOf(game, npcId));
+      const sessionFor: SessionFor = () =>
+        buildSmallTalkSession(CULTURE_PACKS[game.identity.culturePackId], game.proficiencyStep, NAMED_NPCS[npcId], {
+          clock: game.clock,
+          relationship: relationshipWith(game, npcId),
+          ...(wavedOver && { wavedOver }),
+          ...(offersCasualRegister && { offersCasualRegister }),
+        });
+      // Waved over, the Character stops where they are.
+      if (wavedOver) set({ heldStill: true });
+      const smallTalk: SmallTalk = { exchanges: started.exchanges, turns: 0, countedLines: 0, moodChange: 0 };
+      openConversation({ npcId, interaction: null, shiftCustomer: null, smallTalk }, sessionFor, { offersCasualRegister });
+    };
+
+    /**
+     * Opens a conversation with `partner`, whose session `sessionFor` builds for the shopping on the counter (`basket`),
+     * and with a friend's casual-register offer or little something on the house. They speak first.
+     */
+    const openConversation = (partner: Partner, sessionFor: SessionFor, { basket = [], offersCasualRegister = false, onTheHouse = false }: Extras = {}) => {
       gameBeforeConversation = get().game;
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
       remindMicOff(id);
+      const firstMorningOrder = partner.interaction !== null && isFirstMorningCafeOrder(get().game, partner.interaction);
+      if (get().inputMode === 'typed') offerTooltip('typedFallback');
+      // Open mic is never taught in the First Morning: its tooltip waits for a later conversation.
+      else if (openMicOn() && !firstMorningOrder) offerTooltip('openMic');
       set({
         voiceUnavailable: false,
         conversation: {
@@ -1755,12 +2250,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           reconnecting: false,
           retried: false,
           usage: NO_USAGE,
-          patience: startPatience(get().game.proficiencyStep),
+          // A friend has more Patience. The First Morning's café order can't fail.
+          patience: startPatience(
+            get().game.proficiencyStep,
+            isNamedNpc(partner.npcId) ? familiarityTier(memoryOf(get().game, partner.npcId)) : 'stranger',
+            { canRunOut: !firstMorningOrder },
+          ),
+          basket,
           outcome: null,
           closed: false,
           recap: null,
           showingRecap: false,
           tab: 'chat',
+          firstMorningOrder,
+          helpPulse: 'waiting',
           hints: null,
           annotations: {},
           translated: [],
@@ -1768,9 +2271,66 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           npcVoice: null,
           spoken: {},
           helpLog: [],
+          offersCasualRegister,
+          onTheHouse,
         },
       });
       openSession(sessionFor);
+    };
+
+    /** An NPC who is due comes up to the Character, unless the Player is busy: then they wait until the Player is free. */
+    const approachIfFree = () => {
+      const approach = pendingApproach;
+      const { conversation, fainting, journal, pauseMenu, screen } = get();
+      // No one comes over during a Shift: the Character is at work.
+      if (!approach || conversation || fainting || journal || pauseMenu || screen !== 'playing' || get().game.possessions.shift) return;
+      pendingApproach = null;
+      if (!approachStillDue(get().game, approach)) return;
+      // Called in, the Character goes through to the doctor.
+      if (approach === 'doctorCallsName') set({ doctorCall: { ...get().game.clock } });
+      set({ game: approachMade(get().game, approach) });
+      startConversation(approachInteraction(approach), approach);
+    };
+
+    /**
+     * The Character has come within reach of the landlord, who stands in the hallway by the door, so passes
+     * them on the way out: about rent due and unpaid, or a Newcomer Discount step-down, the landlord speaks
+     * first. Only then and there, so a Player who is busy is let by rather than caught later somewhere else.
+     */
+    const catchInHallway = () => {
+      const { game, conversation, fainting, journal, screen } = get();
+      if (conversation || fainting || journal || screen !== 'playing') return;
+      const approach = hallwayApproach(game, placeHours('landlord', game.identity.culturePackId));
+      if (!approach) return;
+      set({ game: hallwayApproachMade(game, approach) });
+      startConversation(approachInteraction(approach), approach);
+    };
+
+    /**
+     * The Character has just come into the park: the first time today, a park regular waves them over for Small Talk.
+     * Only then and there, so a Player who is busy is let by.
+     */
+    const waveOverInThePark = (before: GameState, after: GameState) => {
+      const { conversation, fainting, journal, screen } = get();
+      if (!parkWaveDue(before, after) || conversation || fainting || journal || screen !== 'playing') return;
+      const waved = parkWaveMade(get().game, PARK_REGULARS);
+      set({ game: waved.state });
+      startSmallTalkWith(waved.npcId, true);
+    };
+
+    /** Sets the game after something done at home, where no door or outcome saves it: saved at once if it did a First Morning step. */
+    const setGameSavingFirstMorning = (after: GameState) => {
+      const before = get().game;
+      set({ game: after });
+      if (firstMorningStep(after) !== firstMorningStep(before)) save();
+    };
+
+    /** Whether this change to the game brings an NPC over to the Character. */
+    const noticeApproach = (before: GameState, after: GameState) => {
+      const due = approachDue(before, after);
+      if (!due) return;
+      pendingApproach = due;
+      approachIfFree();
     };
 
     return {
@@ -1780,15 +2340,21 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       arrival: 'newGame',
       slotId: SLOT_IDS[0],
       savedCount: 0,
-      // On the title screen, a new game stands in until a game is chosen.
+      // On the title screen, a First Morning stands in until a game is chosen.
       game: initial ?? createSave(DEV_SETUP),
       tabHidden: false,
       pauseMenu: false,
+      firstMorningGuide: null,
+      firstMorningCard: false,
       onStreet: false,
       interactable: null,
       tramChoosing: false,
+      heldStill: false,
       tramArrival: null,
       conversation: null,
+      basket: [],
+      shelfMarker: null,
+      routeMarker: null,
       typing: false,
       micLevel: 0,
       toast: null,
@@ -1798,9 +2364,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       inputMode: DEFAULT_DEVICE_SETTINGS.inputMode,
       micCheckPassed: DEFAULT_DEVICE_SETTINGS.micCheckPassed,
       talkMode: DEFAULT_DEVICE_SETTINGS.talkMode,
+      volumes: DEFAULT_DEVICE_SETTINGS.volumes,
+      tooltips: DEFAULT_DEVICE_SETTINGS.tooltips,
+      tooltipsDue: [],
       micRetry: null,
       micOffReminder: null,
       journal: null,
+      fainting: null,
+      wardArrival: null,
+      doctorCall: null,
       shiftEnd: null,
       persistCallout: false,
       sign: null,
@@ -1812,8 +2384,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         settingsWrites
           .then(() => deps.deviceSettings.load())
           .then(
-            ({ nativeLanguage, readingAids, showRomaji, inputMode, micCheckPassed, talkMode }) =>
-              set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed, talkMode }),
+            ({ nativeLanguage, readingAids, showRomaji, inputMode, micCheckPassed, talkMode, volumes, tooltips }) =>
+              set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed, talkMode, volumes, tooltips }),
             (error: unknown) => console.warn('[settings] could not be read:', error),
           )
           .then(() => (devTarget ? startDevNewGame(devTarget) : checkSlots()));
@@ -1841,6 +2413,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             characterName: '',
             appearance: DEFAULT_APPEARANCE,
             mic: null,
+            skipFirstMorning: false,
           },
         });
       },
@@ -1859,6 +2432,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const setup = get().setup;
         if (setup) answerSetup({ appearance: { ...setup.appearance, ...change } });
       },
+      chooseSkipFirstMorning: (skipFirstMorning) => answerSetup({ skipFirstMorning }),
       setupNext: () => {
         const { setup, nativeLanguage, micCheckPassed } = get();
         if (get().screen !== 'setup' || !setup || !setupAnswered(setup, nativeLanguage)) return;
@@ -1920,22 +2494,30 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (dt > 0) set({ game: tick(before, dt) });
         realMsSinceSave += realDeltaMs;
         const after = get().game;
+        if (faintedBetween(before, after)) return fainted(before, after);
         if (after.clock.day !== before.clock.day || realMsSinceSave >= SAVE.everyRealMs) save();
+        noticeApproach(before, after);
       },
       setTabHidden: (tabHidden) => {
         set({ tabHidden });
+        timeSilence();
         if (tabHidden) save();
       },
       // The world calls these every frame, so they only notify on a change.
       enterPlace: (placeId) => {
+        // Behind the Fainting screen the Character is in the ward, wherever the world last had them standing.
+        if (get().fainting) return;
         const before = get().game;
         // Out in the open, there's no door to keep anyone out.
         const hours = OPEN_AIR_PLACES.includes(placeId) ? null : placeHours(placeId, before.identity.culturePackId);
         const game = enterPlace(before, placeId, hours);
         if (game === get().game) return;
-        set({ game });
+        // Anything not paid for goes back on the supermarket's shelves, and its marker goes.
+        set({ game, ...(placeId !== 'supermarket' && { basket: [], shelfMarker: null }) });
         // Through a door.
         save();
+        noticeApproach(before, game);
+        waveOverInThePark(before, game);
       },
       setOnStreet: (onStreet) => {
         if (onStreet !== get().onStreet) set({ onStreet });
@@ -1946,7 +2528,9 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // Walking away is like Leave: no cost before the outcome, the closing card after it. A Shift holds the Character
         // behind the counter, so what is within reach there never matters to a Shift Customer.
         if (conversation?.shiftCustomer === null && !conversation.closed && interactable !== conversation.npcId) get().leaveConversation();
-        set({ interactable, tramChoosing: false });
+        // Standing on the platform a passer-by said to get off at, the route marker has done its job.
+        set({ interactable, tramChoosing: false, ...(interactable !== null && interactable === get().routeMarker && { routeMarker: null }) });
+        if (interactable === 'landlord') catchInHallway();
       },
       openTram: () => {
         const { interactable, conversation, game } = get();
@@ -1954,13 +2538,86 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ tramChoosing: true });
       },
       closeTram: () => set({ tramChoosing: false }),
+      letGoOfWalkKeys: () => {
+        if (get().heldStill) set({ heldStill: false });
+      },
       rideTram: (stopId) => {
         const { interactable, conversation, game, tramChoosing } = get();
         if (!tramChoosing || conversation || !isTramStop(interactable)) return;
         const after = rideTram(game, stopsBetween(interactable, stopId), placeHours('tram-stop', game.identity.culturePackId));
         if (after === game) return;
-        set({ game: after, tramChoosing: false, interactable: null, tramArrival: { stopId } });
+        set({ game: after, tramChoosing: false, interactable: null });
+        // Health can run out on the way, and then the Character wakes in the ward instead of getting off.
+        if (faintedBetween(game, after)) return fainted(game, after);
+        // Arriving where a passer-by said to get off, the route marker has done its job.
+        set({ tramArrival: { stopId }, ...(get().routeMarker === stopId && { routeMarker: null }) });
+        noticeApproach(game, after);
       },
+      drinkWater: () => setGameSavingFirstMorning(drinkWater(get().game)),
+      setFirstMorningGuide: (guide) => {
+        const shown = get().firstMorningGuide;
+        if (shown?.metres !== guide.metres || shown.bearing !== guide.bearing) set({ firstMorningGuide: guide });
+      },
+      skipFirstMorning: () => {
+        const { game } = get();
+        const after = skipFirstMorning(game);
+        if (after === game) return;
+        set({ game: after });
+        save();
+        get().closePauseMenu();
+      },
+      dismissFirstMorningCard: () => set({ firstMorningCard: false }),
+      cook: () => {
+        const { game } = get();
+        const after = cook(game);
+        if (after === game) return set({ toast: { kind: 'nothingToCook' } });
+        setGameSavingFirstMorning(after);
+      },
+      workOut: () => {
+        const { interactable, conversation, game } = get();
+        if (conversation || interactable !== 'gym') return;
+        const hours = placeHours('bathhouse', game.identity.culturePackId);
+        const refusal = gymRefusal(game, hours);
+        if (refusal) return set({ toast: { kind: 'gymRefused', refusal } });
+        const after = gymSession(game, hours);
+        set({ game: after });
+        // Health can run out during the workout, and then the Character wakes in the ward.
+        if (faintedBetween(game, after)) return fainted(game, after);
+        noticeApproach(game, after);
+      },
+      takeFromShelf: () => {
+        const { interactable, conversation, basket, shelfMarker, game } = get();
+        if (conversation || !isShelf(interactable) || !isPlaceOpen('supermarket', game)) return;
+        set({ basket: addToBasket(basket, interactable), ...(shelfMarker === interactable && { shelfMarker: null }) });
+      },
+      putBack: (itemId) => {
+        const state = get();
+        const { basket, conversation, game } = state;
+        if (!selectCanPutBack(state) || !basket.some((line) => line.itemId === itemId)) return;
+        const after = putBackFromBasket(basket, itemId);
+        set({ basket: after });
+        if (!conversation) return;
+        // The cashier rings up what is on the counter now, in a new turn of their own.
+        updateConversation({ basket: after, npcLine: null, heardLine: null });
+        voice?.sendText(basketChangedScene(after, game.identity.culturePackId));
+      },
+      wakeInWard: () => {
+        if (!get().fainting) return;
+        set({ fainting: null });
+        offerTooltip('fainting');
+        approachIfFree();
+      },
+      sleep: () => {
+        const { game } = get();
+        if (!bedUsable(game.clock)) return set({ toast: { kind: 'tooEarlyForBed' } });
+        const after = sleep(game);
+        if (after === game) return;
+        set({ game: after });
+        // Waking starts the day, even after a bedtime past midnight, so the save becomes this morning's backup.
+        save({ startsDay: true });
+        noticeApproach(game, after);
+      },
+
       pointAtSign: (signId) => {
         const { sign } = get();
         if (sign?.tooltip.signId === signId) return;
@@ -1987,6 +2644,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         if (after === game) return;
         set({ game: after, shiftEnd: null });
         sizeLastSet = null;
+        offerTooltip('shift');
         nextShiftCustomerOrEnd();
       },
       tapMenuItem: (itemId) => {
@@ -2053,13 +2711,18 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // Closed before its Recap was there to read: it still goes to the Journal.
         const recap = get().shiftEnd?.recap;
         set({ shiftEnd: null, ...(recap?.status === 'writing' && { toast: { kind: 'recapSaved' } as const }) });
+        if (recap) offerTooltip('journal');
       },
       talk: (key = 'E') => {
         const { interactable, conversation, game } = get();
         if (conversation || get().journal || get().pauseMenu || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
-        const interaction = key === 'E' ? selectTalkWithE(get()) : selectTalkWithF(get());
+        if (isNamedNpc(interactable) && key === selectSmallTalkKey(get())) return startSmallTalkWith(interactable);
+        if (key === 'T') return;
+        const interaction = key === 'E' ? selectTalkWithE(get()) : key === 'F' ? selectTalkWithF(get()) : selectTalkWithR(get());
+        // Everyone in town has something to say on E (a conversation, or Small Talk); F and R are only further choices.
         if (!interaction) return;
-        startConversation(interaction);
+        if (isPasserBy(interactable)) return startWithPasserBy(interactable, interaction);
+        startConversation(interaction, null);
       },
       sendTypedLine: (text) => {
         const conversation = get().conversation;
@@ -2074,6 +2737,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           heardLine: null,
           patience: newPlayerTurn(conversation.patience),
         };
+        stopWaitingForPlayer();
         set({ conversation: turn });
         // The backstop: a turn with nothing to make sense of costs Patience whatever the NPC does.
         if (isUnreadableTranscript(line) && notUnderstood(turn)) {
@@ -2082,10 +2746,20 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         }
         voice.sendText(line);
       },
+      giveGift: (itemId) => {
+        const conversation = get().conversation;
+        if (!canTakeTurn(conversation) || !voice || !isNamedNpc(conversation.npcId)) return;
+        if (!selectGiftsToGive(get()).some((gift) => gift.itemId === itemId)) return;
+        const npc = NAMED_NPCS[conversation.npcId];
+        const given = giveGift(get().game, npc, itemId);
+        set({ game: given.state });
+        voice.sendText(giftScene(npc, CULTURE_PACKS[given.state.identity.culturePackId].goods[itemId].name, given));
+      },
       startTalking: () => {
         const conversation = get().conversation;
         if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed' || openMicOn()) return;
         voice.startTalking();
+        stopWaitingForPlayer();
         // A new turn: anything the NPC says next starts a new line, and so does what it hears.
         set({
           conversation: {
@@ -2107,17 +2781,17 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       leaveConversation: () => {
         const conversation = get().conversation;
         if (conversation?.outcome && !conversation.closed) showClosingCard();
-        else endConversation();
+        else endAndOfferJournal();
       },
       skipRecap: () => {
         const writing = get().conversation?.recap;
-        endConversation();
+        endAndOfferJournal();
         if (writing) set({ toast: { kind: 'recapSaved' } });
       },
       seeRecap: () => {
         if (get().conversation?.recap) updateConversation({ showingRecap: true });
       },
-      closeRecap: () => endConversation(),
+      closeRecap: () => endAndOfferJournal(),
       hearItSaid: (text) => {
         deps
           .hearItSaid(text, get().game.identity.targetLanguage)
@@ -2141,8 +2815,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const { game } = get();
         const { hints } = conversation;
         const fresh = hints?.atLine === conversation.lines.length && hints.view.status !== 'failed';
-        // Opening Help shows the place's phrasebook and the personal one, then this moment's hints.
-        const open = logHelp({ ...conversation, tab: 'help' }, 'phrasebook', [
+        // Opening Help shows the place's phrasebook and the personal one, then this moment's hints. Help is found: it stops pulsing.
+        const open = logHelp({ ...conversation, tab: 'help', helpPulse: 'found' }, 'phrasebook', [
           ...placePhrasebook(game.identity.culturePackId, game.placeId).map((phrase) => phrase.text),
           ...game.phrasebook.map((entry) => entry.text),
         ]);
@@ -2166,10 +2840,22 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         set({ readingAids });
         updateDeviceSettings((settings) => ({ ...settings, readingAids: readingAids.show, showRomaji: readingAids.romaji }));
       },
+      setVolume: (bus, level) => {
+        const volumes = { ...get().volumes, [bus]: Math.min(1, Math.max(0, level)) };
+        set({ volumes });
+        updateDeviceSettings((settings) => ({ ...settings, volumes }));
+      },
       setTalkMode: (talkMode) => {
         set({ talkMode });
         updateDeviceSettings((settings) => ({ ...settings, talkMode }));
       },
+      setTooltips: (tooltips) => {
+        set({ tooltips, ...(!tooltips && { tooltipsDue: [] }) });
+        // Those waiting their turn never showed, so they can come up again once tooltips are back on.
+        if (!tooltips) tooltipsOffered.clear();
+        updateDeviceSettings((settings) => ({ ...settings, tooltips }));
+      },
+      dismissTooltip: () => set({ tooltipsDue: get().tooltipsDue.slice(1) }),
       chooseTypedFallback: () => {
         micRetryRun++;
         set({ micRetry: null });
@@ -2212,21 +2898,27 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           },
         );
       },
-      closeJournal: () => set({ journal: null }),
+      closeJournal: () => {
+        set({ journal: null });
+        approachIfFree();
+      },
       openPauseMenu: () => {
-        const { screen, conversation, journal, tramChoosing, voiceUnavailable, shiftEnd } = get();
-        if (screen !== 'playing' || conversation || journal || tramChoosing || voiceUnavailable || shiftEnd) return;
+        const { screen, conversation, journal, fainting, tramChoosing, voiceUnavailable, shiftEnd } = get();
+        if (screen !== 'playing' || conversation || journal || fainting || tramChoosing || voiceUnavailable || shiftEnd) return;
         set({ pauseMenu: true });
       },
       closePauseMenu: () => {
         if (!get().pauseMenu) return;
         set({ pauseMenu: false });
+        approachIfFree();
       },
       quitToTitle: () => {
         if (!get().pauseMenu) return;
         // Saved before the screen changes, since only a game being played is saved. The title screen reads the slots
         // after this write, so Continue plays on from here.
         save();
+        // An NPC still due to come over belongs to this game, not to whichever is played next.
+        pendingApproach = null;
         set({
           screen: 'title',
           title: { status: 'checking' },
@@ -2234,11 +2926,13 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
           interactable: null,
           sign: null,
           tramChoosing: false,
+          heldStill: false,
           typing: false,
           micLevel: 0,
         });
       },
       setTyping: (typing) => set({ typing }),
+      draftTypedLine: timeSilence,
       dismissToast: () => set({ toast: null }),
       dismissVoiceUnavailable: () => set({ voiceUnavailable: false }),
     };
@@ -2285,6 +2979,43 @@ export const selectSetupCanGoOn = (s: GameStore) => s.setup !== null && setupAns
 export const selectSetupIsLast = (s: GameStore) => s.setup !== null && !nextSetupStep(s.setup.step, s.micCheckPassed);
 export const selectInputMode = (s: GameStore) => s.inputMode;
 export const selectTalkMode = (s: GameStore) => s.talkMode;
+export const selectVolumes = (s: GameStore) => s.volumes;
+export const selectTooltipsOn = (s: GameStore) => s.tooltips;
+/** In the town with no screen or panel over the game: what the one-time tooltips and the First Morning banner wait for. */
+const inTownUncovered = (s: GameStore) =>
+  s.screen === 'playing' && !s.pauseMenu && !s.journal && !s.fainting && !s.voiceUnavailable && !s.tramChoosing && !s.shiftEnd;
+/** The one-time tooltip showing above the dock, or null. It waits while a screen or panel is over the game. */
+export const selectTooltip = (s: GameStore): TooltipId | null => (inTownUncovered(s) ? (s.tooltipsDue[0] ?? null) : null);
+/**
+ * Where the First Morning's next step is: the metres there, and its bearing in degrees clockwise from straight ahead on
+ * screen. Rounded by the world, so it changes only as often as the banner would show it.
+ */
+export type FirstMorningGuide = { metres: number; bearing: number };
+/**
+ * The First Morning step the banner prompts, or null once the First Morning is over or skipped. Prompts never block: the
+ * banner waits while a screen, panel or conversation is over the game.
+ */
+export const selectFirstMorningBanner = (s: GameStore) => (inTownUncovered(s) && !s.conversation ? firstMorningStep(s.game) : null);
+export const selectFirstMorningGuide = (s: GameStore) => s.firstMorningGuide;
+/**
+ * The First Morning's closing card shows: once it's done (not skipped), back in the town after the conversation, until
+ * closed. It shows the money (`selectMoneyInShifts`), the day rent is due (`selectRentDueDay`) and where's hiring (`HIRING_PLACES`, content).
+ */
+export const selectFirstMorningCard = (s: GameStore) => s.firstMorningCard && inTownUncovered(s) && !s.conversation;
+export const selectRentDueDay = (s: GameStore) => s.game.rent.dueDay;
+/** In the First Morning's café order, the Help tab pulses, until opened. */
+export const selectHelpPulse = (s: GameStore) => s.conversation?.helpPulse === 'pulsing' && !s.conversation.outcome;
+/**
+ * How the First Morning's café order says to answer, until the order is decided: without a mic, it teaches the Typed
+ * Fallback (`type`); with one, holding Space (`holdSpace`). Open mic is never taught there: with it, it just says to order (`say`).
+ */
+export const selectFirstMorningOrderPrompt = (s: GameStore): 'type' | 'holdSpace' | 'say' | null => {
+  if (!s.conversation?.firstMorningOrder || s.conversation.outcome) return null;
+  if (s.inputMode === 'typed') return 'type';
+  return s.talkMode === 'open-mic' ? 'say' : 'holdSpace';
+};
+/** The First Morning is under way, so the pause menu offers Skip tutorial. */
+export const selectSkippableFirstMorning = (s: GameStore) => firstMorningStep(s.game) !== null;
 export const selectMicRetry = (s: GameStore) => s.micRetry;
 export const selectMicOffChip = (s: GameStore): MicOffChip | null => {
   if (s.inputMode !== 'typed' || !s.conversation) return null;
@@ -2313,10 +3044,24 @@ export const selectShowcaseAppearance = (s: GameStore): AppearancePreset =>
 export const selectAppearance = (s: GameStore) => s.game.identity.appearance;
 
 export const selectTimeScale = (s: GameStore) => {
-  if (s.tabHidden || s.pauseMenu || s.journal || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
+  if (s.tabHidden || s.pauseMenu || s.journal || s.fainting || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
   return s.conversation ? CLOCK.timeScale.conversation : CLOCK.timeScale.normal;
 };
+export const selectHealth = (s: GameStore) => s.game.character.health;
+export const selectHunger = (s: GameStore) => s.game.character.hunger;
+export const selectThirst = (s: GameStore) => s.game.character.thirst;
+export const selectMood = (s: GameStore) => s.game.character.mood;
+/** The face on the dock's Mood gauge. */
+export const selectMoodFace = (s: GameStore) => moodFace(s.game.character.mood);
+const NO_SYMPTOMS: readonly SymptomId[] = [];
+/** What the Character feels while ill, for the Player to describe to the doctor: the symptoms, never which Illness it is. */
+export const selectSymptoms = (s: GameStore): readonly SymptomId[] => {
+  const { illness } = s.game.character;
+  return illness ? ILLNESSES[illness.illnessId].symptoms : NO_SYMPTOMS;
+};
 export const selectMoneyInShifts = (s: GameStore) => s.game.character.moneyInShifts;
+/** What the Character owes, by kind, for the dock to show next to the money. */
+export const selectDebts = (s: GameStore) => s.game.debts;
 export const selectCulturePackId = (s: GameStore) => s.game.identity.culturePackId;
 export const selectTargetLanguage = (s: GameStore) => s.game.identity.targetLanguage;
 export const selectDay = (s: GameStore) => s.game.clock.day;
@@ -2334,19 +3079,91 @@ export const selectPlaceId = (s: GameStore) => s.game.placeId;
 /** What E would use here. Staff at a closed place don't count: there's no one to talk to. */
 export const selectInteractable = (s: GameStore) => {
   if (isTownNpc(s.interactable) && !isAtWork(s.interactable, s.game)) return null;
+  // The shelves are only for shopping while the supermarket is open.
+  if (isShelf(s.interactable) && !isPlaceOpen('supermarket', s.game)) return null;
   return s.interactable;
 };
-/** The conversation `startedWith` starts with the Named NPC the Character is next to, given the Jobs they have and their Proficiency Step, or null. */
+/** The shelf the Character could take a grocery from, or null. */
+export const selectShelf = (s: GameStore) => {
+  const interactable = selectInteractable(s);
+  return isShelf(interactable) ? interactable : null;
+};
+/**
+ * The conversation `startedWith` starts with the Named NPC the Character is next to, given what they bring, the Jobs
+ * they have, their Proficiency Step, their restaurant table and bill and any restaurant debt, or null.
+ */
 const talkWith = (s: GameStore, startedWith: typeof interactionStartedWithE): Interaction | null => {
   const npcId = selectInteractable(s);
   if (!isNamedNpc(npcId)) return null;
-  const { possessions, proficiencyStep } = s.game;
-  return startedWith(npcId, { jobsHired: possessions.jobsHired, step: proficiencyStep });
+  const { possessions, proficiencyStep, restaurant } = s.game;
+  const owesRestaurant = restaurantDebt(s.game) > 0;
+  return startedWith(npcId, {
+    addressRegistered: possessions.addressRegistered,
+    // Gone off or not: the cashier is the one to say whether it can be refunded.
+    returnable: possessions.inventory.some(({ itemId }) => (GROCERIES_SOLD as readonly ItemId[]).includes(itemId)),
+    shopping: s.basket.length > 0,
+    jobsHired: possessions.jobsHired,
+    step: proficiencyStep,
+    restaurant,
+    owesRestaurant,
+    gymMembership: gymMembership(s.game),
+    owesHospital: hospitalDebt(s.game) > 0,
+    holdsPrescription: s.game.clinic.prescription !== null,
+  });
+};
+/**
+ * The key that starts Small Talk with the Named NPC the Character is next to: E with someone who has no other
+ * conversation, T with staff (whose E is their Goal Interaction), or null with no Named NPC in reach. A cashier
+ * isn't idle while the Character has shopping to pay for.
+ */
+export const selectSmallTalkKey = (s: GameStore): TalkKey | null => {
+  if (!isNamedNpc(selectInteractable(s))) return null;
+  if (selectTalkWithE(s)?.effect.kind === 'purchase') return null;
+  return selectTalkWithE(s) ? 'T' : 'E';
+};
+/** E at a passer-by asks which tram goes to a place: there's nothing else to say to a stranger at a tram stop. */
+const isPasserByInReach = (s: GameStore) => {
+  const npcId = selectInteractable(s);
+  return isTownNpc(npcId) && isPasserBy(npcId);
 };
 /** The conversation E starts with the NPC the Character is next to, or null. */
-export const selectTalkWithE = (s: GameStore) => talkWith(s, interactionStartedWithE);
-/** The second conversation F starts with that NPC (asking for work), or null. */
+export const selectTalkWithE = (s: GameStore) => (isPasserByInReach(s) ? INTERACTIONS.askForDirections : talkWith(s, interactionStartedWithE));
+/** The second conversation F starts with that NPC (at the till with shopping, asking where something is; asking for work), or null. */
 export const selectTalkWithF = (s: GameStore) => talkWith(s, interactionStartedWithF);
+/** The conversation R starts with that NPC (at the till, bringing back something bought there), or null. */
+export const selectTalkWithR = (s: GameStore) => talkWith(s, interactionStartedWithR);
+/** What the Character has taken off the shelves to pay for. */
+export const selectBasket = (s: GameStore) => s.basket;
+/**
+ * Whether shopping can go back on the shelves now: any time but in a conversation, and at the till until it's paid for,
+ * while the cashier can hear about it (not while the Player is talking, Help is open or the connection is coming back).
+ * Not the last item at the till, though: leaving the till puts everything back.
+ */
+export const selectCanPutBack = (s: GameStore) => {
+  const { conversation, basket } = s;
+  if (!conversation) return true;
+  const { interaction, outcome, reconnecting, listening, tab } = conversation;
+  const atTheTill = interaction?.effect.kind === 'purchase' && !outcome;
+  const cashierListening = !reconnecting && !listening && tab === 'chat';
+  const lastItem = basket.length === 1 && basket[0]!.quantity === 1;
+  return atTheTill && cashierListening && !lastItem;
+};
+/** The grocery the cashier pointed to, marked on its shelf. */
+export const selectShelfMarker = (s: GameStore) => s.shelfMarker;
+/** The tram stop a passer-by said to get off at, marked until the Character gets there, or null. */
+export const selectRouteMarker = (s: GameStore) => s.routeMarker;
+
+const inventoryLines = new WeakMap<readonly InventoryItem[], { day: number; lines: readonly InventoryLine[] }>();
+/** What the Character owns, and which groceries have gone off today. The same array until either changes. */
+export const selectInventory = (s: GameStore): readonly InventoryLine[] => {
+  const { inventory } = s.game.possessions;
+  const { day } = s.game.clock;
+  const kept = inventoryLines.get(inventory);
+  if (kept?.day === day) return kept.lines;
+  const lines = inventory.map((item) => ({ ...item, goneOff: isGoneOff(item, day) }));
+  inventoryLines.set(inventory, { day, lines });
+  return lines;
+};
 const skillLevels = new WeakMap<GameState['progression']['lifeSkillXp'], Record<LifeSkillId, number>>();
 /** Each Life Skill's level, 0–5 stars. The same object until the XP changes. */
 export const selectLifeSkillLevels = (s: GameStore): Record<LifeSkillId, number> => {
@@ -2382,8 +3199,10 @@ export const selectConversation = (s: GameStore) => s.conversation;
 const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;
 export const selectTyping = (s: GameStore) => s.typing;
-/** Keys belong to the UI, not the world: the typed field has focus, the Journal is open, or the Player is choosing a tram stop. */
-export const selectWorldKeysOff = (s: GameStore) => s.typing || s.pauseMenu || s.journal !== null || s.tramChoosing;
+/** An NPC who came up to the Character has stopped them, until the walking keys held then are let go. */
+export const selectHeldStill = (s: GameStore) => s.heldStill;
+/** Keys belong to the UI, not the world: the typed field has focus, the Journal or the Fainting screen is open, or the Player is choosing a tram stop. */
+export const selectWorldKeysOff = (s: GameStore) => s.typing || s.pauseMenu || s.journal !== null || s.fainting !== null || s.tramChoosing;
 export const selectPauseMenuOpen = (s: GameStore) => s.pauseMenu;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
 /**
@@ -2408,6 +3227,9 @@ export const selectClosingCard = (s: GameStore): ClosingCard | null => (s.conver
 /** The Recap in the column, once See Recap is chosen. */
 export const selectRecap = (s: GameStore) => (s.conversation?.showingRecap ? s.conversation.recap : null);
 export const selectJournal = (s: GameStore) => s.journal;
+export const selectFainting = (s: GameStore) => s.fainting;
+export const selectWardArrival = (s: GameStore) => s.wardArrival;
+export const selectDoctorCall = (s: GameStore) => s.doctorCall;
 /** This town NPC's face while the Player talks to them, or null when they aren't. */
 export const selectNpcExpressionOf = (npcId: TownNpcId) => (s: GameStore) => (s.conversation?.npcId === npcId ? selectNpcExpression(s) : null);
 /** How the NPC the Player is talking to looks, for their face: a Shift Customer as drawn, anyone else as the pack dresses them. */
@@ -2442,6 +3264,27 @@ export const selectLineReading =
 /** The NPC partway through saying a line, for the "speaking…" indicator over them. */
 export const selectNpcSpeaking = (s: GameStore): TownNpcId | null =>
   s.conversation && !s.conversation.closed && s.conversation.npcLine !== null ? s.conversation.npcId : null;
+/** A gift in the inventory, ready to give, and whether the NPC has told the Character it's the one they would love most. */
+export type GiftToGive = { itemId: ItemId; quantity: number; favourite: boolean };
+const NO_GIFTS: readonly GiftToGive[] = [];
+const giftsToGive = new WeakMap<readonly InventoryItem[], { favourite: ItemId | null; gifts: readonly GiftToGive[] }>();
+/** The gifts the Character can give the Named NPC they're talking to, until the conversation's outcome is decided. The same array until they change. */
+export const selectGiftsToGive = (s: GameStore): readonly GiftToGive[] => {
+  const { conversation, game } = s;
+  const npcId = conversation?.npcId ?? null;
+  if (!conversation || !isNamedNpc(npcId) || conversation.outcome || conversation.reconnecting) return NO_GIFTS;
+  const { inventory } = game.possessions;
+  const npc = NAMED_NPCS[npcId];
+  const favourite = memoryOf(game, npc.id).favouriteKnown ? npc.favouriteGift : null;
+  const kept = giftsToGive.get(inventory);
+  if (kept?.favourite === favourite) return kept.gifts;
+  const held = inventory
+    .filter((item) => ITEMS[item.itemId].gift)
+    .map(({ itemId, quantity }) => ({ itemId, quantity, favourite: itemId === favourite }));
+  const gifts = held.length > 0 ? held : NO_GIFTS;
+  giftsToGive.set(inventory, { favourite, gifts });
+  return gifts;
+};
 const NO_PHRASES: readonly PlacePhrase[] = [];
 /** The phrasebook for the place the Character is at. */
 export const selectPlacePhrasebook = (s: GameStore): readonly PlacePhrase[] => {

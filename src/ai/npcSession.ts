@@ -1,18 +1,39 @@
 import { z } from 'zod';
 import {
+  basketFacts,
   type Build,
   interactionFacts,
+  localPlaceName,
   toToolDeclaration,
   type CulturePack,
+  type DrinkExtra,
+  type DrinkSize,
+  type DrinkTemperature,
   type FunctionDeclaration,
   type Interaction,
+  type MedicineId,
   type NamedNpc,
   type NamedNpcId,
+  type TramStopId,
 } from '../content/index.ts';
-import { weekdayOf, type GameState, type LanguageCode, type PlaceId, type ProficiencyStep } from '../sim/index.ts';
+import {
+  familiarityTier,
+  isFamiliarAtLeast,
+  usualOffered,
+  weekdayOf,
+  type ApproachId,
+  type Basket,
+  type GameState,
+  type HospitalStatement,
+  type LanguageCode,
+  type NpcMemory,
+  type PlaceId,
+  type ProficiencyStep,
+  type RentStatement,
+} from '../sim/index.ts';
 
 /**
- * Which voice the NPC speaks with: a Named NPC's own, or, for a Shift Customer, one that suits the build
+ * Which voice the NPC speaks with: a Named NPC's own, or, for a Shift Customer or Passer-by, one that suits the build
  * of their look, drawn by their seed.
  * The gateway resolves it to a prebuilt voice, because voices live only in the gateway config.
  */
@@ -24,15 +45,48 @@ export type NpcSession = {
   systemInstruction: string;
   tools: FunctionDeclaration[];
   voice: VoiceRequest;
-  /** The first message of the session, so the NPC speaks first: the customer walking up. */
+  /** The first message of the session, so the NPC speaks first: the customer walking up, or why the NPC approaches. */
   openingScene: string;
 };
 
 export type NpcSessionContext = {
   clock: GameState['clock'];
+  /** The NPC starts this conversation by approaching the Character, rather than the Player pressing E. */
+  approach?: ApproachId;
+  /** At the till: the shopping the Character has put on the counter. */
+  basket?: Basket;
+  /** For the landlord: what the Character owes in rent. */
+  rent?: RentStatement;
+  /** For the restaurant's server: what the Character has eaten and not paid for. */
+  bill?: Basket;
+  /** For the restaurant's server: what the Character owes, in Shifts, from a bill they walked out on. */
+  restaurantDebt?: number;
+  /** For the pharmacist: what the doctor prescribed the Character, if anything. */
+  prescription?: MedicineId | null;
+  /** For reception settling the hospital bill: what the Character owes the hospital, and any plan they are on. */
+  hospital?: HospitalStatement;
+  /** For a passer-by: the tram stop they are waiting at. */
+  tramStop?: TramStopId;
+  /** What the NPC remembers of the Character, and the Character's name for when they know it. With none, they are strangers. */
+  relationship?: Relationship;
+  /** A friend adds a little something "on the house" to this order: flavour only, the game drew it. */
+  onTheHouse?: true;
+  /** A friend offers, this once, to switch to the casual register (Sie→du, keigo→タメ口). The game decides when. */
+  offersCasualRegister?: true;
+};
+
+export type Relationship = { memory: NpcMemory; characterName: string };
+
+/** What the context of a Small Talk session holds: no goal, so no basket, rent, bill or approach, and always what the NPC remembers. */
+export type SmallTalkContext = Pick<NpcSessionContext, 'clock' | 'offersCasualRegister'> & {
+  relationship: Relationship;
+  /** A park regular saw the Character come into the park and waved them over, so they speak first. */
+  wavedOver?: true;
 };
 
 export const NOT_UNDERSTOOD_TOOL = 'not_understood';
+export const LEARN_NAME_TOOL = 'learn_name';
+export const REVEAL_FAVOURITE_TOOL = 'reveal_favourite';
 
 // What the game answers each tool call with. The system instruction tells the NPC what each answer means.
 export type CompletionResponse =
@@ -42,7 +96,10 @@ export type CompletionResponse =
   | { result: 'invalid_arguments'; error: string }
   | { result: 'wrong_name' };
 export type NotUnderstoodResponse = { result: 'noted' } | { result: 'out_of_patience' };
-export type ToolResponse = CompletionResponse | NotUnderstoodResponse | { result: 'unknown_tool' };
+/** `wrong_name`: the name heard isn't the Character's, so the NPC misheard it. */
+export type LearnNameResponse = { result: 'learned' } | { result: 'wrong_name' };
+export type RevealFavouriteResponse = { result: 'remembered' };
+export type ToolResponse = CompletionResponse | NotUnderstoodResponse | LearnNameResponse | RevealFavouriteResponse | { result: 'unknown_tool' };
 
 /**
  * Sent instead of the player's turn when an unreadable transcript uses up the
@@ -52,9 +109,60 @@ export const OUT_OF_PATIENCE_SCENE =
   "[SCENE: Again you couldn't make sense of anything the customer said, and you have run out of patience. " +
   'Apologise politely and say goodbye: the conversation is over.]';
 
-/** Opens every conversation the Player starts with E, so the NPC speaks first: a customer walking up. */
+/** Opens every conversation the Player starts with E, so the NPC speaks first: a customer, or the landlord's tenant, walking up. */
 export const greetingScene = (who: string) => `[SCENE: A ${who} walks up to you. Greet them first.]`;
 export const GREETING_SCENE = greetingScene('customer');
+
+/** Opens a conversation the NPC starts, saying why they speak to the Character first. */
+const APPROACH_SCENES: Record<ApproachId, string> = {
+  nurseOnWaking: '[SCENE: The patient in the bed beside you has just woken up. Speak to them first.]',
+  doctorCallsName: "[SCENE: You call the patient's name in the waiting room, and they come into your consulting room. Speak to them first.]",
+  landlordRentDue: '[SCENE: Your tenant is walking past you in the hallway. Their rent is due and unpaid: stop them and speak to them first.]',
+  landlordDiscountStepDown: '[SCENE: Your tenant is walking past you in the hallway. Stop them and speak to them first: you have news about their rent.]',
+};
+
+/**
+ * Sent when the customer puts something back while at the till, so the cashier
+ * rings up what is on the counter now instead of the shopping in FACTS.
+ */
+export function basketChangedScene(basket: Basket, packId: LanguageCode): string {
+  return [
+    '[SCENE: The customer has put something back on the shelf. This replaces the shopping in FACTS.',
+    ...basketFacts(basket, packId),
+    "Read back the new total, and wait for them to confirm before you take payment. Don't greet them again.]",
+  ].join('\n');
+}
+
+/** How a gift went: whether it counted (only one a week does), and whether it was the NPC's favourite. */
+export type GiftOutcome = { counted: boolean; favourite: boolean };
+
+const GIFT_HANDED = 'hands you a gift: ';
+const FAVOURITE_GIFT = 'It is the gift you would love most: be delighted, and say so.';
+const GIFT_TOO_SOON = "They gave you a gift only a few days ago, so tell them kindly that they really shouldn't have.";
+
+/**
+ * Sent when the Character hands the NPC a gift from the inventory, by the pack's local name, in any conversation. Their
+ * favourite delights them. A gift that didn't count, coming only days after the last one, gets "you shouldn't have".
+ */
+export function giftScene(npc: NamedNpc, gift: string, { counted, favourite }: GiftOutcome): string {
+  const { who } = workplace(npc);
+  return [
+    `[SCENE: The ${who} ${GIFT_HANDED}${gift}.`,
+    ...(favourite ? [FAVOURITE_GIFT] : []),
+    ...(counted ? [] : [GIFT_TOO_SOON]),
+    'Thank them for it in a sentence or two, then carry on where you left off.]',
+  ].join(' ');
+}
+
+/** How the gift went, from a scene `giftScene` wrote, or null if the text isn't one. */
+export function readGiftScene(text: string): GiftOutcome | null {
+  if (!text.startsWith('[SCENE: ') || !text.includes(GIFT_HANDED)) return null;
+  return { counted: !text.includes(GIFT_TOO_SOON), favourite: text.includes(FAVOURITE_GIFT) };
+}
+
+/** Sent when Small Talk has gone on long enough, or the NPC has become busy, so they wrap it up. */
+export const WRAP_UP_SCENE =
+  '[SCENE: You need to get on with your day now. Wrap up the chat warmly in a sentence or two, and say goodbye.]';
 
 /**
  * Follows the conversation so far when a session replaces one whose connection
@@ -64,6 +172,18 @@ export const RESUME_SCENE =
   '[SCENE: You were interrupted for a moment, and the customer is still with you. ' +
   "Don't greet them again: say sorry for the wait in a few words and carry on from where you left off.]";
 
+/** What `learn_name` takes. The game checks a call's arguments against it too. */
+export const LearnNameArgsSchema = z.object({ name: z.string().describe('Their name, as they said it.') });
+
+export const learnNameTool = (who: string) =>
+  toToolDeclaration(LEARN_NAME_TOOL, `Call this when the ${who} tells you their name, with the name as they said it.`, LearnNameArgsSchema);
+
+/** What `reveal_favourite` takes: only the gift as the NPC put it, since the game already knows their favourite. */
+const RevealFavouriteArgsSchema = z.object({ gift: z.string().describe('The gift you told them you would love most, as you said it.') });
+
+export const revealFavouriteTool = (who: string) =>
+  toToolDeclaration(REVEAL_FAVOURITE_TOOL, `Call this when you tell the ${who} which gift you would love most.`, RevealFavouriteArgsSchema);
+
 export const notUnderstoodTool = (who: string) =>
   toToolDeclaration(
     NOT_UNDERSTOOD_TOOL,
@@ -72,21 +192,37 @@ export const notUnderstoodTool = (who: string) =>
     z.object({ reason: z.enum(['unintelligible', 'other_language', 'nothing_heard']) }),
   );
 
-/** Where each Named NPC with a conversation works, as their persona introduces it, and what they call the person in front of them. */
-type Workplace = { at: (pack: CulturePack) => string; who: string };
-const WORKPLACES: Partial<Record<PlaceId, Workplace>> = {
+/**
+ * Where each Named NPC is found, as their persona introduces it, and what they call the person in front of them.
+ * `as` is how they are there, if not as "the <role> at", and `offDuty` that they aren't working there.
+ */
+type Workplace = { at: (pack: CulturePack) => string; who: string; as?: string; offDuty?: true };
+const WORKPLACES: Record<PlaceId, Workplace | null> = {
   cafe: { at: (pack) => `${pack.cafe.name}, a café`, who: 'customer' },
   supermarket: { at: (pack) => `${pack.supermarket.name}, a supermarket`, who: 'customer' },
+  'convenience-store': { at: (pack) => `${pack.convenienceStore.name}, a convenience store`, who: 'customer' },
   restaurant: { at: (pack) => `${pack.restaurant.name}, a restaurant`, who: 'customer' },
+  clinic: { at: (pack) => `${pack.hospital.name}, the town hospital,`, who: 'patient' },
+  home: { at: (pack) => `${pack.apartments.name}, the apartment block where you live and let flats,`, who: 'tenant' },
+  park: { at: (pack) => `${localPlaceName('park', pack.id)}, the town park,`, who: 'person', as: 'one of the regulars at', offDuty: true },
+  bookshop: { at: (pack) => `${localPlaceName('bookshop', pack.id)}, a bookshop`, who: 'customer' },
+  bathhouse: { at: (pack) => `${localPlaceName('bathhouse', pack.id)}, the town bathhouse and gym,`, who: 'customer' },
+  'town-office': { at: (pack) => `${localPlaceName('town-office', pack.id)}, the town office,`, who: 'resident' },
+  'tram-stop': null,
+};
+
+/** The nurse works on the ward where people who faint are looked after; the rest of the hospital's staff don't. */
+const NPC_WORKPLACES: Partial<Record<NamedNpcId, Workplace>> = {
+  nurse: { at: (pack) => `${pack.hospital.name}, the town hospital, on the ward where people who faint are looked after,`, who: 'patient' },
 };
 
 function workplace(npc: NamedNpc): Workplace {
-  const found = WORKPLACES[npc.placeId];
+  const found = NPC_WORKPLACES[npc.id] ?? WORKPLACES[npc.placeId];
   if (!found) throw new Error(`No workplace for ${npc.id} at the ${npc.placeId}`);
   return found;
 }
 
-// Block 4: how the NPC speaks at each Proficiency Step (the first line follows "The customer"): vocabulary and grammar,
+// Block 4: how the NPC speaks at each Proficiency Step (the first line follows "The customer" or "The patient"): vocabulary and grammar,
 // how much it says per turn, its speed, whether it offers choices up front, and
 // (at A1–A2) one simpler rephrase the first time the customer seems lost.
 const STEP_ADAPTATION: Record<ProficiencyStep, string[]> = {
@@ -156,26 +292,139 @@ function block(heading: string, lines: string[]) {
 }
 
 function personaBlock(npc: NamedNpc, pack: CulturePack) {
-  const { name } = pack.personas[npc.id];
+  const { name, favouriteGift } = pack.personas[npc.id];
   const place = workplace(npc);
   return block('WHO YOU ARE', [
-    `You are ${name}, the ${npc.role} at ${place.at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
+    `You are ${name}, ${place.as ?? `the ${npc.role} at`} ${place.at(pack)} in a small town in ${pack.setting}, where everyone speaks ${pack.languageName}.`,
     `You are ${npc.age}: ${npc.temperament}. Quirks: ${npc.quirks}.`,
-    'Talk like a real, friendly person at work.',
+    `The gift you would love most is ${favouriteGift}. Don't bring it up yourself, but if the ${place.who} asks what you would like ` +
+      `or what you like as a gift, tell them, and call ${REVEAL_FAVOURITE_TOOL}.`,
+    place.offDuty ? 'Talk like a real, friendly person.' : 'Talk like a real, friendly person at work.',
   ]);
 }
 
-function youAndThisPersonBlock(interaction: Interaction, who: string) {
-  // Hiring asks for the name itself.
-  if (interaction.effect.kind === 'hire') {
+/** How the NPC learns the Character's name, while they don't know it. */
+const learnNameLine = (who: string) =>
+  `If the ${who} tells you their name, call ${LEARN_NAME_TOOL} with it as they said it. ` +
+  'If it answers "wrong_name", you misheard: apologise and ask them to say it again.';
+
+const KNOWN_NAME_UNUSED = "They have told you their name, but you don't know them well enough to use it yet.";
+
+/** What the NPC remembers of the Character from NPC Memory: how well they know them, by what name, and what they talked about last. */
+function rememberedLines(
+  { memory, characterName }: Relationship,
+  who: string,
+  { casualRegister }: CulturePack,
+  offersCasualRegister: boolean,
+  unknownName = learnNameLine(who),
+): string[] {
+  const tier = familiarityTier(memory);
+  const lines =
+    tier === 'friend'
+      ? [
+          `This ${who} is a friend: you have talked many times, and you are always glad to see them.`,
+          memory.registerOffered
+            ? `Speak to them warmly, as to a friend. ${casualRegister.inUse} If they would still rather keep it formal, follow their lead.`
+            : 'Speak to them warmly, as to a friend, but still politely.',
+        ]
+      : tier === 'acquaintance'
+        ? [`You know this ${who} a little: they have come by a good few times.`, 'Speak to them in a friendly way, as to a familiar face.']
+        : [`This ${who} is a stranger: you don't really know them yet.`, `Speak to them politely, as you would to any ${who}.`];
+  if (memory.knowsName && tier !== 'stranger') lines.push(`Greet them by name: ${characterName}.`);
+  else lines.push(memory.knowsName ? KNOWN_NAME_UNUSED : unknownName);
+  if (memory.lastTopic && isFamiliarAtLeast(memory, 'acquaintance')) {
+    lines.push(`Last time you talked about ${memory.lastTopic}. Follow up on it once, naturally, early on.`);
+  }
+  if (memory.favouriteKnown) lines.push('You have already told them which gift you would love most.');
+  if (offersCasualRegister) {
+    lines.push(
+      `Early in the conversation, once, ${casualRegister.offer}. It's a small milestone between you, so make it warm; ` +
+        "if they would rather keep things formal, that's fine.",
+    );
+  }
+  return lines;
+}
+
+/** How a usual's café drink is made, as its completion arguments say it: ', size "large", temperature "iced", extras "milk"'. */
+function madeAs({ size, temperature, extras = [] }: UsualLine): string {
+  const quoted = (ids: readonly string[]) => ids.map((id) => `"${id}"`).join(', ');
+  const made = [size && `size "${size}"`, temperature && `temperature "${temperature}"`, extras.length > 0 && `extras ${quoted(extras)}`];
+  return made.filter(Boolean).map((option) => `, ${option}`).join('');
+}
+
+/** One line of a usual's completion arguments: at the café, how a drink made to order is made. */
+type UsualLine = { size?: DrinkSize; temperature?: DrinkTemperature; extras?: readonly DrinkExtra[] };
+
+/** What the usual's completion arguments say of the Character's allergy, at the café: nothing, if they don't carry one. */
+function allergyLine(allergen: unknown): string[] {
+  if (typeof allergen !== 'string') return [];
+  return [allergen === 'none' ? 'They have no allergies (allergen "none").' : `They are allergic to ${allergen} (allergen "${allergen}").`];
+}
+
+/**
+ * "The usual?": what the Character always orders in this interaction, which the NPC offers, and takes a yes to as
+ * the confirmation. None unless the NPC knows them well enough and this is where they order it.
+ */
+function usualLines(interaction: Interaction, memory: NpcMemory, pack: CulturePack): string[] {
+  const usual = usualOffered(memory, interaction);
+  const parsed = usual === null ? null : interaction.parseArgs(usual);
+  const completion = usual === null ? null : interaction.resolveCompletion(usual, pack.id);
+  if (!parsed?.success || !completion?.success) return [];
+  const made = (parsed.data.items ?? []) as UsualLine[];
+  const order = completion.lines
+    .map(({ itemId, name, quantity }, i) => `${quantity} × ${name} (menu id "${itemId}"${madeAs(made[i] ?? {})})`)
+    .join(', ');
+  const { name } = interaction.completion;
+  return [
+    `They always order the same here, their usual: ${order}.`,
+    ...allergyLine(parsed.data.allergen),
+    `When you greet them, ask whether they'll have "the usual", in your own words. If they say yes, that is their confirmation: ` +
+      `tell them the price, and call ${name} with exactly their usual. If they want something else, take their order as you would any other.`,
+  ];
+}
+
+/** A friend's little something "on the house" with the order. It is a gift, so the order and its price stay as they are. */
+const onTheHouseLine = (interaction: Interaction) =>
+  'Today, because they are a friend, add a little something on the house when you hand over their order (a biscuit with a coffee, say, ' +
+  `or whatever suits what they ordered), and mention it once, warmly. It is a gift from you: it changes nothing about the order you call ` +
+  `${interaction.completion.name} with, or its price.`;
+
+/** The completions that ask for the Character's name themselves, so there's no learn_name: what asking for it is part of. */
+const NAME_ASKED_FOR: Partial<Record<Interaction['effect']['kind'], string>> = { hire: 'hiring them', registerResident: 'filling in the form' };
+
+function youAndThisPersonBlock(
+  interaction: Interaction,
+  who: string,
+  { relationship, onTheHouse, offersCasualRegister }: Pick<NpcSessionContext, 'relationship' | 'onTheHouse' | 'offersCasualRegister'>,
+  pack: CulturePack,
+) {
+  // Someone the NPC has got to know is met as such, whatever the conversation.
+  // Hiring and registering an address ask for the name themselves, so there's no learn_name to call.
+  const asksName = NAME_ASKED_FOR[interaction.effect.kind];
+  if (relationship && familiarityTier(relationship.memory) !== 'stranger') {
+    const unknownName = asksName ? `You don't know their name yet; asking for it is part of ${asksName}.` : learnNameLine(who);
     return block('YOU AND THIS PERSON', [
-      `This ${who} is a stranger: you have never met. You don't know their name yet; asking for it is part of hiring them.`,
-      'Speak to them politely, as you would to anyone asking for a job.',
+      ...rememberedLines(relationship, who, pack, offersCasualRegister === true, unknownName),
+      ...usualLines(interaction, relationship.memory, pack),
+      ...(onTheHouse ? [onTheHouseLine(interaction)] : []),
+    ]);
+  }
+  if (asksName) {
+    return block('YOU AND THIS PERSON', [
+      `This ${who} is a stranger: you have never met. You don't know their name yet; asking for it is part of ${asksName}.`,
+      interaction.effect.kind === 'hire' ? 'Speak to them politely, as you would to anyone asking for a job.' : `Speak to them politely, as you would to any ${who}.`,
+    ]);
+  }
+  if (who === 'tenant') {
+    return block('YOU AND THIS PERSON', [
+      "This tenant moved into one of your flats not long ago, newly arrived in town. You know them by sight but not well, and you don't use their name.",
+      'Speak to them politely, as you would to any tenant.',
     ]);
   }
   return block('YOU AND THIS PERSON', [
     `This ${who} is a stranger: you have never met. You don't know their name and don't ask for it.`,
     `Speak to them politely, as you would to any ${who}.`,
+    relationship?.memory.knowsName ? KNOWN_NAME_UNUSED : learnNameLine(who),
   ]);
 }
 
@@ -197,15 +446,51 @@ function stepBlock(step: ProficiencyStep, who: string) {
   return block('HOW TO SPEAK', [`The ${who} ${first}`, ...rest]);
 }
 
-function factsBlock(interaction: Interaction, pack: CulturePack) {
+function factsBlock(interaction: Interaction, pack: CulturePack, context: NpcSessionContext) {
   return block('FACTS', [
     "Answer side questions using only these facts. If asked something not covered, say you don't know.",
-    ...interactionFacts(interaction, pack.id).map((fact) => `- ${fact}`),
+    ...interactionFacts(interaction, pack.id, context).map((fact) => `- ${fact}`),
   ]);
 }
 
 function goalBlock(interaction: Interaction, who: string) {
   const { name } = interaction.completion;
+  if (interaction.effect.kind === 'none') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Only once the ${who} has told you what you need, call ${name} with what they told you. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again.`,
+      `- If ${name} answers "done", say goodbye kindly.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'pointTo') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you think you know what they want, check with them which item they mean, and wait for them to confirm.`,
+      `- Only once they have confirmed, call ${name} with that item. Never call it before.`,
+      `- If they ask for something not in FACTS, tell them kindly you don't sell it.`,
+      `- If ${name} answers "invalid_arguments", ask them again what they are looking for.`,
+      `- If ${name} answers "done", tell them simply where it is, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'payRent') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take any money, read back the amount the ${who} is paying, and wait for them to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with that amount as the plain number. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly they don't have that much with them, and ask whether they want to pay part of it. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", tell them that is more than they owe, and say what they do owe.`,
+      `- If ${name} answers "done", thank them and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'extendRent') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you have agreed a number of days, read it back with the day the rent will then be needed by, and wait for the ${who} to confirm.`,
+      `- Only once they have confirmed, call ${name} with that number of days. Never call it before.`,
+      `- If ${name} answers "done", remind them kindly to pay by then, and say goodbye.`,
+    ]);
+  }
   if (interaction.effect.kind === 'hire') {
     return block('YOUR GOAL', [
       interaction.goal,
@@ -213,6 +498,142 @@ function goalBlock(interaction: Interaction, who: string) {
       `- Only once they have confirmed, call ${name} with their name as they said it and when they can start. Never call it before.`,
       `- If ${name} answers "wrong_name", you misheard their name: apologise, and ask them to say it again slowly, or to spell it. The conversation goes on.`,
       `- If ${name} answers "done", tell them they have the job and can start a shift at the staff door whenever you are open, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'purchase') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take payment, read back the total from FACTS, whether they want a bag and whether they have a points card, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for all of it, and that they can put something back. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again about the bag and the points card.`,
+      `- If ${name} answers "served", hand over their shopping, thank them and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'seatGuest') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know how many they are and where they would like to sit, read both back and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again how many they are and where they would like to sit.`,
+      `- If ${name} answers "done", show them to their seat, tell them you will be back to take their order, and leave them to settle in.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'orderMeal') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you act on it, read back the order with the prices, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they would not have enough money to pay the bill for that, and ask whether they would like something else. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", its error says what is wrong: apologise, put it right with them, and read the order back again.`,
+      `- If ${name} answers "served", bring the meal to the table, wish them a good meal, tell them to ask for the bill when they are ready, and leave them to eat.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'settleBill') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- The bill is exactly the total in FACTS. Read back the total and how they are paying, and wait for the ${who} to confirm.`,
+      `- Only once they have confirmed, call ${name} with how they are paying. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money to pay it now, and that they can come back and pay it later. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again how they would like to pay.`,
+      `- If ${name} answers "done", thank them, say you hope to see them again, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'admit') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take payment, read back the entry with its price from FACTS and whether they want a towel, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name} with what they asked for. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for entry. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again what they would like.`,
+      `- If ${name} answers "done", hand them their locker key (and a towel, if they wanted one), wish them a nice bath and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'registerMember') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Before you take payment, read back the membership, how long it lasts and its price from FACTS, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed your read-back, call ${name}. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for it today, and that they can come back any time: nothing is charged unless they ask. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again whether they would like the membership.`,
+      `- If ${name} answers "done", tell them they can use the gym from today until it runs out, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'registerPatient') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know why they have come, read it back in a few words and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with why they have come. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again why they have come.`,
+      `- If ${name} answers "done", ask them to take a seat in the waiting room until the doctor calls their name, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'diagnose') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Never guess: diagnose only from symptoms the ${who} has told you. If they fit no illness in FACTS yet, ask about how they feel until they do.`,
+      `- Tell them what you think they have, and check they have understood. Only then call ${name} with that illness. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", ask them again about their symptoms.`,
+      `- If ${name} answers "done", tell them to collect their medicine at the pharmacy, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'dispense') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- If FACTS show no prescription, tell the ${who} kindly that you can only give medicine the doctor has prescribed, and say goodbye. Never call ${name}.`,
+      `- Before you hand anything over, read back the medicine and its price from FACTS, and wait for them to confirm.`,
+      `- Only once they have confirmed, call ${name} with that medicine. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for it, and that they can come back for it. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", that is not what was prescribed: check the prescription in FACTS and read it back again.`,
+      `- If ${name} answers "served", hand it over, tell them how to take it, wish them well and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'setPaymentPlan') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once they have chosen, read back how they will pay: all of it now with the amount, or how many weeks and how much each week, from FACTS. Wait for the ${who} to confirm.`,
+      `- Only once they have confirmed, call ${name} with the number of weeks, or 0 to pay it all now. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly they don't have enough to pay it all now, and offer instalments. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again how they would like to pay.`,
+      `- If ${name} answers "done", thank them, tell them when the first instalment is taken if they chose instalments, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'refund') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know which item it is and what is wrong with it, read back the item, what is wrong with it and the refund (its shelf price in FACTS), and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with the item and what is wrong with it. Never call it before.`,
+      `- If ${name} answers "invalid_arguments", its error says why it can't be refunded: tell them kindly. The conversation goes on.`,
+      `- If ${name} answers "done", hand them the money, apologise for the trouble and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'registerResident') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Ask for what the form needs one thing at a time. Once you have it all, read the form back and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with the form as they confirmed it. Never call it before.`,
+      `- If ${name} answers "wrong_name", you misheard their name: apologise, and ask them to say it again slowly, or to spell it. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", its error says what is wrong: tell them kindly.`,
+      `- If ${name} answers "done", tell them their address is registered, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'ship') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      `- Once you know where it is going and how they would like to send it, read back where to, how and the price from FACTS, and wait for the ${who} to confirm. If they correct you, read it back again.`,
+      `- Only once they have confirmed, call ${name} with exactly what they confirmed. Never call it before.`,
+      `- If ${name} answers "cannot_afford", tell them kindly that they don't have enough money for that, and ask whether they would like a cheaper way. The conversation goes on.`,
+      `- If ${name} answers "invalid_arguments", ask them again where it is going and how to send it.`,
+      `- If ${name} answers "done", take the parcel, tell them roughly when it will arrive, and say goodbye.`,
+    ]);
+  }
+  if (interaction.effect.kind === 'giveDirections') {
+    return block('YOUR GOAL', [
+      interaction.goal,
+      '- Once you know where they want to go, tell them which stop to get off at, by its name in FACTS, and wait for them to confirm they have it. If you are not sure where they mean, ask.',
+      "- If they ask for somewhere not in FACTS, tell them kindly you don't know it.",
+      `- Only once they have confirmed, call ${name} with that stop. Never call it before.`,
+      `- If ${name} answers "done", wish them a good trip, and say goodbye.`,
     ]);
   }
   if (interaction.facts.includes('drinkOptions')) {
@@ -236,9 +657,11 @@ function goalBlock(interaction: Interaction, who: string) {
   ]);
 }
 
-function situationBlock({ clock }: Pick<NpcSessionContext, 'clock'>, who: string) {
+function situationBlock({ clock }: Pick<NpcSessionContext, 'clock'>, who: string, approached: boolean) {
   const { day, minuteOfDay } = clock;
-  const first = `The first one means a ${who} has just walked up to you: greet them first.`;
+  const first = approached
+    ? 'The first one tells you why you are speaking to them: you speak first.'
+    : `The first one means a ${who} has just walked up to you: greet them first.`;
   return block('THE SITUATION', [
     `It is ${formatTime(minuteOfDay)} on a ${capitalise(weekdayOf(day))} ${dayPart(minuteOfDay)}.`,
     `A "[SCENE: ...]" message tells you what is happening; it is not the ${who} speaking. ${first}`,
@@ -260,18 +683,104 @@ export function buildNpcSession(
   const { who } = workplace(npc);
   const systemInstruction = [
     personaBlock(npc, culturePack),
-    youAndThisPersonBlock(interaction, who),
+    youAndThisPersonBlock(interaction, who, context, culturePack),
     languageRulesBlock(culturePack, who),
     stepBlock(proficiencyStep, who),
-    factsBlock(interaction, culturePack),
+    factsBlock(interaction, culturePack, context),
     goalBlock(interaction, who),
-    situationBlock(context, who),
+    situationBlock(context, who, context.approach !== undefined),
   ].join('\n\n');
 
   return {
     systemInstruction,
-    tools: [interaction.toolDeclaration, notUnderstoodTool(who)],
+    // Hiring and registering an address take the name in their own completion, so learn_name would only get in the way.
+    tools: [
+      interaction.toolDeclaration,
+      ...(NAME_ASKED_FOR[interaction.effect.kind] ? [] : [learnNameTool(who)]),
+      revealFavouriteTool(who),
+      notUnderstoodTool(who),
+    ],
     voice: { targetLanguage: culturePack.id, npcId: npc.id },
-    openingScene: greetingScene(who),
+    openingScene: context.approach ? APPROACH_SCENES[context.approach] : greetingScene(who),
+  };
+}
+
+/** Whom a passer-by is talking to: someone who has come up to ask them something. */
+const ASKER = 'person';
+
+/**
+ * Everything a Live session needs to play a passer-by waiting at a tram stop in a Goal Interaction: anyone local, with
+ * no name, persona or memory of the Character, who speaks in an anonymous voice that suits the `build` of their look,
+ * picked by `voiceSeed`. Pure.
+ */
+export function buildPasserBySession(
+  interaction: Interaction,
+  culturePack: CulturePack,
+  proficiencyStep: ProficiencyStep,
+  context: Pick<NpcSessionContext, 'clock'> & { tramStop: TramStopId; voiceSeed: number; build: Build },
+): NpcSession {
+  const stop = culturePack.tramStops[context.tramStop].name;
+  const systemInstruction = [
+    block('WHO YOU ARE', [
+      `You are a local, waiting for the tram at ${stop} in a small town in ${culturePack.setting}, where everyone speaks ${culturePack.languageName}.`,
+      'You know the town and its tram line well, and you are happy to help a stranger find their way.',
+      'Talk like a real, friendly person.',
+    ]),
+    block('YOU AND THIS PERSON', [
+      `This ${ASKER} is a stranger: you have never met. You don't know their name and don't ask for it.`,
+      'Speak to them politely, as you would to anyone who asks you the way.',
+    ]),
+    languageRulesBlock(culturePack, ASKER),
+    stepBlock(proficiencyStep, ASKER),
+    factsBlock(interaction, culturePack, context),
+    goalBlock(interaction, ASKER),
+    situationBlock(context, ASKER, false),
+  ].join('\n\n');
+
+  return {
+    systemInstruction,
+    tools: [interaction.toolDeclaration, notUnderstoodTool(ASKER)],
+    voice: { targetLanguage: culturePack.id, shiftCustomerVoice: context.voiceSeed, build: context.build },
+    openingScene: `[SCENE: A ${ASKER} waiting for the tram beside you turns to you, as if to ask you something. Greet them first.]`,
+  };
+}
+
+/** The places where a stated goal would be met at a counter, so a Small Talk partner there points the way. */
+const COUNTER_ROLES = new Set(['barista', 'cashier', 'clerk', 'server', 'receptionist', 'pharmacist', 'shopkeeper', 'attendant']);
+
+function smallTalkGoalBlock(npc: NamedNpc, who: string) {
+  const goal = COUNTER_ROLES.has(npc.role)
+    ? `- If they ask for something you would do for them at work (ordering, buying, paying, asking for help), say kindly that they can come to the counter for that, and carry on chatting. Don't do it now.`
+    : `- If they ask you to do something for them, say kindly that you can't help with that here, and carry on chatting.`;
+  return block('YOUR GOAL', [
+    `This is Small Talk: a friendly, casual chat with no goal, which cannot go wrong.`,
+    `- Chat about everyday things: the weather, the town, your day, what the ${who} has been up to. Ask them questions, answer theirs, and keep it light.`,
+    goal,
+    "- Don't end the chat yourself: keep chatting until a scene tells you to wrap up.",
+  ]);
+}
+
+/**
+ * Everything a Live session needs to play this Named NPC in Small Talk: no goal, no completion function and
+ * no facts, only the NPC, what they remember of the Character, and how to speak. Pure.
+ */
+export function buildSmallTalkSession(culturePack: CulturePack, proficiencyStep: ProficiencyStep, npc: NamedNpc, context: SmallTalkContext): NpcSession {
+  const { who } = workplace(npc);
+  const systemInstruction = [
+    personaBlock(npc, culturePack),
+    block('YOU AND THIS PERSON', rememberedLines(context.relationship, who, culturePack, context.offersCasualRegister === true)),
+    languageRulesBlock(culturePack, who),
+    stepBlock(proficiencyStep, who),
+    smallTalkGoalBlock(npc, who),
+    situationBlock(context, who, context.wavedOver === true),
+  ].join('\n\n');
+
+  return {
+    systemInstruction,
+    tools: [learnNameTool(who), revealFavouriteTool(who), notUnderstoodTool(who)],
+    voice: { targetLanguage: culturePack.id, npcId: npc.id },
+    openingScene: context.wavedOver
+      ? `[SCENE: You see a ${who} you might chat with coming into the park, and wave them over. Speak to them first.]`
+      : `[SCENE: A ${who} you might chat with comes up to you. Greet them first.]`,
   };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from '../i18n/index.ts';
-import { selectPauseMenuOpen, useGame } from '../store/index.ts';
+import { selectPauseMenuOpen, selectSkippableFirstMorning, useGame } from '../store/index.ts';
 import { CreditsScreen, SettingsPanel } from './SettingsPanel.tsx';
 
 type PauseView = 'menu' | 'settings' | 'credits';
@@ -26,12 +26,14 @@ export function PauseMenu() {
 }
 
 /**
- * Resume, Settings, and Save and quit to title, with Settings and the credits
+ * Resume, Settings, during the First Morning Skip tutorial, and Save and quit to title, with Settings and the credits
  * opening in its place. Esc steps back, and from the menu resumes.
  */
 function PauseDialog() {
   const { t } = useTranslation();
   const closePauseMenu = useGame((s) => s.closePauseMenu);
+  const skippable = useGame(selectSkippableFirstMorning);
+  const skipFirstMorning = useGame((s) => s.skipFirstMorning);
   const quitToTitle = useGame((s) => s.quitToTitle);
   const [view, setView] = useState<PauseView>('menu');
 
@@ -64,6 +66,13 @@ function PauseDialog() {
                   {t('pause.settings')}
                 </button>
               </li>
+              {skippable && (
+                <li>
+                  <button type="button" onClick={skipFirstMorning}>
+                    {t('pause.skipTutorial')}
+                  </button>
+                </li>
+              )}
               <li>
                 <button type="button" onClick={quitToTitle}>
                   {t('pause.quitToTitle')}

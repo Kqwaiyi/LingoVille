@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { CULTURE_PACKS, formatLocalMoney, localNpcPlaceName, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
+import { CULTURE_PACKS, formatLocalMoney, isPasserBy, localNpcPlaceName, localPlaceName, TOWN_NPCS, type ServedItem } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { JobId, LanguageCode } from '../sim/index.ts';
 import {
@@ -9,7 +9,10 @@ import {
   selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectFirstMorningOrderPrompt,
+  selectGiftsToGive,
   selectHelpOpen,
+  selectHelpPulse,
   selectMicOffChip,
   selectTalkMode,
   selectLineReading,
@@ -33,6 +36,7 @@ import {
 import { NpcPortrait } from '../world/index.ts';
 import { formatClock } from './format.ts';
 import { HelpPanel } from './HelpPanel.tsx';
+import { itemLabel } from './itemLabel.ts';
 import { JournalPageView } from './JournalPage.tsx';
 import { ReadingLine } from './Ruby.tsx';
 import { MenuGrid, OrderPad, Till } from './ShiftPanel.tsx';
@@ -106,7 +110,7 @@ function NpcFace({ who }: { who: string }) {
   );
 }
 
-/** What was served, in the Native Language. */
+/** What was served (or pointed to), in the Native Language. */
 function servedLine(served: readonly ServedItem[], nativeLanguage: LanguageCode) {
   return served
     .map(({ name, glosses, quantity }) => {
@@ -125,17 +129,27 @@ function ClosingCardPanel({ card, who }: { card: ClosingCard; who: string }) {
   const skipRecap = useGame((s) => s.skipRecap);
   const seeRecap = useGame((s) => s.seeRecap);
 
+  // A meter already at its limit doesn't move, so there's nothing to show.
+  const mood = card.moodChange === 0 ? [] : [card.moodChange > 0 ? t('closing.moodUp') : t('closing.moodDown')];
   const outcome =
-    card.kind === 'failure'
-      ? [t('closing.noCharge')]
-      : [
-          // Only what happened: nothing served or paid for (hiring) shows no line for it.
-          ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
-          ...(card.hired ? [t('closing.hired', { job: t(`skills.names.${card.hired}`) })] : []),
-          ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
-        ];
+    card.kind === 'smallTalk'
+      ? mood
+      : card.kind === 'failure'
+        ? [t('closing.noCharge'), ...mood]
+        : [
+            // Only what happened: nothing served or paid for (the nurse letting the patient go) shows no line for it.
+            ...(card.served.length > 0 ? [servedLine(card.served, nativeLanguage)] : []),
+            ...(card.pointedTo ? [t('closing.pointedTo', { item: servedLine([card.pointedTo], nativeLanguage) })] : []),
+            ...(card.extendedDays ? [t('closing.moreTime', { days: card.extendedDays })] : []),
+            ...(card.hired ? [t('closing.hired', { job: t(`skills.names.${card.hired}`) })] : []),
+            ...(card.registered ? [t('closing.registered')] : []),
+            ...(card.directedTo ? [t('closing.directedTo', { stop: t(`tramStops.${card.directedTo}`) })] : []),
+            ...(card.paidInShifts > 0 ? [`−${formatLocalMoney(card.paidInShifts, packId)}`] : []),
+            ...(card.refundedInShifts ? [`+${formatLocalMoney(card.refundedInShifts, packId)}`] : []),
+            ...mood,
+          ];
 
-  const heading = { success: t('closing.success'), failure: t('closing.notUnderstood', { who }) }[card.kind];
+  const heading = { success: t('closing.success'), failure: t('closing.notUnderstood', { who }), smallTalk: t('closing.smallTalk') }[card.kind];
 
   return (
     <section className="closing-card" aria-label={t('closing.label')} data-outcome={card.kind}>
@@ -191,6 +205,7 @@ function TypedField() {
   const canTakeTurn = useGame(selectCanTakeTurn);
   const sendTypedLine = useGame((s) => s.sendTypedLine);
   const setTyping = useGame((s) => s.setTyping);
+  const draftTypedLine = useGame((s) => s.draftTypedLine);
 
   useEffect(() => {
     if (typing) return;
@@ -221,7 +236,10 @@ function TypedField() {
       autoComplete="off"
       readOnly={!canTakeTurn}
       value={text}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => {
+        setText(e.target.value);
+        draftTypedLine();
+      }}
       onKeyDown={onKeyDown}
       onFocus={() => setTyping(true)}
       onBlur={() => setTyping(false)}
@@ -293,6 +311,46 @@ function MicButton() {
   );
 }
 
+/** Gifts in the inventory, given to a Named NPC from a list that opens upwards. Shown only while there's one to give. */
+function GiftButton() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const gifts = useGame(selectGiftsToGive);
+  const packId = useGame(selectCulturePackId);
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const giveGift = useGame((s) => s.giveGift);
+  if (gifts.length === 0) return null;
+  return (
+    <div className="chat-gift">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {t('chat.gift')}
+      </button>
+      {open && (
+        <section className="gift-list" aria-label={t('chat.gifts')}>
+          <h2>{t('chat.gifts')}</h2>
+          <ul>
+            {gifts.map(({ itemId, quantity, favourite }) => (
+              <li key={itemId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    giveGift(itemId);
+                    setOpen(false);
+                  }}
+                >
+                  {itemLabel(itemId, packId, nativeLanguage)}
+                  {quantity > 1 && ` ×${quantity}`}
+                </button>
+                {favourite && <span className="gift-favourite">{t('chat.favourite')}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
 /** With open mic there's nothing to hold: the mic listens all along, and shows how loud the Player is. */
 function OpenMic() {
   const { t } = useTranslation();
@@ -325,7 +383,22 @@ function InputBar() {
         <MicButton />
       )}
       <TypedField />
+      <GiftButton />
     </div>
+  );
+}
+
+const ORDER_PROMPTS = { type: 'firstMorning.orderType', holdSpace: 'firstMorning.orderHoldSpace', say: 'firstMorning.orderSay' } as const;
+
+/** In the First Morning's café order, until it's decided, how to answer: by typing without a mic, or holding Space with one. */
+function FirstMorningOrderPrompt() {
+  const { t } = useTranslation();
+  const prompt = useGame(selectFirstMorningOrderPrompt);
+  if (!prompt) return null;
+  return (
+    <p className="first-morning-order-prompt" role="note">
+      {t(ORDER_PROMPTS[prompt])}
+    </p>
   );
 }
 
@@ -340,6 +413,7 @@ export function ConversationColumn() {
   const reconnecting = useGame(selectReconnecting);
   const recap = useGame(selectRecap);
   const helpOpen = useGame(selectHelpOpen);
+  const helpPulse = useGame(selectHelpPulse);
   const typing = useGame(selectTyping);
   const leaveConversation = useGame((s) => s.leaveConversation);
   const toggleHelp = useGame((s) => s.toggleHelp);
@@ -376,11 +450,14 @@ export function ConversationColumn() {
   // A Shift Customer is anonymous: just "Customer", and how far into the Shift they come. One already dealt with
   // counts as done while they say goodbye, so they keep their own number until they leave.
   const who = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.subject`) : t('shift.customerSubject');
-  // A Named NPC goes by their local name, with their role beside it.
-  const name = npcId
-    ? CULTURE_PACKS[packId].personas[npcId].name
-    : t('shift.customer', { number: (shift?.done ?? 0) + (conversation.outcome ? 0 : 1), count: shift?.customers ?? 1 });
-  const role = npcId ? t(`roles.${TOWN_NPCS[npcId].role}.name`) : null;
+  // A Named NPC goes by their local name, with their role beside it. A passer-by is just "Passer-by".
+  const passerBy = npcId !== null && isPasserBy(npcId);
+  const name = passerBy
+    ? t(`roles.${TOWN_NPCS[npcId].role}.name`)
+    : npcId
+      ? CULTURE_PACKS[packId].personas[npcId].name
+      : t('shift.customer', { number: (shift?.done ?? 0) + (conversation.outcome ? 0 : 1), count: shift?.customers ?? 1 });
+  const role = npcId && !passerBy ? t(`roles.${TOWN_NPCS[npcId].role}.name`) : null;
 
   return (
     <aside className="chat-column" aria-label={t('chat.label')}>
@@ -403,11 +480,14 @@ export function ConversationColumn() {
               role="tab"
               aria-selected={helpOpen}
               disabled={conversation.closed}
+              data-pulse={helpPulse || undefined}
               onClick={() => !helpOpen && toggleHelp()}
             >
               {t('chat.helpTab')} <kbd>H</kbd>
             </button>
           </div>
+          {/* Help is pointed to, never opened for the Player. */}
+          {helpPulse && <span className="help-nudge">{t('firstMorning.helpNudge')}</span>}
           <button type="button" className="chat-leave" onClick={leaveConversation}>
             {t('chat.leave')} <kbd>Esc</kbd>
           </button>
@@ -435,7 +515,10 @@ export function ConversationColumn() {
           {closingCard ? (
             <ClosingCardPanel card={closingCard} who={who} />
           ) : (
-            <InputBar />
+            <>
+              <FirstMorningOrderPrompt />
+              <InputBar />
+            </>
           )}
         </>
       )}

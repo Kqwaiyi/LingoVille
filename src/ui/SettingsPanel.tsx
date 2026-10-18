@@ -8,13 +8,18 @@ import {
   selectScreen,
   selectTalkMode,
   selectTargetLanguage,
+  selectTooltipsOn,
+  selectVolumes,
   useGame,
+  type VolumeBus,
 } from '../store/index.ts';
 import { CREDITS, type Credit } from './credits.ts';
 
+const VOLUME_BUSES: VolumeBus[] = ['master', 'music', 'ambient', 'voice', 'ui'];
+
 /**
  * Every device setting, kept for this browser whichever save is played: the
- * Native Language, speaking and reading aids. Credits opens
+ * Native Language, volumes, speaking, reading aids and tooltips. Credits opens
  * from the bottom. On the title screen and in the pause menu.
  */
 export function SettingsPanel({ onOpenCredits }: { onOpenCredits: () => void }) {
@@ -24,6 +29,7 @@ export function SettingsPanel({ onOpenCredits }: { onOpenCredits: () => void }) 
       <h2>{t('settings.heading')}</h2>
       <p>{t('settings.kept')}</p>
       <NativeLanguageSetting />
+      <VolumeSettings />
       <SpeakingSettings />
       <ReadingSettings />
       <button type="button" onClick={onOpenCredits}>
@@ -53,6 +59,31 @@ function NativeLanguageSetting() {
         ))}
       </select>
     </label>
+  );
+}
+
+function VolumeSettings() {
+  const { t } = useTranslation();
+  const volumes = useGame(selectVolumes);
+  const setVolume = useGame((s) => s.setVolume);
+  return (
+    <fieldset className="settings-group">
+      <legend>{t('settings.volume')}</legend>
+      {VOLUME_BUSES.map((bus) => (
+        <label key={bus} className="settings-volume">
+          <span>{t(`settings.volumes.${bus}`)}</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(volumes[bus] * 100)}
+            onChange={(e) => setVolume(bus, Number(e.target.value) / 100)}
+          />
+          <output>{Math.round(volumes[bus] * 100)}%</output>
+        </label>
+      ))}
+    </fieldset>
   );
 }
 
@@ -108,7 +139,9 @@ function SpeakingSettings() {
 function ReadingSettings() {
   const { t } = useTranslation();
   const readingAids = useGame(selectReadingAids);
+  const tooltips = useGame(selectTooltipsOn);
   const setReadingAids = useGame((s) => s.setReadingAids);
+  const setTooltips = useGame((s) => s.setTooltips);
   return (
     <fieldset className="settings-group">
       <legend>{t('settings.readingHeading')}</legend>
@@ -129,6 +162,13 @@ function ReadingSettings() {
         <span>
           {t('settings.romaji')}
           <small>{t('settings.romajiNote')}</small>
+        </span>
+      </label>
+      <label className="title-toggle">
+        <input type="checkbox" checked={tooltips} onChange={(e) => setTooltips(e.target.checked)} />
+        <span>
+          {t('settings.tooltips')}
+          <small>{t('settings.tooltipsNote')}</small>
         </span>
       </label>
     </fieldset>

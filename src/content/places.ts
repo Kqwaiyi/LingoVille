@@ -2,8 +2,8 @@ import { CLOCK, PLACE_IDS, type OpeningHours, type PlaceId, type Weekday } from 
 
 const HOUR = 60;
 
-/** Things inside a place that keep their own hours: the landlord at home. */
-export const SERVICE_IDS = ['landlord'] as const;
+/** Things inside a place that keep their own hours: the landlord at home, and the clinic's Fainting ward. */
+export const SERVICE_IDS = ['landlord', 'fainting-ward'] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
 /** Everything that has opening hours: the 11 places and the services inside them. */
@@ -36,6 +36,7 @@ export const OPEN_AIR_PLACES: readonly PlaceId[] = ['park', 'tram-stop'];
 
 export const SERVICE_HOURS: Record<ServiceId, OpeningHours> = {
   landlord: hours(8, 20),
+  'fainting-ward': null,
 };
 
 /** 07:00, from minutes since midnight. Hours that run past midnight wrap: 25:00 is 01:00, but closing at midnight stays 24:00. */

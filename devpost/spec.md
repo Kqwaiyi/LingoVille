@@ -190,6 +190,7 @@ There's no other service: no hosted database, no accounts, no hosting.
 
 **Changed during the build** (recorded in the checklist's Revisions):
 - **The cashier and server Jobs too.** Once the barista's Shift loop worked, the supermarket till and the restaurant's order pad were one Shift template each, so they joined the barista.
+- **More of the town than the PRD's minimum.** The same conversation loop also runs the supermarket and cooking, the convenience store, the restaurant as a guest, the bookshop, the bathhouse's baths, the town office, directions at the tram stops, and Small Talk with gifts and Familiarity. Each one is one more conversation, so they came cheaply once the loop worked.
 
 **Still open:**
 - Everyone is Clawd, the Claude Code mascot. Using it in a public repo and demo video may need permission (from `prd.md > Open Questions`). This can wait until `6-ship`.

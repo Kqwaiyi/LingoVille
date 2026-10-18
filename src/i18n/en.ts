@@ -32,7 +32,7 @@ export const en = {
   },
   roles: {
     barista: {
-      /** As a label: the chat header, the interaction prompt, a Journal page. */
+      /** As a label: the chat header, the interaction prompt, a Journal page with no name yet. */
       name: 'Barista',
       /** Starting a sentence. */
       subject: 'The barista',
@@ -137,6 +137,14 @@ export const en = {
     romajiNote: 'A romaji line under each Japanese line.',
     language: 'Your language',
     languageNote: 'Menus switch at once, and new hints and Recaps follow.',
+    volume: 'Volume',
+    volumes: {
+      master: 'Master',
+      music: 'Music',
+      ambient: 'Ambient',
+      voice: 'Voices',
+      ui: 'UI sounds',
+    },
     speaking: 'Speaking',
     inputMic: 'Speak with the mic',
     inputTyped: 'Type my replies',
@@ -148,6 +156,8 @@ export const en = {
     openMic: 'Open mic',
     openMicNote: 'Speak whenever you like. Use headphones, so the mic doesn’t hear the NPC.',
     readingHeading: 'Reading',
+    tooltips: 'Tooltips',
+    tooltipsNote: 'A short tip the first time something new comes up.',
     credits: 'Credits',
   },
   pause: {
@@ -155,7 +165,28 @@ export const en = {
     resume: 'Resume',
     settings: 'Settings',
     back: 'Back',
+    skipTutorial: 'Skip the tutorial',
     quitToTitle: 'Save and quit to title',
+  },
+  // The First Morning: a banner at the top centre with the step to do next, an arrow and how far it is.
+  firstMorning: {
+    label: 'First Morning',
+    drink: "You're thirsty. Walk to the sink (W A S D) and drink some water",
+    walkToCafe: 'Get breakfast at the café',
+    breakfast: 'Order breakfast from the barista at the counter',
+    distance: '{{metres}} m',
+    // In the café order, how to answer: typed without a mic, push-to-talk with one. Open mic is never taught there.
+    orderType: 'Order breakfast: press T, type what you’d like and press Enter',
+    orderHoldSpace: 'Order breakfast: hold Space, say what you’d like, then let go',
+    orderSay: 'Order breakfast: tell the barista what you’d like',
+    /** Beside the Help tab while it pulses. */
+    helpNudge: 'Stuck? Try Help',
+    // The closing card, once the First Morning is done.
+    cardTitle: 'Your first morning is done!',
+    cardMoney: 'You have {{amount}}',
+    cardRent: 'Rent is due on day {{day}}',
+    cardHiring: '{{number}} places are hiring: {{places}}. Ask the staff about work.',
+    cardOk: 'Got it',
   },
   credits: {
     heading: 'Credits',
@@ -253,16 +284,43 @@ export const en = {
       },
       skip: 'Skip',
     },
+    skipTutorial: 'Skip the tutorial',
     start: 'Start',
     next: 'Next',
     back: 'Back',
   },
   dock: {
     label: 'Dock',
+    health: 'Health',
+    hunger: 'Hunger',
+    thirst: 'Thirst',
+    mood: 'Mood',
     time: 'Time',
     money: 'Money',
     day: 'Day {{day}} · {{weekday}}',
     saved: 'Saved ✓',
+    debts: 'Debts',
+    debt: {
+      hospital: 'Hospital debt {{amount}}',
+      rent: 'Rent debt {{amount}}',
+      restaurant: 'Restaurant debt {{amount}}',
+    },
+    unwell: {
+      label: 'Feeling unwell',
+      symptoms: 'Feeling unwell: {{symptoms}}',
+    },
+  },
+  symptoms: {
+      cough: 'a cough',
+      'sore-throat': 'a sore throat',
+      'runny-nose': 'a runny nose',
+      fever: 'a fever',
+      'body-aches': 'aches all over',
+      chills: 'chills',
+      'stomach-ache': 'a stomach ache',
+      nausea: 'nausea',
+      sneezing: 'sneezing',
+      'itchy-eyes': 'itchy eyes',
   },
   placeLine: {
     label: 'Place',
@@ -279,10 +337,30 @@ export const en = {
     unreachable: 'Gateway unreachable',
   },
   prompt: {
+    drink: 'Press <kbd>E</kbd> to drink tap water',
+    cook: 'Press <kbd>E</kbd> to cook a meal',
+    workOut: 'Press <kbd>E</kbd> to work out',
+    sleep: 'Press <kbd>E</kbd> to go to bed',
     talk: 'Press <kbd>E</kbd> to talk — {{role}}',
+    askTheWay: 'Press <kbd>E</kbd> to ask the way — {{role}}',
+    /** Small Talk with someone who has no other conversation. */
+    chat: 'Press <kbd>E</kbd> to chat — {{role}}',
+    /** Small Talk with staff, beside their E. */
+    chatWithT: 'Press <kbd>T</kbd> to chat',
     tram: 'Press <kbd>E</kbd> to take the tram',
     noTram: 'No tram is running · Trams run {{opens}}–{{closes}}',
+    take: 'Press <kbd>E</kbd> to take {{item}} · {{price}}',
+    pay: 'Press <kbd>E</kbd> to pay — {{role}}',
+    ask: 'Press <kbd>F</kbd> to ask where something is',
+    askForTime: 'Press <kbd>F</kbd> to ask for more time',
     askForWork: 'Press <kbd>F</kbd> to ask for work',
+    buyGift: 'Press <kbd>F</kbd> to buy a gift',
+    askRecommendation: 'Press <kbd>F</kbd> to ask for a recommendation',
+    joinGym: 'Press <kbd>F</kbd> to ask about the gym',
+    renewGym: 'Press <kbd>F</kbd> to renew your gym membership',
+    settleHospitalBill: 'Press <kbd>F</kbd> to settle your hospital bill',
+    registerAddress: 'Press <kbd>F</kbd> to register your address',
+    returnItem: 'Press <kbd>R</kbd> to bring something back',
     startShift: 'Press <kbd>E</kbd> to start a shift — {{job}}',
     staffOnly: 'Staff door · Staff only',
     workedToday: 'Staff door · You’ve already worked a shift today',
@@ -346,7 +424,15 @@ export const en = {
   tram: {
     heading: 'Take the tram to…',
     trip: '{{minutes}} min · Free',
+    /** Beside the stop a passer-by said to get off at. */
+    routeMarker: 'Get off here',
     cancel: 'Stay here',
+  },
+  basket: {
+    label: 'Basket',
+    total: 'Total {{amount}}',
+    payAtTill: 'Pay at the till',
+    putBack: 'Put one {{item}} back',
   },
   skills: {
     open: 'Skills',
@@ -354,10 +440,20 @@ export const en = {
     close: 'Close',
     level: 'Level {{level}} of {{max}}',
     names: {
+      cooking: 'Cooking',
+      fitness: 'Fitness',
       barista: 'Barista',
       cashier: 'Cashier',
       server: 'Server',
     },
+  },
+  inventory: {
+    open: 'Inventory ({{count}})',
+    label: 'Inventory',
+    empty: 'Nothing yet. Groceries from the supermarket go here.',
+    freshUntil: 'Fresh until day {{day}}',
+    goneOff: 'Gone off',
+    close: 'Close',
   },
   faces: {
     relaxed: '{{who}} looks relaxed',
@@ -387,14 +483,29 @@ export const en = {
     micOffHint: 'No mic, so you’re typing your replies',
     micOffEnable: '🎤 off. Enable in Settings',
     openMic: 'Open mic: just speak',
+    gift: '🎁 Gift',
+    gifts: 'Give a gift',
+    /** Beside the gift the NPC told the Character they would love most. */
+    favourite: '★ Their favourite',
   },
   closing: {
     label: 'Conversation over',
     success: 'Done!',
+    /** Small Talk is over. It can't fail. */
+    smallTalk: 'Nice chat!',
     notUnderstood: '{{who}} couldn’t understand you',
     noCharge: 'No charge',
+    pointedTo: '{{item}}: marked on the shelf',
+    /** The landlord gave more time to pay the rent. */
+    moreTime: 'Extra days to pay the rent: {{days}}',
     /** Hired for a Job; `job` is its Life Skill name. */
     hired: 'You got the job: {{job}}',
+    /** The town office registered the Character's address. */
+    registered: 'Address registered',
+    /** A passer-by said which tram stop to get off at; `stop` is its name. */
+    directedTo: 'Get off at {{stop}}: marked on the tram map',
+    moodUp: 'Mood ↑',
+    moodDown: 'Mood ↓',
     skipRecap: 'Skip Recap',
     seeRecap: 'See Recap',
   },
@@ -434,6 +545,7 @@ export const en = {
     label: 'Journal page',
     customer: 'Customer {{number}}',
     shift: 'Shift — {{job}}',
+    smallTalk: 'Small Talk — {{who}}',
     when: 'Day {{day}} · {{time}}',
     noHelpNeeded: 'No Help needed',
     corrections: 'Corrections',
@@ -452,6 +564,30 @@ export const en = {
     body: 'This browser may clear your saves if it runs low on space. Export a backup now and then, from Load a save.',
     gotIt: 'Got it',
   },
+  // One-time tooltips: a card above the dock the first time each system comes up.
+  tooltip: {
+    gotIt: 'Got it',
+    shift: {
+      title: 'Shifts',
+      body: 'Customers come up one at a time. Listen to what each one wants, then give them exactly that. You’re paid when the Shift ends, for every customer served right.',
+    },
+    fainting: {
+      title: 'Fainting',
+      body: 'When Health runs out, you faint and wake up here in the ward. Eat, drink and sleep to keep it up. A hospital bill you can’t pay is owed until you settle it at reception.',
+    },
+    journal: {
+      title: 'Your Journal',
+      body: 'Every Recap is kept in your Journal, with the whole conversation. Press J outside a conversation to read it back.',
+    },
+    openMic: {
+      title: 'Open mic',
+      body: 'Just speak when it’s your turn: there’s no need to hold Space. Use headphones, so the mic doesn’t hear the NPC.',
+    },
+    typedFallback: {
+      title: 'Typing your replies',
+      body: 'Type what you’d say in the field under the chat and press Enter. To speak instead, turn the mic on in Settings: press Esc outside a conversation.',
+    },
+  },
   sign: {
     label: 'Sign',
     translate: 'Translate',
@@ -459,7 +595,23 @@ export const en = {
   toast: {
     recapSaved: 'Recap saved to your Journal',
     loadedBackup: 'Loaded this morning’s save',
+    tooEarlyForBed: 'It’s too early for bed. You can sleep from {{time}}.',
+    nothingToCook: 'Nothing to cook. Groceries from the supermarket can be cooked here.',
+    gymRefused: {
+      notMember: 'The gym is for members. Ask at the bathhouse desk to join.',
+      expired: 'Your gym membership has run out. Renew it at the bathhouse desk.',
+      doneToday: 'You’ve already worked out today. Come back tomorrow.',
+      closed: 'The gym is closed. It opens with the bathhouse.',
+    },
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
+  },
+  fainting: {
+    title: 'You fainted',
+    body: 'You went too long without eating or drinking. You wake up in the hospital ward the next morning at {{time}}.',
+    paid: 'The hospital bill of {{amount}} was paid.',
+    debt: 'You couldn’t pay the hospital bill of {{amount}}, so you owe it. You can settle it at reception.',
+    moodDown: 'Mood ↓',
+    wake: 'Wake up',
   },
   voiceUnavailable: {
     title: 'Voice service unavailable: check the local server',

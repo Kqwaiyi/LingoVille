@@ -1,17 +1,20 @@
 import { z } from 'zod';
-import { LANGUAGE_CODES, PLACE_IDS, type LanguageCode } from '../sim/index.ts';
+import { ECONOMY, LANGUAGE_CODES, PLACE_IDS, type LanguageCode } from '../sim/index.ts';
 import { culturePackSchema, type CulturePack } from './culturePacks.ts';
 import { priceProblem } from './currency.ts';
 import type { Interaction } from './defineInteraction.ts';
-import { ITEMS } from './items.ts';
+import { ITEMS, type GIFTS_SOLD } from './items.ts';
 import { NAMED_NPCS, type NamedNpcId } from './npcs.ts';
+
+/** How each gift is named in a persona's favourite gift, which the prompt reads in English. */
+const GIFT_WORDS: Record<(typeof GIFTS_SOLD)[number], string> = { flowers: 'flowers', chocolates: 'chocolates', 'scented-candle': 'scented candle' };
 
 /**
  * Everything wrong with the Culture Packs, one line each, or nothing: each pack
  * passes its schema (with glosses in exactly the three other Native Languages),
  * sells every item an interaction refers to (saying which allergens are in each one the barista sells avoiding an
- * allergen), converts every catalogue price, and
- * localises and dresses every Named NPC, keeping to the same build in every pack
+ * allergen), converts every catalogue price and the postage, and
+ * localises and dresses every Named NPC, keeping to the gift each one loves most and to the same build in every pack
  * (as the Japanese pack has it), and dresses each place in props of its own, not just as another pack does.
  */
 export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, interactions: readonly Interaction[]): string[] {
@@ -33,8 +36,17 @@ export function culturePackProblems(packs: Record<LanguageCode, CulturePack>, in
       const problem = priceProblem(priceInShifts, pack.currency);
       if (problem) problems.push(`${item}: ${problem}`);
     }
+    for (const [speed, postageInShifts] of Object.entries(ECONOMY.postageInShifts)) {
+      const problem = priceProblem(postageInShifts, pack.currency);
+      if (problem) problems.push(`${speed} postage: ${problem}`);
+    }
     for (const npcId of Object.keys(NAMED_NPCS) as NamedNpcId[]) {
       if (!pack.personas[npcId]) problems.push(`gives ${npcId} no local name.`);
+      const { favouriteGift } = NAMED_NPCS[npcId];
+      const favourite = pack.personas[npcId]?.favouriteGift;
+      if (favourite && !favourite.includes(GIFT_WORDS[favouriteGift])) {
+        problems.push(`gives ${npcId} a favourite gift that isn't ${GIFT_WORDS[favouriteGift]}, the one they love most.`);
+      }
       const build = pack.appearances.npcs[npcId]?.build;
       const jaBuild = packs.ja.appearances.npcs[npcId]?.build;
       if (!pack.appearances.npcs[npcId]) problems.push(`gives ${npcId} no Appearance Preset.`);

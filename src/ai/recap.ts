@@ -5,8 +5,11 @@ import {
   drinkModifiersSchema,
   formatLocalAmount,
   ITEM_IDS,
+  localPlaceName,
+  NAMED_NPCS,
   toGeminiSchema,
   type CulturePack,
+  type NamedNpcId,
 } from '../content/index.ts';
 import { JOB_IDS } from '../sim/index.ts';
 import {
@@ -23,6 +26,8 @@ import {
   type GenerateContentBody,
   type TranscriptLine,
 } from './common.ts';
+
+const NPC_IDS = Object.keys(NAMED_NPCS) as [NamedNpcId, ...NamedNpcId[]];
 
 /** One line of a conversation as the Recap reads it. */
 const RecapLineSchema = TranscriptLineSchema;
@@ -92,9 +97,20 @@ const shared = {
   nativeLanguage: LanguageSchema,
 };
 
+/** A friend offered, in this conversation, to switch to the casual register (Sie→du, keigo→タメ口): the Recap notes it. */
+const registerOffered = z.literal(true).optional();
+
 /** What `/api/recap` takes. The gateway validates requests with it, and builds the prompt from them. */
 export const RecapRequestSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('goal'), ...shared, conversation: RecapConversationSchema }),
+  z.object({ kind: z.literal('goal'), ...shared, conversation: RecapConversationSchema, registerOffered }),
+  z.object({
+    kind: z.literal('smallTalk'),
+    ...shared,
+    npcId: z.enum(NPC_IDS),
+    registerOffered,
+    transcript: z.array(RecapLineSchema),
+    helpLog: z.array(HelpLogEntrySchema),
+  }),
   z.object({ kind: z.literal('shift'), ...shared, jobId: z.enum(JOB_IDS), customers: z.array(ShiftRecapCustomerSchema).min(1) }),
 ]);
 
@@ -104,9 +120,10 @@ export type RecapConversation = z.infer<typeof RecapConversationSchema>;
 export type ShiftRecapCustomer = z.infer<typeof ShiftRecapCustomerSchema>;
 export type RecapRequest = z.infer<typeof RecapRequestSchema>;
 
-/** How much each kind of Recap may hold. */
+/** How much each kind of Recap may hold. Small Talk gets a lighter one, so a casual chat isn't turned into a lesson. */
 const LIMITS: Record<RecapRequest['kind'], { corrections: number; newWords: number }> = {
   goal: { corrections: 3, newWords: 5 },
+  smallTalk: { corrections: 1, newWords: 3 },
   shift: { corrections: 3, newWords: 6 },
 };
 
@@ -132,6 +149,7 @@ function recapSchema(limits: { corrections: number; newWords: number }) {
       )
       .max(limits.newWords),
     cefrEstimate: StepSchema.describe("The CEFR level this conversation's evidence suggests."),
+    lastTopic: z.string().optional().describe('What the conversation was about, in a few words of English.'),
   });
 }
 
@@ -249,6 +267,7 @@ function coachBlock(request: RecapRequest, pack: CulturePack) {
   const native = CULTURE_PACKS[request.nativeLanguage].languageName;
   const what = {
     goal: 'one conversation',
+    smallTalk: 'one Small Talk chat: a casual conversation with no goal, which cannot fail',
     shift: `a whole work Shift, where the learner was the ${request.kind === 'shift' ? request.jobId : 'staff member'} serving several customers`,
   }[request.kind];
   return block('WHO YOU ARE', [
@@ -285,10 +304,22 @@ function writeBlock(request: RecapRequest, pack: CulturePack) {
       `"base" in ${target}, "reading" as pinyin with tone marks for Chinese or hiragana for Japanese (otherwise empty), ` +
       `"gloss" in ${native}.`,
     '- cefrEstimate: the CEFR level the learner showed in this conversation.',
+    '- lastTopic: what the conversation was about, in a few words of English, if it had a topic worth remembering.',
     `Write every explanation in ${native}, never in ${target}. Write examples only in ${target}.`,
   ];
+  if (request.kind === 'smallTalk') {
+    lines.push('Keep it light: this was a chat, not a lesson. Correct only what would really help, and celebrate what went well.');
+  }
   if (request.kind === 'shift') {
     lines.push('Write one combined Recap for the whole Shift: the outcome line sums up how the customers went.');
+  }
+  if (request.kind !== 'shift' && request.registerOffered) {
+    const { role } = request.kind === 'goal' ? interactionPartner(interactionById(request.conversation.interactionId), pack) : NAMED_NPCS[request.npcId];
+    const { formal, casual } = pack.casualRegister;
+    lines.push(
+      `In this conversation the ${role}, now a friend, offered to switch from ${formal} to ${casual}: a real cultural milestone. ` +
+        `Say so warmly in the outcome line, and say in a few words of ${native} what changes from now on.`,
+    );
   }
   return block('WHAT TO WRITE', lines);
 }
@@ -297,6 +328,14 @@ function conversationsText(request: RecapRequest, pack: CulturePack) {
   switch (request.kind) {
     case 'goal':
       return conversationBlock('THE CONVERSATION', request.conversation, pack);
+    case 'smallTalk': {
+      const { role } = NAMED_NPCS[request.npcId];
+      return block('THE CHAT', [
+        `Small Talk with the ${role} at ${localPlaceName(NAMED_NPCS[request.npcId].placeId, pack.id)}.`,
+        ...transcriptLines(request.transcript),
+        ...helpLines(request.helpLog),
+      ]);
+    }
     case 'shift':
       return request.customers.map((customer, i) => shiftCustomerBlock(`CUSTOMER ${i + 1}`, customer, request.jobId, pack)).join('\n\n');
   }

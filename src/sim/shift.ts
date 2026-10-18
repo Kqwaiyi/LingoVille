@@ -3,11 +3,13 @@ import { isOpen, type OpeningHours } from './clock.ts';
 import { nextRandom, randomInt } from './rng.ts';
 import type { Checkout, Diner, GameState, JobId, PadDiner, ShiftOrder, ShiftOrderLine, TillWork } from './state.ts';
 import { gainLifeSkillXp, lifeSkillLevel } from './lifeSkills.ts';
+import { clampMeter } from './meters.ts';
 import { drawLooks, type LookWeights } from './looks.ts';
+import { moodModifier } from './mood.ts';
 import { hundredths, tillTotal, type Till } from './till.ts';
 import { kitchenOrder } from './orderPad.ts';
 import { lineKey } from './tray.ts';
-import { ECONOMY, LIFE_SKILLS, PROFICIENCY_STEP_TABLE, STEP_BANDS, type ProficiencyStep } from './tuning.ts';
+import { ECONOMY, LIFE_SKILLS, MOOD, PROFICIENCY_STEP_TABLE, STEP_BANDS, type ProficiencyStep } from './tuning.ts';
 
 /** Why E at the staff door can't start a Shift now. */
 export type ShiftRefusal = 'notHired' | 'closed' | 'workedToday' | 'underway';
@@ -268,9 +270,10 @@ export function applyShiftCustomer(
 }
 
 /**
- * The Shift is over and paid: base × share of customers served × the Job's Life Skill raise × the
+ * The Shift is over and paid: base × share of customers served × Mood modifier × the Job's Life Skill raise × the
  * stake multiplier for the highest step reached, minus the step's dock (a share of base pay) per failed customer
- * and a share of it per customer served after translating their lines, never below 0.
+ * and a share of it per customer served after translating their lines, never below 0. Once paid, a Shift that makes
+ * the days worked in the last week overwork costs Mood.
  */
 export function endShift(state: GameState): { state: GameState; payInShifts: number } {
   const { shift } = state.possessions;
@@ -278,13 +281,22 @@ export function endShift(state: GameState): { state: GameState; payInShifts: num
   const base = ECONOMY.shiftBasePayInShifts;
   const { stakeMultiplier, failedCustomerDock } = PROFICIENCY_STEP_TABLE[state.progression.highestStep];
   const raise = 1 + ECONOMY.jobLifeSkillPayRaisePerLevel * lifeSkillLevel(state.progression.lifeSkillXp[shift.jobId]);
-  const earned = base * (shift.served / shift.customers) * raise * stakeMultiplier;
+  const earned = base * (shift.served / shift.customers) * moodModifier(state.character.mood) * raise * stakeMultiplier;
   const docked = shift.failed + shift.translated * ECONOMY.translatedCustomerDockShare;
   const payInShifts = Math.max(0, earned - docked * failedCustomerDock * base);
+  const { day } = state.clock;
+  const weekFrom = day - MOOD.overworkWeekDays + 1;
+  const shiftDays = [...state.progression.shiftDays.filter((worked) => worked >= weekFrom && worked !== day), day];
+  const overwork = shiftDays.length >= MOOD.overworkDaysPerWeek ? MOOD.overworkPenaltyPerShift : 0;
   return {
     state: {
       ...state,
-      character: { ...state.character, moneyInShifts: state.character.moneyInShifts + payInShifts },
+      character: {
+        ...state.character,
+        moneyInShifts: state.character.moneyInShifts + payInShifts,
+        mood: clampMeter(state.character.mood + overwork),
+      },
+      progression: { ...state.progression, shiftDays },
       possessions: { ...state.possessions, shift: null },
     },
     payInShifts,
