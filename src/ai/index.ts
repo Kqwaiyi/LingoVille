@@ -41,6 +41,7 @@ export {
   libraryKana,
   libraryPinyin,
   READING_LANGUAGES,
+  romaji,
   rubyUnits,
   SegmentSchema,
   type KanaToken,

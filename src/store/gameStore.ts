@@ -30,6 +30,7 @@ import {
   placeHours,
   placePhrasebook,
   worldSign,
+  type AppearancePreset,
   type Interaction,
   type NamedNpcId,
   type NpcLook,
@@ -46,6 +47,7 @@ import {
   addToPhrasebook,
   applyInteractionOutcome,
   applyRecapEvidence,
+  CHARACTER_NAME,
   CLOCK,
   createSave,
   enterPlace,
@@ -55,10 +57,12 @@ import {
   isOutOfPatience,
   LANGUAGE_CODES,
   isUnreadableTranscript,
+  MIC_CHECK,
   losePatience,
   newPlayerTurn,
   npcExpression,
   rideTram,
+  SAVE,
   startPatience,
   tick,
   tramTripMinutes,
@@ -72,14 +76,17 @@ import {
   type Patience,
   type PhrasebookEntry,
   type PlaceId,
+  type StartingStep,
 } from '../sim/index.ts';
 import {
   addUsage,
   hearItSaid,
   NO_USAGE,
+  openBrowserMic,
   openVoiceSession,
   replaySpoken,
   VoiceServiceUnavailableError,
+  type OpenMic,
   type OpenVoiceSession,
   type SpokenTurn,
   type TokenUsage,
@@ -88,13 +95,25 @@ import {
   type TranscriptLine,
   type VoiceSession,
 } from '../voice/index.ts';
+import { browserDeviceSettings, DEFAULT_DEVICE_SETTINGS, type DeviceSettings, type DeviceSettingsStore } from './deviceSettings.ts';
 import { browserLibraryReadings, type LibraryReadings } from './libraryReadings.ts';
 import { browserJournal, journalPage, type Journal, type JournalEntry, type JournalPage, type NewJournalEntry } from './journal.ts';
+import {
+  deleteSave,
+  exportRawSave,
+  exportSave,
+  importSave,
+  ImportRefused,
+  type ImportProblem,
+  type SaveFile,
+  type SlotStores,
+} from './saveFiles.ts';
+import { browserSaves, SLOT_IDS, type LoadedSave, type Saves, type Slot, type SlotId } from './saves.ts';
 
 /** Builds the NPC's session for a conversation. */
 type SessionFor = () => NpcSession;
 
-/** A fixed setup: the new game the store plays. */
+/** A fixed setup: the new game that stands in behind the title screen. */
 export const DEV_SETUP: NewGameSetup = {
   characterName: 'Sam',
   targetLanguage: 'ja',
@@ -104,14 +123,91 @@ export const DEV_SETUP: NewGameSetup = {
   rngSeed: 20261003,
 };
 
-/** The Native Language: the UI is in English. */
+/** The Native Language until this browser's device settings are read. */
 export const DEV_NATIVE_LANGUAGE: LanguageCode = 'en';
 
-/** The one game's Journal is kept under this id. */
-const JOURNAL_SLOT_ID = 'slot-1';
+/** Which screen shows: the title, New game setup, or the game itself. */
+export type Screen = 'title' | 'setup' | 'playing';
 
-/** Speaking with the mic, or the Typed Fallback. */
-export type InputMode = 'mic' | 'typed';
+/** New game setup's screens, in order. A browser that has passed the mic check skips it. */
+export const SETUP_STEPS = ['nativeLanguage', 'targetLanguage', 'aboutYou', 'appearance', 'micCheck'] as const;
+export type SetupStep = (typeof SETUP_STEPS)[number];
+
+/** Speaking with the mic, or the Typed Fallback. A device setting. */
+export type InputMode = DeviceSettings['inputMode'];
+/** Push-to-talk (hold Space), or open mic, where the voice session detects when the Player speaks. A device setting. */
+export type TalkMode = DeviceSettings['talkMode'];
+/** Retry microphone: waiting for the browser to open the mic, or it still couldn't. */
+export type MicRetry = 'trying' | 'failed';
+/** In the Typed Fallback, where the mic button would be: the day's reminder that Settings can turn the mic on, or just "off". */
+export type MicOffChip = 'enableInSettings' | 'off';
+
+/**
+ * The mic check: waiting for the browser to open the mic, listening for the
+ * Player, heard them, or no mic to be had (refused or missing).
+ */
+export type MicCheckStatus = 'asking' | 'listening' | 'heard' | 'unavailable';
+
+/** New game setup, while it shows: the slot the new game goes into, the screen showing and the answers so far. */
+export type Setup = {
+  slotId: SlotId;
+  step: SetupStep;
+  targetLanguage: LanguageCode | null;
+  /** From the self-assessment. */
+  startingStep: StartingStep | null;
+  characterName: string;
+  appearance: AppearancePreset;
+  /** The mic check, while its screen shows. */
+  mic: MicCheckStatus | null;
+};
+
+/** A slot on the title screen: empty, a save to play, or a save that can't be loaded at all. */
+export type SlotCard =
+  | { slotId: SlotId; status: 'empty' }
+  | {
+      slotId: SlotId;
+      status: 'ready';
+      characterName: string;
+      targetLanguage: LanguageCode;
+      culturePackId: LanguageCode;
+      day: number;
+      placeId: PlaceId;
+      moneyInShifts: number;
+      /** Real time, as an ISO string. */
+      lastPlayedAt: string;
+      /** It will load from this morning's backup. */
+      fromBackup: boolean;
+      /** How the save's Character looks, for the title screen. */
+      appearance: AppearancePreset;
+    }
+  | { slotId: SlotId; status: 'damaged'; characterName: string | null; lastPlayedAt: string };
+
+/** What came of the Player's last import, export or delete on the title screen. */
+export type TitleNotice =
+  | { kind: 'imported'; slotId: SlotId }
+  | { kind: 'importRefused'; problem: ImportProblem }
+  /** The file was fine, but it couldn't be stored. */
+  | { kind: 'importFailed' }
+  | { kind: 'exportFailed' }
+  | { kind: 'deleteFailed' };
+
+/** What the title screen can offer, once it has looked for saves. */
+export type TitleView =
+  | { status: 'checking' }
+  | {
+      status: 'ready';
+      slots: SlotCard[];
+      /** The most recently played slot, which Continue loads, or null with no saves. */
+      continueSlotId: SlotId | null;
+      /** The first empty slot, which New game and Import use, or null when all 4 are full. */
+      freeSlotId: SlotId | null;
+      notice: TitleNotice | null;
+    }
+  /** The saves couldn't be looked at at all. */
+  | { status: 'failed'; message: string };
+
+/** How the Character arrived in the world: a new game, or back from a save. The world picks the spawn point from it. */
+export type Arrival = 'newGame' | 'continued';
 
 /** Something in the world the Character is close enough to use with E: an NPC to talk to, or a tram stop. */
 export type Interactable = TownNpcId | TramStopId;
@@ -129,7 +225,8 @@ export type ChatLine = TranscriptLine & { typed?: true };
 export type Toast =
   /** A network abandonment: the NPC had to step away. */
   | { kind: 'npcSteppedAway'; npcId: TownNpcId }
-  | { kind: 'recapSaved' };
+  | { kind: 'recapSaved' }
+  | { kind: 'loadedBackup' };
 
 /** The Recap in the conversation column: being written, ready as a Journal page, or not to be had. */
 export type RecapView = { status: 'writing' } | { status: 'ready'; entry: JournalPage } | { status: 'failed' };
@@ -145,6 +242,9 @@ export type TranslationView = { status: 'loading' } | { status: 'ready'; text: s
 
 /** An NPC line's reading aid: the library's at first, then the model's once it passes the checks. */
 export type LineReading = { segments: Segment[]; corrected: boolean };
+
+/** The reading aids device settings. Hiding reading aids hides romaji too. */
+export type ReadingAidsSettings = { show: boolean; romaji: boolean };
 
 /** One line of a sign the Player is pointing at, with its library reading and, once translated, its gloss. */
 export type SignTooltipLine = { text: string; note: string | null; segments: Segment[] | null; gloss: string | null };
@@ -168,8 +268,8 @@ export type ClosingCard = Extract<OutcomeResult, { kind: 'success' | 'failure' }
 type Partner = { npcId: NamedNpcId; interaction: Interaction };
 
 /**
- * A conversation under way. It lives only here, and leaving before its outcome
- * is decided changes nothing.
+ * A conversation under way. It lives only here. A Goal Interaction is never saved in progress,
+ * and leaving before its outcome is decided changes nothing.
  */
 export type Conversation = ConversationState & Partner;
 
@@ -229,14 +329,74 @@ export type GameStoreDeps = {
   /** The library readings an NPC line shows the moment it appears. */
   readings: LibraryReadings;
   journal: Journal;
+  saves: Saves;
+  deviceSettings: DeviceSettingsStore;
   hearItSaid: HearItSaid;
   /** Plays an NPC's line again just as they said it. */
   replaySpoken: (spoken: SpokenTurn) => void;
+  /** Asks the browser to keep this site's data when space runs low. */
+  storage: StoragePersistence;
+  /** Hands the Player a file to keep. */
+  downloadFile: (file: SaveFile) => void;
+  /** The RNG seed for a new game. */
+  newRngSeed: () => number;
   /** Dev only: the hour a new game starts at instead of the usual morning's, or null. */
   devStartHour: () => number | null;
-  /** Dev only: the Target Language of the new game the store plays, instead of `DEV_SETUP`'s, or null. */
+  /** Dev only: the Target Language of a new game to start at once, skipping the title screen and setup, or null. Asked once per title screen. */
   devNewGameTarget: () => LanguageCode | null;
+  /** Opens the mic for the mic check. */
+  openMic: OpenMic;
 };
+
+/** The parts of `navigator.storage` that keep saves from being cleared. Each answers whether storage is persistent. */
+export type StoragePersistence = { persisted: () => Promise<boolean>; persist: () => Promise<boolean> };
+
+/** The device settings tooltip id that remembers the persist-refused callout was dismissed. */
+const PERSIST_REFUSED = 'persist-refused';
+
+/** Where the browser can't keep data on request, there's nothing to ask for or warn about. */
+const browserStorage: StoragePersistence = {
+  persisted: () => (typeof navigator !== 'undefined' && navigator.storage?.persisted ? navigator.storage.persisted() : Promise.resolve(true)),
+  persist: () => (typeof navigator !== 'undefined' && navigator.storage?.persist ? navigator.storage.persist() : Promise.resolve(true)),
+};
+
+function downloadInBrowser({ fileName, contents }: SaveFile) {
+  const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
+  const link = Object.assign(document.createElement('a'), { href: url, download: fileName });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** A slot's card on the title screen. */
+function slotCard(slot: Slot): SlotCard {
+  switch (slot.status) {
+    case 'empty':
+      return slot;
+    case 'damaged':
+      return { slotId: slot.slotId, status: 'damaged', characterName: slot.characterName, lastPlayedAt: slot.lastPlayedAt };
+    case 'ready': {
+      const { identity, clock, placeId, character } = slot.save.game;
+      return {
+        slotId: slot.slotId,
+        status: 'ready',
+        characterName: identity.characterName,
+        targetLanguage: identity.targetLanguage,
+        culturePackId: identity.culturePackId,
+        day: clock.day,
+        placeId,
+        moneyInShifts: character.moneyInShifts,
+        lastPlayedAt: slot.lastPlayedAt,
+        fromBackup: slot.fromBackup,
+        appearance: identity.appearance,
+      };
+    }
+  }
+}
+
+/** What the Player types to delete a save: the Character's name or, if the save is too damaged to tell, "delete". */
+export function nameToDelete(card: Exclude<SlotCard, { status: 'empty' }>) {
+  return card.characterName ?? 'delete';
+}
 
 /** POSTs a request to one of the gateway's prompted endpoints, and returns its answer. */
 async function askGateway<Answer>(path: string, request: unknown): Promise<Answer> {
@@ -256,10 +416,16 @@ const BROWSER_DEPS: GameStoreDeps = {
   requestAnnotation: (request) => askGateway<Annotation>('/api/annotate', request),
   readings: browserLibraryReadings,
   journal: browserJournal,
+  saves: browserSaves,
+  deviceSettings: browserDeviceSettings,
   hearItSaid,
   replaySpoken,
+  storage: browserStorage,
+  downloadFile: downloadInBrowser,
+  newRngSeed: () => Math.floor(Math.random() * 2 ** 31),
   devStartHour: devStartHourFromUrl,
-  devNewGameTarget: devNewGameTargetFromUrl,
+  devNewGameTarget: takeDevNewGameFromUrl,
+  openMic: openBrowserMic,
 };
 
 /** Dev only: `?at=9` starts a new game at 09:00, so a place that isn't open first thing can be reached at once. */
@@ -269,29 +435,60 @@ function devStartHourFromUrl(): number | null {
   return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
 }
 
+/** The answers `?newGame` gives setup. */
+const DEV_NEW_GAME = {
+  nativeLanguage: 'en',
+  targetLanguage: 'ja',
+  startingStep: 'A1',
+  characterName: 'Sam',
+} as const satisfies { nativeLanguage: LanguageCode } & Pick<Setup, 'targetLanguage' | 'startingStep' | 'characterName'>;
+
 /**
- * Dev only: `?newGame` plays a new game learning Japanese or (`?newGame=de`) the
- * language named, to play the town in any Culture Pack.
+ * Dev only: `?newGame` starts a new game straight away, learning Japanese or (`?newGame=de`) the
+ * language named, to try the town without the title screen and setup. It comes off the URL once read, so
+ * a reload shows the title screen.
  */
-function devNewGameTargetFromUrl(): LanguageCode | null {
+function takeDevNewGameFromUrl(): LanguageCode | null {
   if (!import.meta.env.DEV || typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   const target = url.searchParams.get('newGame');
   if (target === null) return null;
-  const language = target === '' ? DEV_SETUP.targetLanguage : target;
-  if ((LANGUAGE_CODES as readonly string[]).includes(language)) return language as LanguageCode;
-  console.warn(`[dev] ?newGame=${target} names no Target Language, so the game learns Japanese`);
+  url.searchParams.delete('newGame');
+  window.history.replaceState(window.history.state, '', url);
+  const language = target === '' ? DEV_NEW_GAME.targetLanguage : target;
+  if (language !== DEV_NEW_GAME.nativeLanguage && (LANGUAGE_CODES as readonly string[]).includes(language)) return language as LanguageCode;
+  console.warn(`[dev] ?newGame=${target} names no Target Language for an English speaker, so the title screen shows`);
   return null;
 }
 
 export type GameStore = {
+  screen: Screen;
+  /** The title screen, while it shows. */
+  title: TitleView | null;
+  /** New game setup, while it shows. */
+  setup: Setup | null;
+  arrival: Arrival;
+  /** The slot the game is saved into. */
+  slotId: string;
+  /** How many saves have finished, so the dock can flash "Saved ✓" on each one. */
+  savedCount: number;
   game: GameState;
   /** The Player's own language, which Recaps are written in. */
   nativeLanguage: LanguageCode;
-  /** Speaking with the mic, or the Typed Fallback. */
+  /** Whether readings show over zh and ja lines, and romaji under ja ones. A device setting. */
+  readingAids: ReadingAidsSettings;
+  /** Speaking with the mic, or the Typed Fallback. A device setting. */
   inputMode: InputMode;
+  /** This browser has heard the Player in a mic check, so New game skips it. A device setting. */
+  micCheckPassed: boolean;
+  talkMode: TalkMode;
+  micRetry: MicRetry | null;
+  /** The day the mic-off chip last said to enable the mic in Settings, and the conversation it said it in. */
+  micOffReminder: { day: number; conversationId: number } | null;
   tabHidden: boolean;
-  /** The Character is out on the street, in no place: the place id stays the last one they were in. */
+  /** The pause menu is open: time stands still, and the Character with it. */
+  pauseMenu: boolean;
+  /** The Character is out on the street, in no place: the place id stays the last one they were in. Never saved. */
   onStreet: boolean;
   interactable: Interactable | null;
   /** The Player is choosing where to take the tram. */
@@ -300,7 +497,7 @@ export type GameStore = {
   conversation: Conversation | null;
   /** The typed field has focus, so keys type into it instead of moving or acting. */
   typing: boolean;
-  /** How loud the Player is while push-to-talk is held, from 0 to 1. */
+  /** How loud the Player is while push-to-talk is held, or on the mic check, from 0 to 1. */
   micLevel: number;
   toast: Toast | null;
   /** No token could be minted for a conversation, so the "Voice service unavailable" screen shows. */
@@ -309,6 +506,44 @@ export type GameStore = {
   journal: JournalView | null;
   /** The sign the Player is pointing at, and whether the pointer is on its tooltip, which keeps it open. */
   sign: { tooltip: SignTooltip; held: boolean } | null;
+  /** The browser refused to keep saves safe from clearing, and the Player hasn't dismissed the callout yet. */
+  persistCallout: boolean;
+  /** Looks for saves and reads this browser's device settings, for the title screen. */
+  openTitle: () => void;
+  /** Continue: plays the most recently played save. */
+  continueGame: () => void;
+  /** Load a save: plays the save in this slot. */
+  playSlot: (slotId: SlotId) => void;
+  /** New game: opens setup for the first empty slot, on the Native Language screen. */
+  newGame: () => void;
+  /** Chooses the Native Language: the UI switches at once, and this browser's device settings keep it. */
+  setNativeLanguage: (nativeLanguage: LanguageCode) => void;
+  /** Chooses the Target Language, which is also the Culture Pack. Never the Native Language. */
+  chooseTargetLanguage: (targetLanguage: LanguageCode) => void;
+  /** The self-assessment: the step the Player's description of their level maps to. */
+  chooseStartingStep: (startingStep: StartingStep) => void;
+  /** Names the Character, cut to the longest a name may be. */
+  nameCharacter: (characterName: string) => void;
+  /** Changes one or more parts of the look, keeping the rest. */
+  chooseAppearance: (change: Partial<AppearancePreset>) => void;
+  /** On to the next setup screen once this one is answered; after the last, the new game in its slot. */
+  setupNext: () => void;
+  /** Back to the setup screen before, keeping the answers; from the first, to the title screen. */
+  setupBack: () => void;
+  /** Skip on the mic check: starts the game without waiting for the mic, and leaves the input mode as it was. */
+  skipMicCheck: () => void;
+  /** Downloads the slot as one file: its save, its Journal and its backups' metadata. */
+  exportSave: (slotId: SlotId) => void;
+  /** Downloads everything stored for a slot, as found, for a save that can't be loaded. */
+  exportRawSave: (slotId: SlotId) => void;
+  /** Imports an exported file's contents into the first empty slot. */
+  importSave: (contents: string) => void;
+  /** Deletes the slot's save, its backups and its Journal, if `typedName` is the Character's name. */
+  deleteSave: (slotId: SlotId, typedName: string) => void;
+  dismissTitleNotice: () => void;
+  dismissPersistCallout: () => void;
+  /** Saves now, as the page is closed. */
+  saveNow: () => void;
   /** Called once per rendered frame with the real time since the last one. */
   advance: (realDeltaMs: number) => void;
   setTabHidden: (hidden: boolean) => void;
@@ -355,11 +590,25 @@ export type GameStore = {
   toggleHelp: () => void;
   /** Translate under a finished NPC line: shows its Native Language translation. */
   translateLine: (line: number) => void;
+  /** Shows or hides reading aids, or romaji, and keeps the choice on this device. */
+  setReadingAids: (change: Partial<ReadingAidsSettings>) => void;
+  /** Push-to-talk or open mic, kept on this device. */
+  setTalkMode: (talkMode: TalkMode) => void;
+  /** Types replies instead of speaking them: the Typed Fallback, kept on this device. */
+  chooseTypedFallback: () => void;
+  /** Retry microphone: asks for the mic again, and switches back to Speaking once it opens. */
+  retryMic: () => void;
   /** "+ Phrasebook" on a Recap's new word: keeps it in the personal phrasebook. */
   addToPhrasebook: (word: NewWord, glossLanguage: LanguageCode) => void;
   /** J: opens the full-screen Journal, outside conversations. */
   openJournal: () => void;
   closeJournal: () => void;
+  /** Esc outside a conversation: opens the pause menu, unless something else is open that Esc closes. */
+  openPauseMenu: () => void;
+  /** Resume: closes the pause menu, and time goes on. */
+  closePauseMenu: () => void;
+  /** Quit to title, on the pause menu: saves the game and goes back to the title screen. */
+  quitToTitle: () => void;
   setTyping: (typing: boolean) => void;
   dismissToast: () => void;
   dismissVoiceUnavailable: () => void;
@@ -393,19 +642,30 @@ const isAtWork = (npcId: TownNpcId, game: GameState) =>
 const tramsRunning = (game: GameState) => isPlaceOpen('tram-stop', game);
 
 /**
- * A game store, already playing a game: the one given, or given null, a new
- * game from `DEV_SETUP`.
+ * A game store. Given a game, it is already playing it in the first slot;
+ * given null, it starts on the title screen.
  */
 export function createGameStore(initial: GameState | null, overrides: Partial<GameStoreDeps> = {}) {
   const deps: GameStoreDeps = { ...BROWSER_DEPS, ...overrides };
   // The live session belongs to the open conversation; it never goes into state.
   let voice: VoiceSession | null = null;
   let conversations = 0;
+  // The game as it was when the open conversation began: what a save holds until its outcome is decided.
+  let gameBeforeConversation: GameState | null = null;
+  // Tells each game played apart, so a Recap still on its way when the Player quits to the title moves only its own game.
+  let plays = 0;
+  let realMsSinceSave = 0;
+  // Found by the title screen: what Continue and Load a save play.
+  let slots: Slot[] = [];
+  let askedToPersist = false;
+  // A `?newGame` game is on its way, so the title screen isn't offered meanwhile (StrictMode opens it twice).
+  let startingDevGame = false;
+  const stores: SlotStores = { saves: deps.saves, journal: deps.journal };
   // Each conversation's NPC line readings and the annotations still on their way, kept past
   // the conversation's end until its Journal entry is written, so the Journal keeps the corrected readings.
   const lineReadings = new Map<number, { readings: Conversation['readings']; annotating: Promise<unknown>[] }>();
 
-  return createStore<GameStore>()((set, get) => {
+  return createStore<GameStore>()((set, get, api) => {
     /** A sign's tooltip in this game: each line with its library reading, and its gloss once translated. */
     const signTooltip = (signId: SignId, translated: boolean): SignTooltip => {
       const { game, nativeLanguage } = get();
@@ -426,38 +686,289 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       };
     };
 
-    /** The new game the store plays unless given one: `DEV_SETUP`, in dev learning the language `?newGame` names, from the hour `?at` names. */
-    const newGame = (): GameState => {
-      const targetLanguage = deps.devNewGameTarget() ?? DEV_SETUP.targetLanguage;
-      const game = createSave({ ...DEV_SETUP, targetLanguage, culturePackId: targetLanguage });
-      const startHour = deps.devStartHour();
-      return startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
+    /**
+     * Saves the game into its slot. A conversation is never saved in progress:
+     * until its outcome is decided, the save keeps the game from before it.
+     */
+    const save = ({ startsDay = false } = {}) => {
+      const { screen, conversation, slotId } = get();
+      if (screen !== 'playing') return;
+      askToPersist();
+      const game = conversation && !conversation.outcome && gameBeforeConversation ? gameBeforeConversation : get().game;
+      realMsSinceSave = 0;
+      // Started at once: IndexedDB runs writes in the order they began, so an older game never lands after a newer one.
+      deps.saves.write(slotId, game, { startsDay }).then(
+        () => set({ savedCount: get().savedCount + 1 }),
+        (error: unknown) => console.error('[save] could not save:', error),
+      );
     };
+
+    const play = (game: GameState, slotId: string, arrival: Arrival, toast: Toast | null = null) => {
+      plays++;
+      realMsSinceSave = 0;
+      set({
+        screen: 'playing',
+        title: null,
+        game,
+        slotId,
+        arrival,
+        toast,
+        pauseMenu: false,
+        onStreet: false,
+        micOffReminder: null,
+      });
+      // While the town loads, so the first line doesn't wait for a dictionary.
+      deps.readings.preload(game.identity.targetLanguage).then(
+        () => {
+          // A line that came in before the library had loaded gets its reading now.
+          const conversation = get().conversation;
+          conversation?.lines.forEach((line, i) => line.speaker === 'npc' && !conversation.readings[i] && readLine(conversation, i));
+        },
+        (error: unknown) => console.warn('[readings] the library could not load:', error instanceof Error ? error.message : error),
+      );
+    };
+
+    /** Plays a loaded save. */
+    const playLoaded = ({ save, fromBackup }: LoadedSave) => {
+      play(save.game, save.slotId, 'continued', fromBackup ? { kind: 'loadedBackup' } : null);
+    };
+
+    /** Shows the persist-refused callout, unless the Player has dismissed it before. */
+    const offerPersistCallout = () =>
+      deps.deviceSettings.load().then(
+        ({ tooltipsSeen }) => {
+          if (!tooltipsSeen.includes(PERSIST_REFUSED)) set({ persistCallout: true });
+        },
+        (error: unknown) => console.warn('[settings] could not be read:', error),
+      );
+
+    /** Offers the callout if saves aren't kept safe: checked, or with `ask`, asked for first. */
+    const checkPersisted = (ask: boolean) =>
+      deps.storage
+        .persisted()
+        .then((persisted) => persisted || (ask && deps.storage.persist()))
+        .then(
+          (kept) => {
+            if (!kept) void offerPersistCallout();
+          },
+          (error: unknown) => console.warn('[storage] could not check persistence:', error),
+        );
+
+    /** On the first write, asks the browser to keep saves from being cleared when space runs low. */
+    const askToPersist = () => {
+      if (askedToPersist) return;
+      askedToPersist = true;
+      void checkPersisted(true);
+    };
+
+    // Each device settings change starts writing at once, from the one before, so neither a quick run of
+    // changes nor a reload right after one loses it. Reads wait for the writes still going.
+    let settingsWrites: Promise<unknown> = Promise.resolve();
+    const updateDeviceSettings = (change: (settings: DeviceSettings) => DeviceSettings | null) => {
+      const written = deps.deviceSettings.update(change).catch((error: unknown) => console.warn('[settings] could not be saved:', error));
+      settingsWrites = settingsWrites.then(() => written);
+    };
+
+    /** This browser has shown the persist-refused callout, so no save shows it again. */
+    const markSeen = (id: string) =>
+      updateDeviceSettings((settings) => (settings.tooltipsSeen.includes(id) ? null : { ...settings, tooltipsSeen: [...settings.tooltipsSeen, id] }));
+
+    const answerSetup = (answers: Partial<Setup>) => {
+      const setup = get().setup;
+      if (get().screen === 'setup' && setup) set({ setup: { ...setup, ...answers } });
+    };
+
+    // The mic check's mic, while its screen shows. Each check is its own run, so a late answer from one already left is ignored.
+    let micCheckRun = 0;
+    let closeMicCheck: (() => void) | null = null;
+    const onMicCheck = (run: number) => run === micCheckRun && get().setup?.step === 'micCheck';
+
+    // Each Retry microphone is its own run, so one overtaken by choosing the Typed Fallback is ignored.
+    let micRetryRun = 0;
+    /** The Player speaks with the mic open, and the voice session detects when they start and stop. */
+    const openMicOn = () => get().talkMode === 'open-mic' && get().inputMode === 'mic';
+    /** With open mic, the mic streams only while the Player can take a turn in the chat: not in Help, nor once the outcome is decided. */
+    const openMicListens = (conversation: Conversation | null) => takesTurns(conversation) && conversation.tab === 'chat';
+    // Whether the open session is streaming the open mic. A new session starts out streaming it.
+    let openMicStreaming = true;
+    api.subscribe((state) => {
+      if (!voice || !openMicOn()) return;
+      const listens = openMicListens(state.conversation);
+      if (listens === openMicStreaming) return;
+      openMicStreaming = listens;
+      if (listens) voice.startTalking();
+      else voice.stopTalking();
+    });
+
+    /** In the Typed Fallback, the first conversation of the day reminds the Player that Settings can turn the mic on. */
+    const remindMicOff = (conversationId: number) => {
+      const { day } = get().game.clock;
+      if (get().inputMode === 'typed' && get().micOffReminder?.day !== day) set({ micOffReminder: { day, conversationId } });
+    };
+
+    const setInputMode = (inputMode: InputMode, micCheckPassed = get().micCheckPassed) => {
+      set({ inputMode, micCheckPassed });
+      updateDeviceSettings((settings) => ({ ...settings, inputMode, micCheckPassed }));
+    };
+
+    const startMicCheck = () => {
+      const run = ++micCheckRun;
+      deps
+        .openMic((level) => {
+          if (!onMicCheck(run)) return;
+          set({ micLevel: level });
+          if (level < MIC_CHECK.heardLevel || get().setup?.mic === 'heard') return;
+          answerSetup({ mic: 'heard' });
+          setInputMode('mic', true);
+        })
+        .then(
+          (close) => {
+            if (!onMicCheck(run)) return close();
+            closeMicCheck = close;
+            if (get().setup?.mic === 'asking') answerSetup({ mic: 'listening' });
+          },
+          (error: unknown) => {
+            console.warn('[mic] none to be had, so the Typed Fallback:', error instanceof Error ? error.message : error);
+            // Refused after Skip is still refused.
+            setInputMode('typed');
+            if (onMicCheck(run)) answerSetup({ mic: 'unavailable' });
+          },
+        );
+    };
+
+    const stopMicCheck = () => {
+      micCheckRun++;
+      closeMicCheck?.();
+      closeMicCheck = null;
+      set({ micLevel: 0 });
+    };
+
+    /** Setup is over: the new game starts in its slot, saved at once. */
+    const startNewGame = (setup: Setup) => {
+      stopMicCheck();
+      const { targetLanguage, startingStep, characterName, appearance } = setup;
+      set({ setup: null });
+      // The pre-selected language counts as chosen too, so it no longer follows the browser's.
+      const nativeLanguage = get().nativeLanguage;
+      updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
+      const game = createSave({
+        characterName: characterName.trim(),
+        targetLanguage: targetLanguage!,
+        culturePackId: targetLanguage!,
+        startingStep: startingStep!,
+        appearance,
+        rngSeed: deps.newRngSeed(),
+      });
+      const startHour = deps.devStartHour();
+      const atHour = startHour === null ? game : { ...game, clock: { ...game.clock, minuteOfDay: (startHour / 24) * CLOCK.minutesPerDay } };
+      play(atHour, setup.slotId, 'newGame');
+      save();
+    };
+
+    /** Dev only: a new game in the first empty slot, as if the Player had gone through setup with `DEV_NEW_GAME`'s answers and skipped the mic check. */
+    const startDevNewGame = (targetLanguage: LanguageCode) =>
+      // Saves that can't be read leave no slot to start in: the title screen then says why.
+      deps.saves.slots().catch((): Slot[] => []).then(
+        (found) => {
+          startingDevGame = false;
+          const free = found.find((slot) => slot.status === 'empty');
+          if (get().screen !== 'title' || !free) return checkSlots();
+          slots = found;
+          set({ nativeLanguage: DEV_NEW_GAME.nativeLanguage });
+          startNewGame({
+            slotId: free.slotId,
+            step: 'micCheck',
+            targetLanguage,
+            startingStep: DEV_NEW_GAME.startingStep,
+            characterName: DEV_NEW_GAME.characterName,
+            appearance: DEFAULT_APPEARANCE,
+            mic: null,
+          });
+        },
+      );
+
+    const readyTitle = () => {
+      const title = get().title;
+      return get().screen === 'title' && title?.status === 'ready' ? title : null;
+    };
+
+    /** Looks at every slot again, for the title screen. */
+    const checkSlots = (notice: TitleNotice | null = null) =>
+      deps.saves.slots().then(
+        (found) => {
+          slots = found;
+          if (get().screen !== 'title' || startingDevGame) return;
+          const played = found
+            .filter((slot) => slot.status !== 'empty')
+            .sort((a, b) => b.lastPlayedAt.localeCompare(a.lastPlayedAt));
+          set({
+            title: {
+              status: 'ready',
+              slots: found.map(slotCard),
+              continueSlotId: played[0]?.slotId ?? null,
+              freeSlotId: found.find((slot) => slot.status === 'empty')?.slotId ?? null,
+              notice,
+            },
+          });
+          // Saves from an earlier visit may not have been kept safe.
+          if (played.length > 0) void checkPersisted(false);
+        },
+        (error: unknown) => {
+          console.error('[save] the saves could not be read:', error);
+          slots = [];
+          set({ title: { status: 'failed', message: error instanceof Error ? error.message : String(error) } });
+        },
+      );
+
+    const setNotice = (notice: TitleNotice) => {
+      const title = readyTitle();
+      if (title) set({ title: { ...title, notice } });
+    };
+
+    /** Hands the Player a file made from a slot, or says it couldn't be made. */
+    const download = (make: () => Promise<SaveFile>) =>
+      make().then(deps.downloadFile, (error: unknown) => {
+        console.error('[save] could not export:', error);
+        setNotice({ kind: 'exportFailed' });
+      });
 
     const updateConversation = (change: Partial<ConversationState>) => {
       const conversation = get().conversation;
       if (conversation) set({ conversation: { ...conversation, ...change } });
     };
 
-    /** The outcome is decided and applied. The NPC says goodbye next, then the closing card shows. */
+    /** The outcome is decided and applied, then saved. The NPC says goodbye next, then the closing card shows. */
     const settleOutcome = (game: GameState, outcome: ClosingCard) => {
       set({ game });
       updateConversation({ outcome });
+      save();
     };
 
     const updateRecap = (conversationId: number, recap: RecapView) => {
       if (get().conversation?.id === conversationId) updateConversation({ recap });
     };
 
+    /**
+     * A Recap's evidence moves the hidden Language Proficiency (`apply`), which is saved at once. Only in the game it
+     * was written in (`play`): once the Player has quit to the title, that game is saved and over.
+     */
+    const applyEvidence = (play: number, apply: (game: GameState) => GameState) => {
+      if (play !== plays || get().screen !== 'playing') return;
+      // A later conversation may have begun: a save during it writes the game from before it, which needs the evidence too.
+      if (gameBeforeConversation) gameBeforeConversation = apply(gameBeforeConversation);
+      set({ game: apply(get().game) });
+      save();
+    };
+
     /** A Recap's evidence moves Proficiency. */
-    const applyRecap = (conversation: Conversation, recap: Recap) => {
+    const applyRecap = (play: number, conversation: Conversation, recap: Recap) => {
       const evidence: ConversationEvidence = {
         cefrEstimate: recap.cefrEstimate,
         lines: conversation.lines.map(({ speaker, text }) => ({ speaker, text })),
         helpLog: conversation.helpLog,
         notUnderstoodTurns: conversation.patience.turnsNotUnderstood,
       };
-      set({ game: applyRecapEvidence(get().game, evidence) });
+      applyEvidence(play, (game) => applyRecapEvidence(game, evidence));
     };
 
     /** A Recap as the Journal keeps it: each new word with its reading if that passes the checks, or with the library's. */
@@ -478,7 +989,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
      * while this conversation is still open.
      */
     const writeRecap = (conversation: Conversation, outcome: ClosingCard) => {
-      const { game, nativeLanguage } = get();
+      const { game, nativeLanguage, slotId } = get();
+      const play = plays;
       const { culturePackId, targetLanguage } = game.identity;
       const { npcId, interaction, helpLog } = conversation;
       const transcript = transcriptOf(conversation.lines);
@@ -513,7 +1025,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         .requestRecap(request)
         .then(
           (recap) => {
-            applyRecap(conversation, recap);
+            applyRecap(play, conversation, recap);
             updateRecap(conversation.id, { status: 'ready', entry: journalPage(entry(recap)) });
             return recap;
           },
@@ -526,7 +1038,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         // The Journal keeps the corrected readings, so it waits for the last lines' annotations.
         .then(async (recap) => {
           await Promise.allSettled(lineReadings.get(conversation.id)?.annotating ?? []);
-          return deps.journal.append(JOURNAL_SLOT_ID, entry(recap));
+          return deps.journal.append(slotId, entry(recap));
         })
         .catch((error: unknown) => console.error('[journal] could not save an entry:', error))
         .finally(() => lineReadings.delete(conversation.id));
@@ -730,8 +1242,15 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             readLine(conversation, index);
           }),
           onInputTranscript: live((current, text: string) => {
-            const { lines, index } = addPiece(current.lines, current.heardLine, 'player', text);
-            set({ conversation: { ...current, lines, heardLine: index } });
+            // The conversation waits while Help is open, and is over once the outcome is decided: the open mic isn't heard then.
+            if (openMicOn() && !openMicListens(current)) return;
+            // With open mic, nothing marks a new turn but the Player starting to speak: what the NPC says next is a new line.
+            const turn =
+              openMicOn() && current.heardLine === null
+                ? { ...current, tab: 'chat' as const, npcLine: null, patience: newPlayerTurn(current.patience) }
+                : current;
+            const { lines, index } = addPiece(turn.lines, turn.heardLine, 'player', text);
+            set({ conversation: { ...turn, lines, heardLine: index } });
           }),
           onTurnComplete: live((current, spoken?: SpokenTurn) => {
             const finished = current.npcLine;
@@ -740,22 +1259,25 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
             if (finished !== null) annotate(current.id, finished, current.lines[finished]!.text);
             // Once the outcome is decided, the turn that just ended was the goodbye.
             if (current.outcome) return showClosingCard();
-            updateConversation({ npcLine: null });
+            // With open mic, whatever the Player says after the NPC's turn is a new line.
+            updateConversation(openMicOn() ? { npcLine: null, heardLine: null } : { npcLine: null });
           }),
           onToolCall: live((current, call: ToolCall) => session.sendToolResponse(call.id, answerToolCall(current, call))),
           onMicLevel: live((current, level: number) => {
-            if (current.listening) set({ micLevel: level });
+            if (current.listening || openMicOn()) set({ micLevel: level });
           }),
-          onMicUnavailable: live(() => {
-            // The Typed Fallback from now on, until the page is reloaded.
-            set({ micLevel: 0, inputMode: 'typed' });
+          onMicUnavailable: live((current) => {
+            set({ micLevel: 0 });
+            setInputMode('typed');
+            remindMicOff(current.id);
           }),
           onUsage: live((current, turn: TokenUsage) => set({ conversation: { ...current, usage: addUsage(current.usage, turn) } })),
           onDisconnect: live((current) => connectionFailed(current, sessionFor)),
         },
-        { resumeFrom, typedOnly: get().inputMode === 'typed' },
+        { resumeFrom, typedOnly: get().inputMode === 'typed', openMic: openMicOn() },
       );
       voice = session;
+      openMicStreaming = true;
       updateConversation({ npcVoice: npcSession.voice });
       session.connect().then(
         live(() => {
@@ -798,8 +1320,10 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
 
     /** Opens a conversation with `partner`, whose session `sessionFor` builds. They speak first. */
     const openConversation = (partner: Partner, sessionFor: SessionFor) => {
+      gameBeforeConversation = get().game;
       const id = ++conversations;
       lineReadings.set(id, { readings: {}, annotating: [] });
+      remindMicOff(id);
       set({
         voiceUnavailable: false,
         conversation: {
@@ -830,20 +1354,17 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       openSession(sessionFor);
     };
 
-    const game = initial ?? newGame();
-    // While the town loads, so the first line doesn't wait for a dictionary.
-    deps.readings.preload(game.identity.targetLanguage).then(
-      () => {
-        // A line that came in before the library had loaded gets its reading now.
-        const conversation = get().conversation;
-        conversation?.lines.forEach((line, i) => line.speaker === 'npc' && !conversation.readings[i] && readLine(conversation, i));
-      },
-      (error: unknown) => console.warn('[readings] the library could not load:', error instanceof Error ? error.message : error),
-    );
-
     return {
-      game,
+      screen: initial ? 'playing' : 'title',
+      title: initial ? null : { status: 'checking' },
+      setup: null,
+      arrival: 'newGame',
+      slotId: SLOT_IDS[0],
+      savedCount: 0,
+      // On the title screen, a new game stands in until a game is chosen.
+      game: initial ?? createSave(DEV_SETUP),
       tabHidden: false,
+      pauseMenu: false,
       onStreet: false,
       interactable: null,
       tramChoosing: false,
@@ -854,16 +1375,136 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       toast: null,
       voiceUnavailable: false,
       nativeLanguage: DEV_NATIVE_LANGUAGE,
-      inputMode: 'mic',
+      readingAids: { show: DEFAULT_DEVICE_SETTINGS.readingAids, romaji: DEFAULT_DEVICE_SETTINGS.showRomaji },
+      inputMode: DEFAULT_DEVICE_SETTINGS.inputMode,
+      micCheckPassed: DEFAULT_DEVICE_SETTINGS.micCheckPassed,
+      talkMode: DEFAULT_DEVICE_SETTINGS.talkMode,
+      micRetry: null,
+      micOffReminder: null,
       journal: null,
+      persistCallout: false,
       sign: null,
+      openTitle: () => {
+        set({ title: { status: 'checking' } });
+        const devTarget = deps.devNewGameTarget();
+        if (devTarget) startingDevGame = true;
+        // The settings come first, so the title shows in the Player's language.
+        settingsWrites
+          .then(() => deps.deviceSettings.load())
+          .then(
+            ({ nativeLanguage, readingAids, showRomaji, inputMode, micCheckPassed, talkMode }) =>
+              set({ nativeLanguage, readingAids: { show: readingAids, romaji: showRomaji }, inputMode, micCheckPassed, talkMode }),
+            (error: unknown) => console.warn('[settings] could not be read:', error),
+          )
+          .then(() => (devTarget ? startDevNewGame(devTarget) : checkSlots()));
+      },
+      continueGame: () => {
+        const continueSlotId = readyTitle()?.continueSlotId;
+        if (continueSlotId) get().playSlot(continueSlotId);
+      },
+      playSlot: (slotId) => {
+        const slot = readyTitle() ? slots.find((s) => s.slotId === slotId) : undefined;
+        if (slot?.status === 'ready') playLoaded(slot);
+      },
+      newGame: () => {
+        const freeSlotId = readyTitle()?.freeSlotId;
+        if (!freeSlotId) return;
+        // The Native Language from the device settings: the one the browser suggests, until the Player chooses.
+        set({
+          screen: 'setup',
+          title: null,
+          setup: {
+            slotId: freeSlotId,
+            step: 'nativeLanguage',
+            targetLanguage: null,
+            startingStep: null,
+            characterName: '',
+            appearance: DEFAULT_APPEARANCE,
+            mic: null,
+          },
+        });
+      },
+      setNativeLanguage: (nativeLanguage) => {
+        const setup = get().setup;
+        // A Target Language can't be the Native Language, so one just made it is forgotten.
+        set({ nativeLanguage, setup: setup?.targetLanguage === nativeLanguage ? { ...setup, targetLanguage: null } : setup });
+        updateDeviceSettings((settings) => ({ ...settings, nativeLanguage }));
+      },
+      chooseTargetLanguage: (targetLanguage) => {
+        if (targetLanguage !== get().nativeLanguage) answerSetup({ targetLanguage });
+      },
+      chooseStartingStep: (startingStep) => answerSetup({ startingStep }),
+      nameCharacter: (characterName) => answerSetup({ characterName: [...characterName.trimStart()].slice(0, CHARACTER_NAME.maxLength).join('') }),
+      chooseAppearance: (change) => {
+        const setup = get().setup;
+        if (setup) answerSetup({ appearance: { ...setup.appearance, ...change } });
+      },
+      setupNext: () => {
+        const { setup, nativeLanguage, micCheckPassed } = get();
+        if (get().screen !== 'setup' || !setup || !setupAnswered(setup, nativeLanguage)) return;
+        const next = nextSetupStep(setup.step, micCheckPassed);
+        if (!next) return startNewGame(setup);
+        set({ setup: { ...setup, step: next, mic: next === 'micCheck' ? 'asking' : null } });
+        if (next === 'micCheck') startMicCheck();
+      },
+      setupBack: () => {
+        const setup = get().setup;
+        if (get().screen !== 'setup' || !setup) return;
+        if (setup.step === 'micCheck') stopMicCheck();
+        const before = SETUP_STEPS[SETUP_STEPS.indexOf(setup.step) - 1];
+        if (before) return set({ setup: { ...setup, step: before, mic: null } });
+        set({ screen: 'title', setup: null, title: { status: 'checking' } });
+      },
+      skipMicCheck: () => {
+        const setup = get().setup;
+        if (get().screen === 'setup' && setup?.step === 'micCheck') startNewGame(setup);
+      },
+      exportSave: (slotId) => void download(() => exportSave(stores, slotId)),
+      exportRawSave: (slotId) => void download(() => exportRawSave(stores, slotId)),
+      importSave: (contents) => {
+        const freeSlotId = readyTitle()?.freeSlotId;
+        if (!freeSlotId) return;
+        askToPersist();
+        importSave(stores, freeSlotId, contents).then(
+          () => checkSlots({ kind: 'imported', slotId: freeSlotId }),
+          (error: unknown) => {
+            console.warn('[save] import refused:', error instanceof Error ? error.message : error);
+            setNotice(error instanceof ImportRefused ? { kind: 'importRefused', problem: error.problem } : { kind: 'importFailed' });
+          },
+        );
+      },
+      deleteSave: (slotId, typedName) => {
+        const card = readyTitle()?.slots.find((slot) => slot.slotId === slotId);
+        if (!card || card.status === 'empty' || typedName.trim() !== nameToDelete(card)) return;
+        deleteSave(stores, slotId).then(
+          () => checkSlots(),
+          (error: unknown) => {
+            console.error('[save] could not delete:', error);
+            setNotice({ kind: 'deleteFailed' });
+          },
+        );
+      },
+      dismissTitleNotice: () => {
+        const title = readyTitle();
+        if (title?.notice) set({ title: { ...title, notice: null } });
+      },
+      dismissPersistCallout: () => {
+        set({ persistCallout: false });
+        markSeen(PERSIST_REFUSED);
+      },
+      saveNow: () => save(),
       advance: (realDeltaMs) => {
+        if (get().screen !== 'playing') return;
         const before = get().game;
         const dt = gameMinutesFor(realDeltaMs, selectTimeScale(get()));
         if (dt > 0) set({ game: tick(before, dt) });
+        realMsSinceSave += realDeltaMs;
+        const after = get().game;
+        if (after.clock.day !== before.clock.day || realMsSinceSave >= SAVE.everyRealMs) save();
       },
       setTabHidden: (tabHidden) => {
         set({ tabHidden });
+        if (tabHidden) save();
       },
       // The world calls these every frame, so they only notify on a change.
       enterPlace: (placeId) => {
@@ -873,6 +1514,8 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const game = enterPlace(before, placeId, hours);
         if (game === get().game) return;
         set({ game });
+        // Through a door.
+        save();
       },
       setOnStreet: (onStreet) => {
         if (onStreet !== get().onStreet) set({ onStreet });
@@ -916,7 +1559,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       talk: () => {
         const { interactable, conversation, game } = get();
-        if (conversation || get().journal || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
+        if (conversation || get().journal || get().pauseMenu || !isTownNpc(interactable) || !isAtWork(interactable, game)) return;
         const interaction = selectTalkWithE(get());
         if (!interaction) return;
         startConversation(interaction);
@@ -944,7 +1587,7 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
       },
       startTalking: () => {
         const conversation = get().conversation;
-        if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed') return;
+        if (!canTakeTurn(conversation) || !voice || conversation.listening || get().inputMode === 'typed' || openMicOn()) return;
         voice.startTalking();
         // A new turn: anything the NPC says next starts a new line, and so does what it hears.
         set({
@@ -1020,15 +1663,48 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         const annotation = conversation.annotations[line];
         if (!annotation || annotation.status === 'failed') annotate(conversation.id, line, npcLine.text);
       },
+      setReadingAids: (change) => {
+        const readingAids = { ...get().readingAids, ...change };
+        set({ readingAids });
+        updateDeviceSettings((settings) => ({ ...settings, readingAids: readingAids.show, showRomaji: readingAids.romaji }));
+      },
+      setTalkMode: (talkMode) => {
+        set({ talkMode });
+        updateDeviceSettings((settings) => ({ ...settings, talkMode }));
+      },
+      chooseTypedFallback: () => {
+        micRetryRun++;
+        set({ micRetry: null });
+        setInputMode('typed');
+      },
+      retryMic: () => {
+        if (get().micRetry === 'trying') return;
+        const run = ++micRetryRun;
+        set({ micRetry: 'trying' });
+        deps.openMic(() => {}).then(
+          (close) => {
+            // Only to see that it opens: a conversation opens its own.
+            close();
+            if (run !== micRetryRun) return;
+            set({ micRetry: null });
+            setInputMode('mic');
+          },
+          (error: unknown) => {
+            console.warn('[mic] still none to be had:', error instanceof Error ? error.message : error);
+            if (run === micRetryRun) set({ micRetry: 'failed' });
+          },
+        );
+      },
       addToPhrasebook: (word, glossLanguage) => {
         const game = addToPhrasebook(get().game, { text: word.base, reading: word.reading, gloss: word.gloss, glossLanguage });
         if (game === get().game) return;
         set({ game });
+        save();
       },
       openJournal: () => {
-        if (get().conversation || get().journal) return;
+        if (get().conversation || get().journal || get().pauseMenu) return;
         set({ journal: { entries: null, failed: false } });
-        deps.journal.list(JOURNAL_SLOT_ID).then(
+        deps.journal.list(get().slotId).then(
           (entries) => {
             if (get().journal) set({ journal: { entries, failed: false } });
           },
@@ -1039,6 +1715,31 @@ export function createGameStore(initial: GameState | null, overrides: Partial<Ga
         );
       },
       closeJournal: () => set({ journal: null }),
+      openPauseMenu: () => {
+        const { screen, conversation, journal, tramChoosing, voiceUnavailable } = get();
+        if (screen !== 'playing' || conversation || journal || tramChoosing || voiceUnavailable) return;
+        set({ pauseMenu: true });
+      },
+      closePauseMenu: () => {
+        if (!get().pauseMenu) return;
+        set({ pauseMenu: false });
+      },
+      quitToTitle: () => {
+        if (!get().pauseMenu) return;
+        // Saved before the screen changes, since only a game being played is saved. The title screen reads the slots
+        // after this write, so Continue plays on from here.
+        save();
+        set({
+          screen: 'title',
+          title: { status: 'checking' },
+          pauseMenu: false,
+          interactable: null,
+          sign: null,
+          tramChoosing: false,
+          typing: false,
+          micLevel: 0,
+        });
+      },
       setTyping: (typing) => set({ typing }),
       dismissToast: () => set({ toast: null }),
       dismissVoiceUnavailable: () => set({ voiceUnavailable: false }),
@@ -1055,11 +1756,66 @@ export function useGame<T>(selector: (state: GameStore) => T): T {
 
 // --- Selectors: the only way world and UI read game state -------------------
 
+export const selectScreen = (s: GameStore) => s.screen;
+
+/** The setup screen after this one, if any. A browser that has passed the mic check skips it. */
+function nextSetupStep(step: SetupStep, micCheckPassed: boolean): SetupStep | undefined {
+  const next = SETUP_STEPS[SETUP_STEPS.indexOf(step) + 1];
+  return next === 'micCheck' && micCheckPassed ? undefined : next;
+}
+
+/** Whether the setup screen showing has what it needs to go on. */
+function setupAnswered(setup: Setup, nativeLanguage: LanguageCode) {
+  switch (setup.step) {
+    case 'nativeLanguage':
+    case 'appearance':
+      return true;
+    case 'targetLanguage':
+      return setup.targetLanguage !== null && setup.targetLanguage !== nativeLanguage;
+    case 'aboutYou':
+      return setup.startingStep !== null && setup.characterName.trim() !== '';
+    // Start waits for the check to hear the Player or find no mic; Skip doesn't.
+    case 'micCheck':
+      return setup.mic === 'heard' || setup.mic === 'unavailable';
+  }
+}
+
+/** New game setup, while it shows: its screen and the answers so far. */
+export const selectSetup = (s: GameStore) => s.setup;
+export const selectSetupCanGoOn = (s: GameStore) => s.setup !== null && setupAnswered(s.setup, s.nativeLanguage);
+/** Whether the setup screen showing is the last, so going on starts the game. */
+export const selectSetupIsLast = (s: GameStore) => s.setup !== null && !nextSetupStep(s.setup.step, s.micCheckPassed);
 export const selectInputMode = (s: GameStore) => s.inputMode;
+export const selectTalkMode = (s: GameStore) => s.talkMode;
+export const selectMicRetry = (s: GameStore) => s.micRetry;
+export const selectMicOffChip = (s: GameStore): MicOffChip | null => {
+  if (s.inputMode !== 'typed' || !s.conversation) return null;
+  return s.micOffReminder?.conversationId === s.conversation.id ? 'enableInSettings' : 'off';
+};
+const TARGET_LANGUAGES = Object.fromEntries(
+  LANGUAGE_CODES.map((native) => [native, LANGUAGE_CODES.filter((language) => language !== native)]),
+) as Record<LanguageCode, LanguageCode[]>;
+/** The Target Languages on offer: every language but the Native Language. */
+export const selectTargetLanguages = (s: GameStore) => TARGET_LANGUAGES[s.nativeLanguage];
+export const selectTitle = (s: GameStore) => s.title;
+export const selectArrival = (s: GameStore) => s.arrival;
+export const selectSavedCount = (s: GameStore) => s.savedCount;
+export const selectPersistCallout = (s: GameStore) => s.persistCallout;
+/** The save Continue would load, as the title screen shows it, if there is one. */
+const continueCard = (s: GameStore) => {
+  const title = s.title?.status === 'ready' ? s.title : null;
+  const card = title?.slots.find((slot) => slot.slotId === title.continueSlotId);
+  return card?.status === 'ready' ? card : null;
+};
+/** The place the title screen shows: where the Continue save was left, or home. */
+export const selectTitlePlaceId = (s: GameStore): PlaceId => continueCard(s)?.placeId ?? 'home';
+/** The Character standing in the live scene behind the title screen: the look being chosen in setup, else the Continue save's. */
+export const selectShowcaseAppearance = (s: GameStore): AppearancePreset =>
+  s.setup?.appearance ?? continueCard(s)?.appearance ?? DEFAULT_APPEARANCE;
 export const selectAppearance = (s: GameStore) => s.game.identity.appearance;
 
 export const selectTimeScale = (s: GameStore) => {
-  if (s.tabHidden || s.journal || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
+  if (s.tabHidden || s.pauseMenu || s.journal || s.conversation?.tab === 'help') return CLOCK.timeScale.paused;
   return s.conversation ? CLOCK.timeScale.conversation : CLOCK.timeScale.normal;
 };
 export const selectMoneyInShifts = (s: GameStore) => s.game.character.moneyInShifts;
@@ -1117,8 +1873,19 @@ const NO_LINES: readonly ChatLine[] = [];
 export const selectChatLines = (s: GameStore) => s.conversation?.lines ?? NO_LINES;
 export const selectTyping = (s: GameStore) => s.typing;
 /** Keys belong to the UI, not the world: the typed field has focus, the Journal is open, or the Player is choosing a tram stop. */
-export const selectWorldKeysOff = (s: GameStore) => s.typing || s.journal !== null || s.tramChoosing;
+export const selectWorldKeysOff = (s: GameStore) => s.typing || s.pauseMenu || s.journal !== null || s.tramChoosing;
+export const selectPauseMenuOpen = (s: GameStore) => s.pauseMenu;
 export const selectListening = (s: GameStore) => s.conversation?.listening ?? false;
+/**
+ * The mic is open: push-to-talk is held, open mic is streaming (while the Player can take a turn in the chat), or the
+ * mic check is listening.
+ */
+export const selectMicOpen = (s: GameStore) => {
+  if (s.screen === 'setup') return s.setup?.step === 'micCheck' && s.setup.mic !== 'unavailable';
+  if (!s.conversation) return false;
+  const openMic = s.talkMode === 'open-mic' && s.inputMode === 'mic';
+  return s.conversation.listening || (openMic && takesTurns(s.conversation) && s.conversation.tab === 'chat');
+};
 export const selectMicLevel = (s: GameStore) => s.micLevel;
 export const selectReconnecting = (s: GameStore) => s.conversation?.reconnecting ?? false;
 /** The Player can take a turn: not while the NPC says goodbye once the outcome is decided, nor while reconnecting. */
@@ -1153,13 +1920,14 @@ export const selectTranslation =
   (line: number) =>
   (s: GameStore): TranslationView | null =>
     s.conversation?.translated.includes(line) ? (s.conversation.annotations[line] ?? TRANSLATING) : null;
+export const selectReadingAids = (s: GameStore) => s.readingAids;
 
 export const selectSignTooltip = (s: GameStore) => s.sign?.tooltip ?? null;
-/** An NPC line's reading aid. */
+/** An NPC line's reading aid, unless reading aids are hidden. */
 export const selectLineReading =
   (line: number) =>
   (s: GameStore): Segment[] | null =>
-    s.conversation?.readings[line]?.segments ?? null;
+    s.readingAids.show ? (s.conversation?.readings[line]?.segments ?? null) : null;
 /** The NPC partway through saying a line, for the "speaking…" indicator over them. */
 export const selectNpcSpeaking = (s: GameStore): TownNpcId | null =>
   s.conversation && !s.conversation.closed && s.conversation.npcLine !== null ? s.conversation.npcId : null;

@@ -25,11 +25,12 @@ export type PlaceId = (typeof PLACE_IDS)[number];
 /** A word or phrase the Player kept from a Recap, with its gloss in the Native Language it was saved in. */
 export type PhrasebookEntry = { text: string; reading: string; gloss: string; glossLanguage: LanguageCode; dayAdded: number };
 
-/** The setup a new game is built from. */
+/** The answers from New game setup that a save is built from. */
 export type NewGameSetup = {
   characterName: string;
   targetLanguage: LanguageCode;
   culturePackId: LanguageCode;
+  /** From the self-assessment. */
   startingStep: StartingStep;
   appearance: AppearancePreset;
   rngSeed: number;

@@ -19,7 +19,7 @@ Build mode: fast
   Learner check: Run `npm run dev`, walk into the café with WASD, press E and order a coffee out loud (or press T and type it). Does the barista understand you, read it back and serve it?
   Commit: `Order a coffee out loud at the café`
 
-- [ ] **2. Get unstuck with Help, then learn from the Recap**
+- [x] **2. Get unstuck with Help, then learn from the Recap**
   Becomes usable: In a conversation, the Help tab gives model sentences to say or hear for this moment, every NPC line can be translated and replayed, and Japanese and Chinese lines carry their readings. Each conversation ends with a Recap of up to three corrections and new words, kept in the Journal (J).
   Why now: Help is how a stuck learner recovers, the second moment in the scope's "What Working Looks Like", and the Recap is where they learn from each conversation. Both build on the conversation from slice 1 and need the gateway's prompted routes.
   PRD ref: `prd.md > The Core Journey` (steps 5 and 7), `prd.md > Features and Behavior > Help`, `prd.md > Features and Behavior > Recap and Journal`

@@ -107,6 +107,13 @@ body,
   white-space: nowrap;
 }
 
+.dock-saved {
+  /* Holds its line while empty, so the dock never jumps. */
+  min-height: 1.3em;
+  font-size: 11px;
+  color: var(--ok);
+}
+
 .dock-money {
   font-size: 18px;
   font-weight: 600;
@@ -235,6 +242,10 @@ body,
 
 .sign-tooltip rt {
   font-size: 0.6em;
+  color: var(--hud-muted);
+}
+
+.sign-tooltip .romaji-line {
   color: var(--hud-muted);
 }
 
@@ -414,7 +425,7 @@ body,
   cursor: default;
 }
 
-/* Reading aids: pinyin or furigana over the NPC's line. */
+/* Reading aids: pinyin or furigana over the NPC's line, and an optional romaji line under a Japanese one. */
 /* A reading wider than its kanji overhangs it, rather than spacing the kanji apart. */
 ruby {
   ruby-align: center;
@@ -428,6 +439,12 @@ ruby {
 .journal-lines ruby rt {
   font-size: 10px;
   color: #7b8496;
+}
+
+.romaji-line {
+  display: block;
+  font-size: 13px;
+  color: #4a5266;
 }
 
 /* Translate shows the Native Language line under the NPC's. */
@@ -650,6 +667,17 @@ ruby {
   color: #6b6458;
   font-size: 13px;
   line-height: 1.25;
+}
+
+/* Open mic: nothing to hold, so the dot shows the mic is live all along. */
+.mic-open {
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+
+.mic-open .mic-dot {
+  opacity: 1;
 }
 
 .chat-notice {
@@ -1024,6 +1052,569 @@ ruby {
   max-width: 640px;
 }
 
+/* --- Title screen ------------------------------------------------------------ */
+
+/* The menu and panel sit over the live town, with a dark gradient on the left so they stay readable. */
+.title-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 440px) 1fr;
+  align-items: center;
+  gap: clamp(16px, 4vw, 56px);
+  padding: 0 clamp(16px, 6vw, 80px);
+  background: linear-gradient(90deg, rgba(12, 15, 24, 0.94) 0%, rgba(12, 15, 24, 0.78) 38%, rgba(12, 15, 24, 0) 72%);
+  color: var(--hud-ink);
+}
+
+.title-menu h1 {
+  margin: 0 0 28px;
+  font-size: 40px;
+  letter-spacing: 0.02em;
+}
+
+.title-menu ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.title-menu li > button {
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--hud-muted);
+  font: inherit;
+  font-size: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-menu li > button[aria-current] {
+  color: var(--hud-ink);
+  font-weight: 700;
+}
+
+.title-menu li > button[aria-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.title-menu li > button:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 4px;
+}
+
+.title-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.title-panel,
+.pause-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  border-radius: 16px;
+  background: rgba(20, 24, 36, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.title-panel h2,
+.pause-panel h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.pause-panel p,
+.title-panel p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--hud-muted);
+}
+
+.title-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.title-toggle input {
+  margin-top: 4px;
+  accent-color: var(--ok);
+}
+
+.title-toggle input:disabled + span {
+  opacity: 0.45;
+}
+
+.title-toggle small {
+  display: block;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.title-panel button,
+.pause-panel button,
+.persist-callout button,
+.delete-dialog button {
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.title-panel button.primary,
+.pause-panel button.primary {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: #1d2433;
+  font-weight: 600;
+}
+
+.title-panel button.danger,
+.delete-dialog button.danger {
+  border-color: var(--low);
+  color: var(--low);
+}
+
+.title-panel button:disabled,
+.pause-panel button:disabled,
+.delete-dialog button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.title-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: stretch;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.title-panel .title-notice {
+  color: var(--hud-ink);
+}
+
+.title-panel .title-notice-close {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 0;
+}
+
+.slot-summary,
+.slot-damaged {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.slot-summary strong,
+.slot-damaged strong {
+  font-size: 17px;
+}
+
+.slot-when {
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.slot-backup {
+  font-size: 13px;
+  color: #f2d16b;
+}
+
+.slot-damaged strong {
+  color: #f2d16b;
+}
+
+.slot-actions {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.slot-row .slot-actions {
+  margin-top: 0;
+}
+
+.slot-row .slot-damaged {
+  grid-column: 2 / -1;
+}
+
+.slot-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hud-muted);
+}
+
+.slot-empty {
+  grid-column: 2 / -1;
+  color: var(--hud-muted);
+}
+
+.slot-more {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #1d2433;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.title-keys {
+  position: absolute;
+  left: clamp(16px, 6vw, 80px);
+  bottom: 20px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.title-keys kbd,
+.title-screen kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  font: inherit;
+}
+
+.persist-callout {
+  position: absolute;
+  right: 20px;
+  /* Above the dock's line, so it never covers the dock's buttons. */
+  bottom: 150px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.persist-callout p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.delete-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: #1d2433;
+  color: var(--hud-ink);
+}
+
+.delete-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.delete-dialog p {
+  margin: 0;
+  color: var(--hud-muted);
+}
+
+.delete-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.delete-dialog input {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+}
+
+.delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* --- Setup ----------------------------------------------------------------- */
+
+.setup-screen {
+  grid-template-columns: minmax(0, 480px) 1fr;
+}
+
+.setup-panel {
+  align-items: stretch;
+}
+
+.setup-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.setup-choice {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.setup-choice:has(input:checked) {
+  border-color: var(--ok);
+  background: rgba(111, 207, 142, 0.14);
+}
+
+.setup-choice:has(input:focus-visible) {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.setup-choice input {
+  align-self: center;
+  margin: 0;
+  accent-color: var(--ok);
+}
+
+.setup-choice span {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.setup-choice small {
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+/* Screens 2 and 3: one choice per row, as each carries a sentence. */
+.setup-choices-single {
+  grid-template-columns: 1fr;
+}
+
+.setup-choice .setup-sentence {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.setup-appearance-part {
+  margin-top: 2px;
+}
+
+.setup-appearance-part legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+/* The parts of a look are short words, so each row holds as many as fit, each as wide as its word. */
+.setup-choices-hats,
+.setup-choices-eyewear,
+.setup-choices-neckwear {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.setup-appearance-part .setup-choice {
+  position: relative;
+  flex: 1 0 auto;
+  justify-content: center;
+  padding: 7px 12px;
+}
+
+.setup-appearance-part .setup-choice input {
+  position: absolute;
+  opacity: 0;
+}
+
+.setup-appearance-part .setup-choice small {
+  font-size: 14px;
+  color: var(--hud-ink);
+}
+
+.setup-choices-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+/* A round sample of the colour, ringed when chosen. */
+.setup-swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: var(--swatch);
+  cursor: pointer;
+}
+
+.setup-swatch:has(input:checked) {
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px rgba(111, 207, 142, 0.35);
+}
+
+.setup-swatch:has(input:focus-visible) {
+  outline: 2px solid var(--ok);
+  outline-offset: 3px;
+}
+
+.setup-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.setup-name {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--hud-muted);
+}
+
+.setup-name input {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hud-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.setup-name input:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.setup-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Skip sits beside Start, away from Back. */
+.setup-actions .setup-skip {
+  margin-left: auto;
+}
+
+.setup-tip {
+  margin: 0;
+  font-size: 14px;
+  color: var(--hud-muted);
+}
+
+/* The mic check's live level: a bar that fills with how loud the Player is, green once heard. */
+.mic-meter {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.mic-meter::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #e5484d;
+  transform: scaleX(var(--level, 0));
+  transform-origin: left;
+  transition: transform 80ms linear;
+}
+
+.mic-meter[data-heard]::before {
+  background: var(--ok);
+}
+
+.setup-mic-status {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 15px;
+}
+
+.setup-mic-status[data-status='heard'] {
+  color: var(--ok);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .title-screen {
+    grid-template-columns: 1fr;
+    align-content: center;
+  }
+}
+
 /* Anchored to the NPC in the scene while a line of theirs is coming in. */
 .npc-speaking {
   padding: 2px 8px;
@@ -1033,4 +1624,112 @@ ruby {
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* --- Settings, the pause menu and the credits --------------------------------- */
+
+.pause-panel {
+  width: min(440px, calc(100vw - 32px));
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: stretch;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pause-actions button {
+  width: 100%;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: stretch;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.settings-group legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  align-self: stretch;
+}
+
+.settings-row small {
+  display: block;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.settings-row select {
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+}
+
+.settings-row option {
+  color: #1d2433;
+}
+
+.settings-retry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-left: 26px;
+}
+
+.settings-retry [role='status'] {
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.credits-section {
+  align-self: stretch;
+}
+
+.credits-section h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.credits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credits-list a {
+  color: var(--ok);
+}
+
+.credits-list small {
+  display: block;
+  font-size: 12px;
+  color: var(--hud-muted);
 }

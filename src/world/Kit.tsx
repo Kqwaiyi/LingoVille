@@ -3,13 +3,13 @@ import { useFrame } from '@react-three/fiber';
 import { CuboidCollider } from '@react-three/rapier';
 import { useEffect, useMemo, useRef } from 'react';
 import { Box3, InstancedMesh, Matrix4, Quaternion, Vector3, type BufferGeometry, type Material, type Mesh, type Object3D } from 'three';
-import { selectLampsOn, useGame } from '../store/index.ts';
+import { selectLampsOn, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { GLASS, LAMP, litGlass, namedMaterial } from './materials.ts';
 import { LAMP_BULBS, TOWN_ART_URL, WINDOW_GLASS, type ArtPiece, type Repaint, type Size } from './townArt.ts';
 
 export type { Repaint, Size };
-import type { Vec2, Vec3 } from './town.ts';
+import { spawnAt, type Vec2, type Vec3 } from './town.ts';
 
 // The town's kit pieces, from `public/town/town.glb`: every building, street piece and stick of furniture is one of
 // these, in palette colours and the surfaces they're made of (`materials.ts`).
@@ -124,6 +124,17 @@ export function crossesFootprint(from: Point, to: Point, { centre: [cx, cz], siz
   return true;
 }
 
+/** Where the camera looks: at the Character, or on the title screen at the place the save was left. */
+function useLookedAt() {
+  const playing = useGame(selectScreen) === 'playing';
+  const titlePlaceId = useGame(selectTitlePlaceId);
+  return (): Point => {
+    if (playing) return characterPosition;
+    const [x, , z] = spawnAt(titlePlaceId);
+    return { x, z };
+  };
+}
+
 /**
  * One kit piece among many drawn together (`Instances`): where it stands, how it's turned, sized and repainted, as a
  * `Piece` takes them. `lit` lights its window glass and bulb once the lamps are on; `lift` names the footprint (an
@@ -167,6 +178,7 @@ type Batch = { mesh: InstancedMesh; matrices: Matrix4[]; lifts: (number | undefi
 export function Instances({ placements, lifts = [], liftMargin = LIFT_MARGIN }: { placements: readonly Placement[]; lifts?: readonly Footprint[]; liftMargin?: number }) {
   const art = useTownArt();
   const lampsOn = useGame(selectLampsOn);
+  const lookedAt = useLookedAt();
   const batches = useMemo(() => {
     // Batched by mesh, not by piece: a piece's parts that aren't repainted (its trim, its frames) are drawn together
     // across every repaint of it, and only glass and bulbs care whether they light up.
@@ -210,7 +222,7 @@ export function Instances({ placements, lifts = [], liftMargin = LIFT_MARGIN }: 
   const lifted = useRef('');
   useFrame(({ camera }) => {
     if (lifts.length === 0) return;
-    const target = characterPosition;
+    const target = lookedAt();
     const inTheWay = lifts.map((footprint, i) => crossesFootprint(camera.position, target, footprint, liftMargin + (lifted.current[i] === '1' ? LIFT_HYSTERESIS : 0)));
     const key = inTheWay.map(Number).join('');
     if (key === lifted.current) return;

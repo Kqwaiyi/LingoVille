@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { CanvasTexture, Mesh, SRGBColorSpace } from 'three';
 import { SIGN_IDS, worldSign, type SignId, type SignLine } from '../content/index.ts';
 import { MOVEMENT } from '../sim/index.ts';
-import { selectCulturePackId, useGame } from '../store/index.ts';
+import { selectCulturePackId, selectScreen, selectTitlePlaceId, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { placeAt, SIGNS } from './town.ts';
 import { PALETTE } from './palette.ts';
@@ -69,8 +69,10 @@ function paintSign(lines: SignLine[], [width, height]: readonly [number, number]
  */
 function Sign({ signId }: { signId: SignId }) {
   const packId = useGame(selectCulturePackId);
+  const playing = useGame(selectScreen) === 'playing';
   const pointAtSign = useGame((s) => s.pointAtSign);
   const unpointSign = useGame((s) => s.unpointSign);
+  const titlePlaceId = useGame(selectTitlePlaceId);
   const { position, size, rotation = 0, liftsInside } = SIGNS[signId];
   const board = useRef<Mesh>(null);
   const texture = useMemo(() => paintSign(worldSign(signId, packId), size), [signId, packId, size]);
@@ -89,13 +91,14 @@ function Sign({ signId }: { signId: SignId }) {
   useFrame(() => {
     if (liftsInside && board.current) {
       // Lifted off, the board is out of sight and out of the pointer's way, so signs behind it can still be pointed at.
-      const lifted = placeAt(characterPosition.x, characterPosition.z) === liftsInside;
+      // On the title screen, as the roof does, off the save's place.
+      const lifted = playing ? placeAt(characterPosition.x, characterPosition.z) === liftsInside : titlePlaceId === liftsInside;
       board.current.visible = !lifted;
       board.current.raycast = lifted ? () => {} : Mesh.prototype.raycast;
     }
     if (!hovered.current) return;
     const distance = Math.hypot(characterPosition.x - position[0], characterPosition.z - position[2]);
-    const inRange = distance <= MOVEMENT.signReadRangeMetres;
+    const inRange = playing && distance <= MOVEMENT.signReadRangeMetres;
     if (inRange && !shown.current) pointAtSign(signId);
     if (!inRange && shown.current) unpointSign(signId, true);
     shown.current = inRange;
@@ -133,9 +136,10 @@ function Sign({ signId }: { signId: SignId }) {
 
 /** Every sign and menu in the town. */
 export function Signs() {
+  const playing = useGame(selectScreen) === 'playing';
   // The camera follows the Character, so what's under a resting pointer changes without the pointer moving.
   useFrame(({ events }) => {
-    events.update?.();
+    if (playing) events.update?.();
   });
   return SIGN_IDS.map((signId) => <Sign key={signId} signId={signId} />);
 }

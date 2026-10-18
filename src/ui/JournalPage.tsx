@@ -1,7 +1,7 @@
 import { TOWN_NPCS } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
-import { selectInPhrasebook, useGame, type JournalPage, type NewWord } from '../store/index.ts';
+import { selectInPhrasebook, selectReadingAids, useGame, type JournalPage, type NewWord } from '../store/index.ts';
 import { formatClock } from './format.ts';
 import { ReadingLine, RubyText } from './Ruby.tsx';
 
@@ -16,9 +16,10 @@ export function HearItSaid({ text, language }: { text: string; language?: Langua
   );
 }
 
-/** A word with its reading over it, when it has one. */
+/** A word with its reading over it, when it has one and reading aids show. */
 export function Reading({ base, reading, language }: { base: string; reading: string; language: LanguageCode }) {
-  if (!reading || reading === base) return <>{base}</>;
+  const { show } = useGame(selectReadingAids);
+  if (!show || !reading || reading === base) return <>{base}</>;
   return <RubyText language={language} segments={[{ base, reading }]} />;
 }
 

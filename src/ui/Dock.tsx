@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatLocalMoney, formatTime } from '../content/index.ts';
 import { useTranslation } from '../i18n/index.ts';
-import { PLACE_LINE } from '../sim/index.ts';
+import { PLACE_LINE, SAVE } from '../sim/index.ts';
 import {
   selectClockMinute,
   selectCulturePackId,
@@ -10,6 +10,7 @@ import {
   selectPlaceHours,
   selectPlaceId,
   selectPlaceOpen,
+  selectSavedCount,
   selectWeekday,
   useGame,
 } from '../store/index.ts';
@@ -28,6 +29,22 @@ function Money() {
       </div>
     </div>
   );
+}
+
+/** "Saved ✓" under the clock for a moment after each save. Silent: it makes no sound. */
+function SavedNotice() {
+  const { t } = useTranslation();
+  const savedCount = useGame(selectSavedCount);
+  const [shownFor, setShownFor] = useState(0);
+
+  useEffect(() => {
+    if (savedCount === 0) return;
+    setShownFor(savedCount);
+    const timer = setTimeout(() => setShownFor(0), SAVE.noticeMs);
+    return () => clearTimeout(timer);
+  }, [savedCount]);
+
+  return <div className="dock-saved">{shownFor > 0 ? t('dock.saved') : ''}</div>;
 }
 
 /**
@@ -98,6 +115,7 @@ export function Dock() {
             {formatClock(minute)}
           </time>
           <div className="dock-day">{t('dock.day', { day, weekday: t(`weekdays.${weekday}`) })}</div>
+          <SavedNotice />
         </div>
         <div className="dock-sep" aria-hidden />
         <Money />

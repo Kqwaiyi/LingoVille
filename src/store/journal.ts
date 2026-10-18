@@ -1,10 +1,10 @@
-import { createStore, get, update, type UseStore } from 'idb-keyval';
+import { createStore, del, get, set, update, type UseStore } from 'idb-keyval';
 import { z } from 'zod';
 import { SegmentSchema } from '../ai/index.ts';
 import { INTERACTIONS, NAMED_NPCS, type NamedNpcId } from '../content/index.ts';
 
 // The Journal: every Recap the Player has had, kept per slot in its own IndexedDB
-// database. Entries are only ever added. Each holds the
+// database, apart from the save. Entries are only ever added. Each holds the
 // text as it was rendered, in the Native Language it was written in, so later
 // changes to prompts or settings never rewrite history.
 
@@ -102,6 +102,12 @@ export type Journal = {
   append(slotId: string, entry: NewJournalEntry): Promise<JournalEntry>;
   /** Every entry in the slot's Journal, newest first. Rejects, naming the slot, if any entry can't be read. */
   list(slotId: string): Promise<JournalEntry[]>;
+  /** The slot's entries as stored, oldest first, readable or not. */
+  raw(slotId: string): Promise<unknown[]>;
+  /** Puts a whole Journal, oldest first, into a slot, in place of any it had. */
+  restore(slotId: string, entries: JournalEntry[]): Promise<void>;
+  /** Removes the slot's Journal. */
+  remove(slotId: string): Promise<void>;
 };
 
 export function createJournal(openStore: () => UseStore): Journal {
@@ -131,6 +137,11 @@ export function createJournal(openStore: () => UseStore): Journal {
         })
         .reverse();
     },
+    raw: async (slotId) => (await get<unknown[]>(slotId, entries())) ?? [],
+    restore: async (slotId, restored) => {
+      await set(slotId, restored.map((entry) => JournalEntrySchema.parse(entry)), entries());
+    },
+    remove: (slotId) => del(slotId, entries()),
   };
 }
 

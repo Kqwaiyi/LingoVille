@@ -80,6 +80,19 @@ export type VoiceSessionOptions = {
   resumeFrom?: TranscriptLine[];
   /** The Player is in the Typed Fallback: the session never asks for the mic. */
   typedOnly?: boolean;
+  /**
+   * Open mic: the mic streams from connect and automatic voice activity detection
+   * decides when the Player starts and stops. `stopTalking` and `startTalking`
+   * then only stop and resume streaming it, while the conversation waits.
+   */
+  openMic?: boolean;
 };
+
+/**
+ * Opens the mic for the mic check and reports how loud it is, from 0 to 1, on
+ * the same scale as a conversation's mic level, until the returned function
+ * closes it. Rejects if the Player refuses the mic or has none.
+ */
+export type OpenMic = (onLevel: (level: number) => void) => Promise<() => void>;
 
 export type OpenVoiceSession = (session: NpcSession, events: VoiceSessionEvents, options?: VoiceSessionOptions) => VoiceSession;

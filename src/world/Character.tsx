@@ -14,15 +14,19 @@ import { TOWN_NPC_IDS, TOWN_NPCS } from '../content/index.ts';
 import { CLOCK, MOVEMENT, PLACE_IDS, type PlaceId } from '../sim/index.ts';
 import {
   selectAppearance,
+  selectArrival,
+  selectPlaceId,
   selectTramArrival,
   selectTramRunning,
   selectWorldKeysOff,
   useGame,
+  type Arrival,
   type Interactable,
 } from '../store/index.ts';
 import { CharacterFigure, WALK_METRES_PER_SECOND } from './CharacterFigure.tsx';
 import type { Control } from './controls.ts';
 import {
+  IN_BED,
   isWaitingForTram,
   NPC_SPOTS,
   placeAt,
@@ -34,10 +38,12 @@ import {
 
 /**
  * Where the Character appears. A new game starts at home
- * (or, in dev, wherever `?spawn=` says).
+ * (or, in dev, wherever `?spawn=` says); Continue puts the Character at the
+ * saved place's entrance, or in bed if that's home.
  */
-function spawnPoint(search: string): Vec3 {
-  return spawnAt(devSpawnPlace(search));
+function spawnPoint(arrival: Arrival, placeId: PlaceId, search: string): Vec3 {
+  if (arrival === 'newGame') return spawnAt(devSpawnPlace(search));
+  return placeId === 'home' ? IN_BED : spawnAt(placeId);
 }
 
 /** Dev only: `?spawn=cafe` starts a new game at the café door, to skip the walk across town. */
@@ -124,10 +130,12 @@ export function Character() {
   const model = useRef<Group>(null);
   const fallSpeed = useRef(0);
   const orbit = useOrbitDrag();
+  const arrival = useGame(selectArrival);
+  const startPlaceId = useGame(selectPlaceId);
   // Where the Character appeared. Fixed at mount: after that, the Character walks.
   // A copy of its own, the same array every render: a new one would put the body back here each time the Character re-renders.
   const [spawn] = useState((): [number, number, number] => {
-    const point = spawnPoint(window.location.search);
+    const point = spawnPoint(arrival, startPlaceId, window.location.search);
     characterPosition.set(...point);
     return [...point];
   });

@@ -43,7 +43,7 @@ export const AppearancePresetSchema = z.object({
 /** One look on Clawd: a hat, eyewear and neckwear (any of them none), and the colour they come in. */
 export type AppearancePreset = z.infer<typeof AppearancePresetSchema>;
 
-/** The look a new game starts with: Clawd as the mascot is, wearing nothing. */
+/** The look setup starts from, until the Player chooses: Clawd as the mascot is, wearing nothing. */
 export const DEFAULT_APPEARANCE: AppearancePreset = { hat: 'none', eyewear: 'none', neckwear: 'none', colour: 'denim' };
 
 /** The builds an NPC Voice suits. Clawd's shape is the same for both: only the voice tells. */

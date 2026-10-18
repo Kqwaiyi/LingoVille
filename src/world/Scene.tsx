@@ -3,10 +3,11 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
 import { Suspense, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { Group, Mesh, SkinnedMesh } from 'three';
-import { useGame } from '../store/index.ts';
+import { gameStore, selectScreen, selectTitle, useGame } from '../store/index.ts';
 import { CONTROLS } from './controls.ts';
 import { Character } from './Character.tsx';
 import { Effects } from './Effects.tsx';
+import { TitleShowcase } from './TitleShowcase.tsx';
 import { Town } from './Town.tsx';
 import { Lighting } from './Lighting.tsx';
 
@@ -20,11 +21,18 @@ function ClockDriver() {
 /** How many of the town's materials come into view each frame as it first appears, so each frame compiles only a few. */
 const REVEAL_PER_FRAME = 4;
 
+/** Whether the game has finished opening: the title screen has read the saves, or a game has started. */
+function opened() {
+  const state = gameStore.getState();
+  return selectScreen(state) !== 'title' || selectTitle(state)?.status !== 'checking';
+}
+
 /**
  * Brings what it holds into view a few materials at a time, once their shaders have been compiled (in parallel, off the
- * page's main thread, where the browser can: `compileAsync`). Drawn all at once, the town's first frame would compile
- * every shader it has in one go, holding the page up for a second or more; this way the page opens first and keeps
- * answering while the town comes in, over a few frames. (Figures, which hide parts of themselves, are left as they are.)
+ * page's main thread, where the browser can: `compileAsync`) and the game has opened. Drawn all at once, the town's
+ * first frame would compile every shader it has in one go, holding the page up for a second or more while the title
+ * screen is still reading the saves; this way the page opens first and keeps answering while the town comes in, over
+ * a few frames. (Figures, which hide parts of themselves, are left as they are.)
  */
 function Precompiled({ children }: { children: ReactNode }) {
   const group = useRef<Group>(null);
@@ -45,14 +53,15 @@ function Precompiled({ children }: { children: ReactNode }) {
   }, [gl, camera, scene]);
   useFrame(() => {
     const { ready, waiting } = reveal.current;
-    if (!ready || waiting.length === 0) return;
+    if (!ready || waiting.length === 0 || !opened()) return;
     for (const mesh of waiting.splice(0, REVEAL_PER_FRAME).flat()) mesh.visible = true;
   });
   return <group ref={group}>{children}</group>;
 }
 
-/** The live town, with the Character in it. */
+/** The live town: behind the title screen, and then the game itself. */
 export function Scene() {
+  const screen = useGame(selectScreen);
   return (
     <KeyboardControls map={CONTROLS}>
       {/* No multisampling of its own: the frame is drawn into the effects' buffers, which anti-alias it at the end.
@@ -67,7 +76,7 @@ export function Scene() {
             <Precompiled>
               <Town />
             </Precompiled>
-            <Character />
+            {screen === 'playing' ? <Character /> : <TitleShowcase />}
           </Physics>
         </Suspense>
         <Effects />

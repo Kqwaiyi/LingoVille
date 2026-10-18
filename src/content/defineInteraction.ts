@@ -35,7 +35,7 @@ export type EffectKind = 'serveOrder';
 type EffectFor<Args> = Args extends ServeOrderArgs ? { kind: 'serveOrder' } : never;
 
 export type InteractionDefinition<Args extends z.ZodObject> = {
-  /** kebab-case, stable: the Journal refers to it. */
+  /** kebab-case, stable: saves and the Journal refer to it. */
   id: string;
   placeId: PlaceId;
   npcId: NamedNpcId;

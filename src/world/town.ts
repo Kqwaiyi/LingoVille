@@ -516,7 +516,8 @@ function insideTheDoor({ centre: [x, z], size: [, depth], facing }: Building): V
 /**
  * Where the Character starts at each place. At home it stands facing the tap;
  * in other buildings just inside the door; at the tram
- * stop on the first platform of the line.
+ * stop on the first platform of the line. The save keeps only the place, not
+ * which stop, so Continue at a tram stop always starts at the first one.
  */
 export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
   ...(Object.fromEntries(BUILDINGS.map((building) => [building.placeId, insideTheDoor(building)])) as Record<PlaceId, Vec3>),
@@ -528,6 +529,9 @@ export const SPAWN_POINTS: Record<PlaceId, Vec3> = {
 export function spawnAt(placeId: PlaceId): Vec3 {
   return SPAWN_POINTS[placeId];
 }
+
+/** Back from a save at home, the Character wakes up in bed. It drops onto the mattress. */
+export const IN_BED: Vec3 = [HOME_BED[0], 1.5, HOME_BED[2]];
 
 const within = (x: number, z: number, [cx, cz]: Vec2, [w, d]: Vec2) => Math.abs(x - cx) < w / 2 && Math.abs(z - cz) < d / 2;
 

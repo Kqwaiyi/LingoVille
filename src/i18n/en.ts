@@ -1,7 +1,13 @@
-// English: the UI's strings.
-// `{{name}}` is filled in by the UI; `<tag>…</tag>` marks words the UI wraps (a key, a command).
+// English: the source the other three resources follow, key for key.
+// `{{name}}` is filled in by the UI; `<tag>…</tag>` marks words the UI wraps (a key, a name to type).
 
 export const en = {
+  languages: {
+    ja: 'Japanese',
+    zh: 'Chinese',
+    en: 'English',
+    de: 'German',
+  },
   weekdays: {
     monday: 'Monday',
     tuesday: 'Tuesday',
@@ -85,11 +91,178 @@ export const en = {
     'central-stop': 'Town Centre',
     'east-stop': 'Market Street',
   },
+  title: {
+    menuLabel: 'Title menu',
+    menu: {
+      continue: 'Continue',
+      load: 'Load a save',
+      newGame: 'New game',
+      import: 'Import a save',
+      settings: 'Settings',
+    },
+    keys: '<kbd>↑</kbd> <kbd>↓</kbd> Select · <kbd>Enter</kbd> Confirm · <kbd>Esc</kbd> Back',
+    readFailed: 'Your saves couldn’t be read. {{message}}',
+    dismiss: 'Dismiss',
+    full: 'Delete a save to start a new one',
+    fullImport: 'Delete a save to import one',
+    newGame: {
+      heading: 'Start a new life',
+      body: 'Move into town on your first morning, with a little money and a lot to learn.',
+      start: 'Start',
+    },
+    import: {
+      body: 'Bring back a life from an exported file, with its Journal. It goes into an empty slot.',
+      choose: 'Choose a file',
+      fileLabel: 'Save file to import',
+    },
+    notice: {
+      imported: 'Imported into slot {{slot}}.',
+      exportFailed: 'The save couldn’t be exported.',
+      deleteFailed: 'The save couldn’t be deleted.',
+      importFailed: 'The save couldn’t be imported.',
+    },
+    importRefused: {
+      notASaveFile: 'That file isn’t an Insomniacs save.',
+      newerVersion: 'That save was made by a newer version of the game, so this one can’t read it.',
+      damaged: 'That save file is damaged, so it can’t be imported.',
+      slotNotEmpty: 'A save can only be imported into an empty slot. Delete a save first.',
+    },
+  },
+  settings: {
+    heading: 'Settings',
+    kept: 'Kept for this browser, whichever save you play.',
+    readingAids: 'Reading aids',
+    readingAidsNote: 'Pinyin over Chinese, furigana over Japanese.',
+    romaji: 'Show romaji',
+    romajiNote: 'A romaji line under each Japanese line.',
+    language: 'Your language',
+    languageNote: 'Menus switch at once, and new hints and Recaps follow.',
+    speaking: 'Speaking',
+    inputMic: 'Speak with the mic',
+    inputTyped: 'Type my replies',
+    retryMic: 'Retry microphone',
+    retrying: 'Asking for the mic…',
+    retryFailed: 'Still no mic. Allow it for this site in the browser, then try again.',
+    pushToTalk: 'Push-to-talk',
+    pushToTalkNote: 'Hold Space while you speak.',
+    openMic: 'Open mic',
+    openMicNote: 'Speak whenever you like. Use headphones, so the mic doesn’t hear the NPC.',
+    readingHeading: 'Reading',
+    credits: 'Credits',
+  },
+  pause: {
+    heading: 'Paused',
+    resume: 'Resume',
+    settings: 'Settings',
+    back: 'Back',
+    quitToTitle: 'Save and quit to title',
+  },
+  credits: {
+    heading: 'Credits',
+    ccBy: 'Licensed under CC BY',
+    ccByNone: 'Nothing under CC BY yet.',
+    cc0: 'Public domain (CC0), with thanks',
+    by: 'by {{creator}}',
+    back: 'Back',
+  },
+  slots: {
+    where: 'Day {{day}} · {{place}}',
+    lastPlayed: 'Last played {{when}}',
+    unknownTime: 'at an unknown time',
+    neverPlayed: 'Never played',
+    fromBackup: 'Loads this morning’s save',
+    damaged: '⚠ This save couldn’t be loaded',
+    empty: 'Empty · New game or Import',
+    play: 'Play',
+    more: 'More for slot {{slot}}',
+    export: 'Export',
+    exportRaw: 'Export raw',
+    delete: 'Delete',
+  },
+  deleteDialog: {
+    titleNamed: 'Delete {{name}}’s save?',
+    titleUnnamed: 'Delete this save?',
+    body: 'This removes the save, its backups and its Journal. It can’t be undone.',
+    typeToConfirm: 'Type <name>{{name}}</name> to confirm',
+    cancel: 'Cancel',
+    delete: 'Delete',
+  },
+  setup: {
+    nativeLanguage: {
+      heading: 'Which language do you read best?',
+      body: 'Menus, Help and your Recaps will be in this language.',
+      choices: 'Native Language',
+    },
+    targetLanguage: {
+      heading: 'Which language do you want to learn?',
+      body: 'Your town is where it’s spoken, with its shops, money and signs.',
+      choices: 'Target Language',
+      packs: {
+        ja: 'Japanese: set in a Japanese town',
+        zh: 'Chinese: set in a Chinese town',
+        en: 'English: set in a UK town',
+        de: 'German: set in a German town',
+      },
+    },
+    aboutYou: {
+      heading: 'How much {{language}} do you know?',
+      body: 'Pick the sentence that fits best. The town adjusts to you as you play.',
+      levels: 'Your level',
+      level: {
+        A1: 'I know a few words, or none at all.',
+        A2: 'I can manage simple, everyday things if people speak slowly.',
+        B1: 'I can get by in most everyday situations.',
+        B2: 'I can talk about most things without much effort.',
+      },
+      name: 'Your character’s name',
+    },
+    appearance: {
+      heading: 'How does {{name}} look?',
+      body: 'Everyone in town is Clawd. Pick what your character wears, so they stand out.',
+      hat: 'Hat',
+      hats: { none: 'None', beanie: 'Beanie', cap: 'Cap', beret: 'Beret', 'top-hat': 'Top hat', 'sun-hat': 'Sun hat', bow: 'Bow', flower: 'Flower', 'party-hat': 'Party hat' },
+      eyewear: 'Glasses',
+      eyewears: { none: 'None', 'round-glasses': 'Round glasses', 'square-glasses': 'Square glasses', monocle: 'Monocle' },
+      neckwear: 'Scarf or tie',
+      neckwears: { none: 'None', scarf: 'Scarf', 'bow-tie': 'Bow tie', tie: 'Tie', bandana: 'Neckerchief' },
+      colour: 'Colour',
+      colours: {
+        denim: 'Denim',
+        sky: 'Sky blue',
+        teal: 'Teal',
+        pine: 'Pine green',
+        leaf: 'Leaf green',
+        mustard: 'Mustard',
+        red: 'Red',
+        blush: 'Pink',
+        plum: 'Plum',
+        cream: 'Cream',
+        charcoal: 'Charcoal',
+      },
+    },
+    micCheck: {
+      heading: 'Let’s check your mic',
+      body: 'Allow the mic when your browser asks, then say anything. In town you talk to people by holding Space.',
+      headphones: 'Headphones work best, so the mic doesn’t hear the game.',
+      level: 'Mic level',
+      status: {
+        asking: 'Waiting for your browser to open the mic…',
+        listening: 'Listening… say anything.',
+        heard: 'Heard you! Your mic works.',
+        unavailable: 'No mic to use, so you’ll type your replies instead. Everything works typed.',
+      },
+      skip: 'Skip',
+    },
+    start: 'Start',
+    next: 'Next',
+    back: 'Back',
+  },
   dock: {
     label: 'Dock',
     time: 'Time',
     money: 'Money',
     day: 'Day {{day}} · {{weekday}}',
+    saved: 'Saved ✓',
   },
   placeLine: {
     label: 'Place',
@@ -141,6 +314,8 @@ export const en = {
     mic: 'Hold to talk (Space)',
     micOff: '🎤 off',
     micOffHint: 'No mic, so you’re typing your replies',
+    micOffEnable: '🎤 off. Enable in Settings',
+    openMic: 'Open mic: just speak',
   },
   closing: {
     label: 'Conversation over',
@@ -197,12 +372,18 @@ export const en = {
     keepLabel: 'Add “{{word}}” to my phrasebook',
     kept: '✓ In my phrasebook',
   },
+  persist: {
+    label: 'Keeping your saves',
+    body: 'This browser may clear your saves if it runs low on space. Export a backup now and then, from Load a save.',
+    gotIt: 'Got it',
+  },
   sign: {
     label: 'Sign',
     translate: 'Translate',
   },
   toast: {
     recapSaved: 'Recap saved to your Journal',
+    loadedBackup: 'Loaded this morning’s save',
     npcSteppedAway: '{{who}} had to step away. Nothing was lost.',
   },
   voiceUnavailable: {
@@ -211,3 +392,7 @@ export const en = {
     back: 'Back to the game',
   },
 };
+
+/** Every resource has exactly English's keys, each a string. */
+type Strings<T> = { [K in keyof T]: T[K] extends string ? string : Strings<T[K]> };
+export type UiStrings = Strings<typeof en>;

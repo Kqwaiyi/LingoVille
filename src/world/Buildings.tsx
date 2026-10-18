@@ -272,7 +272,8 @@ export function usePieceSizesForBuildings(): PieceSizes {
 
 /**
  * Every building's floors above the ground floor, its roof and its corners' stones and pipes. The floors above lift off
- * while they stand between the camera and the Character (inside included), so they're always in view.
+ * while they stand between the camera and the Character (inside included), so they're always in view; on the title
+ * screen, off the place the save was left at.
  */
 function UpstairsAndRoofs() {
   const sizes = usePieceSizesForBuildings();

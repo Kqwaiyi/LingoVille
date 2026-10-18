@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
-import { hasReadingAids, rubyUnits, type Segment } from '../ai/index.ts';
+import { hasReadingAids, romaji, rubyUnits, type Segment } from '../ai/index.ts';
 import type { LanguageCode } from '../sim/index.ts';
+import { selectReadingAids, useGame } from '../store/index.ts';
 
 /**
  * Text with its reading over it: one `<ruby>` per hanzi, or per run of kanji
@@ -24,12 +25,23 @@ export function RubyText({ language, segments }: { language: LanguageCode; segme
   );
 }
 
-/** A zh or ja line with its reading aid, or the plain text while it has none. */
+/**
+ * A zh or ja line with its reading aid, and for ja the romaji line under it if
+ * Show romaji is on. Hiding reading aids hides both, leaving the plain text.
+ */
 export function ReadingLine({ language, text, segments }: { language: LanguageCode; text: string; segments: Segment[] | null | undefined }) {
-  if (!segments) return <span lang={language}>{text}</span>;
+  const settings = useGame(selectReadingAids);
+  if (!settings.show || !segments) return <span lang={language}>{text}</span>;
   return (
-    <span lang={language} className="reading-line">
-      <RubyText language={language} segments={segments} />
-    </span>
+    <>
+      <span lang={language} className="reading-line">
+        <RubyText language={language} segments={segments} />
+      </span>
+      {language === 'ja' && settings.romaji && (
+        <span className="romaji-line" lang="ja-Latn">
+          {romaji(segments)}
+        </span>
+      )}
+    </>
   );
 }

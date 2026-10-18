@@ -47,6 +47,15 @@ export const DAYLIGHT = {
   lampsOffAt: 6.5 * MINUTES_PER_HOUR,
 } as const;
 
+// --- Saving -----------------------------------------------------------------
+
+export const SAVE = {
+  /** Autosave this often in real time while playing, on top of the event triggers. */
+  everyRealMs: 2 * 60 * 1000,
+  /** How long "Saved ✓" stays under the clock. */
+  noticeMs: 2000,
+} as const;
+
 // --- Moving around the town -------------------------------------------------
 
 export const MOVEMENT = {
@@ -93,9 +102,20 @@ export type ProficiencyStep = (typeof PROFICIENCY_STEPS)[number];
 /** The band at each Proficiency Step: B = A1–A2, I = B1–B2, A = C1–C2. */
 export const STEP_BANDS: Record<ProficiencyStep, Band> = { A1: 'B', A2: 'B', B1: 'I', B2: 'I', C1: 'A', C2: 'A' };
 
-/** The steps a new game can start the Character at. */
+/** The steps the self-assessment in New game setup can start the Character at. */
 export const STARTING_STEPS = ['A1', 'A2', 'B1', 'B2'] as const satisfies readonly ProficiencyStep[];
 export type StartingStep = (typeof STARTING_STEPS)[number];
+
+export const CHARACTER_NAME = {
+  /** The longest name the Player can give the Character, in characters. */
+  maxLength: 20,
+} as const;
+
+/** The mic check, the last screen of New game setup. */
+export const MIC_CHECK = {
+  /** How loud a sound must be, on the mic meter's 0–1 scale, for the check to have heard the Player. */
+  heardLevel: 0.15,
+} as const;
 
 /** Patience by Proficiency Step. */
 export const PROFICIENCY_STEP_TABLE: Record<ProficiencyStep, { startingPatience: number }> = {

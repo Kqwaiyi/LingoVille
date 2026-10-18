@@ -1,4 +1,5 @@
 import { pinyin } from 'pinyin-pro';
+import { toRomaji } from 'wanakana';
 import { z } from 'zod';
 import type { LanguageCode } from '../sim/index.ts';
 
@@ -54,7 +55,8 @@ const PREFIX = '接頭詞';
 
 /**
  * The ja library reading, from kuromoji's tokens: each word with kanji gets a
- * hiragana reading. Prefixes join their word and endings their verb.
+ * hiragana reading. Prefixes join their word and endings their verb, so romaji
+ * reads as words.
  */
 export function libraryKana(tokens: KanaToken[]): Segment[] {
   const words: { base: string; kana: string | null; pos: string }[] = [];
@@ -73,6 +75,8 @@ export function libraryKana(tokens: KanaToken[]): Segment[] {
   }
   return words.map(({ base, kana }) => ({ base, reading: hasHan(base) && kana !== null ? kana : '' }));
 }
+
+const isPunctuation = (text: string) => /^[\p{P}\p{S}\s]+$/u.test(text);
 
 /**
  * Lines a word's kana reading up with its kanji, so furigana sit over the kanji
@@ -127,4 +131,18 @@ function furiganaUnits({ base, reading }: Segment): Segment[] {
   // Where a number's reading ends and its counter's begins can't be told, so the reading spans both.
   if (/\d/.test(base)) return [{ base, reading }];
   return alignFurigana(base, reading) ?? [{ base, reading }];
+}
+
+// Particles that are written one way and said another.
+const SAID_AS: Record<string, string> = { は: 'wa', へ: 'e', を: 'o' };
+
+/** The romaji line under a Japanese line: its readings spelled out word by word. */
+export function romaji(segments: Segment[]): string {
+  let line = '';
+  for (const { base, reading } of segments) {
+    const word = SAID_AS[base] ?? toRomaji(reading || base);
+    if (isPunctuation(base)) line += word;
+    else line += (line === '' || line.endsWith(' ') ? '' : ' ') + word;
+  }
+  return line.trim();
 }
