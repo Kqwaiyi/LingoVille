@@ -55,6 +55,7 @@ The links weren't checked in this session; check them early in the build.
 - **Demo recording:** record locally with a real key. Show a café order with one try the barista doesn't understand, a Help hint, the order being served and its Recap, then a barista Shift.
 - **Submission:** a short demo video and a public GitHub repository. There's no deployment.
 - **Repository:** https://github.com/Kqwaiyi/LingoVille (public).
+- **Demo video:** https://streamable.com/e9sems (public).
 
 ## Look and Feel
 Carried forward from `prd.md > Look and Feel` and `scope.md > Inspiration & Identity`.
