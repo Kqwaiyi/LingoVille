@@ -53,6 +53,8 @@ export const MOVEMENT = {
   walkSpeedMetresPerSecond: 4,
   /** How close the Character must be to talk to an NPC. Walking further away ends the conversation. */
   talkRangeMetres: 2.5,
+  /** How close the Character must be for pointing at a sign or menu to show its reading aid. */
+  signReadRangeMetres: 6,
 } as const;
 
 /** Trams are fast travel: free, and the only cost is time. */
@@ -108,4 +110,32 @@ export const PROFICIENCY_STEP_TABLE: Record<ProficiencyStep, { startingPatience:
 export const PATIENCE = {
   /** The NPC's face looks strained once this much Patience or less is left. */
   strainedAtOrBelow: 1,
+} as const;
+
+// --- Language Proficiency ---------------------------------------------------
+
+export const PROFICIENCY = {
+  /** Fraction of the gap to the Recap's CEFR estimate closed per conversation. */
+  updateRate: 0.15,
+  fastStartUpdateRate: 0.3,
+  fastStartInteractions: 10,
+  /** A conversation with this many player turns or fewer ("a latte, please") counts only this much (default). */
+  shortConversation: { maxPlayerTurns: 2, weight: 0.15 },
+  /** How far below the Recap's estimate each turn the NPC couldn't make sense of pulls the score (default), in steps. */
+  notUnderstoodPull: 0.4,
+  /** How far past a step boundary the score must go before the current step changes, so it doesn't flicker (default). */
+  stepBuffer: 0.15,
+  /**
+   * The middle of each step on the hidden score (default), which runs from 0 to the number of steps.
+   * A new save starts here (only A1–B2 can be a starting step), and a Recap's estimate pulls the score here.
+   */
+  stepCentre: { A1: 0.5, A2: 1.5, B1: 2.5, B2: 3.5, C1: 4.5, C2: 5.5 } satisfies Record<ProficiencyStep, number>,
+} as const;
+
+/** How Help discounts a conversation as Proficiency evidence (default). Help only ever reduces weight. */
+export const HELP_EVIDENCE = {
+  /** A player turn that closely repeats a hint or phrase shown just before it counts this much. */
+  copiedTurnWeight: 0.1,
+  /** How alike a turn and a hint must be (Dice similarity of letter pairs, 0–1) to count as a close repeat. */
+  closeRepeatSimilarity: 0.6,
 } as const;

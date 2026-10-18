@@ -5,6 +5,8 @@ import { ConversationColumn } from './ConversationColumn.tsx';
 import { Dock } from './Dock.tsx';
 import { GatewayStatus } from './GatewayStatus.tsx';
 import { InteractionPrompt } from './InteractionPrompt.tsx';
+import { Journal } from './Journal.tsx';
+import { SignTooltip } from './SignTooltip.tsx';
 import { TramPanel } from './TramPanel.tsx';
 import { Toast, VoiceUnavailableScreen } from './VoiceNotices.tsx';
 import './hud.css';
@@ -41,9 +43,11 @@ function Hud() {
       <GatewayStatus />
       <InteractionPrompt />
       <TramPanel />
+      <SignTooltip />
       <Dock />
       <ConversationColumn />
       <Toast />
+      <Journal />
       <VoiceUnavailableScreen />
     </>
   );

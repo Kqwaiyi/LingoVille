@@ -84,6 +84,7 @@ export {
   type ItemId,
 } from './items.ts';
 export { NAMED_NPC_IDS, NAMED_NPCS, namedNpcSchema, type NamedNpc, type NamedNpcId } from './npcs.ts';
+export { PLACE_PHRASEBOOKS, placePhrasebook, placePhrasebookSchema, type PlacePhrase } from './phrasebooks.ts';
 export { placeHours } from './openingHours.ts';
 export { formatTime, HOURS_IDS, OPEN_AIR_PLACES, PLACE_HOURS, SERVICE_HOURS, type HoursId } from './places.ts';
 export { SIGN_IDS, worldSign, type SignId, type SignLine } from './signs.ts';

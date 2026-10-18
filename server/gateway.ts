@@ -1,5 +1,22 @@
 import http from 'node:http';
 import { z } from 'zod';
+import {
+  AnnotateRequestSchema,
+  AnnotationSchema,
+  buildAnnotateRequest,
+  buildHintRequest,
+  buildRecapRequest,
+  HintRequestSchema,
+  HintsSchema,
+  libraryPinyin,
+  RecapRequestSchema,
+  recapSchemaFor,
+  type Annotation,
+  type GenerateContentBody,
+  type Hints,
+  type Recap,
+  type Segment,
+} from '../src/ai/index.ts';
 import { NAMED_NPC_IDS } from '../src/content/index.ts';
 import { LANGUAGE_CODES } from '../src/sim/index.ts';
 import {
@@ -10,6 +27,8 @@ import {
   LIVE_ENDPOINT,
   MODELS,
   NAMED_NPC_VOICES,
+  VOICES,
+  type TargetLanguage,
   type VoiceName,
 } from './config.ts';
 
@@ -140,10 +159,213 @@ async function mintToken(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingM
 
 type Route = (env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>;
 
+/** Calls `generateContent` on a model. Throws with Gemini's answer, for the gateway log, when it fails. */
+async function generateContent(apiKey: string, deps: GatewayDeps, model: string, body: unknown) {
+  const upstream = await deps.fetch(`${GEMINI_API_BASE}/${ENDPOINT_VERSIONS.generateContent}/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const answer = (await upstream.json()) as {
+    candidates?: { content?: { parts?: { text?: string; inlineData?: { data?: string } }[] } }[];
+  };
+  if (!upstream.ok) throw new Error(`${model} ${upstream.status}: ${JSON.stringify(answer)}`);
+  const parts = answer.candidates?.[0]?.content?.parts ?? [];
+  return { parts, answer };
+}
+
+const MOCK_RECAP: Recap = {
+  outcome: 'You ordered a hot latte and paid. Nicely done!',
+  corrections: [
+    { said: 'ホットラテ ください', natural: 'ホットラテをください', why: 'Add を after the thing you are asking for.' },
+    { said: 'はい', natural: 'はい、お願いします', why: 'お願いします makes a yes to an offer sound polite.' },
+  ],
+  newWords: [
+    { base: 'いらっしゃいませ', reading: 'いらっしゃいませ', gloss: 'welcome (said by shop staff)' },
+    { base: 'よろしいですか', reading: 'よろしいですか', gloss: 'is that all right? (polite)' },
+  ],
+  cefrEstimate: 'A1',
+};
+
+/**
+ * Answers a prompted endpoint: validates the request, builds the body with the
+ * builder from `ai`, and checks the model's JSON answer against its schema.
+ * Gemini's own answer stays in the gateway log.
+ */
+async function promptedEndpoint<Request, Answer>(
+  { env, deps, req, res }: { env: GatewayEnv; deps: GatewayDeps; req: http.IncomingMessage; res: http.ServerResponse },
+  endpoint: {
+    name: string;
+    model: string;
+    request: z.ZodType<Request>;
+    build: (request: Request) => GenerateContentBody;
+    answer: (request: Request) => z.ZodType<Answer>;
+    mock: (request: Request) => Answer;
+  },
+) {
+  const request = endpoint.request.safeParse(await readJson(req));
+  if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
+  if (env.mock) return sendJson(res, 200, endpoint.mock(request.data));
+  if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
+
+  try {
+    const { parts, answer } = await generateContent(env.apiKey, deps, endpoint.model, endpoint.build(request.data));
+    const text = parts.map((part) => part.text ?? '').join('');
+    const checked = endpoint.answer(request.data).safeParse(JSON.parse(text || 'null'));
+    if (!checked.success) throw new Error(`${endpoint.model} answered something that does not match its schema: ${JSON.stringify(answer)}`);
+    return sendJson(res, 200, checked.data);
+  } catch (error) {
+    console.warn(`[gateway] /api/${endpoint.name} failed:`, error instanceof Error ? error.message : error);
+    return sendJson(res, 502, { error: `${endpoint.name}_unavailable` });
+  }
+}
+
+/** POST /api/recap: a Recap of a conversation, built from the transcript, the Help log, the interaction, the step and the Native Language. */
+const recap: Route = (env, deps, req, res) =>
+  promptedEndpoint(
+    { env, deps, req, res },
+    {
+      name: 'recap',
+      model: MODELS.recap,
+      request: RecapRequestSchema,
+      build: buildRecapRequest,
+      answer: (request) => recapSchemaFor(request.kind),
+      mock: () => MOCK_RECAP,
+    },
+  );
+
+// Canned hints in mock mode: full sentences the scripted fake barista understands.
+const MOCK_HINTS: Record<TargetLanguage, Hints['hints']> = {
+  ja: [
+    { text: 'ホットラテをください。', translation: 'A hot latte, please.' },
+    { text: 'メニューをください。', translation: 'The menu, please.' },
+    { text: 'もう一度お願いします。', translation: 'Once more, please.' },
+  ],
+  zh: [
+    { text: '请给我一杯热拿铁。', translation: 'A hot latte, please.' },
+    { text: '请给我看一下菜单。', translation: 'The menu, please.' },
+  ],
+  en: [
+    { text: 'Could I have a latte, please?', translation: 'Could I have a latte, please?' },
+    { text: 'Could I see the menu, please?', translation: 'Could I see the menu, please?' },
+  ],
+  de: [
+    { text: 'Einen Latte, bitte.', translation: 'A latte, please.' },
+    { text: 'Kann ich bitte die Karte sehen?', translation: 'Can I see the menu, please?' },
+  ],
+};
+
+/** POST /api/hint: 2–3 hint sentences with translations, for the moment the Player opened Help. */
+const hint: Route = (env, deps, req, res) =>
+  promptedEndpoint(
+    { env, deps, req, res },
+    {
+      name: 'hint',
+      model: MODELS.hint,
+      request: HintRequestSchema,
+      build: buildHintRequest,
+      answer: () => HintsSchema,
+      mock: (request): Hints => ({ hints: MOCK_HINTS[request.culturePackId] }),
+    },
+  );
+
+// Canned ja readings for the scripted fake barista's lines that mock mode corrects. Any other ja line
+// gets no usable reading, which the browser's checks reject, so the library reading stays.
+const MOCK_JA_READINGS: Record<string, Segment[]> = {
+  'いらっしゃいませ！ご注文はお決まりですか？': [
+    { base: 'いらっしゃいませ', reading: '' },
+    { base: '！', reading: '' },
+    { base: 'ご注文', reading: 'ごちゅうもん' },
+    { base: 'は', reading: '' },
+    { base: 'お決まり', reading: 'おきまり' },
+    { base: 'ですか', reading: '' },
+    { base: '？', reading: '' },
+  ],
+  'すみません、よくわかりませんでした。': [
+    { base: 'すみません', reading: '' },
+    { base: '、', reading: '' },
+    { base: 'よく', reading: '' },
+    { base: 'わかりませんでした', reading: '' },
+    { base: '。', reading: '' },
+  ],
+};
+
+function mockSegments(targetLanguage: TargetLanguage, line: string): Segment[] | undefined {
+  if (targetLanguage === 'zh') return libraryPinyin(line);
+  if (targetLanguage === 'ja') return MOCK_JA_READINGS[line] ?? [{ base: line, reading: '' }];
+  return undefined;
+}
+
+/** POST /api/annotate: an NPC line's Native Language translation and, for zh and ja, its readings, as soon as the line is finished. */
+const annotate: Route = (env, deps, req, res) =>
+  promptedEndpoint(
+    { env, deps, req, res },
+    {
+      name: 'annotate',
+      model: MODELS.annotate,
+      request: AnnotateRequestSchema,
+      build: buildAnnotateRequest,
+      answer: () => AnnotationSchema,
+      mock: (request): Annotation => {
+        const segments = mockSegments(request.targetLanguage, request.line);
+        return { translation: `Mock translation: ${request.line}`, ...(segments && { segments }) };
+      },
+    },
+  );
+
+// Gemini TTS answers with 16-bit mono PCM at this rate.
+const TTS_SAMPLE_RATE = 24_000;
+
+/** A short, soft beep: the canned hear-it-said clip in mock mode. */
+function mockClip() {
+  const samples = new Int16Array(TTS_SAMPLE_RATE / 4);
+  for (let i = 0; i < samples.length; i++) samples[i] = Math.round(Math.sin((2 * Math.PI * 440 * i) / TTS_SAMPLE_RATE) * 0x0800);
+  return Buffer.from(samples.buffer).toString('base64');
+}
+
+// Hear-it-said is for a phrase or a sentence, never a speech. An NPC's line is said in their own voice.
+const TtsRequestSchema = z.object({
+  text: z.string().trim().min(1).max(500),
+  targetLanguage: z.enum(Object.keys(VOICES) as [TargetLanguage, ...TargetLanguage[]]),
+  voice: VoiceRequestSchema.optional(),
+});
+
+// The part of Gemini's TTS answer the gateway uses.
+const TtsAnswerSchema = z.object({ inlineData: z.object({ data: z.string().min(1) }) });
+
+/** POST /api/tts: hear-it-said, a phrase said aloud in the voice for its language, or an NPC's line in theirs, as base64 PCM. */
+async function tts(env: GatewayEnv, deps: GatewayDeps, req: http.IncomingMessage, res: http.ServerResponse) {
+  const request = TtsRequestSchema.safeParse(await readJson(req));
+  if (!request.success) return sendJson(res, 400, { error: 'bad_request' });
+  const { text, targetLanguage, voice } = request.data;
+  if (env.mock) return sendJson(res, 200, { audio: mockClip(), sampleRate: TTS_SAMPLE_RATE });
+  if (!env.apiKey) return sendJson(res, 503, { error: 'no_api_key' });
+
+  try {
+    const { parts, answer } = await generateContent(env.apiKey, deps, MODELS.tts, {
+      contents: [{ role: 'user', parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice ? requestedVoice(voice) : VOICES[targetLanguage] } } },
+      },
+    });
+    const audio = parts.map((part) => TtsAnswerSchema.safeParse(part)).find((part) => part.success);
+    if (!audio?.success) throw new Error(`${MODELS.tts} gave no audio: ${JSON.stringify(answer)}`);
+    return sendJson(res, 200, { audio: audio.data.inlineData.data, sampleRate: TTS_SAMPLE_RATE });
+  } catch (error) {
+    console.warn('[gateway] could not say a phrase:', error instanceof Error ? error.message : error);
+    return sendJson(res, 502, { error: 'tts_unavailable' });
+  }
+}
+
 const REAL_DEPS: GatewayDeps = { fetch: (...args) => globalThis.fetch(...args), now: () => Date.now() };
 
 const ROUTES: Record<string, Route> = {
   '/api/token': mintToken,
+  '/api/recap': recap,
+  '/api/hint': hint,
+  '/api/annotate': annotate,
+  '/api/tts': tts,
 };
 
 export function createGateway(env: GatewayEnv, deps: GatewayDeps = REAL_DEPS): http.Server {

@@ -1,7 +1,8 @@
-import { useFrame } from '@react-three/fiber';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { CanvasTexture, Mesh, SRGBColorSpace } from 'three';
 import { SIGN_IDS, worldSign, type SignId, type SignLine } from '../content/index.ts';
+import { MOVEMENT } from '../sim/index.ts';
 import { selectCulturePackId, useGame } from '../store/index.ts';
 import { characterPosition } from './Character.tsx';
 import { placeAt, SIGNS } from './town.ts';
@@ -9,6 +10,8 @@ import { PALETTE } from './palette.ts';
 
 /** Pixels per metre of sign. */
 const RESOLUTION = 256;
+/** How long the tooltip waits after the pointer leaves a sign, so the pointer can reach the tooltip's Translate. */
+const LEAVE_GRACE_MS = 400;
 const INK = PALETTE.ink;
 const BOARD = PALETTE.cream;
 const FONT = 'system-ui, "Hiragino Sans", "Noto Sans CJK JP", "Microsoft YaHei", "PingFang SC", sans-serif';
@@ -59,24 +62,69 @@ function paintSign(lines: SignLine[], [width, height]: readonly [number, number]
   return texture;
 }
 
-/** A sign painted from the Culture Pack. */
+/**
+ * A sign painted from the Culture Pack. Pointing at it while the Character is
+ * within range shows its tooltip (reading aid and Translate); walking out of
+ * range or pointing away hides it.
+ */
 function Sign({ signId }: { signId: SignId }) {
   const packId = useGame(selectCulturePackId);
+  const pointAtSign = useGame((s) => s.pointAtSign);
+  const unpointSign = useGame((s) => s.unpointSign);
   const { position, size, rotation = 0, liftsInside } = SIGNS[signId];
   const board = useRef<Mesh>(null);
   const texture = useMemo(() => paintSign(worldSign(signId, packId), size), [signId, packId, size]);
   useEffect(() => () => texture.dispose(), [texture]);
 
+  const hovered = useRef(false);
+  const shown = useRef(false);
+  const leaving = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelLeave = () => {
+    if (leaving.current) clearTimeout(leaving.current);
+    leaving.current = null;
+  };
+  useEffect(() => cancelLeave, []);
+
+  // The Character walks while the pointer rests, so range is checked every frame.
   useFrame(() => {
     if (liftsInside && board.current) {
-      // Lifted off, the board is out of sight.
+      // Lifted off, the board is out of sight and out of the pointer's way, so signs behind it can still be pointed at.
       const lifted = placeAt(characterPosition.x, characterPosition.z) === liftsInside;
       board.current.visible = !lifted;
+      board.current.raycast = lifted ? () => {} : Mesh.prototype.raycast;
     }
+    if (!hovered.current) return;
+    const distance = Math.hypot(characterPosition.x - position[0], characterPosition.z - position[2]);
+    const inRange = distance <= MOVEMENT.signReadRangeMetres;
+    if (inRange && !shown.current) pointAtSign(signId);
+    if (!inRange && shown.current) unpointSign(signId, true);
+    shown.current = inRange;
   });
 
+  const leave = () => {
+    hovered.current = false;
+    cancelLeave();
+    leaving.current = setTimeout(() => {
+      shown.current = false;
+      unpointSign(signId);
+    }, LEAVE_GRACE_MS);
+  };
+  // Pointer events reach everything under the pointer, so a sign only counts when nothing stands in front of it.
+  const point = (e: ThreeEvent<PointerEvent>) => {
+    const inFront = e.intersections[0]?.object === e.eventObject;
+    if (!inFront) {
+      if (hovered.current) leave();
+      return;
+    }
+    if (hovered.current) return;
+    cancelLeave();
+    hovered.current = true;
+    // Shown again at once if it never hid: the pointer came back within the grace.
+    if (shown.current) pointAtSign(signId);
+  };
+
   return (
-    <mesh ref={board} position={[...position]} rotation-y={rotation}>
+    <mesh ref={board} position={[...position]} rotation-y={rotation} onPointerOver={point} onPointerMove={point} onPointerOut={leave}>
       <planeGeometry args={[size[0], size[1]]} />
       <meshStandardMaterial map={texture} />
     </mesh>
@@ -85,5 +133,9 @@ function Sign({ signId }: { signId: SignId }) {
 
 /** Every sign and menu in the town. */
 export function Signs() {
+  // The camera follows the Character, so what's under a resting pointer changes without the pointer moving.
+  useFrame(({ events }) => {
+    events.update?.();
+  });
   return SIGN_IDS.map((signId) => <Sign key={signId} signId={signId} />);
 }

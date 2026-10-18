@@ -5,7 +5,7 @@ import { selectToast, selectVoiceUnavailable, useGame } from '../store/index.ts'
 
 const TOAST_MS = 5_000;
 
-/** A notice at the top of the screen that clears itself, such as a network abandonment. */
+/** A notice at the top of the screen that clears itself, such as a network abandonment or a skipped Recap. */
 export function Toast() {
   const { t } = useTranslation();
   const toast = useGame(selectToast);
@@ -20,6 +20,7 @@ export function Toast() {
   if (!toast) return null;
   return (
     <div className="toast" role="status">
+      {toast.kind === 'recapSaved' && t('toast.recapSaved')}
       {toast.kind === 'npcSteppedAway' &&
         t('toast.npcSteppedAway', { who: t(`roles.${TOWN_NPCS[toast.npcId].role}.subject`) })}
     </div>

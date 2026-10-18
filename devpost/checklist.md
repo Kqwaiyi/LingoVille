@@ -9,7 +9,7 @@ Build mode: fast
 
 ## Slices
 
-- [ ] **1. Order a coffee out loud at the café**
+- [x] **1. Order a coffee out loud at the café**
   Becomes usable: A running game where you walk the town to the café, press E, and order a drink out loud in Japanese, or type it. The barista reads the order back, serves it and takes the money. Turns they can't make sense of wear out their Patience, shown only on their face, until they give up at no charge.
   Why now: This is the unique kernel, speaking to be understood, and the riskiest part: Gemini Live, one-use tokens and the audio worklets. Bootstrapping (Vite, the gateway and its mock mode, the town) lives inside it, so every later slice lands on a running game.
   PRD ref: `prd.md > The Core Journey` (steps 4 and 6), `prd.md > Features and Behavior > Speaking to NPCs`
@@ -61,7 +61,7 @@ Build mode: fast
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — after slice 1
+- [x] Early usable behavior explored — after slice 1, ordering at the café by voice and by typing
 - [ ] Final kick-the-tires exploration and feedback completed
 
 ## Final Review

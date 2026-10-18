@@ -10,6 +10,8 @@ export type Patience = {
   starting: number;
   /** The Player's latest turn already cost Patience, so it can't cost it twice. */
   spentThisTurn: boolean;
+  /** Player turns the NPC couldn't make sense of at all, counted even once Patience has run out. Proficiency evidence. */
+  turnsNotUnderstood: number;
 };
 
 /** How the NPC's face looks: the only way Patience shows. */
@@ -18,7 +20,7 @@ export type NpcExpression = 'relaxed' | 'puzzled' | 'strained';
 /** Patience at the start of a conversation: from the step table. */
 export function startPatience(step: ProficiencyStep): Patience {
   const starting = PROFICIENCY_STEP_TABLE[step].startingPatience;
-  return { left: starting, starting, spentThisTurn: false };
+  return { left: starting, starting, spentThisTurn: false, turnsNotUnderstood: 0 };
 }
 
 /** The Player takes a new turn, which may cost Patience once. */
@@ -36,6 +38,7 @@ export function losePatience(patience: Patience): Patience {
     ...patience,
     left: Math.max(0, patience.left - 1),
     spentThisTurn: true,
+    turnsNotUnderstood: patience.turnsNotUnderstood + 1,
   };
 }
 

@@ -136,7 +136,7 @@ export function Character() {
   const enterPlace = useGame((s) => s.enterPlace);
   const setOnStreet = useGame((s) => s.setOnStreet);
   const setInteractable = useGame((s) => s.setInteractable);
-  // Letters typed into the chat field must not walk the Character away.
+  // Letters typed into the chat field, or keys pressed in the Journal, must not walk the Character away.
   const keysOff = useGame(selectWorldKeysOff);
   const tramArrival = useGame(selectTramArrival);
   const tramRunning = useGame(selectTramRunning);

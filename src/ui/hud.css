@@ -199,6 +199,73 @@ body,
   color: var(--hud-muted);
 }
 
+/* --- Signs ---------------------------------------------------------------- */
+
+/* Pointing at a sign or menu: its words with their reading aid, and Translate. */
+.sign-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: 168px;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.sign-tooltip ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sign-tooltip li + li {
+  margin-top: 4px;
+}
+
+.sign-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sign-tooltip rt {
+  font-size: 0.6em;
+  color: var(--hud-muted);
+}
+
+.sign-note {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--hud-muted);
+}
+
+.sign-gloss {
+  display: block;
+  font-size: 13px;
+  color: var(--hud-muted);
+}
+
+.sign-tooltip button {
+  margin-top: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--hud-muted);
+  border-radius: 999px;
+  background: none;
+  color: var(--hud-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sign-tooltip button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* --- Conversation ---------------------------------------------------------- */
 
 .game {
@@ -206,6 +273,7 @@ body,
   --paper: #fffaf2;
   --ink: #1d2433;
   --rule: #e6dfd2;
+  --accent: #ff8a3d;
   --player: #2d6cdf;
 }
 
@@ -277,6 +345,12 @@ body,
   cursor: pointer;
 }
 
+.chat-tabs [role='tab'][aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
 .chat-tabs .chat-leave {
   margin-left: auto;
 }
@@ -326,6 +400,126 @@ body,
   opacity: 0.75;
 }
 
+.chat-tabs [role='tab'] kbd {
+  margin-left: 4px;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+
+.chat-tabs [role='tab']:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Reading aids: pinyin or furigana over the NPC's line. */
+/* A reading wider than its kanji overhangs it, rather than spacing the kanji apart. */
+ruby {
+  ruby-align: center;
+}
+
+.reading-line {
+  line-height: 1.9;
+}
+
+.bubble ruby rt,
+.journal-lines ruby rt {
+  font-size: 10px;
+  color: #7b8496;
+}
+
+/* Translate shows the Native Language line under the NPC's. */
+.bubble-translation {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--rule);
+  font-size: 14px;
+  color: #4a5266;
+}
+
+.bubble-actions {
+  display: flex;
+  gap: 4px;
+  margin: 4px -6px -4px;
+}
+
+.bubble-actions button {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: #7b8496;
+  cursor: pointer;
+}
+
+.bubble-actions button:hover {
+  background: #f4ede0;
+  color: var(--ink);
+}
+
+/* --- Help -------------------------------------------------------------------- */
+
+.help {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+
+.help-waits {
+  position: sticky;
+  top: 0;
+  margin: 0 -16px 4px;
+  padding: 8px 16px;
+  background: #fff3e6;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: #8a5a2b;
+}
+
+.help-section h4 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7b8496;
+}
+
+.help-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.help-phrase {
+  margin: 0;
+  font-size: 17px;
+}
+
+.help-phrase ruby rt {
+  font-size: 10px;
+  color: #7b8496;
+}
+
+.help-gloss,
+.help-note {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: #4a5266;
+}
+
+.help-note {
+  color: #7b8496;
+}
+
 .chat-input {
   display: flex;
   align-items: center;
@@ -363,6 +557,32 @@ body,
 .closing-card p {
   margin: 0 0 12px;
   font-size: 15px;
+}
+
+.closing-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.closing-card-actions button {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.closing-card-actions .primary {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--ink);
+}
+
+.closing-card-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* --- Voice ----------------------------------------------------------------- */
@@ -486,6 +706,322 @@ body,
   color: #1d2433;
   font: inherit;
   cursor: pointer;
+}
+
+/* --- Recap and Journal ------------------------------------------------------ */
+
+.recap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recap-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.recap-writing {
+  margin: 24px 0;
+  text-align: center;
+  color: #7b8496;
+}
+
+.recap-actions {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--rule);
+}
+
+/* A lined Journal page: ruled lines every line-height, and a margin rule on the left. */
+.journal-page {
+  --line: 26px;
+  position: relative;
+  padding: 10px 14px 18px 30px;
+  border-radius: 6px;
+  background-color: #fffdf8;
+  background-image:
+    linear-gradient(to right, transparent 20px, #f0b8a8 20px, #f0b8a8 21px, transparent 21px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line) - 1px), #dfe6f0 calc(var(--line) - 1px), #dfe6f0 var(--line));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  color: var(--ink);
+  line-height: var(--line);
+}
+
+.journal-page h3,
+.journal-page h4,
+.journal-page p,
+.journal-page ul {
+  margin: 0;
+}
+
+.journal-page h3 {
+  font-size: 16px;
+}
+
+.journal-page h4 {
+  margin-top: var(--line);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b6a55;
+}
+
+.journal-page-header p {
+  font-size: 13px;
+  color: #7b8496;
+}
+
+.journal-sticker {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--ok);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 22px;
+  transform: rotate(4deg);
+}
+
+.journal-outcome {
+  margin-top: var(--line) !important;
+  font-size: 15px;
+}
+
+.journal-page ul {
+  padding: 0;
+  list-style: none;
+}
+
+.journal-corrections li + li {
+  margin-top: 6px;
+}
+
+.journal-said {
+  color: #8a5a44;
+}
+
+.journal-natural {
+  font-weight: 600;
+}
+
+.journal-why,
+.journal-gloss {
+  font-size: 14px;
+  color: #4a5266;
+}
+
+.journal-words ruby rt {
+  font-size: 11px;
+}
+
+/* The conversation itself, folded away under the Recap. */
+.journal-lines {
+  margin-top: var(--line);
+  font-size: 15px;
+}
+
+.journal-lines summary {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b6a55;
+  cursor: pointer;
+}
+
+.journal-lines ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-lines li[data-speaker='player'] {
+  color: #4a5266;
+}
+
+.journal-line-speaker {
+  display: block;
+  font-size: 11px;
+  line-height: 18px;
+  color: #7b8496;
+  text-transform: capitalize;
+}
+
+.hear-it-said {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.journal-keep {
+  padding: 0 8px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.journal-kept {
+  font-size: 12px;
+  color: #3f8f5b;
+}
+
+/* The full-screen Journal: the entry list on the left, the selected entry on the right. */
+.journal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f4ede0;
+  color: var(--ink);
+}
+
+.journal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.journal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.journal-views {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 24px;
+}
+
+.journal-views button {
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  color: #7b8496;
+  cursor: pointer;
+}
+
+.journal-views [aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.journal-phrasebook {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.journal-phrasebook ul {
+  max-width: 640px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-phrasebook li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.journal-phrase {
+  font-size: 18px;
+}
+
+.journal-added {
+  margin-left: auto;
+  font-size: 12px;
+  color: #7b8496;
+}
+
+.journal-close {
+  padding: 6px 12px;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.journal-close kbd {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #7b8496;
+}
+
+.journal-panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+}
+
+.journal-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--rule);
+}
+
+.journal-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-list button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 24px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.journal-list button[aria-current] {
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.journal-list button span {
+  font-size: 13px;
+  color: #7b8496;
+}
+
+.journal-empty {
+  margin: 16px 24px;
+  color: #7b8496;
+}
+
+.journal-selected {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.journal-selected .journal-page {
+  max-width: 640px;
 }
 
 /* Anchored to the NPC in the scene while a line of theirs is coming in. */

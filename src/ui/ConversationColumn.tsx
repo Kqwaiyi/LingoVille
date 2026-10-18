@@ -9,29 +9,68 @@ import {
   selectClosingCard,
   selectConversation,
   selectCulturePackId,
+  selectHelpOpen,
   selectInputMode,
+  selectLineReading,
   selectListening,
   selectMicLevel,
   selectNativeLanguage,
   selectNpcExpression,
   selectNpcLook,
   selectReconnecting,
+  selectRecap,
   selectTargetLanguage,
+  selectTranslation,
   selectTyping,
   useGame,
   type ChatLine,
   type ClosingCard,
+  type RecapView,
 } from '../store/index.ts';
 import { NpcPortrait } from '../world/index.ts';
 import { formatClock } from './format.ts';
+import { HelpPanel } from './HelpPanel.tsx';
+import { JournalPageView } from './JournalPage.tsx';
+import { ReadingLine } from './Ruby.tsx';
 
-function Bubble({ line }: { line: ChatLine }) {
+/** Under a finished NPC line: Translate, which shows the Native Language line underneath, and 🔊 Replay. */
+function NpcLineHelp({ index, text }: { index: number; text: string }) {
+  const { t } = useTranslation();
+  const translation = useGame(selectTranslation(index));
+  const nativeLanguage = useGame(selectNativeLanguage);
+  const translateLine = useGame((s) => s.translateLine);
+  const replayLine = useGame((s) => s.replayLine);
+  return (
+    <>
+      {translation?.status === 'ready' && (
+        <p className="bubble-translation" lang={nativeLanguage}>
+          {translation.text}
+        </p>
+      )}
+      {translation?.status === 'loading' && <p className="bubble-translation">{t('chat.translating')}</p>}
+      <div className="bubble-actions">
+        {translation?.status !== 'ready' && translation?.status !== 'loading' && (
+          <button type="button" onClick={() => translateLine(index)}>
+            {translation?.status === 'failed' ? t('chat.translateFailed') : t('chat.translate')}
+          </button>
+        )}
+        <button type="button" aria-label={t('chat.replayLabel', { text })} onClick={() => replayLine(index)}>
+          {t('chat.replay')}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function Bubble({ line, index, finished }: { line: ChatLine; index: number; finished: boolean }) {
   const { t } = useTranslation();
   const language = useGame(selectTargetLanguage);
+  const reading = useGame(selectLineReading(index));
   if (line.speaker === 'npc') {
     return (
       <div className="bubble bubble-npc">
-        <span lang={language}>{line.text}</span>
+        <ReadingLine language={language} text={line.text} segments={reading} />
+        {finished && <NpcLineHelp index={index} text={line.text} />}
       </div>
     );
   }
@@ -67,11 +106,13 @@ function servedLine(served: readonly ServedItem[], nativeLanguage: LanguageCode)
     .join(', ');
 }
 
-/** Replaces the input bar once the conversation is over: the outcome and its effects. */
+/** Replaces the input bar once the conversation is over: the outcome, its effects, and the way on to the Recap. */
 function ClosingCardPanel({ card, who }: { card: ClosingCard; who: string }) {
   const { t } = useTranslation();
   const packId = useGame(selectCulturePackId);
   const nativeLanguage = useGame(selectNativeLanguage);
+  const skipRecap = useGame((s) => s.skipRecap);
+  const seeRecap = useGame((s) => s.seeRecap);
 
   const outcome =
     card.kind === 'failure'
@@ -88,6 +129,42 @@ function ClosingCardPanel({ card, who }: { card: ClosingCard; who: string }) {
     <section className="closing-card" aria-label={t('closing.label')} data-outcome={card.kind}>
       <h2>{heading}</h2>
       <p>{outcome.join(' · ')}</p>
+      <div className="closing-card-actions">
+        <button type="button" onClick={skipRecap} autoFocus>
+          {t('closing.skipRecap')}
+        </button>
+        <button type="button" className="primary" onClick={seeRecap}>
+          {t('closing.seeRecap')}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** The Recap in the column, as a lined Journal page, with a loading state while it is written. */
+function RecapPanel({ recap }: { recap: RecapView }) {
+  const { t } = useTranslation();
+  const closeRecap = useGame((s) => s.closeRecap);
+  return (
+    <section className="recap" aria-label={t('recap.label')} aria-busy={recap.status === 'writing'}>
+      <div className="recap-body">
+        {recap.status === 'writing' && (
+          <p className="recap-writing" role="status">
+            {t('recap.writing')}
+          </p>
+        )}
+        {recap.status === 'failed' && (
+          <p className="recap-writing" role="status">
+            {t('recap.failed')}
+          </p>
+        )}
+        {recap.status === 'ready' && <JournalPageView page={recap.entry} />}
+      </div>
+      <div className="closing-card-actions recap-actions">
+        <button type="button" className="primary" onClick={closeRecap} autoFocus>
+          {t('recap.done')}
+        </button>
+      </div>
     </section>
   );
 }
@@ -231,7 +308,11 @@ export function ConversationColumn() {
   const packId = useGame(selectCulturePackId);
   const closingCard = useGame(selectClosingCard);
   const reconnecting = useGame(selectReconnecting);
+  const recap = useGame(selectRecap);
+  const helpOpen = useGame(selectHelpOpen);
+  const typing = useGame(selectTyping);
   const leaveConversation = useGame((s) => s.leaveConversation);
+  const toggleHelp = useGame((s) => s.toggleHelp);
   const log = useRef<HTMLDivElement>(null);
   const open = conversation !== null;
 
@@ -244,9 +325,19 @@ export function ConversationColumn() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, leaveConversation]);
 
+  // H toggles Help, unless the typed field has focus.
+  useEffect(() => {
+    if (!open || typing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'KeyH' && !e.repeat) toggleHelp();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, typing, toggleHelp]);
+
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
-  }, [lines]);
+  }, [lines, helpOpen]);
 
   if (!conversation) return null;
   const { npcId } = conversation;
@@ -267,25 +358,49 @@ export function ConversationColumn() {
           {localNpcPlaceName(npcId, packId)} · {formatClock(minute)}
         </div>
         <div className="chat-tabs">
+          <div role="tablist" aria-label={t('chat.tabs')}>
+            <button type="button" role="tab" aria-selected={!helpOpen} onClick={() => helpOpen && toggleHelp()}>
+              {t('chat.chatTab')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={helpOpen}
+              disabled={conversation.closed}
+              onClick={() => !helpOpen && toggleHelp()}
+            >
+              {t('chat.helpTab')} <kbd>H</kbd>
+            </button>
+          </div>
           <button type="button" className="chat-leave" onClick={leaveConversation}>
             {t('chat.leave')} <kbd>Esc</kbd>
           </button>
         </div>
       </header>
-      <div className="chat-log" role="log" aria-label={t('chat.log')} ref={log}>
-        {lines.map((line, i) => (
-          <Bubble key={i} line={line} />
-        ))}
-        {reconnecting && (
-          <p className="chat-notice" role="status">
-            {t('chat.reconnecting')}
-          </p>
-        )}
-      </div>
-      {closingCard ? (
-        <ClosingCardPanel card={closingCard} who={who} />
+      {recap ? (
+        <RecapPanel recap={recap} />
       ) : (
-        <InputBar />
+        <>
+          {helpOpen ? (
+            <HelpPanel />
+          ) : (
+            <div className="chat-log" role="log" aria-label={t('chat.log')} ref={log}>
+              {lines.map((line, i) => (
+                <Bubble key={i} line={line} index={i} finished={i !== conversation.npcLine} />
+              ))}
+              {reconnecting && (
+                <p className="chat-notice" role="status">
+                  {t('chat.reconnecting')}
+                </p>
+              )}
+            </div>
+          )}
+          {closingCard ? (
+            <ClosingCardPanel card={closingCard} who={who} />
+          ) : (
+            <InputBar />
+          )}
+        </>
       )}
     </aside>
   );

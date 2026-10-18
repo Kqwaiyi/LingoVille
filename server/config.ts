@@ -18,8 +18,14 @@ export const LIVE_ENDPOINT = 'GenerativeService.BidiGenerateContentConstrained';
 
 export const MODELS = {
   live: 'gemini-3.8-live',
+  recap: 'gemini-3.8-flash',
+  annotate: 'gemini-3.5-flash-lite',
+  hint: 'gemini-3.5-flash-lite',
+  tts: 'gemini-3.8-flash-lite-tts',
   evalJudge: 'gemini-3.8-pro',
 } as const;
+
+export type TargetLanguage = 'ja' | 'zh' | 'en' | 'de';
 
 // Every prebuilt voice the game uses, tagged with the build it suits. Voices are not language-specific.
 export const VOICE_BUILDS = {
@@ -38,6 +44,7 @@ export const VOICE_BUILDS = {
   Iapetus: 'masculine',
   Achird: 'masculine',
   Algenib: 'masculine',
+  Charon: 'masculine',
 } as const satisfies Record<string, Build>;
 
 export type VoiceName = keyof typeof VOICE_BUILDS;
@@ -60,4 +67,12 @@ export const NAMED_NPC_VOICES: Record<NamedNpcId, VoiceName> = {
   pharmacist: 'Iapetus',
   'park-regular-3': 'Achird',
   shopkeeper: 'Algenib',
+};
+
+// Hear-it-said's voice per Target Language, picked by ear.
+export const VOICES: Record<TargetLanguage, VoiceName> = {
+  ja: 'Kore',
+  zh: 'Leda',
+  en: 'Puck',
+  de: 'Charon',
 };

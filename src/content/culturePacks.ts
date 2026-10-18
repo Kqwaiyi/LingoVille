@@ -913,7 +913,7 @@ function localTitle(placeId: PlaceId, packId: LanguageCode): { name: string; nam
   throw new Error(`The ${placeId} has no local name in the ${packId} pack`);
 }
 
-/** A staffed place by its local name in this pack: a shop, the hospital, the apartment block, or another place Named NPCs are found. */
+/** A staffed place by its local name in this pack, as the Journal keeps it: a shop, the hospital, the apartment block, or another place Named NPCs are found. */
 export function localPlaceName(placeId: PlaceId, packId: LanguageCode): string {
   return localTitle(placeId, packId).name;
 }

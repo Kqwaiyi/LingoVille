@@ -7,7 +7,8 @@ import { formatTime } from './places.ts';
 import { TRAM_LINE, type TramStopId } from './townNpcs.ts';
 
 // World text: the signs and menus the world paints as canvas textures, written
-// from the Culture Pack.
+// from the Culture Pack. Pointing at one shows each line's reading aid, and
+// Translate shows its gloss.
 
 /** Every place with a name board: over a building's door, or at the park's way in. Each tram stop's is on its pole. */
 const NAMED_PLACES = ['home', 'cafe', 'supermarket', 'convenience-store', 'restaurant', 'clinic', 'park', 'bookshop', 'bathhouse', 'town-office'] as const satisfies readonly PlaceId[];
