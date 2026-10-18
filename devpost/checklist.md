@@ -49,7 +49,7 @@ Build mode: fast
   Learner check: Ask the barista for a job, then work a Shift. Does the pay feel fair for how you did?
   Commit: `Get a Job and work a Shift`
 
-- [ ] **5. Live day to day: needs, the gym, the clinic and rent**
+- [x] **5. Live day to day: needs, the gym, the clinic and rent**
   Becomes usable: Hunger and Thirst run down over the day, and Health falls when either is empty, ending in Fainting and a hospital bill. The gym, Illness and the clinic, and weekly rent with the landlord all work by talking, and Mood rises and falls with how the day goes. A new game starts with the First Morning, which guides the Player to the café; one-time tooltips explain each system, and the town has music and sound.
   Why now: These are what make every day take more conversations, the scope's reason to come back. They spend the money Shifts earn, so they follow slice 4, and the First Morning walks a new player through them, so it comes once they exist.
   PRD ref: `prd.md > The Core Journey` (steps 3 and 9), `prd.md > Features and Behavior > Setup and First Morning` (the First Morning), `prd.md > Features and Behavior > Well-being, Mood and Fainting`, `prd.md > Features and Behavior > Gym`, `prd.md > Features and Behavior > Illness and the Clinic`, `prd.md > Features and Behavior > Rent and Debt`
@@ -62,23 +62,25 @@ Build mode: fast
 ## Hands-on Checkpoints
 
 - [x] Early usable behavior explored — after slice 1, ordering at the café by voice and by typing
-- [ ] Final kick-the-tires exploration and feedback completed
+- [x] Final kick-the-tires exploration and feedback completed
 
 ## Final Review
 
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship
+- [x] Final review complete — feedback resolved and learner confirms ready to ship
+
+No changes needed: the learner played the core journey from the Title Screen to a Shift and a rent day and confirmed the proof of concept is ready.
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
+- [x] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
+- [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: [what actually happened; real document/test/code references; unfinished work if interrupted]
-Route and stops: [actual paths and symbols; guided stops completed, or reference-only route]
-Edit outcome: [tried/kept/reverted/declined/not applicable; verification if changed]
-Reflection: [offered/answered/declined/already covered — personal answer belongs only in the ignored profile]
-Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
+Activity and evidence: Brief recap of the mock-mode check every slice used: one scripted barista (`src/voice/mockVoiceSession.ts`) behind the `VoiceSession` interface, so each slice's order and closing card could be checked without a key.
+Route and stops: Reference route, not toured live: `src/ui/InteractionPrompt.tsx` (`talk('E')`) → `src/store/gameStore.ts` (`startConversation`) → `src/ai/npcSession.ts` (`buildNpcSession`) → `src/sim/interactionOutcome.ts` (`applyInteractionOutcome`) → `src/ui/ConversationColumn.tsx` (`ClosingCardPanel`).
+Edit outcome: Declined.
+Reflection: Offered and declined.
+Activity mode: Brief recap.
 
 ## Revisions
 

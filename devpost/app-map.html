@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LingoVille App Map</title>
+<style>
+  :root {
+    --bg: #fbf8f3;
+    --surface: #ffffff;
+    --text: #2b2a33;
+    --muted: #5f5d6b;
+    --line: #e4ddd2;
+    --accent: #c4613a;
+    --accent-soft: #f6e2d7;
+    --code-bg: #f2ede5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1d1c22;
+      --surface: #26252d;
+      --text: #ece9f1;
+      --muted: #aaa6b6;
+      --line: #3a3843;
+      --accent: #f0956b;
+      --accent-soft: #3a2b26;
+      --code-bg: #302e38;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 52rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
+  h1 { font-size: 1.8rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.2rem; margin: 2.25rem 0 .75rem; }
+  p, li { color: var(--text); }
+  .lead { color: var(--muted); margin-top: 0; }
+  code {
+    font: .9em/1.4 ui-monospace, "Cascadia Code", Consolas, monospace;
+    background: var(--code-bg);
+    padding: .1em .35em;
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  .pieces { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); padding: 0; list-style: none; }
+  .pieces li, .stop, .practice {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: .85rem 1rem;
+  }
+  .pieces strong { display: block; }
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { color: var(--muted); font-size: .9rem; margin-top: .5rem; }
+  svg .box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  svg .label { fill: var(--text); font: 600 13px system-ui, sans-serif; }
+  svg .sub { fill: var(--muted); font: 11px ui-monospace, Consolas, monospace; }
+  svg .arrow { stroke: var(--accent); stroke-width: 1.8; fill: none; marker-end: url(#head); }
+  svg #head path { fill: var(--accent); }
+  ol.route { padding-left: 1.25rem; }
+  ol.route > li { margin-bottom: 1rem; }
+  .tag { display: inline-block; font-size: .8rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 .5rem; margin-left: .35rem; }
+  details { margin-top: .5rem; }
+  summary { cursor: pointer; color: var(--accent); }
+  summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; vertical-align: top; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: .9rem; }
+  pre { background: var(--code-bg); border-radius: 8px; padding: .75rem 1rem; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  .note { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>LingoVille App Map</h1>
+  <p class="lead">A take-home guide to where things live in the finished proof of concept: one real action traced through the code, where to start a change, and one practice worth reusing.</p>
+
+  <h2>What the app is</h2>
+  <p>A 3D town in the browser where every errand is a spoken conversation in the language you're learning. The people in town only act on what they understood, and each conversation ends with a short Recap. A few pieces do the work:</p>
+  <ul class="pieces">
+    <li><strong>The town</strong><code>src/world</code>: the 3D scene, walking and the people in it.</li>
+    <li><strong>The game rules</strong><code>src/sim</code>: money, Patience, Shifts, needs, rent, as plain functions. Every number is in <code>tuning.ts</code>.</li>
+    <li><strong>The content</strong><code>src/content</code>: each place's conversations, items, and the four Culture Packs.</li>
+    <li><strong>The store</strong><code>src/store/gameStore.ts</code>: connects the rules, the voice and the screens, and saves.</li>
+    <li><strong>The voice</strong><code>src/voice</code>: the live Gemini session, and a scripted stand-in for mock mode.</li>
+    <li><strong>The gateway</strong><code>server/</code>: holds the Gemini key and answers <code>/api/*</code>.</li>
+  </ul>
+
+  <h2>One action: ordering a coffee</h2>
+  <figure>
+    <svg viewBox="0 0 760 300" role="img" aria-labelledby="flow-title flow-desc">
+      <title id="flow-title">How a spoken café order moves through the code</title>
+      <desc id="flow-desc">Pressing E starts a conversation in the store, which builds the barista's instructions and opens a voice session with a token from the gateway. When the barista calls serve_order, the game rules check and apply the order, and the closing card shows.</desc>
+      <defs>
+        <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <rect class="box" x="10" y="20" width="160" height="60" rx="8"/>
+      <text class="label" x="22" y="45">Press E at the counter</text>
+      <text class="sub" x="22" y="64">InteractionPrompt.tsx</text>
+
+      <rect class="box" x="210" y="20" width="160" height="60" rx="8"/>
+      <text class="label" x="222" y="45">Start the conversation</text>
+      <text class="sub" x="222" y="64">gameStore.ts · talk</text>
+
+      <rect class="box" x="410" y="20" width="160" height="60" rx="8"/>
+      <text class="label" x="422" y="45">Barista's instructions</text>
+      <text class="sub" x="422" y="64">npcSession.ts</text>
+
+      <rect class="box" x="590" y="110" width="160" height="60" rx="8"/>
+      <text class="label" x="602" y="135">Voice session + token</text>
+      <text class="sub" x="602" y="154">/api/token · gateway.ts</text>
+
+      <rect class="box" x="410" y="200" width="160" height="60" rx="8"/>
+      <text class="label" x="422" y="225">serve_order called</text>
+      <text class="sub" x="422" y="244">answerToolCall</text>
+
+      <rect class="box" x="210" y="200" width="160" height="60" rx="8"/>
+      <text class="label" x="222" y="225">Check and pay</text>
+      <text class="sub" x="222" y="244">interactionOutcome.ts</text>
+
+      <rect class="box" x="10" y="200" width="160" height="60" rx="8"/>
+      <text class="label" x="22" y="225">Closing card shows</text>
+      <text class="sub" x="22" y="244">ConversationColumn.tsx</text>
+
+      <path class="arrow" d="M170 50 H206"/>
+      <path class="arrow" d="M370 50 H406"/>
+      <path class="arrow" d="M570 50 H670 V106"/>
+      <path class="arrow" d="M670 170 V230 H574"/>
+      <path class="arrow" d="M410 230 H374"/>
+      <path class="arrow" d="M210 230 H174"/>
+    </svg>
+    <figcaption>In mock mode (<code>GEMINI_MOCK=1</code>) the same path runs with a scripted barista instead of Gemini Live.</figcaption>
+  </figure>
+
+  <h2>Route through the code <span class="tag">reference route</span></h2>
+  <p class="note">Three stops, in the order the action happens. Search for the anchor in each file; line numbers drift, names don't.</p>
+  <ol class="route">
+    <li class="stop">
+      <strong>You press E.</strong> <code>src/ui/InteractionPrompt.tsx</code>, the <code>keydown</code> handler that ends in <code>talk('E')</code>. The store's <code>talk</code> action in <code>src/store/gameStore.ts</code> picks the café's conversation and calls <code>startConversation</code>.
+      <details>
+        <summary>Why it's built this way</summary>
+        <p>The screens never change the game themselves: they call store actions, and read the game only through selectors. That keeps every rule in one place to test.</p>
+      </details>
+    </li>
+    <li class="stop">
+      <strong>The barista is briefed and connected.</strong> <code>src/ai/npcSession.ts</code>, <code>buildNpcSession</code>, writes the barista's instructions from <code>orderDrink</code> in <code>src/content/interactions.ts</code>: speak only the Target Language, read the order back, then call <code>serve_order</code>. <code>src/voice/openVoiceSession.ts</code> asks <code>server/gateway.ts</code> (<code>mintToken</code>) for a one-use token and opens the live session.
+      <details>
+        <summary>Why it's built this way</summary>
+        <p>The browser never sees the Gemini key: the gateway mints a short-lived token per conversation, and the model and voice come back with it.</p>
+      </details>
+    </li>
+    <li class="stop">
+      <strong>The order is served and paid.</strong> When the barista calls <code>serve_order</code>, <code>answerToolCall</code> in <code>src/store/gameStore.ts</code> hands it to <code>applyInteractionOutcome</code> in <code>src/sim/interactionOutcome.ts</code>, which checks the item and that you can afford it, then takes the money. <code>ClosingCardPanel</code> in <code>src/ui/ConversationColumn.tsx</code> shows the result.
+      <details>
+        <summary>Why it's built this way</summary>
+        <p>The model decides what it understood; the game decides what that costs. A price the model got wrong can't reach your wallet, because the rules check every completion against the menu.</p>
+      </details>
+    </li>
+  </ol>
+
+  <h2>To change this, start here</h2>
+  <table>
+    <thead><tr><th scope="col">To change…</th><th scope="col">Start in</th></tr></thead>
+    <tbody>
+      <tr><td>A price, the starting money, Patience, or any other game number</td><td><code>src/sim/tuning.ts</code></td></tr>
+      <tr><td>What a place sells, its signs or its props</td><td><code>src/content/culturePacks.ts</code> (one pack per language)</td></tr>
+      <tr><td>What a conversation is for, and how it ends</td><td><code>src/content/interactions.ts</code></td></tr>
+      <tr><td>How NPCs are told to behave</td><td><code>src/ai/npcSession.ts</code></td></tr>
+      <tr><td>Which Gemini model or voice is used</td><td><code>server/config.ts</code></td></tr>
+      <tr><td>A label on screen</td><td><code>src/i18n/en.ts</code>, then the same key in <code>ja.ts</code>, <code>zh.ts</code> and <code>de.ts</code></td></tr>
+      <tr><td>Where a building or a person stands</td><td><code>src/world/town.ts</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>A practice to reuse</h2>
+  <div class="practice">
+    <p><strong>Give the AI a stand-in behind the same interface.</strong> Every conversation goes through one interface, <code>VoiceSession</code> (<code>src/voice/voiceSession.ts</code>). The gateway's mock mode swaps Gemini for a scripted NPC (<code>src/voice/mockVoiceSession.ts</code>) without the rest of the game knowing.</p>
+    <p>That's what let each build slice be checked the same way every time, with no key and no cost: walk to the barista, order, and see the closing card. On another project that calls an AI model, put the model behind an interface early and write a scripted stand-in for it. Your checks then test your app, not the model's mood that day.</p>
+  </div>
+
+  <h2>Run it again</h2>
+<pre><code>npm install
+cp .env.example .env    # then set GEMINI_API_KEY, or GEMINI_MOCK=1
+npm run dev             # then open http://localhost:5173</code></pre>
+  <p class="note">This map was made from the code at the slice 5 commit, “Live day to day: needs, the gym, the clinic and rent”. It's a snapshot: paths and names may drift as the code changes.</p>
+</main>
+</body>
+</html>
